@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { BaseNode, HtmlPolicy, ParsedNode } from 'stream-markdown-parser'
 import type { CodeBlockMonacoOptions, CodeBlockMonacoTheme, CodeBlockNodeProps, CodeBlockPreviewPayload, ShikiCodeBlockProps } from '../../types/component-props'
+import { normalizeShikiLanguage } from 'markstream-core'
 import { normalizeCustomHtmlTags } from 'stream-markdown-parser'
 import { computed, provide } from 'vue-demi'
 import AdmonitionNode from '../../components/AdmonitionNode'
@@ -272,6 +273,20 @@ function getCodeBlockLanguage(node: ParsedNode) {
     : ''
 }
 
+function getCustomCodeLanguageComponent(
+  customComponents: Record<string, unknown>,
+  language: string,
+) {
+  if (!language)
+    return undefined
+
+  const raw = language.trim().toLowerCase()
+  const normalized = normalizeShikiLanguage(raw)
+
+  return customComponents[raw]
+    ?? (normalized && normalized !== raw ? customComponents[normalized] : undefined)
+}
+
 function getNodeComponent(node: ParsedNode, language?: string) {
   if (!node)
     return FallbackComponent
@@ -279,7 +294,9 @@ function getNodeComponent(node: ParsedNode, language?: string) {
   const customForType = (customComponents as any)[String((node as any).type)]
   if (node.type === 'code_block') {
     const lang = language ?? getCodeBlockLanguage(node)
-    const customForLanguage = lang ? (customComponents as any)[lang] : undefined
+    const customForLanguage = lang
+      ? getCustomCodeLanguageComponent(customComponents as any, lang)
+      : undefined
     if (customForLanguage)
       return customForLanguage
 
@@ -310,7 +327,7 @@ function isCustomCodeBlockComponent(component: unknown) {
 }
 
 function isCustomLanguageCodeBlockComponent(component: unknown, language?: string) {
-  return Boolean(component && language && component === (customComponentsMap.value as any)[language])
+  return Boolean(component && language && component === getCustomCodeLanguageComponent(customComponentsMap.value as any, language))
 }
 
 function getBindingsFor(node: ParsedNode, language?: string, component?: unknown) {

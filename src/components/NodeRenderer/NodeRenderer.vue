@@ -16,7 +16,7 @@ import type {
   NodeRendererMode,
   NodeRendererProps,
 } from '../../types/node-renderer-props'
-import { getShikiLangs, getShikiThemes } from 'markstream-core'
+import { getShikiLangs, getShikiThemes, normalizeShikiLanguage } from 'markstream-core'
 import { computed, defineAsyncComponent, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
@@ -1830,7 +1830,7 @@ function usesShikiCodeBlockLayoutOptions() {
     if (lang === 'mermaid' || lang === 'infographic' || lang === 'd2' || lang === 'd2lang')
       return false
 
-    return Boolean(customComponents[lang])
+    return Boolean(getCustomCodeLanguageComponent(customComponents, lang))
   })
 }
 
@@ -5446,8 +5446,22 @@ function getCodeBlockLanguage(node: ParsedNode) {
     : ''
 }
 
-function hasExactCodeLanguageOverride(language: string) {
-  return Boolean(language && customComponentsMap.value[language])
+function getCustomCodeLanguageComponent(
+  customComponents: Record<string, unknown>,
+  language: string,
+) {
+  if (!language)
+    return undefined
+
+  const raw = language.trim().toLowerCase()
+  const normalized = normalizeShikiLanguage(raw)
+
+  return customComponents[raw]
+    ?? (normalized && normalized !== raw ? customComponents[normalized] : undefined)
+}
+
+function hasCodeLanguageOverride(language: string) {
+  return Boolean(language && getCustomCodeLanguageComponent(customComponentsMap.value, language))
 }
 
 function isCustomCodeBlockComponent(component: unknown) {
@@ -5455,7 +5469,7 @@ function isCustomCodeBlockComponent(component: unknown) {
 }
 
 function isCustomLanguageCodeBlockComponent(component: unknown, language?: string) {
-  return Boolean(component && language && component === customComponentsMap.value[language])
+  return Boolean(component && language && component === getCustomCodeLanguageComponent(customComponentsMap.value, language))
 }
 
 function shouldUsePreCodeBindings(
@@ -5465,7 +5479,7 @@ function shouldUsePreCodeBindings(
 ) {
   return node.type === 'code_block'
     && resolvedCodeRenderer.value === 'pre'
-    && !hasExactCodeLanguageOverride(language)
+    && !hasCodeLanguageOverride(language)
     && component === PreCodeNode
 }
 
@@ -5503,7 +5517,9 @@ function getNodeComponent(node: ParsedNode, language?: string) {
   const customForType = customComponents[String(node.type)]
   if (node.type === 'code_block') {
     const lang = language ?? getCodeBlockLanguage(node)
-    const customForLanguage = lang ? customComponents[lang] : undefined
+    const customForLanguage = lang
+      ? getCustomCodeLanguageComponent(customComponents, lang)
+      : undefined
     if (customForLanguage)
       return customForLanguage
 

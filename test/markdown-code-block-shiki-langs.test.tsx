@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, ref } from 'vue'
 import { getHighlightRegistrationKey, getRegisterHighlightOptions, getShikiRendererOptions, registerHighlightOnce } from '../packages/markstream-core/src'
 import { removeCustomComponents as removeVue2CustomComponents, setCustomComponents as setVue2CustomComponents } from '../packages/markstream-vue2/src/utils/nodeComponents'
+import { removeCustomComponents, setCustomComponents } from '../src/utils/nodeComponents'
 import { flushAll } from './setup/flush-all'
 
 const streamMarkdownMock = vi.hoisted(() => {
@@ -70,6 +71,21 @@ function makeNode(language = 'typescript', code = 'const value = 1') {
 }
 
 const vue2CustomId = 'vue2-shiki-langs-forwarding'
+const vueCustomId = 'vue-shiki-langs-forwarding'
+const VueCodeBlockProbe = defineComponent({
+  name: 'VueCodeBlockProbe',
+  props: {
+    node: { type: Object, required: true },
+    langs: Array,
+  },
+  setup(props) {
+    return () => h('div', {
+      'class': 'vue-code-block-probe',
+      'data-language': String((props.node as any)?.language ?? ''),
+      'data-langs': JSON.stringify(props.langs ?? null),
+    })
+  },
+})
 const Vue2CodeBlockProbe = defineComponent({
   name: 'Vue2CodeBlockProbe',
   props: {
@@ -171,6 +187,7 @@ beforeEach(() => {
 
 afterEach(() => {
   resetStreamMarkdownMock()
+  removeCustomComponents(vueCustomId)
   removeVue2CustomComponents(vue2CustomId)
   document.body.innerHTML = ''
   ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = false
@@ -246,6 +263,40 @@ describe('markdown code block Shiki langs', () => {
 
     expect(firstRegisterHighlight).toHaveBeenCalledTimes(1)
     expect(secondRegisterHighlight).toHaveBeenCalledTimes(1)
+  })
+
+  it('serializes different highlight registration keys for the same registerHighlight function', async () => {
+    const first = createDeferred()
+    const events: string[] = []
+    const registerHighlight = vi.fn((opts?: { langs?: string[] }) => {
+      const lang = opts?.langs?.[0] ?? 'none'
+      events.push(`start:${lang}`)
+
+      if (lang === 'typescript') {
+        return first.promise.then(() => {
+          events.push('end:typescript')
+        })
+      }
+
+      events.push(`end:${lang}`)
+    })
+
+    const p1 = registerHighlightOnce(registerHighlight, { langs: ['typescript'] }, 'ts')
+    const p2 = registerHighlightOnce(registerHighlight, { langs: ['python'] }, 'py')
+
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(events).toEqual(['start:typescript'])
+
+    first.resolve()
+    await Promise.all([p1, p2])
+
+    expect(events).toEqual([
+      'start:typescript',
+      'end:typescript',
+      'start:python',
+      'end:python',
+    ])
   })
 
   it('passes langs to Vue registerHighlight and renderer', async () => {
@@ -779,6 +830,11 @@ describe('markdown code block Shiki langs', () => {
 
     await wrapper.setProps({ langs: ['python'] })
     await flushAll()
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(1)
+
+    first.reject(new Error('stale failed registration'))
+    await first.promise.catch(() => {})
+    await flushAll()
     expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
 
     second.resolve()
@@ -791,10 +847,6 @@ describe('markdown code block Shiki langs', () => {
       'const value = 1',
       'plaintext',
     )
-
-    first.reject(new Error('stale failed registration'))
-    await first.promise.catch(() => {})
-    await flushAll()
 
     expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
     expect(renderer?.updateCode).toHaveBeenLastCalledWith(
@@ -1234,6 +1286,46 @@ describe('markdown code block Shiki langs', () => {
 
     expect(vnode.data.props.langs).toEqual(['typescript'])
     expect(vnode.data.props.codeBlockProps).toEqual({ langs: ['python'] })
+  })
+
+  it('matches Vue custom language code block overrides by normalized Shiki aliases', async () => {
+    setCustomComponents(vueCustomId, { typescript: VueCodeBlockProbe })
+    const { default: NodeRenderer } = await import('../src/components/NodeRenderer')
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId: vueCustomId,
+        nodes: [makeNode('ts')],
+        langs: ['typescript'],
+      },
+    })
+
+    await flushAll()
+
+    const probe = wrapper.get('.vue-code-block-probe')
+    expect(probe.attributes('data-language')).toBe('ts')
+    expect(probe.attributes('data-langs')).toBe('["typescript"]')
+
+    wrapper.unmount()
+  })
+
+  it('matches Vue2 custom language code block overrides by normalized Shiki aliases', async () => {
+    setVue2CustomComponents(vue2CustomId, { typescript: Vue2CodeBlockProbe as any })
+    const { default: LegacyNodesRenderer } = await import('../packages/markstream-vue2/src/components/NodeRenderer/LegacyNodesRenderer.vue')
+    const wrapper = mount(LegacyNodesRenderer as any, {
+      props: {
+        customId: vue2CustomId,
+        nodes: [makeNode('ts')],
+        langs: ['typescript'],
+      },
+    })
+
+    await flushAll()
+
+    const probe = wrapper.get('.vue2-code-block-probe')
+    expect(probe.attributes('data-language')).toBe('ts')
+    expect(probe.attributes('data-langs')).toBe('["typescript"]')
+
+    wrapper.unmount()
   })
 
   it('forwards Vue2 LegacyNodesRenderer top-level langs and lets codeBlockProps override them', async () => {
@@ -1755,6 +1847,13 @@ describe('markdown code block Shiki langs', () => {
       }))
     })
     await flushReact()
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      first.resolve()
+      await first.promise
+    })
+    await flushReact()
     expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
 
     await act(async () => {
@@ -1771,12 +1870,6 @@ describe('markdown code block Shiki langs', () => {
       'plaintext',
     )
     expect(host.querySelector('.code-fallback-plain')).toBeNull()
-
-    await act(async () => {
-      first.resolve()
-      await first.promise
-    })
-    await flushReact()
 
     expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
     expect(renderer.updateCode).toHaveBeenLastCalledWith(
@@ -1887,6 +1980,13 @@ describe('markdown code block Shiki langs', () => {
       }))
     })
     await flushReact()
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      first.reject(new Error('stale failed registration'))
+      await first.promise.catch(() => {})
+    })
+    await flushReact()
     expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
 
     await act(async () => {
@@ -1901,12 +2001,6 @@ describe('markdown code block Shiki langs', () => {
       'const value = 1',
       'plaintext',
     )
-
-    await act(async () => {
-      first.reject(new Error('stale failed registration'))
-      await first.promise.catch(() => {})
-    })
-    await flushReact()
 
     expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
     expect(renderer?.updateCode).toHaveBeenLastCalledWith(

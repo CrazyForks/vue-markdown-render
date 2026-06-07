@@ -19,18 +19,26 @@ type HighlightRegistrationTaskMap = Map<
   Promise<SharedHighlightRegistrationStatus>
 >
 
-const sharedHighlightRegistrationTasks = new WeakMap<
+interface HighlightRegistrationState {
+  tasks: HighlightRegistrationTaskMap
+  tail: Promise<unknown>
+}
+
+const sharedHighlightRegistrationStates = new WeakMap<
   RegisterHighlightFn,
-  HighlightRegistrationTaskMap
+  HighlightRegistrationState
 >()
 
-function getHighlightRegistrationTasks(registerHighlight: RegisterHighlightFn) {
-  let tasks = sharedHighlightRegistrationTasks.get(registerHighlight)
-  if (!tasks) {
-    tasks = new Map()
-    sharedHighlightRegistrationTasks.set(registerHighlight, tasks)
+function getHighlightRegistrationState(registerHighlight: RegisterHighlightFn) {
+  let state = sharedHighlightRegistrationStates.get(registerHighlight)
+  if (!state) {
+    state = {
+      tasks: new Map(),
+      tail: Promise.resolve(),
+    }
+    sharedHighlightRegistrationStates.set(registerHighlight, state)
   }
-  return tasks
+  return state
 }
 
 // Shiki ids are not display/icon ids; keep this map limited to safe Shiki aliases.
@@ -170,12 +178,14 @@ export async function registerHighlightOnce(
   if (!registerHighlight)
     return 'ready'
 
-  const tasks = getHighlightRegistrationTasks(registerHighlight)
+  const state = getHighlightRegistrationState(registerHighlight)
+  const tasks = state.tasks
   const cached = tasks.get(key)
   if (cached)
     return cached
 
-  const task = Promise.resolve()
+  const task = state.tail
+    .catch(() => {})
     .then(() => registerHighlight(opts))
     .then(() => 'ready' as const)
     .catch((err) => {
@@ -184,5 +194,6 @@ export async function registerHighlightOnce(
     })
 
   tasks.set(key, task)
+  state.tail = task.catch(() => {})
   return task
 }

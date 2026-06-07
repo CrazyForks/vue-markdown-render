@@ -15,11 +15,13 @@ describe('release dependency gates', () => {
     expect(prepublishOnly).toContain('pnpm run check:workspace-deps-published')
     expect(prepublishOnly).toContain('pnpm run test:smoke:pack')
     expect(prepublishOnly).toContain('pnpm run test:smoke:pack:optional')
+    expect(prepublishOnly).toContain('pnpm run test:smoke:vue2-cjs')
     expect(prepublishOnly).toContain('pnpm run test:smoke:shiki-dependent-imports')
     expect(prepublishOnly.indexOf('pnpm run build:parser')).toBeLessThan(prepublishOnly.indexOf('pnpm run check:workspace-deps-published'))
     expect(prepublishOnly.indexOf('pnpm run check:workspace-deps-published')).toBeLessThan(prepublishOnly.indexOf('pnpm run test:smoke:pack'))
     expect(prepublishOnly.indexOf('pnpm run test:smoke:pack')).toBeLessThan(prepublishOnly.indexOf('pnpm run test:smoke:pack:optional'))
-    expect(prepublishOnly.indexOf('pnpm run test:smoke:pack:optional')).toBeLessThan(prepublishOnly.indexOf('pnpm run test:smoke:shiki-dependent-imports'))
+    expect(prepublishOnly.indexOf('pnpm run test:smoke:pack:optional')).toBeLessThan(prepublishOnly.indexOf('pnpm run test:smoke:vue2-cjs'))
+    expect(prepublishOnly.indexOf('pnpm run test:smoke:vue2-cjs')).toBeLessThan(prepublishOnly.indexOf('pnpm run test:smoke:shiki-dependent-imports'))
   })
 
   it('uses the workspace dependency publish gate in the release script', () => {
@@ -156,15 +158,22 @@ describe('release dependency gates', () => {
     const smokeScript = readFileSync(resolve(process.cwd(), 'scripts/smoke-shiki-dependent-imports.mjs'), 'utf8')
 
     expect(scripts['test:smoke:shiki-dependent-imports']).toBe('node scripts/smoke-shiki-dependent-imports.mjs')
+    expect(scripts['release:verify']).toContain('pnpm run test:smoke:vue2-cjs')
     expect(scripts['release:verify']).toContain('pnpm run test:smoke:shiki-dependent-imports')
     expect(scripts['release:verify'].indexOf('pnpm run test:smoke:pack:optional')).toBeLessThan(
+      scripts['release:verify'].indexOf('pnpm run test:smoke:vue2-cjs'),
+    )
+    expect(scripts['release:verify'].indexOf('pnpm run test:smoke:vue2-cjs')).toBeLessThan(
       scripts['release:verify'].indexOf('pnpm run test:smoke:shiki-dependent-imports'),
     )
     expect(smokeScript).toContain('markstream-react')
     expect(smokeScript).toContain('markstream-vue2')
+    expect(smokeScript).toContain('stream-markdown')
+    expect(smokeScript).toContain('shiki')
     expect(smokeScript).toContain('normalizeShikiLanguage')
     expect(smokeScript).toContain('registerHighlightOnce')
     expect(smokeScript).toContain('getRegisterHighlightOptions')
+    expect(smokeScript).toContain('createShikiStreamRenderer')
   })
 
   it('keeps stream-markdown peer range aligned with the langs-capable release', () => {
@@ -173,6 +182,7 @@ describe('release dependency gates', () => {
     const streamMarkdownTypes = readFileSync(resolve(process.cwd(), 'node_modules/stream-markdown/dist/index.d.ts'), 'utf8')
 
     expect(packageJson.peerDependencies['stream-markdown']).toBe('>=0.0.15')
+    expect(packageJson.devDependencies['stream-markdown']).toBe('^0.0.15')
     expect(reactPackageJson.peerDependencies['stream-markdown']).toBe('>=0.0.15')
     expect(vue2PackageJson.peerDependencies['stream-markdown']).toBe('>=0.0.15')
     expect(streamMarkdownTypes).toContain('declare function registerHighlight(options?: {')

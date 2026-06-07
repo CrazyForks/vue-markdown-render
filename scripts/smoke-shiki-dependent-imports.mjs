@@ -120,6 +120,8 @@ try {
       'markstream-vue2': `file:${packed.get('markstream-vue2')}`,
       'markstream-core': `file:${packed.get('markstream-core')}`,
       'stream-markdown-parser': `file:${packed.get('stream-markdown-parser')}`,
+      'stream-markdown': '^0.0.15',
+      'shiki': '^4.0.2',
       'vue': '^3.5.31',
       'react': '^19.2.0',
       'react-dom': '^19.2.0',
@@ -148,6 +150,12 @@ const core = await import('markstream-core')
 for (const key of ['normalizeShikiLanguage', 'registerHighlightOnce', 'getRegisterHighlightOptions']) {
   if (!(key in core))
     throw new Error(\`[smoke-shiki-dependent-imports] markstream-core missing \${key}\`)
+}
+
+const streamMarkdown = await import('stream-markdown')
+for (const key of ['registerHighlight', 'createShikiStreamRenderer']) {
+  if (typeof streamMarkdown[key] !== 'function')
+    throw new Error(\`[smoke-shiki-dependent-imports] stream-markdown missing \${key}\`)
 }
 `)
 

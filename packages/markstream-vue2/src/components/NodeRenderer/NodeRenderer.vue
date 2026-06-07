@@ -3,6 +3,7 @@ import type { BaseNode, HtmlPolicy, MarkdownIt, ParsedNode, ParseOptions } from 
 import type { SmoothMarkdownStreamOptions } from '../../composables/useSmoothMarkdownStream'
 import type { VisibilityHandle } from '../../composables/viewportPriority'
 import type { CodeBlockMonacoOptions, CodeBlockMonacoTheme, CodeBlockNodeProps, CodeBlockPreviewPayload, D2BlockNodeProps, InfographicBlockNodeProps, MermaidBlockNodeProps, ShikiCodeBlockProps } from '../../types/component-props'
+import { normalizeShikiLanguage } from 'markstream-core'
 import { getMarkdown, mergeCustomHtmlTags, parseMarkdownToStructure, resolveCustomHtmlTags } from 'stream-markdown-parser'
 import { h as createVNode } from 'vue'
 import { computed, getCurrentInstance, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue-demi'
@@ -2081,6 +2082,20 @@ function getCodeBlockLanguage(node: ParsedNode) {
     : ''
 }
 
+function getCustomCodeLanguageComponent(
+  customComponents: Record<string, unknown>,
+  language: string,
+) {
+  if (!language)
+    return undefined
+
+  const raw = language.trim().toLowerCase()
+  const normalized = normalizeShikiLanguage(raw)
+
+  return customComponents[raw]
+    ?? (normalized && normalized !== raw ? customComponents[normalized] : undefined)
+}
+
 function isLegacyStructuredNode(node: ParsedNode | null | undefined) {
   if (!node)
     return false
@@ -2163,7 +2178,9 @@ function getNodeComponent(node: ParsedNode, language?: string) {
   const customForType = (customComponents as any)[String((node as any).type)]
   if (node.type === 'code_block') {
     const lang = language ?? getCodeBlockLanguage(node)
-    const customForLanguage = lang ? (customComponents as any)[lang] : undefined
+    const customForLanguage = lang
+      ? getCustomCodeLanguageComponent(customComponents as any, lang)
+      : undefined
     if (customForLanguage)
       return customForLanguage
 
@@ -2207,7 +2224,7 @@ function isCustomCodeBlockComponent(component: unknown) {
 }
 
 function isCustomLanguageCodeBlockComponent(component: unknown, language?: string) {
-  return Boolean(component && language && component === (customComponentsMap.value as any)[language])
+  return Boolean(component && language && component === getCustomCodeLanguageComponent(customComponentsMap.value as any, language))
 }
 
 function getBindingsFor(node: ParsedNode, language?: string, component?: unknown) {
