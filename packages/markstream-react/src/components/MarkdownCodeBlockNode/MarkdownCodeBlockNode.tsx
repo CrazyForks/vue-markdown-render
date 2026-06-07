@@ -58,12 +58,12 @@ interface HighlightRegistrationConfig {
 interface HighlightRegistrationInput {
   key: string
   themes?: readonly unknown[]
-  langs?: readonly string[]
+  langs?: readonly unknown[]
 }
 
 function createHighlightRegistrationConfig(
   themes?: readonly unknown[],
-  langs?: readonly string[],
+  langs?: readonly unknown[],
 ): HighlightRegistrationConfig {
   const registerOptions = getRegisterHighlightOptions(themes, langs)
   const rendererOptions = registerOptions
@@ -481,8 +481,10 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     const key = currentRegistrationConfig.key
     latestRegistrationKeyRef.current = key
 
-    if (rendererRef.current && rendererConfigKeyRef.current !== key)
+    if (rendererRef.current && rendererConfigKeyRef.current !== key) {
+      renderFallback(code)
       disposeCurrentRenderer()
+    }
 
     const highlightStatus = await waitForCurrentHighlightRegistration(currentRegistrationConfig)
     if (!isCurrentRenderSeq(seq) || highlightStatus === 'stale')

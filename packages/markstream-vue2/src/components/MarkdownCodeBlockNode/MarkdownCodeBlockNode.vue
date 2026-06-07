@@ -537,8 +537,10 @@ async function initRenderer(epoch: number) {
   const nextRendererConfigKey = highlightRegistrationKey.value
   latestHighlightRegistrationKey = nextRendererConfigKey
 
-  if (renderer && rendererConfigKey !== nextRendererConfigKey)
+  if (renderer && rendererConfigKey !== nextRendererConfigKey) {
+    renderFallback(props.node.code, true)
     disposeCurrentRenderer()
+  }
 
   const highlightStatus = await waitForCurrentHighlightRegistration(
     rendererOptions.themes,

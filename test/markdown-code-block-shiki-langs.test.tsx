@@ -184,6 +184,17 @@ describe('markdown code block Shiki langs', () => {
     expect(getRegisterHighlightOptions(undefined, [])).toEqual({})
   })
 
+  it('filters non-string Shiki langs from registration options', () => {
+    const langs = ['ts', 123, null, undefined, { id: 'python' }, ' py ', '', 'ts'] as any[]
+
+    expect(getRegisterHighlightOptions(undefined, langs)).toEqual({
+      langs: ['typescript', 'python'],
+    })
+    expect(getHighlightRegistrationKey(undefined, langs)).toBe(
+      getHighlightRegistrationKey(undefined, ['typescript', 'python']),
+    )
+  })
+
   it('filters non-string Shiki themes from registration options', async () => {
     const themes = ['vitesse-light', { name: 'custom-theme' }, ' vitesse-dark ', '', 'vitesse-light'] as any[]
     const expected = {
@@ -567,6 +578,46 @@ describe('markdown code block Shiki langs', () => {
       'const value = 1',
       'plaintext',
     )
+
+    wrapper.unmount()
+  })
+
+  it('keeps Vue fallback visible while langs re-registration is pending', async () => {
+    const initialLang = 'vue-pending-initial'
+    const nextLang = 'vue-pending-next'
+    const pendingRegistration = createDeferred()
+    streamMarkdownMock.registerHighlight
+      .mockImplementationOnce(async (opts?: { langs?: string[] }) => {
+        streamMarkdownMock.loadLangs(opts)
+      })
+      .mockImplementationOnce(() => pendingRegistration.promise.then(() => {
+        streamMarkdownMock.loadLangs({ langs: [nextLang] })
+      }))
+
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode(initialLang, 'const value = 1'),
+        langs: [initialLang],
+      },
+    })
+
+    await flushAll()
+    await waitForRendererCreated()
+
+    const initialRendererCount = streamMarkdownMock.createdRenderers.length
+
+    await wrapper.setProps({ langs: [nextLang] })
+    await flushAll()
+
+    expect(wrapper.find('.code-block-render').text()).toBe('')
+    expect(wrapper.find('.code-fallback-plain').text()).toContain('const value = 1')
+
+    pendingRegistration.resolve()
+    await pendingRegistration.promise
+    await flushAll()
+    await waitForRendererCount(initialRendererCount + 1)
 
     wrapper.unmount()
   })
@@ -1930,6 +1981,63 @@ describe('markdown code block Shiki langs', () => {
       'const value = 1',
       'plaintext',
     )
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('keeps React fallback visible while langs re-registration is pending', async () => {
+    const initialLang = 'react-pending-initial'
+    const nextLang = 'react-pending-next'
+    const pendingRegistration = createDeferred()
+    streamMarkdownMock.registerHighlight
+      .mockImplementationOnce(async (opts?: { langs?: string[] }) => {
+        streamMarkdownMock.loadLangs(opts)
+      })
+      .mockImplementationOnce(() => pendingRegistration.promise.then(() => {
+        streamMarkdownMock.loadLangs({ langs: [nextLang] })
+      }))
+
+    const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    const node = makeNode(initialLang, 'const value = 1')
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node,
+        langs: [initialLang],
+      }))
+    })
+
+    await flushReact()
+    await waitForReactRendererCreated()
+
+    const initialRendererCount = streamMarkdownMock.createdRenderers.length
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node,
+        langs: [nextLang],
+      }))
+    })
+    await flushReact()
+
+    expect(host.querySelector('.code-block-render')?.textContent).toBe('')
+    expect(host.querySelector('.code-fallback-plain')?.textContent).toContain('const value = 1')
+
+    await act(async () => {
+      pendingRegistration.resolve()
+      await pendingRegistration.promise
+    })
+    await flushReact()
+    await waitForReactRendererCount(initialRendererCount + 1)
 
     await act(async () => {
       root.unmount()

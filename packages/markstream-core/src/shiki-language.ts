@@ -97,9 +97,12 @@ export function getShikiLanguageMatchKey(rawLang?: string | null) {
   return normalizeShikiLanguage(rawLang)
 }
 
-export function getShikiLangs(langs?: readonly string[]) {
+export function getShikiLangs(langs?: readonly unknown[]) {
   const normalized = Array.isArray(langs)
-    ? langs.map(lang => normalizeShikiLanguage(lang)).filter(Boolean)
+    ? langs
+        .filter((lang): lang is string => typeof lang === 'string')
+        .map(lang => normalizeShikiLanguage(lang))
+        .filter(Boolean)
     : []
 
   return normalized.length > 0
@@ -122,14 +125,14 @@ export function getShikiThemes(themes?: readonly unknown[]) {
 
 export function getShikiRendererOptions(
   themes?: readonly unknown[],
-  langs?: readonly string[],
+  langs?: readonly unknown[],
 ): Pick<ShikiRendererOptions, 'themes' | 'langs'> {
   return getRegisterHighlightOptions(themes, langs)
 }
 
 export function getRegisterHighlightOptions(
   themes?: readonly unknown[],
-  langs?: readonly string[],
+  langs?: readonly unknown[],
 ): RegisterHighlightOptions {
   const shikiThemes = getShikiThemes(themes)
   const shikiLangs = getShikiLangs(langs)
@@ -140,7 +143,7 @@ export function getRegisterHighlightOptions(
   }
 }
 
-export function getHighlightRegistrationKey(themes?: readonly unknown[], langs?: readonly string[]) {
+export function getHighlightRegistrationKey(themes?: readonly unknown[], langs?: readonly unknown[]) {
   const themesKey = getShikiThemes(themes)?.join('\u0000') ?? ''
 
   const langsKey = getShikiLangs(langs)
@@ -151,7 +154,7 @@ export function getHighlightRegistrationKey(themes?: readonly unknown[], langs?:
   return `${themesKey}\u0000\u0000${langsKey}`
 }
 
-export function createRegisteredHighlightLanguages(langs?: readonly string[]) {
+export function createRegisteredHighlightLanguages(langs?: readonly unknown[]) {
   const shikiLangs = getShikiLangs(langs)
   if (!shikiLangs?.length)
     return undefined
