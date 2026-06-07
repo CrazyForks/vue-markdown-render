@@ -84,6 +84,19 @@ function renderCustomCodeBlockComponent(
   specialProps: Record<string, unknown> = {},
 ) {
   const extraProps = getCodeBlockExtraProps(ctx.codeBlockProps)
+  const onPreviewCode = ctx.events.onHandleArtifactClick
+    ? (payload: { type: string, content: string, title: string }) => {
+        const artifactType = payload.type === 'image/svg+xml' ? 'image/svg+xml' : 'text/html'
+
+        ctx.events.onHandleArtifactClick?.({
+          node,
+          artifactType,
+          artifactTitle: payload.title,
+          id: String(key),
+        })
+      }
+    : undefined
+
   return React.createElement(component, {
     key,
     node,
@@ -98,6 +111,7 @@ function renderCustomCodeBlockComponent(
     minWidth: ctx.codeBlockThemes?.minWidth,
     maxWidth: ctx.codeBlockThemes?.maxWidth,
     onCopy: ctx.events.onCopy,
+    onPreviewCode,
     ...extraProps,
     ...specialProps,
     ctx,

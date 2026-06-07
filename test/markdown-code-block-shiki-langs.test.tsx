@@ -641,7 +641,7 @@ describe('markdown code block Shiki langs', () => {
     )
     expect(streamMarkdownMock.createdRenderers[initialRendererCount]?.updateCode).toHaveBeenLastCalledWith(
       'const value = 1',
-      'plaintext',
+      'typescript',
     )
 
     wrapper.unmount()
@@ -1258,6 +1258,28 @@ describe('markdown code block Shiki langs', () => {
       1,
       'puts 1',
       'ruby',
+    )
+
+    wrapper.unmount()
+  })
+
+  it('does not treat Vue2 langs as a hard allow-list when a language is already available', async () => {
+    streamMarkdownMock.loadedLangs.add('python')
+    const { default: Vue2MarkdownCodeBlockNode } = await import('../packages/markstream-vue2/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(Vue2MarkdownCodeBlockNode as any, {
+      props: {
+        loading: false,
+        node: makeNode('python'),
+        langs: ['typescript'],
+      },
+    })
+
+    await flushAll()
+    await waitForRendererCreated()
+
+    expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenLastCalledWith(
+      'const value = 1',
+      'python',
     )
 
     wrapper.unmount()
@@ -2163,7 +2185,7 @@ describe('markdown code block Shiki langs', () => {
     )
     expect(streamMarkdownMock.createdRenderers[initialRendererCount]?.updateCode).toHaveBeenLastCalledWith(
       'const value = 1',
-      'plaintext',
+      'typescript',
     )
 
     await act(async () => {
@@ -2320,9 +2342,10 @@ describe('markdown code block Shiki langs', () => {
     })
   })
 
-  it('falls back to plaintext in React when the block language is not included in langs', async () => {
+  it('does not treat React langs as a hard allow-list when a language is already available', async () => {
     const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+    streamMarkdownMock.loadedLangs.add('python')
     const host = document.createElement('div')
     document.body.appendChild(host)
     const root = createRoot(host)
@@ -2340,7 +2363,7 @@ describe('markdown code block Shiki langs', () => {
     expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenCalledTimes(1)
     expect(streamMarkdownMock.createdRenderers[0]?.updateCode).toHaveBeenLastCalledWith(
       'const value = 1',
-      'plaintext',
+      'python',
     )
 
     await act(async () => {

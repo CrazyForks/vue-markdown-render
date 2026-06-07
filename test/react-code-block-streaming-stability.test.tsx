@@ -5,7 +5,7 @@
 import React, { act, useEffect, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { NodeRenderer } from '../packages/markstream-react/src/components/NodeRenderer'
 import { removeCustomComponents, setCustomComponents } from '../packages/markstream-react/src/customComponents'
 import { NodeRenderer as ServerNodeRenderer } from '../packages/markstream-react/src/server'
@@ -39,6 +39,18 @@ function CodeBlockProbe(props: any) {
       data-has-render-node={String(typeof props.renderNode === 'function')}
     />
   )
+}
+
+function PreviewCodeProbe(props: any) {
+  useEffect(() => {
+    props.onPreviewCode?.({
+      type: 'text/html',
+      content: '<div>preview</div>',
+      title: 'HTML Preview',
+    })
+  }, [props.onPreviewCode])
+
+  return <div className="preview-code-probe" />
 }
 
 async function flushReact() {
@@ -149,6 +161,45 @@ describe('markstream-react code block streaming stability', () => {
     const probe = host.querySelector('.code-block-probe') as HTMLElement | null
     expect(probe?.getAttribute('data-langs')).toBe('["python"]')
     expect(probe?.getAttribute('data-stream')).toBe('false')
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('forwards custom code block preview to onHandleArtifactClick', async () => {
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+    const onHandleArtifactClick = vi.fn()
+    setCustomComponents(scopeId, { code_block: PreviewCodeProbe as any })
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(React.createElement(NodeRenderer as any, {
+        customId: scopeId,
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'html',
+            code: '<div>preview</div>',
+            raw: '```html\n<div>preview</div>\n```',
+          },
+        ],
+        onHandleArtifactClick,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+        batchRendering: false,
+        maxLiveNodes: 0,
+      }))
+    })
+    await flushReact()
+
+    expect(onHandleArtifactClick).toHaveBeenCalledWith(expect.objectContaining({
+      artifactType: 'text/html',
+      artifactTitle: 'HTML Preview',
+    }))
 
     await act(async () => {
       root.unmount()

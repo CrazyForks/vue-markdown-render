@@ -3,7 +3,6 @@ import type { RegisterHighlightOptions, ShikiRendererOptions } from 'markstream-
 import type { PropType } from 'vue-demi'
 import type { MarkdownCodeBlockPreviewPayload } from '../../types/component-props'
 import {
-  createRegisteredHighlightLanguages,
   getHighlightRegistrationKey,
   getRegisterHighlightOptions,
   normalizeShikiLanguage,
@@ -364,13 +363,11 @@ let createShikiRenderer:
 let registerHighlight:
   | ((opts?: RegisterHighlightOptions) => Promise<unknown> | unknown)
   | undefined
-let registeredHighlightLanguages: Set<string> | undefined
 let registeredHighlightKey: string | null = null
 let latestHighlightRegistrationKey = ''
 let highlightRegistrationSeq = 0
 let renderEpoch = 0
 let disposed = false
-const warnedMissingLanguages = new Set<string>()
 const warnedRendererErrors = new Set<string>()
 const isDevEnv = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.DEV)
 let streamMarkdownLoadPromise: Promise<void> | null = null
@@ -403,25 +400,15 @@ function rendererNeedsReconfigure() {
   return Boolean(renderer && rendererConfigKey !== highlightRegistrationKey.value)
 }
 
-function normalizeRendererLanguage(rawLang?: string | null, hasContent = false) {
+function normalizeRendererLanguage(rawLang?: string | null) {
   const normalized = normalizeShikiLanguage(rawLang)
-  if (!normalized)
-    return 'plaintext'
-
-  if (!registeredHighlightLanguages || registeredHighlightLanguages.has(normalized))
-    return normalized
-
-  if (hasContent && isDevEnv && !warnedMissingLanguages.has(normalized)) {
-    warnedMissingLanguages.add(normalized)
-    console.warn(`[MarkdownCodeBlockNode] Language "${normalized}" not preloaded in stream-markdown; falling back to plaintext.`)
-  }
-  return 'plaintext'
+  return normalized || 'plaintext'
 }
 
 async function updateRendererWithFallback(code: string, rawLang?: string | null, epoch = renderEpoch) {
   if (!renderer || !isCurrentRenderEpoch(epoch))
     return undefined
-  const normalized = normalizeRendererLanguage(rawLang, Boolean(code && code.length))
+  const normalized = normalizeRendererLanguage(rawLang)
   try {
     await renderer.updateCode(code, normalized)
     return isCurrentRenderEpoch(epoch) ? normalized : undefined
@@ -480,7 +467,6 @@ async function ensureHighlightRegistered(themes?: readonly unknown[], langs?: re
     return 'stale'
 
   registeredHighlightKey = key
-  registeredHighlightLanguages = createRegisteredHighlightLanguages(opts.langs)
   return 'ready'
 }
 

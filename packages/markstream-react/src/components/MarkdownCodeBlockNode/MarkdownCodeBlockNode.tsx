@@ -2,7 +2,6 @@ import type { RegisterHighlightOptions, ShikiRendererOptions } from 'markstream-
 import type { VisibilityHandle } from '../../context/viewportPriority'
 import type { ShikiCodeBlockProps } from '../../types/component-props'
 import {
-  createRegisteredHighlightLanguages,
   getHighlightRegistrationKey,
   getRegisterHighlightOptions,
   normalizeShikiLanguage,
@@ -84,18 +83,9 @@ function escapeHtml(str: string) {
     .replace(/'/g, '&#39;')
 }
 
-function normalizeRendererLanguageForRegistered(
-  rawLang: string | null | undefined,
-  registeredLanguages?: ReadonlySet<string>,
-) {
+function normalizeRendererLanguage(rawLang: string | null | undefined) {
   const normalized = normalizeShikiLanguage(rawLang)
-  if (!normalized)
-    return 'plaintext'
-
-  if (!registeredLanguages || registeredLanguages.has(normalized))
-    return normalized
-
-  return 'plaintext'
+  return normalized || 'plaintext'
 }
 
 function getRenderSignature(
@@ -213,7 +203,6 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const createRendererRef = useRef<null | ((el: HTMLElement, opts: ShikiRendererOptions) => ShikiRenderer)>(null)
   const streamMarkdownLoadPromiseRef = useRef<Promise<void> | null>(null)
   const registerHighlightRef = useRef<((opts?: RegisterHighlightOptions) => Promise<unknown> | unknown) | null>(null)
-  const registeredHighlightLanguagesRef = useRef<Set<string> | undefined>()
   const registeredKeyRef = useRef<string>('')
   const highlightRegistrationSeqRef = useRef(0)
   const latestRegistrationKeyRef = useRef(registrationInputKey)
@@ -414,7 +403,6 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       return 'stale'
 
     registeredKeyRef.current = key
-    registeredHighlightLanguagesRef.current = createRegisteredHighlightLanguages(config.registerOptions.langs)
     return 'ready'
   }, [])
 
@@ -438,10 +426,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     if (!renderer || !isCurrentRenderSeq(seq))
       return undefined
 
-    const lang = normalizeRendererLanguageForRegistered(
-      rawLang,
-      registeredHighlightLanguagesRef.current,
-    )
+    const lang = normalizeRendererLanguage(rawLang)
 
     try {
       await renderer.updateCode(code, lang)
