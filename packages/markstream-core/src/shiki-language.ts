@@ -159,14 +159,6 @@ export function getHighlightRegistrationKey(themes?: readonly unknown[], langs?:
   return `${themesKey}\u0000\u0000${langsKey}`
 }
 
-export function createRegisteredHighlightLanguages(langs?: readonly unknown[]) {
-  const shikiLangs = getShikiLangs(langs)
-  if (!shikiLangs?.length)
-    return undefined
-
-  return new Set(shikiLangs)
-}
-
 export async function registerHighlightOnce(
   registerHighlight: RegisterHighlightFn | undefined,
   opts: RegisterHighlightOptions,

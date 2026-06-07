@@ -526,8 +526,8 @@ async function initRenderer(epoch: number) {
   latestHighlightRegistrationKey = nextRendererConfigKey
 
   if (renderer && rendererConfigKey !== nextRendererConfigKey) {
+    disposeCurrentRenderer({ resetStableRender: true })
     renderFallback(props.node.code, true)
-    disposeCurrentRenderer()
   }
 
   const highlightStatus = await waitForCurrentHighlightRegistration(
@@ -538,7 +538,7 @@ async function initRenderer(epoch: number) {
   if (!isCurrentRenderEpoch(epoch) || highlightStatus === 'stale')
     return
   if (highlightStatus === 'failed') {
-    renderFallback(props.node.code, !hasStableRender.value)
+    renderFallback(props.node.code, true)
     return
   }
 

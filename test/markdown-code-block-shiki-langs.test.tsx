@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { mount } from '@vue/test-utils'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -1302,6 +1304,30 @@ describe('markdown code block Shiki langs', () => {
     expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
 
     wrapper.unmount()
+  })
+
+  it('keeps Vue2 fallback forced when Shiki re-registration fails after a stable render', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'packages/markstream-vue2/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue'),
+      'utf8',
+    )
+
+    expect(source).toContain(`if (renderer && rendererConfigKey !== nextRendererConfigKey) {
+    disposeCurrentRenderer({ resetStableRender: true })
+    renderFallback(props.node.code, true)
+  }`)
+    expect(source).toContain(`if (highlightStatus === 'failed') {
+    renderFallback(props.node.code, true)
+    return
+  }`)
+    expect(source).not.toContain(`if (renderer && rendererConfigKey !== nextRendererConfigKey) {
+    renderFallback(props.node.code, true)
+    disposeCurrentRenderer()
+  }`)
+    expect(source).not.toContain(`if (highlightStatus === 'failed') {
+    renderFallback(props.node.code, !hasStableRender.value)
+    return
+  }`)
   })
 
   it('forwards Vue2 MarkdownRenderCompat top-level langs and codeBlockProps through render props', async () => {
