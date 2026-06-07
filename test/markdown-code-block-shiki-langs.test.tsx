@@ -196,7 +196,7 @@ afterEach(() => {
 describe('markdown code block Shiki langs', () => {
   it('normalizes Shiki langs and omits empty lang lists from registration options', () => {
     expect(getRegisterHighlightOptions(undefined, ['ts', 'js', 'ts'])).toEqual({
-      langs: ['typescript', 'javascript'],
+      langs: ['javascript', 'typescript'],
     })
     expect(getRegisterHighlightOptions(undefined, [])).toEqual({})
   })
@@ -205,10 +205,10 @@ describe('markdown code block Shiki langs', () => {
     const langs = ['ts', 123, null, undefined, { id: 'python' }, ' py ', '', 'ts'] as any[]
 
     expect(getRegisterHighlightOptions(undefined, langs)).toEqual({
-      langs: ['typescript', 'python'],
+      langs: ['python', 'typescript'],
     })
     expect(getHighlightRegistrationKey(undefined, langs)).toBe(
-      getHighlightRegistrationKey(undefined, ['typescript', 'python']),
+      getHighlightRegistrationKey(undefined, ['python', 'typescript']),
     )
   })
 
@@ -395,7 +395,7 @@ describe('markdown code block Shiki langs', () => {
 
     expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(1)
     expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith(
-      expect.objectContaining({ langs: ['typescript', 'javascript'] }),
+      expect.objectContaining({ langs: ['javascript', 'typescript'] }),
     )
 
     await wrapper.setProps({ langs: ['javascript', 'typescript'] })

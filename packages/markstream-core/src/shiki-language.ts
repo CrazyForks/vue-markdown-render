@@ -106,16 +106,17 @@ export function getShikiLanguageMatchKey(rawLang?: string | null) {
 }
 
 export function getShikiLangs(langs?: readonly unknown[]) {
-  const normalized = Array.isArray(langs)
-    ? langs
-        .filter((lang): lang is string => typeof lang === 'string')
-        .map(lang => normalizeShikiLanguage(lang))
-        .filter(Boolean)
-    : []
+  if (!Array.isArray(langs))
+    return undefined
 
-  return normalized.length > 0
-    ? Array.from(new Set(normalized))
-    : undefined
+  const normalized = langs
+    .filter((lang): lang is string => typeof lang === 'string')
+    .map(lang => normalizeShikiLanguage(lang))
+    .filter(Boolean)
+
+  const unique = Array.from(new Set(normalized)).sort()
+
+  return unique.length > 0 ? unique : undefined
 }
 
 export function getShikiThemes(themes?: readonly unknown[]) {
@@ -153,11 +154,7 @@ export function getRegisterHighlightOptions(
 
 export function getHighlightRegistrationKey(themes?: readonly unknown[], langs?: readonly unknown[]) {
   const themesKey = getShikiThemes(themes)?.join('\u0000') ?? ''
-
-  const langsKey = getShikiLangs(langs)
-    ?.map(lang => getShikiLanguageMatchKey(lang))
-    .sort()
-    .join('\u0000') ?? ''
+  const langsKey = getShikiLangs(langs)?.join('\u0000') ?? ''
 
   return `${themesKey}\u0000\u0000${langsKey}`
 }
@@ -175,6 +172,7 @@ export async function registerHighlightOnce(
   opts: RegisterHighlightOptions,
   key = getHighlightRegistrationKey(opts.themes, opts.langs),
 ): Promise<SharedHighlightRegistrationStatus> {
+  // Successful registrations stay cached for this registerHighlight instance; failed ones are retried.
   if (!registerHighlight)
     return 'ready'
 

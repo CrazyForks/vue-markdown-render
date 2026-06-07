@@ -98,13 +98,45 @@ function packPackage(pkg) {
   return tarball
 }
 
+function readPackedPackageJson(tarball) {
+  const raw = execFileSync(
+    process.platform === 'win32' ? 'tar.exe' : 'tar',
+    ['-xOf', tarball, 'package/package.json'],
+    {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  )
+  return JSON.parse(raw)
+}
+
+function assertDependsOnPackedCore(packageName, tarball, expectedCoreVersion) {
+  if (packageName === 'markstream-core' || packageName === 'stream-markdown-parser')
+    return
+
+  const manifest = readPackedPackageJson(tarball)
+  const actual = manifest.dependencies?.['markstream-core']
+
+  if (!actual)
+    throw new Error(`[smoke-shiki-dependent-imports] ${packageName} package.json does not depend on markstream-core.`)
+
+  if (!String(actual).includes(expectedCoreVersion)) {
+    throw new Error(
+      `[smoke-shiki-dependent-imports] ${packageName} depends on markstream-core@${actual}, expected a range containing ${expectedCoreVersion}.`,
+    )
+  }
+}
+
 try {
   const rootPackageJson = readJson(path.join(repoRoot, 'package.json'))
+  const corePackageJson = readJson(path.join(repoRoot, 'packages/markstream-core/package.json'))
   const packed = new Map()
 
   for (const pkg of packages) {
     ensureBuiltPackage(pkg)
-    packed.set(pkg.name, packPackage(pkg))
+    const tarball = packPackage(pkg)
+    assertDependsOnPackedCore(pkg.name, tarball, corePackageJson.version)
+    packed.set(pkg.name, tarball)
   }
 
   writeProjectFile('package.json', `${JSON.stringify({
@@ -151,6 +183,10 @@ for (const key of ['normalizeShikiLanguage', 'registerHighlightOnce', 'getRegist
   if (!(key in core))
     throw new Error(\`[smoke-shiki-dependent-imports] markstream-core missing \${key}\`)
 }
+
+const registerOptions = core.getRegisterHighlightOptions(undefined, ['ts', 'js', 'ts'])
+if (JSON.stringify(registerOptions) !== JSON.stringify({ langs: ['javascript', 'typescript'] }))
+  throw new Error('[smoke-shiki-dependent-imports] markstream-core did not normalize Shiki langs.')
 
 const streamMarkdown = await import('stream-markdown')
 for (const key of ['registerHighlight', 'createShikiStreamRenderer']) {

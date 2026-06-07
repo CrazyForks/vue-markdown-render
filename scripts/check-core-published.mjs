@@ -135,6 +135,15 @@ function formatError(err) {
   return err instanceof Error ? err.message : String(err)
 }
 
+function isGitWorktree(repoRoot) {
+  try {
+    return runGit(repoRoot, ['rev-parse', '--is-inside-work-tree'], { ignoreStderr: true }) === 'true'
+  }
+  catch {
+    return false
+  }
+}
+
 function hasGitChanges(repoRoot, relativePath) {
   const base = getDiffBase(repoRoot)
   try {
@@ -211,13 +220,29 @@ function main() {
     )
   }
 
+  const isRepoGitWorktree = Boolean(repoRoot && isGitWorktree(repoRoot))
+  const shouldCheckCoreSourceChanges = Boolean(
+    isRepoGitWorktree
+    && (
+      process.env.CI === '1'
+      || process.env.CI === 'true'
+      || getExplicitDiffBase()
+    ),
+  )
+
   if (
-    repoRoot
+    shouldCheckCoreSourceChanges
     && hasGitChanges(repoRoot, path.relative(repoRoot, path.dirname(corePackageJsonPath)))
     && !hasPackageVersionChanged(repoRoot, path.relative(repoRoot, corePackageJsonPath), targetVersion)
   ) {
     throw new Error(
       `[check-core-published] ${args.corePackageName}@${targetVersion} is already published, but local core files changed. Bump ${args.corePackageName} before publishing dependents.`,
+    )
+  }
+  else if (isRepoGitWorktree && !shouldCheckCoreSourceChanges) {
+    console.warn(
+      '[check-core-published] Skip local core source diff guard because no CI/diff base was provided. '
+      + 'Set GITHUB_BASE_SHA / MARKSTREAM_RELEASE_BASE_SHA / MARKSTREAM_DIFF_BASE to enable it locally.',
     )
   }
 
