@@ -20,7 +20,7 @@ type HighlightRegistrationTaskMap = Map<
 >
 
 interface HighlightRegistrationState {
-  tasks: HighlightRegistrationTaskMap
+  inFlight: HighlightRegistrationTaskMap
   tail: Promise<unknown>
 }
 
@@ -33,7 +33,7 @@ function getHighlightRegistrationState(registerHighlight: RegisterHighlightFn) {
   let state = sharedHighlightRegistrationStates.get(registerHighlight)
   if (!state) {
     state = {
-      tasks: new Map(),
+      inFlight: new Map(),
       tail: Promise.resolve(),
     }
     sharedHighlightRegistrationStates.set(registerHighlight, state)
@@ -123,17 +123,26 @@ export function getShikiThemes(themes?: readonly unknown[]) {
   if (!Array.isArray(themes))
     return undefined
 
-  const normalized = themes
-    .map(theme => typeof theme === 'string' ? theme.trim() : '')
-    .filter(Boolean)
+  const unique: string[] = []
+  const seen = new Set<string>()
 
-  return normalized.length > 0
-    ? Array.from(new Set(normalized)).sort()
-    : undefined
+  for (const theme of themes) {
+    if (typeof theme !== 'string')
+      continue
+
+    const normalized = theme.trim()
+    if (!normalized || seen.has(normalized))
+      continue
+
+    seen.add(normalized)
+    unique.push(normalized)
+  }
+
+  return unique.length > 0 ? unique : undefined
 }
 
 function getShikiThemesKey(themes?: readonly unknown[]) {
-  return getShikiThemes(themes)?.slice().sort().join('\u0000') ?? ''
+  return getShikiThemes(themes)?.join('\u0000') ?? ''
 }
 
 export function getShikiRendererOptions(
@@ -168,13 +177,11 @@ export async function registerHighlightOnce(
   opts: RegisterHighlightOptions,
   key = getHighlightRegistrationKey(opts.themes, opts.langs),
 ): Promise<SharedHighlightRegistrationStatus> {
-  // Successful registrations stay cached for this registerHighlight instance; failed ones are retried.
   if (!registerHighlight)
     return 'ready'
 
   const state = getHighlightRegistrationState(registerHighlight)
-  const tasks = state.tasks
-  const cached = tasks.get(key)
+  const cached = state.inFlight.get(key)
   if (cached)
     return cached
 
@@ -182,12 +189,12 @@ export async function registerHighlightOnce(
     .catch(() => {})
     .then(() => registerHighlight(opts))
     .then(() => 'ready' as const)
-    .catch((err) => {
-      tasks.delete(key)
-      throw err
+    .finally(() => {
+      if (state.inFlight.get(key) === task)
+        state.inFlight.delete(key)
     })
 
-  tasks.set(key, task)
+  state.inFlight.set(key, task)
   state.tail = task.catch(() => {})
   return task
 }

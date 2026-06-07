@@ -2098,14 +2098,8 @@ function getCustomCodeLanguageComponent(
   if (!raw)
     return undefined
 
-  const candidates = [
-    raw,
-    normalizeLanguageIdentifier(raw),
-    normalizeShikiLanguage(raw),
-  ].filter((key): key is string => Boolean(key))
-
-  for (const key of Array.from(new Set(candidates))) {
-    const component = customComponents[key]
+  for (const key of [raw, normalizeLanguageIdentifier(raw), normalizeShikiLanguage(raw)]) {
+    const component = key && customComponents[key]
     if (component)
       return component
   }

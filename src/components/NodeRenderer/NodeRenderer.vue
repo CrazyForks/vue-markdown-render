@@ -16,7 +16,7 @@ import type {
   NodeRendererMode,
   NodeRendererProps,
 } from '../../types/node-renderer-props'
-import { getShikiLangs, getShikiThemes, normalizeShikiLanguage } from 'markstream-core'
+import { getShikiLangs, normalizeShikiLanguage } from 'markstream-core'
 import { computed, defineAsyncComponent, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
@@ -1762,21 +1762,6 @@ function getHostVirtualMeasurementKey() {
   return key == null ? '' : String(key)
 }
 
-function getVirtualShikiThemesKey(value: unknown) {
-  return getShikiThemes(Array.isArray(value) ? value : undefined)?.join('\u0000') ?? ''
-}
-
-function getVirtualShikiLangsKey(value: unknown) {
-  const langs = Array.isArray(value)
-    ? value.filter((lang): lang is string => typeof lang === 'string')
-    : undefined
-
-  return getShikiLangs(langs)
-    ?.slice()
-    .sort()
-    .join('\u0000') ?? ''
-}
-
 function getVirtualRendererLayoutKey() {
   const renderer = resolvedCodeRenderer.value
   const monaco = renderer === 'monaco' ? props.codeBlockMonacoOptions : undefined
@@ -1793,8 +1778,10 @@ function getVirtualRendererLayoutKey() {
     rendererProps.codeBlockStream === false ? 'code-static' : 'code-stream',
     stringifyVirtualToken(props.codeBlockMinWidth),
     stringifyVirtualToken(props.codeBlockMaxWidth),
-    includeShikiCodeOptions ? getVirtualShikiThemesKey(codeProps?.themes ?? props.themes) : '',
-    includeShikiCodeOptions ? getVirtualShikiLangsKey(codeProps?.langs ?? props.langs) : '',
+    '',
+    includeShikiCodeOptions
+      ? getShikiLangs((codeProps?.langs ?? props.langs) as readonly unknown[] | undefined)?.join('\u0000') ?? ''
+      : '',
     stringifyVirtualToken(monaco?.fontSize),
     stringifyVirtualToken(monaco?.lineHeight),
     stringifyVirtualToken(monaco?.fontFamily),
@@ -3037,7 +3024,7 @@ function warnStandaloneHeightCacheIgnored(reason: string) {
   if (
     warnedStandaloneHeightCacheWithoutSignature
     || typeof console === 'undefined'
-    || !(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV)
+    || !import.meta.env.DEV
   ) {
     return
   }
@@ -4347,7 +4334,7 @@ function autoDisableViewportPriority(reason: 'too-many-targets') {
   if (viewportPriorityAutoDisabled.value)
     return
   viewportPriorityAutoDisabled.value = true
-  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV && typeof console !== 'undefined')
+  if (import.meta.env.DEV && typeof console !== 'undefined')
     console.warn('[markstream-vue] viewportPriority auto-disabled:', reason)
 
   destroyNodeVisibilityState()
@@ -5048,7 +5035,7 @@ const MermaidBlockNodeAsync = defineAsyncComponent({
     }
     catch (e) {
       console.warn(
-        '[markstream-vue] Optional peer dependencies for MermaidBlockNode are missing. Falling back to preformatted code rendering. To enable Mermaid rendering, please install "mermaid".',
+        '[markstream-vue] Mermaid missing; pre.',
         e,
       )
       return PreCodeNode
@@ -5066,7 +5053,7 @@ const InfographicBlockNodeAsync = defineAsyncComponent({
     }
     catch (e) {
       console.warn(
-        '[markstream-vue] Failed to load InfographicBlockNode. Falling back to preformatted code rendering. To enable Infographic rendering, install "@antv/infographic" and configure setInfographicLoader with a dynamic loader.',
+        '[markstream-vue] Infographic failed; pre.',
         e,
       )
       return PreCodeNode
@@ -5083,7 +5070,7 @@ const D2BlockNodeAsync = defineAsyncComponent(async () => {
   }
   catch (e) {
     console.warn(
-      '[markstream-vue] Optional peer dependencies for D2BlockNode are missing. Falling back to preformatted code rendering. To enable D2 rendering, please install "@terrastruct/d2".',
+      '[markstream-vue] D2 missing; pre.',
       e,
     )
     return PreCodeNode
@@ -5432,14 +5419,8 @@ function getCustomCodeLanguageComponent(
   if (!raw)
     return undefined
 
-  const candidates = [
-    raw,
-    normalizeLanguageIdentifier(raw),
-    normalizeShikiLanguage(raw),
-  ].filter((key): key is string => Boolean(key))
-
-  for (const key of Array.from(new Set(candidates))) {
-    const component = customComponents[key]
+  for (const key of [raw, normalizeLanguageIdentifier(raw), normalizeShikiLanguage(raw)]) {
+    const component = key && customComponents[key]
     if (component)
       return component
   }

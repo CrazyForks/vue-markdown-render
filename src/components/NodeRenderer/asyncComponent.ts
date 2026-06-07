@@ -51,7 +51,7 @@ export const CodeBlockNodeAsync = defineAsyncComponent({
     }
     catch (e) {
       console.warn(
-        '[markstream-vue] Optional peer dependencies for CodeBlockNode are missing. Falling back to preformatted code rendering (no Monaco). To enable full code block features, please install "stream-monaco".',
+        '[markstream-vue] Code missing; pre.',
         e,
       )
       return PreCodeNode
@@ -89,7 +89,7 @@ export const MathInlineNodeAsync = defineAsyncComponent(async () => {
   }
   catch (e) {
     console.warn(
-      '[markstream-vue] Optional peer dependencies for MathInlineNode are missing. Falling back to text rendering. To enable full math rendering features, please install "katex".',
+      '[markstream-vue] MathInline missing; text.',
       e,
     )
   }
@@ -115,7 +115,7 @@ export const MathBlockNodeAsync = defineAsyncComponent(async () => {
   }
   catch (e) {
     console.warn(
-      '[markstream-vue] Optional peer dependencies for MathBlockNode are missing. Falling back to text rendering. To enable full math rendering features, please install "katex".',
+      '[markstream-vue] MathBlock missing; text.',
       e,
     )
   }

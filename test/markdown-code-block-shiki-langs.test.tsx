@@ -242,17 +242,11 @@ describe('markdown code block Shiki langs', () => {
     )
   })
 
-  it('filters non-string Shiki themes from registration options', async () => {
+  it('dedupes Shiki themes without reordering caller priority', () => {
     const themes = ['vitesse-light', { name: 'custom-theme' }, ' vitesse-dark ', '', 'vitesse-light'] as any[]
     const expected = {
-      themes: ['vitesse-dark', 'vitesse-light'],
+      themes: ['vitesse-light', 'vitesse-dark'],
     }
-
-    expect(getRegisterHighlightOptions(themes)).toEqual(expected)
-    expect(getShikiRendererOptions(themes)).toEqual(expected)
-    expect(getHighlightRegistrationKey(themes)).toBe(
-      getHighlightRegistrationKey(['vitesse-light', 'vitesse-dark']),
-    )
 
     expect(getRegisterHighlightOptions(themes)).toEqual(expected)
     expect(getShikiRendererOptions(themes)).toEqual(expected)
@@ -282,25 +276,32 @@ describe('markdown code block Shiki langs', () => {
     )
   })
 
-  it('uses a stable registration key for reordered normalized themes and langs', () => {
+  it('uses an order-sensitive registration key for Shiki themes', () => {
     expect(
-      getHighlightRegistrationKey(['vitesse-dark', 'vitesse-light'], ['ts', 'js']),
-    ).toBe(
-      getHighlightRegistrationKey(['vitesse-light', 'vitesse-dark'], ['javascript', 'typescript']),
+      getHighlightRegistrationKey(['vitesse-dark', 'vitesse-light']),
+    ).not.toBe(
+      getHighlightRegistrationKey(['vitesse-light', 'vitesse-dark']),
     )
   })
 
-  it('scopes highlight registration tasks by registerHighlight function instance', async () => {
-    const firstRegisterHighlight = vi.fn()
-    const secondRegisterHighlight = vi.fn()
+  it('coalesces concurrent highlight registration calls for the same key', async () => {
+    const deferred = createDeferred()
+    const registerHighlight = vi.fn(() => deferred.promise)
     const opts = { langs: ['typescript'] }
+    const key = getHighlightRegistrationKey(undefined, opts.langs)
 
-    await registerHighlightOnce(firstRegisterHighlight, opts)
-    await registerHighlightOnce(firstRegisterHighlight, opts)
-    await registerHighlightOnce(secondRegisterHighlight, opts)
+    const first = registerHighlightOnce(registerHighlight, opts, key)
+    const second = registerHighlightOnce(registerHighlight, opts, key)
 
-    expect(firstRegisterHighlight).toHaveBeenCalledTimes(1)
-    expect(secondRegisterHighlight).toHaveBeenCalledTimes(1)
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(registerHighlight).toHaveBeenCalledTimes(1)
+
+    deferred.resolve()
+    await Promise.all([first, second])
+
+    await registerHighlightOnce(registerHighlight, opts, key)
+    expect(registerHighlight).toHaveBeenCalledTimes(2)
   })
 
   it('serializes different highlight registration keys for the same registerHighlight function', async () => {
@@ -337,11 +338,11 @@ describe('markdown code block Shiki langs', () => {
     ])
   })
 
-  it('retries failed highlight registration once and caches the successful retry', async () => {
+  it('retries failed highlight registration and allows later registrations', async () => {
     const registerHighlight = vi
       .fn()
       .mockRejectedValueOnce(new Error('first registration failed'))
-      .mockResolvedValueOnce(undefined)
+      .mockResolvedValue(undefined)
     const opts = { langs: ['typescript'] }
     const key = getHighlightRegistrationKey(undefined, opts.langs)
 
@@ -351,9 +352,10 @@ describe('markdown code block Shiki langs', () => {
     await expect(registerHighlightOnce(registerHighlight, opts, key)).resolves.toBe('ready')
     await expect(registerHighlightOnce(registerHighlight, opts, key)).resolves.toBe('ready')
 
-    expect(registerHighlight).toHaveBeenCalledTimes(2)
+    expect(registerHighlight).toHaveBeenCalledTimes(3)
     expect(registerHighlight).toHaveBeenNthCalledWith(1, opts)
     expect(registerHighlight).toHaveBeenNthCalledWith(2, opts)
+    expect(registerHighlight).toHaveBeenNthCalledWith(3, opts)
   })
 
   it('passes langs to Vue registerHighlight and renderer', async () => {
@@ -495,7 +497,7 @@ describe('markdown code block Shiki langs', () => {
     wrapper.unmount()
   })
 
-  it('deduplicates Vue highlight registration across matching code block instances', async () => {
+  it('registers Vue highlight for later matching code block instances', async () => {
     const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
     const first = mount(MarkdownCodeBlockNode, {
       props: {
@@ -519,7 +521,7 @@ describe('markdown code block Shiki langs', () => {
     await flushAll()
     await waitForRendererCount(2)
 
-    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(1)
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
 
     first.unmount()
     second.unmount()
@@ -1254,7 +1256,7 @@ describe('markdown code block Shiki langs', () => {
     }
   })
 
-  it('deduplicates Vue2 highlight registration across matching code block instances', async () => {
+  it('registers Vue2 highlight for later matching code block instances', async () => {
     const { default: Vue2MarkdownCodeBlockNode } = await import('../packages/markstream-vue2/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
     const first = mount(Vue2MarkdownCodeBlockNode as any, {
       props: {
@@ -1278,7 +1280,7 @@ describe('markdown code block Shiki langs', () => {
     await flushAll()
     await waitForRendererCount(2)
 
-    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(1)
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
 
     first.unmount()
     second.unmount()
@@ -1688,7 +1690,7 @@ describe('markdown code block Shiki langs', () => {
     overrideWrapper.unmount()
   })
 
-  it('keeps React renderer registration stable when only theme order changes', async () => {
+  it('reconfigures React renderer when theme order changes', async () => {
     const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -1726,12 +1728,14 @@ describe('markdown code block Shiki langs', () => {
 
     await flushReact()
 
-    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(1)
-    expect(renderer.dispose).not.toHaveBeenCalled()
-    expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenCalledTimes(initialRendererCount)
+    await waitForReactRendererCount(initialRendererCount + 1)
+
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
+    expect(renderer.dispose).toHaveBeenCalled()
+    expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenCalledTimes(initialRendererCount + 1)
     expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenLastCalledWith(
       expect.any(HTMLElement),
-      expect.objectContaining({ themes: ['a', 'b'], langs: ['typescript'] }),
+      expect.objectContaining({ themes: ['b', 'a'], langs: ['typescript'] }),
     )
 
     await act(async () => {

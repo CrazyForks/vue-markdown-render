@@ -369,7 +369,7 @@ let highlightRegistrationSeq = 0
 let renderEpoch = 0
 let disposed = false
 const warnedRendererErrors = new Set<string>()
-const isDevEnv = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.DEV)
+const isDevEnv = import.meta.env.DEV
 let warnedMissingRegisterHighlightForLangs = false
 let streamMarkdownLoadPromise: Promise<void> | null = null
 let streamMarkdownUnavailable = false
