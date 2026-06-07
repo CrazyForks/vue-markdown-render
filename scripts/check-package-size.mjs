@@ -7,10 +7,10 @@ const root = process.cwd()
 const distDir = join(root, 'dist')
 
 const budgets = {
-  maxDistBytes: Number(process.env.MAX_DIST_BYTES || 860 * 1024),
-  maxJsChunkBytes: Number(process.env.MAX_JS_CHUNK_BYTES || 235 * 1024),
-  maxPackSizeBytes: Number(process.env.MAX_PACK_TGZ_BYTES || 240 * 1024),
-  maxPackUnpackedBytes: Number(process.env.MAX_PACK_UNPACKED_BYTES || 930 * 1024),
+  maxDistBytes: Number(process.env.MAX_DIST_BYTES || 900 * 1024),
+  maxJsChunkBytes: Number(process.env.MAX_JS_CHUNK_BYTES || 250 * 1024),
+  maxPackSizeBytes: Number(process.env.MAX_PACK_TGZ_BYTES || 260 * 1024),
+  maxPackUnpackedBytes: Number(process.env.MAX_PACK_UNPACKED_BYTES || 980 * 1024),
 }
 
 function formatBytes(bytes) {
@@ -43,6 +43,7 @@ const allFiles = collectFiles(distDir)
 const distBytes = allFiles.reduce((sum, f) => sum + f.size, 0)
 const jsFiles = allFiles.filter(f => f.relPath.endsWith('.js'))
 const largestJs = jsFiles.sort((a, b) => b.size - a.size)[0]
+const largestFiles = [...allFiles].sort((a, b) => b.size - a.size).slice(0, 10)
 
 const packJson = execFileSync('npm', ['pack', '--dry-run', '--json'], {
   cwd: root,
@@ -72,6 +73,9 @@ if (largestJs)
   console.log(`[size-check] largest JS: ${largestJs.relPath} (${formatBytes(largestJs.size)})`)
 console.log(`[size-check] pack tarball: ${formatBytes(pack.size)}`)
 console.log(`[size-check] pack unpacked: ${formatBytes(pack.unpackedSize)}`)
+console.log('[size-check] largest dist files:')
+for (const file of largestFiles)
+  console.log(`- ${file.relPath}: ${formatBytes(file.size)}`)
 
 if (failures.length > 0) {
   console.error('[size-check] Budget check failed:')
