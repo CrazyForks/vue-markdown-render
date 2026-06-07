@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { mount } from '@vue/test-utils'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -1410,28 +1408,57 @@ describe('markdown code block Shiki langs', () => {
     wrapper.unmount()
   })
 
-  it('keeps Vue2 fallback forced when Shiki re-registration fails after a stable render', () => {
-    const source = readFileSync(
-      resolve(process.cwd(), 'packages/markstream-vue2/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue'),
-      'utf8',
+  it('keeps Vue2 fallback forced when Shiki re-registration fails after a stable render', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const initialLang = 'vue2-fallback-forced-initial'
+    const nextLang = 'vue2-fallback-forced-next'
+
+    const { default: Vue2MarkdownCodeBlockNode } = await import(
+      '../packages/markstream-vue2/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue',
     )
 
-    expect(source).toContain(`if (renderer && rendererConfigKey !== nextRendererConfigKey) {
-    disposeCurrentRenderer({ resetStableRender: true })
-    renderFallback(props.node.code, true)
-  }`)
-    expect(source).toContain(`if (highlightStatus === 'failed') {
-    renderFallback(props.node.code, true)
-    return
-  }`)
-    expect(source).not.toContain(`if (renderer && rendererConfigKey !== nextRendererConfigKey) {
-    renderFallback(props.node.code, true)
-    disposeCurrentRenderer()
-  }`)
-    expect(source).not.toContain(`if (highlightStatus === 'failed') {
-    renderFallback(props.node.code, !hasStableRender.value)
-    return
-  }`)
+    const langs = ref([initialLang])
+    const wrapper = mount(defineComponent({
+      setup() {
+        const node = makeNode(initialLang, 'const value = 1')
+        return () => h(Vue2MarkdownCodeBlockNode as any, {
+          loading: false,
+          node,
+          langs: langs.value,
+        })
+      },
+    }))
+
+    try {
+      await flushAll()
+      await waitForRendererCreated()
+      await flushAll()
+
+      expect(wrapper.find('.code-block-render').text()).toContain('const value = 1')
+      expect(wrapper.find('.code-fallback-plain').exists()).toBe(false)
+
+      const initialRendererCount = streamMarkdownMock.createdRenderers.length
+      const oldRenderer = streamMarkdownMock.createdRenderers[initialRendererCount - 1]
+
+      streamMarkdownMock.registerHighlight.mockRejectedValue(new Error('load failed'))
+
+      langs.value = [nextLang]
+      await flushAll()
+      const childState = (wrapper.findComponent(Vue2MarkdownCodeBlockNode as any).vm as any).$.setupState
+      await childState.safeInitRenderer()
+      for (let i = 0; i < 10 && oldRenderer.dispose.mock.calls.length === 0; i++)
+        await flushAll()
+
+      expect(oldRenderer.dispose).toHaveBeenCalledTimes(1)
+      expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenCalledTimes(initialRendererCount)
+      expect(wrapper.find('.code-block-render').text()).toBe('')
+      expect(childState.rendererReady).toBe(false)
+      expect(childState.fallbackHtml).toContain('const value = 1')
+    }
+    finally {
+      wrapper.unmount()
+      warnSpy.mockRestore()
+    }
   })
 
   it('forwards Vue2 MarkdownRenderCompat top-level langs and codeBlockProps through render props', async () => {

@@ -110,6 +110,15 @@ function readPackedPackageJson(tarball) {
   return JSON.parse(raw)
 }
 
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function rangeMentionsExactVersion(range, version) {
+  const escapedVersion = escapeRegExp(version)
+  return new RegExp(`(^|[^0-9A-Za-z.-])${escapedVersion}($|[^0-9A-Za-z.-])`).test(String(range))
+}
+
 function assertDependsOnPackedCore(packageName, tarball, expectedCoreVersion) {
   if (packageName === 'markstream-core' || packageName === 'stream-markdown-parser')
     return
@@ -120,7 +129,7 @@ function assertDependsOnPackedCore(packageName, tarball, expectedCoreVersion) {
   if (!actual)
     throw new Error(`[smoke-shiki-dependent-imports] ${packageName} package.json does not depend on markstream-core.`)
 
-  if (!String(actual).includes(expectedCoreVersion)) {
+  if (!rangeMentionsExactVersion(actual, expectedCoreVersion)) {
     throw new Error(
       `[smoke-shiki-dependent-imports] ${packageName} depends on markstream-core@${actual}, expected a range containing ${expectedCoreVersion}.`,
     )

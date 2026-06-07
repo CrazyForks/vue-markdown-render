@@ -32,11 +32,11 @@ function notifyDrainIfBelowCap() {
 let recordRenderPerformance: ((metric: any) => void) | null = null
 try {
   if (typeof window !== 'undefined' && import.meta.env.DEV) {
-    const monitorModuleId = ['../utils/performance', 'Monitor'].join('')
-    import(/* @vite-ignore */ monitorModuleId).then((a) => {
-      const monitor = a[['perf', 'Monitor'].join('')]
-      recordRenderPerformance = metric => monitor.recordRender(metric)
-    })
+    import('../utils/performanceMonitor')
+      .then(({ perfMonitor }) => {
+        recordRenderPerformance = metric => perfMonitor.recordRender(metric)
+      })
+      .catch(() => {})
   }
 }
 catch {}

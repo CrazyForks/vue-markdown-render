@@ -11,6 +11,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useViewportPriority } from '../../context/viewportPriority'
 import { useSafeI18n } from '../../i18n/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../tooltip/singletonTooltip'
+import { isDevEnvironment } from '../../utils/devEnv'
 import { getLanguageIcon, languageMap, normalizeLanguageIdentifier, subscribeLanguageIconsRevision } from '../../utils/languageIcon'
 
 export interface MarkdownCodeBlockNodeProps extends ShikiCodeBlockProps {
@@ -47,6 +48,8 @@ interface ShikiRenderer {
 }
 
 type HighlightRegistrationStatus = 'ready' | 'failed' | 'stale'
+
+const isDevEnv = isDevEnvironment()
 
 interface HighlightRegistrationConfig {
   key: string
@@ -426,7 +429,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     if (!config.rendererOptions.langs?.length || registerHighlightRef.current || !createRendererRef.current)
       return config
 
-    if (!warnedMissingRegisterHighlightForLangsRef.current && typeof console !== 'undefined') {
+    if (isDevEnv && !warnedMissingRegisterHighlightForLangsRef.current && typeof console !== 'undefined') {
       warnedMissingRegisterHighlightForLangsRef.current = true
       console.warn(
         '[MarkdownCodeBlockNode] `langs` requires stream-markdown >=0.0.15 with registerHighlight(); '
