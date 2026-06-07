@@ -16,6 +16,7 @@ import type {
   NodeRendererMode,
   NodeRendererProps,
 } from '../../types/node-renderer-props'
+import { getShikiLangs, getShikiThemes } from 'markstream-core'
 import { computed, defineAsyncComponent, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
@@ -1760,6 +1761,21 @@ function getHostVirtualMeasurementKey() {
   return key == null ? '' : String(key)
 }
 
+function getVirtualShikiThemesKey(value: unknown) {
+  return getShikiThemes(Array.isArray(value) ? value : undefined)?.join('\u0000') ?? ''
+}
+
+function getVirtualShikiLangsKey(value: unknown) {
+  const langs = Array.isArray(value)
+    ? value.filter((lang): lang is string => typeof lang === 'string')
+    : undefined
+
+  return getShikiLangs(langs)
+    ?.slice()
+    .sort()
+    .join('\u0000') ?? ''
+}
+
 function getVirtualRendererLayoutKey() {
   const renderer = resolvedCodeRenderer.value
   const monaco = renderer === 'monaco' ? props.codeBlockMonacoOptions : undefined
@@ -1776,8 +1792,8 @@ function getVirtualRendererLayoutKey() {
     rendererProps.codeBlockStream === false ? 'code-static' : 'code-stream',
     stringifyVirtualToken(props.codeBlockMinWidth),
     stringifyVirtualToken(props.codeBlockMaxWidth),
-    includeShikiCodeOptions ? stringifyVirtualToken(codeProps?.themes ?? props.themes) : '',
-    includeShikiCodeOptions ? stringifyVirtualToken(codeProps?.langs ?? props.langs) : '',
+    includeShikiCodeOptions ? getVirtualShikiThemesKey(codeProps?.themes ?? props.themes) : '',
+    includeShikiCodeOptions ? getVirtualShikiLangsKey(codeProps?.langs ?? props.langs) : '',
     stringifyVirtualToken(monaco?.fontSize),
     stringifyVirtualToken(monaco?.lineHeight),
     stringifyVirtualToken(monaco?.fontFamily),

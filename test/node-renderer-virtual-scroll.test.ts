@@ -2738,7 +2738,8 @@ describe('node renderer virtual-scroll coordination', () => {
 
     expect(wrapper.get('.virtual-language-code-block-probe').attributes('data-langs')).toBe('["typescript"]')
     const initialKey = (wrapper.vm as any).captureVirtualState()?.measurementKey
-    expect(initialKey).toContain('["typescript"]')
+    expect(initialKey).toContain('typescript')
+    expect(initialKey).not.toContain('["typescript"]')
 
     await wrapper.setProps({
       langs: ['typescript', 'python'],
@@ -2747,7 +2748,67 @@ describe('node renderer virtual-scroll coordination', () => {
 
     const nextKey = (wrapper.vm as any).captureVirtualState()?.measurementKey
     expect(nextKey).not.toBe(initialKey)
-    expect(nextKey).toContain('["typescript","python"]')
+    expect(nextKey).toContain('python')
+
+    wrapper.unmount()
+  })
+
+  it('normalizes shiki langs in the virtual layout key for language custom code blocks', async () => {
+    const LanguageCodeBlockProbe = defineComponent({
+      inheritAttrs: false,
+      props: {
+        node: { type: Object, required: true },
+      },
+      setup(_, { attrs }) {
+        return () => h('div', {
+          'class': 'virtual-language-code-block-probe',
+          'data-langs': JSON.stringify(attrs.langs ?? null),
+        })
+      },
+    })
+
+    setCustomComponents('virtual-prefix-test', {
+      ts: LanguageCodeBlockProbe as any,
+    })
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId: 'virtual-prefix-test',
+        nodes: [createCodeBlock(3)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        langs: ['ts', 'js'],
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'normalized-language-code-block-layout-key',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const initialKey = (wrapper.vm as any).captureVirtualState()?.measurementKey
+    expect(initialKey).toContain('javascript')
+    expect(initialKey).toContain('typescript')
+    expect(initialKey).not.toContain('["ts","js"]')
+
+    await wrapper.setProps({
+      langs: ['javascript', 'typescript'],
+    })
+    await flushAll()
+
+    expect((wrapper.vm as any).captureVirtualState()?.measurementKey).toBe(initialKey)
+
+    await wrapper.setProps({
+      langs: ['typescript', 'javascript'],
+    })
+    await flushAll()
+
+    expect((wrapper.vm as any).captureVirtualState()?.measurementKey).toBe(initialKey)
 
     wrapper.unmount()
   })

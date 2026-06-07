@@ -71,22 +71,62 @@ function npmViewVersion(packageName, version) {
   return null
 }
 
-function getDiffBase() {
+let cachedDiffBase = null
+
+function runGit(repoRoot, args, { ignoreStderr = false } = {}) {
+  return execFileSync(
+    'git',
+    args,
+    {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', ignoreStderr ? 'ignore' : 'pipe'],
+    },
+  ).trim()
+}
+
+function getExplicitDiffBase() {
   return (
     process.env.GITHUB_BASE_SHA
     || process.env.MARKSTREAM_RELEASE_BASE_SHA
     || process.env.MARKSTREAM_DIFF_BASE
-    || 'HEAD~1'
+    || ''
   )
+}
+
+function getDiffBase(repoRoot) {
+  const explicit = getExplicitDiffBase()
+  if (explicit)
+    return explicit
+
+  if (cachedDiffBase)
+    return cachedDiffBase
+
+  for (const ref of ['origin/main', 'origin/master', 'upstream/main', 'upstream/master']) {
+    try {
+      runGit(repoRoot, ['rev-parse', '--verify', ref], { ignoreStderr: true })
+      const mergeBase = runGit(repoRoot, ['merge-base', 'HEAD', ref], { ignoreStderr: true })
+      if (mergeBase) {
+        cachedDiffBase = mergeBase
+        return cachedDiffBase
+      }
+    }
+    catch {
+      // Ref not available locally.
+    }
+  }
+
+  cachedDiffBase = 'HEAD~1'
+  return cachedDiffBase
 }
 
 function hasGitChanges(repoRoot, relativePath) {
   try {
-    const base = getDiffBase()
-    const output = execFileSync(
-      'git',
+    const base = getDiffBase(repoRoot)
+    const output = runGit(
+      repoRoot,
       ['diff', '--name-only', `${base}...HEAD`, '--', relativePath],
-      { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+      { ignoreStderr: true },
     ).trim()
     return output.length > 0
   }
@@ -97,11 +137,11 @@ function hasGitChanges(repoRoot, relativePath) {
 
 function hasPackageVersionChanged(repoRoot, packageJsonRelativePath, targetVersion) {
   try {
-    const base = getDiffBase()
-    const previousRaw = execFileSync(
-      'git',
+    const base = getDiffBase(repoRoot)
+    const previousRaw = runGit(
+      repoRoot,
       ['show', `${base}:${packageJsonRelativePath}`],
-      { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+      { ignoreStderr: true },
     )
     const previousPackageJson = JSON.parse(previousRaw)
     return previousPackageJson.version !== targetVersion
