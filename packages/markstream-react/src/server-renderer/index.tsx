@@ -238,16 +238,21 @@ function getCustomCodeLanguageComponent(
   customComponents: Record<string, any>,
   rawLanguage: string,
 ) {
-  if (!rawLanguage)
+  const raw = rawLanguage.trim().toLowerCase()
+  if (!raw)
     return null
 
-  const exact = customComponents[rawLanguage]
-  if (exact)
-    return exact
+  const candidates = [
+    raw,
+    normalizeLanguageIdentifier(raw),
+    normalizeShikiLanguage(raw),
+  ].filter(Boolean)
 
-  const normalized = normalizeShikiLanguage(rawLanguage)
-  if (normalized && normalized !== rawLanguage)
-    return customComponents[normalized] ?? null
+  for (const key of Array.from(new Set(candidates))) {
+    const component = customComponents[key]
+    if (component)
+      return component
+  }
 
   return null
 }

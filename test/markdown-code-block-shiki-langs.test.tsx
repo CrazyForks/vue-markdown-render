@@ -268,6 +268,14 @@ describe('markdown code block Shiki langs', () => {
     )
   })
 
+  it('uses a stable registration key for reordered normalized themes and langs', () => {
+    expect(
+      getHighlightRegistrationKey(['vitesse-dark', 'vitesse-light'], ['ts', 'js']),
+    ).toBe(
+      getHighlightRegistrationKey(['vitesse-light', 'vitesse-dark'], ['javascript', 'typescript']),
+    )
+  })
+
   it('scopes highlight registration tasks by registerHighlight function instance', async () => {
     const firstRegisterHighlight = vi.fn()
     const secondRegisterHighlight = vi.fn()
@@ -1370,6 +1378,29 @@ describe('markdown code block Shiki langs', () => {
     wrapper.unmount()
   })
 
+  it('matches Vue custom language code block overrides by UI aliases before Shiki aliases', async () => {
+    setCustomComponents(vueCustomId, {
+      plain: VueCodeBlockProbe,
+      shell: VueCodeBlockProbe,
+    })
+    const { default: NodeRenderer } = await import('../src/components/NodeRenderer')
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId: vueCustomId,
+        nodes: [makeNode('sh'), makeNode('txt')],
+      },
+    })
+
+    await flushAll()
+
+    const probes = wrapper.findAll('.vue-code-block-probe')
+    expect(probes).toHaveLength(2)
+    expect(probes[0].attributes('data-language')).toBe('sh')
+    expect(probes[1].attributes('data-language')).toBe('txt')
+
+    wrapper.unmount()
+  })
+
   it('matches React custom language code block overrides by normalized Shiki aliases', async () => {
     setReactCustomComponents(reactCustomId, {
       typescript: ReactCodeBlockProbe as any,
@@ -1401,6 +1432,38 @@ describe('markdown code block Shiki langs', () => {
     })
   })
 
+  it('matches React custom language code block overrides by UI aliases before Shiki aliases', async () => {
+    setReactCustomComponents(reactCustomId, {
+      plain: ReactCodeBlockProbe as any,
+      shell: ReactCodeBlockProbe as any,
+    })
+
+    const { NodeRenderer: ReactNodeRenderer } = await import('../packages/markstream-react/src/components/NodeRenderer')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(React.createElement(ReactNodeRenderer, {
+        customId: reactCustomId,
+        nodes: [makeNode('sh'), makeNode('txt')],
+      }))
+    })
+
+    await flushReact()
+
+    const probes = host.querySelectorAll('.react-code-block-probe')
+    expect(probes).toHaveLength(2)
+    expect(probes[0]?.getAttribute('data-language')).toBe('sh')
+    expect(probes[1]?.getAttribute('data-language')).toBe('txt')
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
   it('matches React server custom language code block overrides by normalized Shiki aliases', async () => {
     setReactCustomComponents(reactCustomId, {
       typescript: ReactCodeBlockProbe as any,
@@ -1420,6 +1483,26 @@ describe('markdown code block Shiki langs', () => {
     expect(probe?.getAttribute('data-langs')).toBe('["typescript"]')
   })
 
+  it('matches React server custom language code block overrides by UI aliases before Shiki aliases', async () => {
+    setReactCustomComponents(reactCustomId, {
+      plain: ReactCodeBlockProbe as any,
+      shell: ReactCodeBlockProbe as any,
+    })
+
+    const { NodeRenderer: ReactServerNodeRenderer } = await import('../packages/markstream-react/src/server-renderer')
+    const html = renderToStaticMarkup(React.createElement(ReactServerNodeRenderer, {
+      customId: reactCustomId,
+      nodes: [makeNode('sh'), makeNode('txt')],
+    }))
+    const host = document.createElement('div')
+    host.innerHTML = html
+
+    const probes = host.querySelectorAll('.react-code-block-probe')
+    expect(probes).toHaveLength(2)
+    expect(probes[0]?.getAttribute('data-language')).toBe('sh')
+    expect(probes[1]?.getAttribute('data-language')).toBe('txt')
+  })
+
   it('matches Vue2 custom language code block overrides by normalized Shiki aliases', async () => {
     setVue2CustomComponents(vue2CustomId, { typescript: Vue2CodeBlockProbe as any })
     const { default: LegacyNodesRenderer } = await import('../packages/markstream-vue2/src/components/NodeRenderer/LegacyNodesRenderer.vue')
@@ -1436,6 +1519,45 @@ describe('markdown code block Shiki langs', () => {
     const probe = wrapper.get('.vue2-code-block-probe')
     expect(probe.attributes('data-language')).toBe('ts')
     expect(probe.attributes('data-langs')).toBe('["typescript"]')
+
+    wrapper.unmount()
+  })
+
+  it('matches Vue2 custom language code block overrides by UI aliases before Shiki aliases', async () => {
+    setVue2CustomComponents(vue2CustomId, {
+      plain: Vue2CodeBlockProbe as any,
+      shell: Vue2CodeBlockProbe as any,
+    })
+    const { default: LegacyNodesRenderer } = await import('../packages/markstream-vue2/src/components/NodeRenderer/LegacyNodesRenderer.vue')
+    const legacyWrapper = mount(LegacyNodesRenderer as any, {
+      props: {
+        customId: vue2CustomId,
+        nodes: [makeNode('sh'), makeNode('txt')],
+      },
+    })
+
+    await flushAll()
+
+    const legacyProbes = legacyWrapper.findAll('.vue2-code-block-probe')
+    expect(legacyProbes).toHaveLength(2)
+    expect(legacyProbes[0].attributes('data-language')).toBe('sh')
+    expect(legacyProbes[1].attributes('data-language')).toBe('txt')
+    legacyWrapper.unmount()
+
+    const { default: Vue2NodeRenderer } = await import('../packages/markstream-vue2/src/components/NodeRenderer')
+    const wrapper = mount(Vue2NodeRenderer as any, {
+      props: {
+        customId: vue2CustomId,
+        nodes: [makeNode('sh'), makeNode('txt')],
+      },
+    })
+
+    await flushAll()
+
+    const probes = wrapper.findAll('.vue2-code-block-probe')
+    expect(probes).toHaveLength(2)
+    expect(probes[0].attributes('data-language')).toBe('sh')
+    expect(probes[1].attributes('data-language')).toBe('txt')
 
     wrapper.unmount()
   })
@@ -1471,7 +1593,7 @@ describe('markdown code block Shiki langs', () => {
     overrideWrapper.unmount()
   })
 
-  it('keeps React theme order significant for highlight registration', async () => {
+  it('keeps React renderer registration stable when only theme order changes', async () => {
     const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -1508,16 +1630,13 @@ describe('markdown code block Shiki langs', () => {
     })
 
     await flushReact()
-    await waitForReactRendererCount(initialRendererCount + 1)
 
-    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
-    expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith(
-      expect.objectContaining({ themes: ['b', 'a'], langs: ['typescript'] }),
-    )
-    expect(renderer.dispose).toHaveBeenCalledTimes(1)
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(1)
+    expect(renderer.dispose).not.toHaveBeenCalled()
+    expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenCalledTimes(initialRendererCount)
     expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenLastCalledWith(
       expect.any(HTMLElement),
-      expect.objectContaining({ themes: ['b', 'a'], langs: ['typescript'] }),
+      expect.objectContaining({ themes: ['a', 'b'], langs: ['typescript'] }),
     )
 
     await act(async () => {

@@ -132,6 +132,10 @@ export function getShikiThemes(themes?: readonly unknown[]) {
     : undefined
 }
 
+function getShikiThemesKey(themes?: readonly unknown[]) {
+  return getShikiThemes(themes)?.slice().sort().join('\u0000') ?? ''
+}
+
 export function getShikiRendererOptions(
   themes?: readonly unknown[],
   langs?: readonly unknown[],
@@ -153,7 +157,7 @@ export function getRegisterHighlightOptions(
 }
 
 export function getHighlightRegistrationKey(themes?: readonly unknown[], langs?: readonly unknown[]) {
-  const themesKey = getShikiThemes(themes)?.join('\u0000') ?? ''
+  const themesKey = getShikiThemesKey(themes)
   const langsKey = getShikiLangs(langs)?.join('\u0000') ?? ''
 
   return `${themesKey}\u0000\u0000${langsKey}`

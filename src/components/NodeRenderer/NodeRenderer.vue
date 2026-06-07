@@ -59,6 +59,7 @@ import {
 } from '../../internal/heightEstimationExperiment'
 import { clampInfographicPreviewHeight, clampMermaidPreviewHeight, estimateInfographicPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber } from '../../utils/diagramHeight'
 import { getCustomNodeAttrs, getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from '../../utils/htmlRenderer'
+import { normalizeLanguageIdentifier } from '../../utils/languageIcon'
 import { isReservedNodeComponentKey, useCustomNodeComponents } from '../../utils/nodeComponents'
 import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import { setNormalizedElementScrollTop } from '../../utils/normalizedScroll'
@@ -5427,14 +5428,23 @@ function getCustomCodeLanguageComponent(
   customComponents: Record<string, unknown>,
   language: string,
 ) {
-  if (!language)
+  const raw = language.trim().toLowerCase()
+  if (!raw)
     return undefined
 
-  const raw = language.trim().toLowerCase()
-  const normalized = normalizeShikiLanguage(raw)
+  const candidates = [
+    raw,
+    normalizeLanguageIdentifier(raw),
+    normalizeShikiLanguage(raw),
+  ].filter((key): key is string => Boolean(key))
 
-  return customComponents[raw]
-    ?? (normalized && normalized !== raw ? customComponents[normalized] : undefined)
+  for (const key of Array.from(new Set(candidates))) {
+    const component = customComponents[key]
+    if (component)
+      return component
+  }
+
+  return undefined
 }
 
 function hasCodeLanguageOverride(language: string) {

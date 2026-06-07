@@ -522,7 +522,10 @@ async function initRenderer(epoch: number) {
     getResolvedThemes(),
     props.langs,
   )
-  const nextRendererConfigKey = highlightRegistrationKey.value
+  const nextRendererConfigKey = getHighlightRegistrationKey(
+    rendererOptions.themes,
+    rendererOptions.langs,
+  )
   latestHighlightRegistrationKey = nextRendererConfigKey
 
   if (renderer && rendererConfigKey !== nextRendererConfigKey) {

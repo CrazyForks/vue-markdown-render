@@ -33,6 +33,7 @@ import TableNode from '../../components/TableNode'
 import TextNode from '../../components/TextNode'
 import ThematicBreakNode from '../../components/ThematicBreakNode'
 import VmrContainerNode from '../../components/VmrContainerNode'
+import { normalizeLanguageIdentifier } from '../../utils'
 import { getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from '../../utils/htmlRenderer'
 import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
 import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
@@ -277,14 +278,23 @@ function getCustomCodeLanguageComponent(
   customComponents: Record<string, unknown>,
   language: string,
 ) {
-  if (!language)
+  const raw = language.trim().toLowerCase()
+  if (!raw)
     return undefined
 
-  const raw = language.trim().toLowerCase()
-  const normalized = normalizeShikiLanguage(raw)
+  const candidates = [
+    raw,
+    normalizeLanguageIdentifier(raw),
+    normalizeShikiLanguage(raw),
+  ].filter((key): key is string => Boolean(key))
 
-  return customComponents[raw]
-    ?? (normalized && normalized !== raw ? customComponents[normalized] : undefined)
+  for (const key of Array.from(new Set(candidates))) {
+    const component = customComponents[key]
+    if (component)
+      return component
+  }
+
+  return undefined
 }
 
 function getNodeComponent(node: ParsedNode, language?: string) {
