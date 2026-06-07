@@ -140,10 +140,6 @@ export default defineConfig(({ mode }) => {
             vue: 'Vue',
           },
           exports: 'named',
-          manualChunks(id: string) {
-            if (id.endsWith('/src/composables/useMarkstreamVirtualAdapter.ts'))
-              return 'virtual-adapter'
-          },
           // Workers are handled by worker.rollupOptions.output below.
           chunkFileNames: '[name].js',
           assetFileNames: (assetInfo: any) => {

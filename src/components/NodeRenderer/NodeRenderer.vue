@@ -57,6 +57,7 @@ import {
   heightEstimationExperimentRevision,
   registerHeightEstimationRendererController,
 } from '../../internal/heightEstimationExperiment'
+import { getCodeBlockExtraProps } from '../../utils/codeBlockExtraProps'
 import { isDevEnvironment } from '../../utils/devEnv'
 import { clampInfographicPreviewHeight, clampMermaidPreviewHeight, estimateInfographicPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber } from '../../utils/diagramHeight'
 import { getCustomNodeAttrs, getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from '../../utils/htmlRenderer'
@@ -1779,10 +1780,9 @@ function getVirtualRendererLayoutKey() {
     rendererProps.codeBlockStream === false ? 'code-static' : 'code-stream',
     stringifyVirtualToken(props.codeBlockMinWidth),
     stringifyVirtualToken(props.codeBlockMaxWidth),
-    '',
-    includeShikiCodeOptions
-      ? getShikiLangs((codeProps?.langs ?? props.langs) as readonly unknown[] | undefined)?.join('\u0000') ?? ''
-      : '',
+    ...(includeShikiCodeOptions
+      ? [getShikiLangs((codeProps?.langs ?? props.langs) as readonly unknown[] | undefined)?.join('\u0000') ?? '']
+      : []),
     stringifyVirtualToken(monaco?.fontSize),
     stringifyVirtualToken(monaco?.lineHeight),
     stringifyVirtualToken(monaco?.fontFamily),
@@ -5118,32 +5118,6 @@ const nodeComponents: Partial<CustomComponents> = {
   // 例如:custom_node: CustomNode,
 }
 const indexPrefix = computed(() => getCurrentIndexPrefix())
-const RESERVED_CODE_BLOCK_EXTRA_PROPS = new Set([
-  'node',
-  'key',
-  'ref',
-  'ctx',
-  'renderNode',
-  'indexKey',
-  '__proto__',
-  'prototype',
-  'constructor',
-])
-
-function getCodeBlockExtraProps(source: unknown) {
-  const extraProps: Record<string, unknown> = {}
-
-  if (!source || typeof source !== 'object')
-    return extraProps
-
-  for (const [key, value] of Object.entries(source as Record<string, unknown>)) {
-    if (!RESERVED_CODE_BLOCK_EXTRA_PROPS.has(key))
-      extraProps[key] = value
-  }
-
-  return extraProps
-}
-
 const codeBlockExtraProps = computed(() => getCodeBlockExtraProps(props.codeBlockProps))
 const codeBlockBindings = computed(() => ({
   // streaming behavior control for CodeBlockNode / MarkdownCodeBlockNode
