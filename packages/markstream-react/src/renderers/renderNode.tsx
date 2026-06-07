@@ -45,17 +45,8 @@ import { VmrContainerNode } from '../components/VmrContainerNode/VmrContainerNod
 import { getCustomNodeComponents } from '../customComponents'
 import { resolveCustomHtmlTag } from '../utils/customHtmlTag'
 import { normalizeLanguageIdentifier } from '../utils/languageIcon'
+import { getCodeBlockExtraProps } from './codeBlockExtraProps'
 import { renderNodeChildren } from './renderChildren'
-
-function getCodeBlockExtraProps(ctx: RenderContext) {
-  const extraProps = { ...(ctx.codeBlockProps || {}) } as Record<string, unknown>
-  delete extraProps.node
-  delete extraProps.key
-  delete extraProps.ctx
-  delete extraProps.renderNode
-  delete extraProps.indexKey
-  return extraProps
-}
 
 function getRawCodeBlockLanguage(node: any) {
   const trimmed = String(node?.language || '').trim()
@@ -73,7 +64,7 @@ function renderCustomCodeBlockComponent(
   ctx: RenderContext,
   specialProps: Record<string, unknown> = {},
 ) {
-  const extraProps = getCodeBlockExtraProps(ctx)
+  const extraProps = getCodeBlockExtraProps(ctx.codeBlockProps)
   return React.createElement(component, {
     key,
     node,
@@ -95,6 +86,21 @@ function renderCustomCodeBlockComponent(
     indexKey: key,
     typewriter: ctx.typewriter,
     fade: ctx.fade,
+  })
+}
+
+function renderSpecialCodeBlockComponent(
+  component: any,
+  node: any,
+  key: React.Key,
+  ctx: RenderContext,
+  specialProps: Record<string, unknown> = {},
+) {
+  return React.createElement(component, {
+    key,
+    node,
+    isDark: ctx.isDark,
+    ...specialProps,
   })
 }
 
@@ -135,7 +141,7 @@ function renderCodeBlock(
     const mermaidProps = getMermaidRenderProps(node, ctx)
     const customMermaid = customForLanguage || customComponents.mermaid
     if (customMermaid)
-      return renderCustomCodeBlockComponent(customMermaid, node, key, ctx, mermaidProps)
+      return renderSpecialCodeBlockComponent(customMermaid, node, key, ctx, mermaidProps)
     if (!ctx.renderCodeBlocksAsPre) {
       return (
         <MermaidBlockNode
@@ -153,7 +159,7 @@ function renderCodeBlock(
     const infographicProps = getInfographicRenderProps(node, ctx)
     const customInfographic = customForLanguage || customComponents.infographic
     if (customInfographic)
-      return renderCustomCodeBlockComponent(customInfographic, node, key, ctx, infographicProps)
+      return renderSpecialCodeBlockComponent(customInfographic, node, key, ctx, infographicProps)
 
     return (
       <InfographicBlockNode
@@ -169,7 +175,7 @@ function renderCodeBlock(
   if (language === 'd2' || language === 'd2lang') {
     const customD2 = customForLanguage || customComponents.d2
     if (customD2)
-      return renderCustomCodeBlockComponent(customD2, node, key, ctx, ctx.d2Props || {})
+      return renderSpecialCodeBlockComponent(customD2, node, key, ctx, ctx.d2Props || {})
 
     return (
       <D2BlockNode
@@ -205,7 +211,7 @@ function renderCodeBlock(
       maxWidth={ctx.codeBlockThemes?.maxWidth}
       isDark={ctx.isDark}
       onCopy={ctx.events.onCopy}
-      {...getCodeBlockExtraProps(ctx)}
+      {...getCodeBlockExtraProps(ctx.codeBlockProps)}
     />
   )
 }

@@ -136,7 +136,10 @@ describe('release dependency gates', () => {
   it('blocks dependent publishes when changed core files reuse a published version', () => {
     const script = readFileSync(resolve(process.cwd(), 'scripts/check-core-published.mjs'), 'utf8')
 
-    expect(script).toContain('HEAD~1...HEAD')
+    expect(script).toContain('process.env.GITHUB_BASE_SHA')
+    expect(script).toContain('process.env.MARKSTREAM_RELEASE_BASE_SHA')
+    expect(script).toContain('process.env.MARKSTREAM_DIFF_BASE')
+    expect(script).toMatch(/`\$\{base\}\.\.\.HEAD`/)
     expect(script).toContain('hasPackageVersionChanged')
     expect(script).toContain('local core files changed')
     expect(script).toMatch(/Bump \$\{args\.corePackageName\} before publishing dependents\./)

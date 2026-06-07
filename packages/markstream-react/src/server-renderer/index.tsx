@@ -42,6 +42,7 @@ import {
 import { clampInfographicPreviewHeight, estimateInfographicPreviewHeight, parsePositiveNumber as parsePositiveInfographicNumber } from '../components/InfographicBlockNode/height'
 import { clampMermaidPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber as parsePositiveMermaidNumber } from '../components/MermaidBlockNode/height'
 import { getCustomNodeComponents } from '../customComponents'
+import { getCodeBlockExtraProps } from '../renderers/codeBlockExtraProps'
 import { BLOCK_LEVEL_TYPES, renderInline, renderNodeChildren, tokenAttrsToProps } from '../renderers/renderChildren'
 import { isParagraphBreakingCustomHtmlNode, resolveCustomHtmlTag } from '../utils/customHtmlTag'
 import { normalizeDomAttrs } from '../utils/htmlToReact'
@@ -115,16 +116,6 @@ function mergeHtmlBlockWrapperProps(
   return next
 }
 
-function getCodeBlockExtraProps(ctx: RenderContext) {
-  const extraProps = { ...(ctx.codeBlockProps || {}) } as Record<string, unknown>
-  delete extraProps.node
-  delete extraProps.key
-  delete extraProps.ctx
-  delete extraProps.renderNode
-  delete extraProps.indexKey
-  return extraProps
-}
-
 function renderCustomCodeBlockComponent(
   component: any,
   node: any,
@@ -132,7 +123,7 @@ function renderCustomCodeBlockComponent(
   ctx: RenderContext,
   specialProps: Record<string, unknown> = {},
 ) {
-  const extraProps = getCodeBlockExtraProps(ctx)
+  const extraProps = getCodeBlockExtraProps(ctx.codeBlockProps)
 
   return React.createElement(component as any, {
     key,
@@ -154,6 +145,21 @@ function renderCustomCodeBlockComponent(
     renderNode,
     indexKey: key,
     typewriter: ctx.typewriter,
+  })
+}
+
+function renderSpecialCodeBlockComponent(
+  component: any,
+  node: any,
+  key: React.Key,
+  ctx: RenderContext,
+  specialProps: Record<string, unknown> = {},
+) {
+  return React.createElement(component as any, {
+    key,
+    node,
+    isDark: ctx.isDark,
+    ...specialProps,
   })
 }
 
@@ -243,7 +249,7 @@ function renderCodeBlock(
     const mermaidProps = getMermaidRenderProps(node, ctx)
     const customMermaid = customForLanguage || customComponents.mermaid
     if (customMermaid)
-      return renderCustomCodeBlockComponent(customMermaid, node, key, ctx, mermaidProps)
+      return renderSpecialCodeBlockComponent(customMermaid, node, key, ctx, mermaidProps)
     return (
       <MermaidBlockNode
         key={key}
@@ -259,7 +265,7 @@ function renderCodeBlock(
     const infographicProps = getInfographicRenderProps(node, ctx)
     const customInfographic = customForLanguage || customComponents.infographic
     if (customInfographic)
-      return renderCustomCodeBlockComponent(customInfographic, node, key, ctx, infographicProps)
+      return renderSpecialCodeBlockComponent(customInfographic, node, key, ctx, infographicProps)
     return (
       <InfographicBlockNode
         key={key}
@@ -274,7 +280,7 @@ function renderCodeBlock(
   if (language === 'd2' || language === 'd2lang') {
     const customD2 = customForLanguage || customComponents.d2
     if (customD2)
-      return renderCustomCodeBlockComponent(customD2, node, key, ctx, ctx.d2Props || {})
+      return renderSpecialCodeBlockComponent(customD2, node, key, ctx, ctx.d2Props || {})
     return (
       <D2BlockNode
         key={key}
@@ -307,7 +313,7 @@ function renderCodeBlock(
       minWidth={ctx.codeBlockThemes?.minWidth}
       maxWidth={ctx.codeBlockThemes?.maxWidth}
       isDark={ctx.isDark}
-      {...getCodeBlockExtraProps(ctx)}
+      {...getCodeBlockExtraProps(ctx.codeBlockProps)}
     />
   )
 }

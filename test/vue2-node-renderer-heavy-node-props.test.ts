@@ -404,7 +404,7 @@ describe('markstream-vue2 heavy-node prop forwarding', () => {
     expect(probe.attributes('data-show-header')).toBe('false')
   })
 
-  it('forwards top-level langs to legacy exact custom mermaid renderers', async () => {
+  it('keeps top-level langs off legacy exact custom mermaid renderers', async () => {
     setCustomComponents(customId, {
       mermaid: GenericCodeBlockAttrsProbe as any,
     })
@@ -428,7 +428,7 @@ describe('markstream-vue2 heavy-node prop forwarding', () => {
 
     const probe = wrapper.get('.generic-code-block-attrs-probe')
     expect(probe.attributes('data-language')).toBe('mermaid')
-    expect(probe.attributes('data-langs')).toBe('["mermaid"]')
+    expect(probe.attributes('data-langs')).toBe('null')
   })
 
   it('re-emits copy from legacy custom code block renderers', async () => {

@@ -155,7 +155,7 @@ describe('markstream-react code block streaming stability', () => {
     })
   })
 
-  it('forwards code block props to custom mermaid renderers on client and server', async () => {
+  it('keeps generic code block props off custom mermaid renderers on client and server', async () => {
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
     setCustomComponents(scopeId, { mermaid: CodeBlockProbe as any })
 
@@ -190,9 +190,9 @@ describe('markstream-react code block streaming stability', () => {
     await flushReact()
 
     const probe = host.querySelector('.code-block-probe') as HTMLElement | null
-    expect(probe?.getAttribute('data-langs')).toBe('["mermaid"]')
+    expect(probe?.getAttribute('data-langs')).toBe('null')
     expect(probe?.getAttribute('data-show-header')).toBe('false')
-    expect(probe?.getAttribute('data-stream')).toBe('false')
+    expect(probe?.getAttribute('data-stream')).toBe('undefined')
 
     const html = renderToStaticMarkup(React.createElement(ServerNodeRenderer as any, {
       customId: scopeId,
@@ -207,9 +207,9 @@ describe('markstream-react code block streaming stability', () => {
       },
     }))
 
-    expect(html).toContain('data-langs="[&quot;mermaid&quot;]"')
+    expect(html).toContain('data-langs="null"')
     expect(html).toContain('data-show-header="false"')
-    expect(html).toContain('data-stream="false"')
+    expect(html).toContain('data-stream="undefined"')
 
     await act(async () => {
       root.unmount()
@@ -245,6 +245,10 @@ describe('markstream-react code block streaming stability', () => {
           ctx: { unsafe: true },
           renderNode: null,
           indexKey: 'wrong-index',
+          ref: 'wrong-ref',
+          ['__proto__']: { unsafe: true },
+          prototype: { unsafe: true },
+          constructor: { unsafe: true },
           langs: ['python'],
         },
         viewportPriority: false,
@@ -290,6 +294,10 @@ describe('markstream-react code block streaming stability', () => {
         ctx: { unsafe: true },
         renderNode: null,
         indexKey: 'wrong-index',
+        ref: 'wrong-ref',
+        ['__proto__']: { unsafe: true },
+        prototype: { unsafe: true },
+        constructor: { unsafe: true },
         langs: ['python'],
       },
     }))

@@ -141,14 +141,28 @@ const customComponentsMap = computed(() => {
   return getCustomNodeComponents(props.customId)
 })
 const indexPrefix = computed(() => (props.indexKey != null ? String(props.indexKey) : 'legacy-renderer'))
-function getCodeBlockExtraProps(source: unknown) {
-  const extraProps = { ...((source ?? {}) as Record<string, unknown>) }
+const RESERVED_CODE_BLOCK_EXTRA_PROPS = new Set([
+  'node',
+  'key',
+  'ref',
+  'ctx',
+  'renderNode',
+  'indexKey',
+  '__proto__',
+  'prototype',
+  'constructor',
+])
 
-  delete extraProps.node
-  delete extraProps.key
-  delete extraProps.ctx
-  delete extraProps.renderNode
-  delete extraProps.indexKey
+function getCodeBlockExtraProps(source: unknown) {
+  const extraProps: Record<string, unknown> = {}
+
+  if (!source || typeof source !== 'object')
+    return extraProps
+
+  for (const [key, value] of Object.entries(source as Record<string, unknown>)) {
+    if (!RESERVED_CODE_BLOCK_EXTRA_PROPS.has(key))
+      extraProps[key] = value
+  }
 
   return extraProps
 }
@@ -301,12 +315,16 @@ function isCustomLanguageCodeBlockComponent(component: unknown, language?: strin
 
 function getBindingsFor(node: ParsedNode, language?: string, component?: unknown) {
   const lang = language ?? getCodeBlockLanguage(node)
+  if (node.type === 'code_block' && isCustomLanguageCodeBlockComponent(component, lang)) {
+    if (lang === 'mermaid' || lang === 'infographic' || lang === 'd2' || lang === 'd2lang')
+      return {}
+
+    return customCodeBlockBindings.value
+  }
+
   if (
     node.type === 'code_block'
-    && (
-      isCustomCodeBlockComponent(component)
-      || isCustomLanguageCodeBlockComponent(component, lang)
-    )
+    && isCustomCodeBlockComponent(component)
   ) {
     return customCodeBlockBindings.value
   }

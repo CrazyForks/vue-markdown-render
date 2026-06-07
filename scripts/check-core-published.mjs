@@ -71,11 +71,21 @@ function npmViewVersion(packageName, version) {
   return null
 }
 
+function getDiffBase() {
+  return (
+    process.env.GITHUB_BASE_SHA
+    || process.env.MARKSTREAM_RELEASE_BASE_SHA
+    || process.env.MARKSTREAM_DIFF_BASE
+    || 'HEAD~1'
+  )
+}
+
 function hasGitChanges(repoRoot, relativePath) {
   try {
+    const base = getDiffBase()
     const output = execFileSync(
       'git',
-      ['diff', '--name-only', 'HEAD~1...HEAD', '--', relativePath],
+      ['diff', '--name-only', `${base}...HEAD`, '--', relativePath],
       { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
     ).trim()
     return output.length > 0
@@ -87,9 +97,10 @@ function hasGitChanges(repoRoot, relativePath) {
 
 function hasPackageVersionChanged(repoRoot, packageJsonRelativePath, targetVersion) {
   try {
+    const base = getDiffBase()
     const previousRaw = execFileSync(
       'git',
-      ['show', `HEAD~1:${packageJsonRelativePath}`],
+      ['show', `${base}:${packageJsonRelativePath}`],
       { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
     )
     const previousPackageJson = JSON.parse(previousRaw)

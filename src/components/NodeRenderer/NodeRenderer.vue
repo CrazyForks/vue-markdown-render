@@ -5136,14 +5136,28 @@ const nodeComponents: Partial<CustomComponents> = {
   // 例如:custom_node: CustomNode,
 }
 const indexPrefix = computed(() => getCurrentIndexPrefix())
-function getCodeBlockExtraProps(source: unknown) {
-  const extraProps = { ...((source ?? {}) as Record<string, unknown>) }
+const RESERVED_CODE_BLOCK_EXTRA_PROPS = new Set([
+  'node',
+  'key',
+  'ref',
+  'ctx',
+  'renderNode',
+  'indexKey',
+  '__proto__',
+  'prototype',
+  'constructor',
+])
 
-  delete extraProps.node
-  delete extraProps.key
-  delete extraProps.ctx
-  delete extraProps.renderNode
-  delete extraProps.indexKey
+function getCodeBlockExtraProps(source: unknown) {
+  const extraProps: Record<string, unknown> = {}
+
+  if (!source || typeof source !== 'object')
+    return extraProps
+
+  for (const [key, value] of Object.entries(source as Record<string, unknown>)) {
+    if (!RESERVED_CODE_BLOCK_EXTRA_PROPS.has(key))
+      extraProps[key] = value
+  }
 
   return extraProps
 }
@@ -5439,6 +5453,30 @@ function shouldUsePreCodeBindings(
     && component === PreCodeNode
 }
 
+function getMermaidBindingsFor(node: ParsedNode) {
+  const bindings = { ...mermaidBindings.value } as Record<string, any>
+  if (parsePositiveNumber(bindings.estimatedPreviewHeightPx) == null) {
+    bindings.estimatedPreviewHeightPx = clampMermaidPreviewHeight(
+      estimateMermaidPreviewHeight(String((node as RuntimeCodeBlockNode)?.code ?? '')),
+      undefined,
+      bindings.maxHeight === 'none' ? null : (parsePositiveNumber(bindings.maxHeight) ?? undefined),
+    )
+  }
+  return bindings
+}
+
+function getInfographicBindingsFor(node: ParsedNode) {
+  const bindings = { ...infographicBindings.value } as Record<string, any>
+  if (parsePositiveNumber(bindings.estimatedPreviewHeightPx) == null) {
+    bindings.estimatedPreviewHeightPx = clampInfographicPreviewHeight(
+      estimateInfographicPreviewHeight(String((node as RuntimeCodeBlockNode)?.code ?? '')),
+      undefined,
+      bindings.maxHeight === 'none' ? null : (parsePositiveNumber(bindings.maxHeight) ?? undefined),
+    )
+  }
+  return bindings
+}
+
 // Decide which component to use for a given node. Ensure that code blocks
 // with language `mermaid` are rendered with `MermaidBlockNode` (unless a
 // custom component named `mermaid` is registered for the given customId).
@@ -5500,21 +5538,21 @@ function getBindingsFor(node: ParsedNode, language?: string, component?: unknown
   if (component && shouldUsePreCodeBindings(node, lang, component))
     return preCodeBlockBindings.value
 
-  if (node.type === 'code_block' && isCustomCodeBlockComponent(component))
-    return customCodeBlockBindings.value
-
   if (node.type === 'code_block' && isCustomLanguageCodeBlockComponent(component, lang)) {
     if (lang === 'mermaid')
-      return { ...customCodeBlockBindings.value, ...mermaidBindings.value }
+      return getMermaidBindingsFor(node)
 
     if (lang === 'infographic')
-      return { ...customCodeBlockBindings.value, ...infographicBindings.value }
+      return getInfographicBindingsFor(node)
 
     if (lang === 'd2' || lang === 'd2lang')
-      return { ...customCodeBlockBindings.value, ...d2Bindings.value }
+      return d2Bindings.value
 
     return customCodeBlockBindings.value
   }
+
+  if (node.type === 'code_block' && isCustomCodeBlockComponent(component))
+    return customCodeBlockBindings.value
 
   if (node.type === 'code_block' && isMarkdownCodeBlockComponent(component))
     return shikiCodeBlockBindings.value

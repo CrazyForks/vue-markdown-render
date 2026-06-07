@@ -435,7 +435,7 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
     expect(wrapper.get('.generic-code-block-attrs-probe').attributes('data-langs')).toBe('["typescript"]')
   })
 
-  it('forwards code block props to exact custom mermaid renderers', async () => {
+  it('keeps generic code block props off exact custom mermaid renderers', async () => {
     setCustomComponents(customId, {
       mermaid: GenericCodeBlockAttrsProbe as any,
     })
@@ -471,8 +471,8 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
 
     const probe = wrapper.get('.generic-code-block-attrs-probe')
     expect(probe.attributes('data-show-header')).toBe('false')
-    expect(probe.attributes('data-has-stream')).toBe('true')
-    expect(probe.attributes('data-langs')).toBe('["mermaid"]')
+    expect(probe.attributes('data-has-stream')).toBe('false')
+    expect(probe.attributes('data-langs')).toBe('null')
   })
 
   it('does not let codeBlockProps override reserved code block props', async () => {
@@ -490,8 +490,12 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
           },
           indexKey: 'spoofed-index',
           key: 'spoofed-key',
+          ref: 'spoofed-ref',
           ctx: {},
           renderNode: () => null,
+          ['__proto__']: { polluted: true },
+          prototype: { polluted: true },
+          constructor: { polluted: true },
           showHeader: false,
         },
         nodes: [
