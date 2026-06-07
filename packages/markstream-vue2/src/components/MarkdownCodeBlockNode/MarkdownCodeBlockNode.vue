@@ -12,6 +12,7 @@ import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { getLanguageIcon, languageIconsRevision, languageMap, normalizeLanguageIdentifier } from '../../utils'
+import { isDevEnvironment } from '../../utils/devEnv'
 
 interface MarkdownCodeBlockNodeProps {
   node: {
@@ -369,7 +370,7 @@ let highlightRegistrationSeq = 0
 let renderEpoch = 0
 let disposed = false
 const warnedRendererErrors = new Set<string>()
-const isDevEnv = import.meta.env.DEV
+const isDevEnv = isDevEnvironment()
 let warnedMissingRegisterHighlightForLangs = false
 let streamMarkdownLoadPromise: Promise<void> | null = null
 let streamMarkdownUnavailable = false

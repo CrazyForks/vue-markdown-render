@@ -1,3 +1,4 @@
+import { isDevEnvironment } from '../utils/devEnv'
 import { normalizeKaTeXRenderInput } from '../utils/normalizeKaTeXRenderInput'
 
 interface Pending {
@@ -31,7 +32,7 @@ function notifyDrainIfBelowCap() {
 
 let perfMonitor: any = null
 try {
-  if (typeof window !== 'undefined' && import.meta.env.DEV) {
+  if (typeof window !== 'undefined' && isDevEnvironment()) {
     import('../utils/performanceMonitor').then((a) => {
       perfMonitor = a.perfMonitor
     })

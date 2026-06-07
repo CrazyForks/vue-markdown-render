@@ -21,6 +21,7 @@ type HighlightRegistrationTaskMap = Map<
 
 interface HighlightRegistrationState {
   inFlight: HighlightRegistrationTaskMap
+  completed: Set<string>
   tail: Promise<unknown>
 }
 
@@ -34,6 +35,7 @@ function getHighlightRegistrationState(registerHighlight: RegisterHighlightFn) {
   if (!state) {
     state = {
       inFlight: new Map(),
+      completed: new Set(),
       tail: Promise.resolve(),
     }
     sharedHighlightRegistrationStates.set(registerHighlight, state)
@@ -181,6 +183,9 @@ export async function registerHighlightOnce(
     return 'ready'
 
   const state = getHighlightRegistrationState(registerHighlight)
+  if (state.completed.has(key))
+    return 'ready'
+
   const cached = state.inFlight.get(key)
   if (cached)
     return cached
@@ -188,7 +193,10 @@ export async function registerHighlightOnce(
   const task = state.tail
     .catch(() => {})
     .then(() => registerHighlight(opts))
-    .then(() => 'ready' as const)
+    .then(() => {
+      state.completed.add(key)
+      return 'ready' as const
+    })
     .finally(() => {
       if (state.inFlight.get(key) === task)
         state.inFlight.delete(key)

@@ -57,6 +57,7 @@ import {
   heightEstimationExperimentRevision,
   registerHeightEstimationRendererController,
 } from '../../internal/heightEstimationExperiment'
+import { isDevEnvironment } from '../../utils/devEnv'
 import { clampInfographicPreviewHeight, clampMermaidPreviewHeight, estimateInfographicPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber } from '../../utils/diagramHeight'
 import { getCustomNodeAttrs, getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from '../../utils/htmlRenderer'
 import { normalizeLanguageIdentifier } from '../../utils/languageIcon'
@@ -3024,7 +3025,7 @@ function warnStandaloneHeightCacheIgnored(reason: string) {
   if (
     warnedStandaloneHeightCacheWithoutSignature
     || typeof console === 'undefined'
-    || !import.meta.env.DEV
+    || !isDevEnvironment()
   ) {
     return
   }
@@ -4334,7 +4335,7 @@ function autoDisableViewportPriority(reason: 'too-many-targets') {
   if (viewportPriorityAutoDisabled.value)
     return
   viewportPriorityAutoDisabled.value = true
-  if (import.meta.env.DEV && typeof console !== 'undefined')
+  if (isDevEnvironment() && typeof console !== 'undefined')
     console.warn('[markstream-vue] viewportPriority auto-disabled:', reason)
 
   destroyNodeVisibilityState()
@@ -5035,7 +5036,7 @@ const MermaidBlockNodeAsync = defineAsyncComponent({
     }
     catch (e) {
       console.warn(
-        '[markstream-vue] Mermaid missing; pre.',
+        '[markstream-vue] Optional peer dependencies for MermaidBlockNode are missing. Falling back to preformatted code rendering. To enable Mermaid rendering, please install "mermaid".',
         e,
       )
       return PreCodeNode
@@ -5053,7 +5054,7 @@ const InfographicBlockNodeAsync = defineAsyncComponent({
     }
     catch (e) {
       console.warn(
-        '[markstream-vue] Infographic failed; pre.',
+        '[markstream-vue] Optional peer dependencies for InfographicBlockNode are missing. Falling back to preformatted code rendering.',
         e,
       )
       return PreCodeNode
@@ -5070,7 +5071,7 @@ const D2BlockNodeAsync = defineAsyncComponent(async () => {
   }
   catch (e) {
     console.warn(
-      '[markstream-vue] D2 missing; pre.',
+      '[markstream-vue] Optional peer dependencies for D2BlockNode are missing. Falling back to preformatted code rendering. To enable D2 rendering, please install "@terrastruct/d2".',
       e,
     )
     return PreCodeNode

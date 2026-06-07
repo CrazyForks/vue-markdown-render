@@ -301,7 +301,7 @@ describe('markdown code block Shiki langs', () => {
     await Promise.all([first, second])
 
     await registerHighlightOnce(registerHighlight, opts, key)
-    expect(registerHighlight).toHaveBeenCalledTimes(2)
+    expect(registerHighlight).toHaveBeenCalledTimes(1)
   })
 
   it('serializes different highlight registration keys for the same registerHighlight function', async () => {
@@ -338,7 +338,7 @@ describe('markdown code block Shiki langs', () => {
     ])
   })
 
-  it('retries failed highlight registration and allows later registrations', async () => {
+  it('retries failed highlight registration and caches later success', async () => {
     const registerHighlight = vi
       .fn()
       .mockRejectedValueOnce(new Error('first registration failed'))
@@ -352,10 +352,9 @@ describe('markdown code block Shiki langs', () => {
     await expect(registerHighlightOnce(registerHighlight, opts, key)).resolves.toBe('ready')
     await expect(registerHighlightOnce(registerHighlight, opts, key)).resolves.toBe('ready')
 
-    expect(registerHighlight).toHaveBeenCalledTimes(3)
+    expect(registerHighlight).toHaveBeenCalledTimes(2)
     expect(registerHighlight).toHaveBeenNthCalledWith(1, opts)
     expect(registerHighlight).toHaveBeenNthCalledWith(2, opts)
-    expect(registerHighlight).toHaveBeenNthCalledWith(3, opts)
   })
 
   it('passes langs to Vue registerHighlight and renderer', async () => {
@@ -497,7 +496,7 @@ describe('markdown code block Shiki langs', () => {
     wrapper.unmount()
   })
 
-  it('registers Vue highlight for later matching code block instances', async () => {
+  it('reuses Vue highlight registration for later matching code block instances', async () => {
     const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
     const first = mount(MarkdownCodeBlockNode, {
       props: {
@@ -521,7 +520,7 @@ describe('markdown code block Shiki langs', () => {
     await flushAll()
     await waitForRendererCount(2)
 
-    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(1)
 
     first.unmount()
     second.unmount()
@@ -1256,7 +1255,7 @@ describe('markdown code block Shiki langs', () => {
     }
   })
 
-  it('registers Vue2 highlight for later matching code block instances', async () => {
+  it('reuses Vue2 highlight registration for later matching code block instances', async () => {
     const { default: Vue2MarkdownCodeBlockNode } = await import('../packages/markstream-vue2/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
     const first = mount(Vue2MarkdownCodeBlockNode as any, {
       props: {
@@ -1280,7 +1279,7 @@ describe('markdown code block Shiki langs', () => {
     await flushAll()
     await waitForRendererCount(2)
 
-    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(2)
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(1)
 
     first.unmount()
     second.unmount()

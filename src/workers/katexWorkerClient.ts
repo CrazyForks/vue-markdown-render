@@ -1,4 +1,5 @@
 import { isKatexEnabled } from '../components/MathInlineNode/katex'
+import { isDevEnvironment } from '../utils/devEnv'
 import { normalizeKaTeXRenderInput } from '../utils/normalizeKaTeXRenderInput'
 
 interface Pending {
@@ -39,9 +40,8 @@ function notifyDrainIfBelowCap() {
 // Performance monitoring (optional, dev-only by default)
 let perfMonitor: any = null
 try {
-  // Only load in development. This guard is statically analyzable,
-  // so the import below is removed from production builds.
-  if (typeof window !== 'undefined' && import.meta.env.DEV) {
+  // Only load in development without assuming a Vite-style import.meta.env.
+  if (typeof window !== 'undefined' && isDevEnvironment()) {
     // Use an opaque dynamic import path so bundlers don't emit a chunk in prod builds.
     // This runs only in dev; in production the whole block is tree-shaken.
 

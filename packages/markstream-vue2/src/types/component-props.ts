@@ -23,8 +23,8 @@ export interface CommonCodeBlockProps {
 export interface ShikiCodeBlockProps extends CommonCodeBlockProps {
   themes?: readonly string[]
   /**
-   * Shiki-only language list forwarded to stream-markdown's registerHighlight().
-   * When provided, only these languages are preloaded for the Shiki renderer.
+   * Shiki language preload request forwarded to stream-markdown's registerHighlight().
+   * This is not a rendering allow-list; already available Shiki languages may still highlight.
    */
   langs?: readonly string[]
 }
