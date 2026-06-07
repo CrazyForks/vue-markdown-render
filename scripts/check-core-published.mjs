@@ -86,12 +86,33 @@ function runGit(repoRoot, args, { ignoreStderr = false } = {}) {
 }
 
 function getExplicitDiffBase() {
-  return (
+  const direct = (
     process.env.GITHUB_BASE_SHA
     || process.env.MARKSTREAM_RELEASE_BASE_SHA
     || process.env.MARKSTREAM_DIFF_BASE
     || ''
   )
+  if (direct)
+    return direct
+
+  const eventPath = process.env.GITHUB_EVENT_PATH
+  if (eventPath && fs.existsSync(eventPath)) {
+    try {
+      const event = JSON.parse(fs.readFileSync(eventPath, 'utf8'))
+      const pullRequestBase = event?.pull_request?.base?.sha
+      const pushBase = event?.before
+
+      if (typeof pullRequestBase === 'string' && pullRequestBase)
+        return pullRequestBase
+      if (typeof pushBase === 'string' && pushBase && !/^0+$/.test(pushBase))
+        return pushBase
+    }
+    catch {
+      // Fall through to local refs.
+    }
+  }
+
+  return ''
 }
 
 function getDiffBase(repoRoot) {

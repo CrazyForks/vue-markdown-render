@@ -55,8 +55,8 @@ interface IdleDeadlineLike {
 }
 
 type NodeRendererCodeBlockProps
-  = Partial<Omit<CodeBlockNodeProps, 'node'>>
-    & Partial<Pick<ShikiCodeBlockProps, 'langs'>>
+  = Partial<Omit<CodeBlockNodeProps, 'node' | 'themes'>>
+    & Partial<ShikiCodeBlockProps>
     & Record<string, unknown>
 
 // Exported props interface so declaration generators can include prop types

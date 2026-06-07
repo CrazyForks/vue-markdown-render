@@ -144,6 +144,9 @@ describe('release dependency gates', () => {
     expect(script).toContain('process.env.GITHUB_BASE_REF')
     expect(script).toContain('process.env.MARKSTREAM_RELEASE_BASE_SHA')
     expect(script).toContain('process.env.MARKSTREAM_DIFF_BASE')
+    expect(script).toContain('process.env.GITHUB_EVENT_PATH')
+    expect(script).toContain('event?.pull_request?.base?.sha')
+    expect(script).toContain('event?.before')
     expect(script).toContain('function isGitWorktree')
     expect(script).toContain('const shouldCheckCoreSourceChanges')
     expect(script).toContain('Skip local core source diff guard because no CI/diff base was provided')
@@ -158,6 +161,8 @@ describe('release dependency gates', () => {
 
   it('smoke-tests packed Shiki dependent package imports after packed smoke', () => {
     const scripts = packageJson.scripts
+    const reactPackageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'packages/markstream-react/package.json'), 'utf8'))
+    const vue2PackageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'packages/markstream-vue2/package.json'), 'utf8'))
     const smokeScript = readFileSync(resolve(process.cwd(), 'scripts/smoke-shiki-dependent-imports.mjs'), 'utf8')
 
     expect(scripts['test:smoke:shiki-dependent-imports']).toBe('node scripts/smoke-shiki-dependent-imports.mjs')
@@ -169,6 +174,8 @@ describe('release dependency gates', () => {
     expect(scripts['release:verify'].indexOf('pnpm run test:smoke:vue2-cjs')).toBeLessThan(
       scripts['release:verify'].indexOf('pnpm run test:smoke:shiki-dependent-imports'),
     )
+    expect(reactPackageJson.scripts.release).toContain('pnpm -w run test:smoke:shiki-dependent-imports')
+    expect(vue2PackageJson.scripts.release).toContain('pnpm -w run test:smoke:shiki-dependent-imports')
     expect(smokeScript).toContain('markstream-react')
     expect(smokeScript).toContain('markstream-vue2')
     expect(smokeScript).toContain('stream-markdown')

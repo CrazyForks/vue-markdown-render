@@ -1780,7 +1780,7 @@ function getVirtualRendererLayoutKey() {
   const renderer = resolvedCodeRenderer.value
   const monaco = renderer === 'monaco' ? props.codeBlockMonacoOptions : undefined
   const codeProps = props.codeBlockProps as Record<string, unknown> | undefined
-  const includeShikiCodeOptions = usesShikiCodeBlockLayoutOptions()
+  const includeShikiCodeOptions = renderer === 'shiki'
 
   return [
     props.isDark ? 'dark' : 'light',
@@ -1809,29 +1809,6 @@ function getVirtualRendererLayoutKey() {
     stringifyVirtualToken(codeProps?.showCollapseButton),
     stringifyVirtualToken(codeProps?.showFontSizeButtons),
   ].join('\u0000')
-}
-
-function usesShikiCodeBlockLayoutOptions() {
-  if (resolvedCodeRenderer.value === 'shiki')
-    return true
-
-  const customComponents = customComponentsMap.value as Record<string, unknown>
-  if (customComponents.code_block)
-    return true
-
-  return parsedNodes.value.some((node) => {
-    if (node.type !== 'code_block')
-      return false
-
-    const lang = getCodeBlockLanguage(node)
-    if (!lang)
-      return false
-
-    if (lang === 'mermaid' || lang === 'infographic' || lang === 'd2' || lang === 'd2lang')
-      return false
-
-    return Boolean(getCustomCodeLanguageComponent(customComponents, lang))
-  })
 }
 
 function getVirtualMeasurementKey() {

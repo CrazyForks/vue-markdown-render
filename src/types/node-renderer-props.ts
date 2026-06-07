@@ -12,8 +12,8 @@ import type {
 } from './component-props'
 
 export type NodeRendererCodeBlockProps
-  = Partial<Omit<CodeBlockNodeProps, 'node'>>
-    & Partial<Pick<ShikiCodeBlockProps, 'langs'>>
+  = Partial<Omit<CodeBlockNodeProps, 'node' | 'themes'>>
+    & Partial<ShikiCodeBlockProps>
     & Record<string, unknown>
 export type NodeRendererMode = 'docs' | 'chat' | 'minimal'
 export type NodeRendererCodeRenderer = 'pre' | 'shiki' | 'monaco'

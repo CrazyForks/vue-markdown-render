@@ -2698,7 +2698,7 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
-  it('includes langs in the virtual layout key for language custom code blocks', async () => {
+  it('does not include langs in the virtual layout key for language custom code blocks', async () => {
     const LanguageCodeBlockProbe = defineComponent({
       inheritAttrs: false,
       props: {
@@ -2738,7 +2738,7 @@ describe('node renderer virtual-scroll coordination', () => {
 
     expect(wrapper.get('.virtual-language-code-block-probe').attributes('data-langs')).toBe('["typescript"]')
     const initialKey = (wrapper.vm as any).captureVirtualState()?.measurementKey
-    expect(initialKey).toContain('typescript')
+    expect(initialKey).not.toContain('typescript')
     expect(initialKey).not.toContain('["typescript"]')
 
     await wrapper.setProps({
@@ -2746,35 +2746,17 @@ describe('node renderer virtual-scroll coordination', () => {
     })
     await flushAll()
 
-    const nextKey = (wrapper.vm as any).captureVirtualState()?.measurementKey
-    expect(nextKey).not.toBe(initialKey)
-    expect(nextKey).toContain('python')
+    expect(wrapper.get('.virtual-language-code-block-probe').attributes('data-langs')).toBe('["typescript","python"]')
+    expect((wrapper.vm as any).captureVirtualState()?.measurementKey).toBe(initialKey)
 
     wrapper.unmount()
   })
 
-  it('normalizes shiki langs in the virtual layout key for language custom code blocks', async () => {
-    const LanguageCodeBlockProbe = defineComponent({
-      inheritAttrs: false,
-      props: {
-        node: { type: Object, required: true },
-      },
-      setup(_, { attrs }) {
-        return () => h('div', {
-          'class': 'virtual-language-code-block-probe',
-          'data-langs': JSON.stringify(attrs.langs ?? null),
-        })
-      },
-    })
-
-    setCustomComponents('virtual-prefix-test', {
-      ts: LanguageCodeBlockProbe as any,
-    })
-
+  it('normalizes shiki langs in the virtual layout key for built-in shiki code blocks', async () => {
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
     const wrapper = mount(NodeRenderer, {
       props: {
-        customId: 'virtual-prefix-test',
+        codeRenderer: 'shiki',
         nodes: [createCodeBlock(3)],
         final: true,
         fade: false,

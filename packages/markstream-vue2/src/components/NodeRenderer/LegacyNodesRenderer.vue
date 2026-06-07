@@ -41,8 +41,8 @@ import { MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
 import FallbackComponent from './FallbackComponent.vue'
 
 type NodeRendererCodeBlockProps
-  = Partial<Omit<CodeBlockNodeProps, 'node'>>
-    & Partial<Pick<ShikiCodeBlockProps, 'langs'>>
+  = Partial<Omit<CodeBlockNodeProps, 'node' | 'themes'>>
+    & Partial<ShikiCodeBlockProps>
     & Record<string, unknown>
 
 const props = withDefaults(defineProps<{
