@@ -16,7 +16,7 @@ import type {
   NodeRendererMode,
   NodeRendererProps,
 } from '../../types/node-renderer-props'
-import { getShikiLangs, normalizeShikiLanguage } from 'markstream-core'
+import { getShikiLangs, getShikiThemes, normalizeShikiLanguage } from 'markstream-core'
 import { computed, defineAsyncComponent, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
@@ -1769,6 +1769,12 @@ function getVirtualRendererLayoutKey() {
   const monaco = renderer === 'monaco' ? props.codeBlockMonacoOptions : undefined
   const codeProps = props.codeBlockProps as Record<string, unknown> | undefined
   const includeShikiCodeOptions = renderer === 'shiki'
+  const shikiThemesKey = includeShikiCodeOptions
+    ? getShikiThemes((codeProps?.themes ?? props.themes) as readonly unknown[] | undefined)?.join('\u0000') ?? ''
+    : ''
+  const shikiLangsKey = includeShikiCodeOptions
+    ? getShikiLangs((codeProps?.langs ?? props.langs) as readonly unknown[] | undefined)?.join('\u0000') ?? ''
+    : ''
 
   return [
     props.isDark ? 'dark' : 'light',
@@ -1780,9 +1786,7 @@ function getVirtualRendererLayoutKey() {
     rendererProps.codeBlockStream === false ? 'code-static' : 'code-stream',
     stringifyVirtualToken(props.codeBlockMinWidth),
     stringifyVirtualToken(props.codeBlockMaxWidth),
-    ...(includeShikiCodeOptions
-      ? [getShikiLangs((codeProps?.langs ?? props.langs) as readonly unknown[] | undefined)?.join('\u0000') ?? '']
-      : []),
+    ...(includeShikiCodeOptions ? [shikiThemesKey, shikiLangsKey] : []),
     stringifyVirtualToken(monaco?.fontSize),
     stringifyVirtualToken(monaco?.lineHeight),
     stringifyVirtualToken(monaco?.fontFamily),

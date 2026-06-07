@@ -2795,6 +2795,52 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('normalizes shiki themes in the virtual layout key for built-in shiki code blocks', async () => {
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        codeRenderer: 'shiki',
+        nodes: [createCodeBlock(3)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        themes: [' vitesse-light ', 'vitesse-dark', 'vitesse-light'] as any,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'normalized-shiki-theme-layout-key',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const initialKey = (wrapper.vm as any).captureVirtualState()?.measurementKey
+    expect(initialKey).toContain('vitesse-light')
+    expect(initialKey).toContain('vitesse-dark')
+
+    await wrapper.setProps({
+      themes: ['vitesse-light', 'vitesse-dark'],
+    })
+    await flushAll()
+
+    expect((wrapper.vm as any).captureVirtualState()?.measurementKey).toBe(initialKey)
+
+    await wrapper.setProps({
+      codeBlockProps: {
+        themes: ['github-light'],
+      },
+    })
+    await flushAll()
+
+    const overrideKey = (wrapper.vm as any).captureVirtualState()?.measurementKey
+    expect(overrideKey).toContain('github-light')
+    expect(overrideKey).not.toBe(initialKey)
+
+    wrapper.unmount()
+  })
+
   it('treats prop restoreState as cache-only unless restoreAnchor is provided', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
 
