@@ -86,6 +86,7 @@ const fallbackHtml = ref('')
 const rendererReady = ref(false)
 const hasStableRender = ref(false)
 let renderObserver: MutationObserver | undefined
+let lastCommittedRenderSignature = ''
 
 // Auto-scroll state management
 const autoScrollEnabled = ref(true) // Start with auto-scroll enabled
@@ -296,12 +297,24 @@ function hasRendererContentChanged(previousSnapshot: string) {
   return hasRendererContent() && getRendererContentSnapshot() !== previousSnapshot
 }
 
-async function clearFallbackWhenRendererReady(epoch: number, previousSnapshot: string) {
+function getRenderSignature(configKey: string | null | undefined, lang: string, code: string) {
+  return `${configKey ?? ''}\u0000${lang}\u0000${code}`
+}
+
+function markRendererCommitted(renderSignature: string) {
+  lastCommittedRenderSignature = renderSignature
+  clearFallback()
+}
+
+async function clearFallbackWhenRendererReady(epoch: number, previousSnapshot: string, renderSignature: string) {
   await nextTick()
   if (!isCurrentRenderEpoch(epoch))
     return
-  if (hasRendererContentChanged(previousSnapshot)) {
-    clearFallback()
+  if (
+    hasRendererContentChanged(previousSnapshot)
+    || (lastCommittedRenderSignature === renderSignature && hasRendererContent())
+  ) {
+    markRendererCommitted(renderSignature)
     return
   }
   const target = rendererTarget.value
@@ -319,13 +332,18 @@ async function clearFallbackWhenRendererReady(epoch: number, previousSnapshot: s
     }
     if (!hasRendererContentChanged(previousSnapshot))
       return
-    clearFallback()
+    markRendererCommitted(renderSignature)
     observer.disconnect()
     if (renderObserver === observer)
       renderObserver = undefined
   })
   renderObserver = observer
-  observer.observe(target, { childList: true, subtree: true })
+  observer.observe(target, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+    attributes: true,
+  })
 }
 // Lazy-load stream-markdown (and thus shiki) only when needed
 interface ShikiRenderer {
@@ -368,6 +386,7 @@ function disposeCurrentRenderer(options: { resetStableRender?: boolean } = {}) {
   renderer?.dispose()
   renderer = undefined
   rendererConfigKey = null
+  lastCommittedRenderSignature = ''
   clearRendererTarget()
   rendererReady.value = false
   if (options.resetStableRender)
@@ -399,15 +418,15 @@ function normalizeRendererLanguage(rawLang?: string | null, hasContent = false) 
 
 async function updateRendererWithFallback(code: string, rawLang?: string | null, epoch = renderEpoch) {
   if (!renderer || !isCurrentRenderEpoch(epoch))
-    return false
+    return undefined
   const normalized = normalizeRendererLanguage(rawLang, Boolean(code && code.length))
   try {
     await renderer.updateCode(code, normalized)
-    return isCurrentRenderEpoch(epoch)
+    return isCurrentRenderEpoch(epoch) ? normalized : undefined
   }
   catch (err) {
     if (!isCurrentRenderEpoch(epoch))
-      return false
+      return undefined
 
     if (normalized !== 'plaintext') {
       if (isDevEnv && !warnedRendererErrors.has(normalized)) {
@@ -416,20 +435,20 @@ async function updateRendererWithFallback(code: string, rawLang?: string | null,
       }
       try {
         await renderer.updateCode(code, 'plaintext')
-        return isCurrentRenderEpoch(epoch)
+        return isCurrentRenderEpoch(epoch) ? 'plaintext' : undefined
       }
       catch (plainErr) {
         if (!isCurrentRenderEpoch(epoch))
-          return false
+          return undefined
         if (isDevEnv)
           console.warn('[MarkdownCodeBlockNode] Failed to render code block even as plaintext.', plainErr)
-        return false
+        return undefined
       }
     }
     else if (isDevEnv) {
       console.warn('[MarkdownCodeBlockNode] Failed to render code block even as plaintext.', err)
     }
-    return false
+    return undefined
   }
 }
 
@@ -554,17 +573,23 @@ async function initRenderer(epoch: number) {
 
   renderFallback(props.node.code, !hasStableRender.value)
   const previousSnapshot = getRendererContentSnapshot()
-  const updated = await updateRendererWithFallback(props.node.code, props.node.language, epoch)
+  const renderedLang = await updateRendererWithFallback(props.node.code, props.node.language, epoch)
   if (!isCurrentRenderEpoch(epoch))
     return
-  if (!updated) {
+  if (!renderedLang) {
     keepLastSuccessfulRender()
     return
   }
-  if (hasStableRender.value)
+  if (hasStableRender.value) {
     keepLastSuccessfulRender()
-  else
-    await clearFallbackWhenRendererReady(epoch, previousSnapshot)
+  }
+  else {
+    await clearFallbackWhenRendererReady(
+      epoch,
+      previousSnapshot,
+      getRenderSignature(nextRendererConfigKey, renderedLang, props.node.code),
+    )
+  }
 }
 
 async function safeInitRenderer(epoch = nextRenderEpoch()) {
@@ -630,6 +655,7 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
     fallbackHtml.value = ''
     rendererReady.value = false
     hasStableRender.value = false
+    lastCommittedRenderSignature = ''
     return
   }
 
@@ -648,17 +674,23 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
 
   renderFallback(code, !hasStableRender.value)
   const previousSnapshot = getRendererContentSnapshot()
-  const updated = await updateRendererWithFallback(code, lang, epoch)
+  const renderedLang = await updateRendererWithFallback(code, lang, epoch)
   if (!isCurrentRenderEpoch(epoch))
     return
-  if (!updated) {
+  if (!renderedLang) {
     keepLastSuccessfulRender()
     return
   }
-  if (hasStableRender.value)
+  if (hasStableRender.value) {
     keepLastSuccessfulRender()
-  else
-    await clearFallbackWhenRendererReady(epoch, previousSnapshot)
+  }
+  else {
+    await clearFallbackWhenRendererReady(
+      epoch,
+      previousSnapshot,
+      getRenderSignature(rendererConfigKey ?? highlightRegistrationKey.value, renderedLang, code),
+    )
+  }
 })
 
 watch(

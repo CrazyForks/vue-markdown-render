@@ -837,6 +837,57 @@ describe('markdown code block Shiki langs', () => {
     wrapper.unmount()
   })
 
+  it('clears Vue fallback after an idempotent renderer update keeps DOM unchanged', async () => {
+    streamMarkdownMock.createShikiStreamRenderer.mockImplementationOnce((el: HTMLElement) => {
+      let rendered = ''
+      const renderer = {
+        updateCode: vi.fn(async (code: string, lang?: string) => {
+          const next = `${lang ?? ''}:${code}`
+          if (rendered === next)
+            return
+          rendered = next
+          el.textContent = next
+        }),
+        setTheme: vi.fn(async () => {}),
+        dispose: vi.fn(),
+      }
+      streamMarkdownMock.createdRenderers.push(renderer)
+      return renderer
+    })
+
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        stream: false,
+        node: makeNode('typescript', 'const value = 1'),
+        langs: ['typescript'],
+      },
+    })
+
+    await flushAll()
+    await waitForRendererCreated()
+    const renderer = streamMarkdownMock.createdRenderers[0]
+    await waitForRendererUpdateCall(renderer, 1)
+    await flushAll()
+
+    expect(wrapper.find('.code-block-render').text()).toBe('typescript:const value = 1')
+    expect(wrapper.find('.code-fallback-plain').exists()).toBe(false)
+
+    await wrapper.setProps({ loading: true })
+    await flushAll()
+
+    await wrapper.setProps({ loading: false })
+    await flushAll()
+    await waitForRendererUpdateCall(renderer, 2)
+    await flushAll()
+
+    expect(wrapper.find('.code-block-render').text()).toBe('typescript:const value = 1')
+    expect(wrapper.find('.code-fallback-plain').exists()).toBe(false)
+
+    wrapper.unmount()
+  })
+
   it('keeps Vue renderer reconfiguration when code updates during pending langs registration', async () => {
     const second = createDeferred()
     streamMarkdownMock.registerHighlight
@@ -904,6 +955,55 @@ describe('markdown code block Shiki langs', () => {
     )
 
     wrapper.unmount()
+  })
+
+  it('observes Vue2 renderer attribute and character data mutations', async () => {
+    const OriginalMutationObserver = globalThis.MutationObserver
+    const observe = vi.fn()
+    const disconnect = vi.fn()
+    ;(globalThis as any).MutationObserver = class {
+      constructor(_callback: MutationCallback) {}
+      disconnect = disconnect
+      observe = observe
+    }
+
+    streamMarkdownMock.createShikiStreamRenderer.mockImplementationOnce(() => {
+      const renderer = {
+        updateCode: vi.fn(async () => {}),
+        setTheme: vi.fn(async () => {}),
+        dispose: vi.fn(),
+      }
+      streamMarkdownMock.createdRenderers.push(renderer)
+      return renderer
+    })
+
+    const { default: Vue2MarkdownCodeBlockNode } = await import('../packages/markstream-vue2/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(Vue2MarkdownCodeBlockNode as any, {
+      props: {
+        loading: false,
+        node: makeNode('typescript'),
+        langs: ['typescript'],
+      },
+    })
+
+    try {
+      await flushAll()
+      await waitForRendererCreated()
+      const renderer = streamMarkdownMock.createdRenderers[0]
+      await waitForRendererUpdateCall(renderer, 1)
+      await flushAll()
+
+      expect(observe).toHaveBeenCalledWith(expect.any(HTMLElement), {
+        childList: true,
+        subtree: true,
+        characterData: true,
+        attributes: true,
+      })
+    }
+    finally {
+      wrapper.unmount()
+      ;(globalThis as any).MutationObserver = OriginalMutationObserver
+    }
   })
 
   it('deduplicates Vue2 highlight registration across matching code block instances', async () => {
@@ -1290,6 +1390,69 @@ describe('markdown code block Shiki langs', () => {
       writeRendererDom?.()
       await Promise.resolve()
     })
+    await flushReact()
+
+    expect(host.querySelector('.code-block-render')?.textContent).toBe('typescript:const value = 1')
+    expect(host.querySelector('.code-fallback-plain')).toBeNull()
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('clears React fallback after an idempotent renderer update keeps DOM unchanged', async () => {
+    streamMarkdownMock.createShikiStreamRenderer.mockImplementationOnce((el: HTMLElement) => {
+      let rendered = ''
+      const renderer = {
+        updateCode: vi.fn(async (code: string, lang?: string) => {
+          const next = `${lang ?? ''}:${code}`
+          if (rendered === next)
+            return
+          rendered = next
+          el.textContent = next
+        }),
+        setTheme: vi.fn(async () => {}),
+        dispose: vi.fn(),
+      }
+      streamMarkdownMock.createdRenderers.push(renderer)
+      return renderer
+    })
+
+    const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    const node = makeNode('typescript', 'const value = 1')
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        node,
+        langs: ['typescript'],
+      }))
+    })
+
+    await flushReact()
+    await waitForReactRendererCreated()
+    const renderer = streamMarkdownMock.createdRenderers[0]
+    await waitForRendererUpdateCall(renderer, 1)
+    await flushReact()
+
+    expect(host.querySelector('.code-block-render')?.textContent).toBe('typescript:const value = 1')
+    expect(host.querySelector('.code-fallback-plain')).toBeNull()
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        loading: false,
+        isDark: true,
+        node,
+        langs: ['typescript'],
+      }))
+    })
+    await flushReact()
+    await waitForRendererUpdateCall(renderer, 2)
     await flushReact()
 
     expect(host.querySelector('.code-block-render')?.textContent).toBe('typescript:const value = 1')
