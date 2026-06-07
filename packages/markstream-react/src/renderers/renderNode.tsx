@@ -1,5 +1,6 @@
 import type { ParsedNode } from 'stream-markdown-parser'
 import type { RenderContext } from '../types'
+import { normalizeShikiLanguage } from 'markstream-core'
 import React from 'react'
 import { getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from 'stream-markdown-parser'
 import { AdmonitionNode } from '../components/AdmonitionNode/AdmonitionNode'
@@ -55,6 +56,24 @@ function getRawCodeBlockLanguage(node: any) {
   const [firstToken] = trimmed.split(/\s+/)
   const [base] = firstToken.split(':')
   return base.toLowerCase()
+}
+
+function getCustomCodeLanguageComponent(
+  customComponents: Record<string, any>,
+  rawLanguage: string,
+) {
+  if (!rawLanguage)
+    return null
+
+  const exact = customComponents[rawLanguage]
+  if (exact)
+    return exact
+
+  const normalized = normalizeShikiLanguage(rawLanguage)
+  if (normalized && normalized !== rawLanguage)
+    return customComponents[normalized] ?? null
+
+  return null
 }
 
 function renderCustomCodeBlockComponent(
@@ -136,7 +155,7 @@ function renderCodeBlock(
 ) {
   const rawLanguage = getRawCodeBlockLanguage(node)
   const language = normalizeLanguageIdentifier(rawLanguage)
-  const customForLanguage = rawLanguage ? customComponents[rawLanguage] : null
+  const customForLanguage = getCustomCodeLanguageComponent(customComponents, rawLanguage)
   if (language === 'mermaid') {
     const mermaidProps = getMermaidRenderProps(node, ctx)
     const customMermaid = customForLanguage || customComponents.mermaid

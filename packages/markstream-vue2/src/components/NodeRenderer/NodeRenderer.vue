@@ -120,7 +120,7 @@ export interface NodeRendererProps {
    * Vue2's default code block renderer is Monaco-backed. This prop is used
    * when a custom `code_block` or language renderer uses MarkdownCodeBlockNode.
    */
-  langs?: string[]
+  langs?: readonly string[]
   isDark?: boolean
   customId?: string
   indexKey?: number | string

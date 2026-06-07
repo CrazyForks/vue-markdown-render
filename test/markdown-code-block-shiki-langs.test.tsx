@@ -1,9 +1,14 @@
 import { mount } from '@vue/test-utils'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, ref } from 'vue'
 import { getHighlightRegistrationKey, getRegisterHighlightOptions, getShikiRendererOptions, registerHighlightOnce } from '../packages/markstream-core/src'
+import {
+  removeCustomComponents as removeReactCustomComponents,
+  setCustomComponents as setReactCustomComponents,
+} from '../packages/markstream-react/src/customComponents'
 import { removeCustomComponents as removeVue2CustomComponents, setCustomComponents as setVue2CustomComponents } from '../packages/markstream-vue2/src/utils/nodeComponents'
 import { removeCustomComponents, setCustomComponents } from '../src/utils/nodeComponents'
 import { flushAll } from './setup/flush-all'
@@ -72,6 +77,14 @@ function makeNode(language = 'typescript', code = 'const value = 1') {
 
 const vue2CustomId = 'vue2-shiki-langs-forwarding'
 const vueCustomId = 'vue-shiki-langs-forwarding'
+const reactCustomId = 'react-shiki-langs-forwarding'
+function ReactCodeBlockProbe(props: { node: any, langs?: readonly string[] }) {
+  return React.createElement('div', {
+    'className': 'react-code-block-probe',
+    'data-language': String(props.node?.language ?? ''),
+    'data-langs': JSON.stringify(props.langs ?? null),
+  })
+}
 const VueCodeBlockProbe = defineComponent({
   name: 'VueCodeBlockProbe',
   props: {
@@ -187,6 +200,7 @@ beforeEach(() => {
 
 afterEach(() => {
   resetStreamMarkdownMock()
+  removeReactCustomComponents(reactCustomId)
   removeCustomComponents(vueCustomId)
   removeVue2CustomComponents(vue2CustomId)
   document.body.innerHTML = ''
@@ -1306,6 +1320,56 @@ describe('markdown code block Shiki langs', () => {
     expect(probe.attributes('data-langs')).toBe('["typescript"]')
 
     wrapper.unmount()
+  })
+
+  it('matches React custom language code block overrides by normalized Shiki aliases', async () => {
+    setReactCustomComponents(reactCustomId, {
+      typescript: ReactCodeBlockProbe as any,
+    })
+
+    const { NodeRenderer: ReactNodeRenderer } = await import('../packages/markstream-react/src/components/NodeRenderer')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    await act(async () => {
+      root.render(React.createElement(ReactNodeRenderer, {
+        customId: reactCustomId,
+        nodes: [makeNode('ts')],
+        langs: ['typescript'],
+      }))
+    })
+
+    await flushReact()
+
+    const probe = host.querySelector('.react-code-block-probe') as HTMLElement | null
+    expect(probe?.getAttribute('data-language')).toBe('ts')
+    expect(probe?.getAttribute('data-langs')).toBe('["typescript"]')
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('matches React server custom language code block overrides by normalized Shiki aliases', async () => {
+    setReactCustomComponents(reactCustomId, {
+      typescript: ReactCodeBlockProbe as any,
+    })
+
+    const { NodeRenderer: ReactServerNodeRenderer } = await import('../packages/markstream-react/src/server-renderer')
+    const html = renderToStaticMarkup(React.createElement(ReactServerNodeRenderer, {
+      customId: reactCustomId,
+      nodes: [makeNode('ts')],
+      langs: ['typescript'],
+    }))
+    const host = document.createElement('div')
+    host.innerHTML = html
+
+    const probe = host.querySelector('.react-code-block-probe') as HTMLElement | null
+    expect(probe?.getAttribute('data-language')).toBe('ts')
+    expect(probe?.getAttribute('data-langs')).toBe('["typescript"]')
   })
 
   it('matches Vue2 custom language code block overrides by normalized Shiki aliases', async () => {

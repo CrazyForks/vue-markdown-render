@@ -33,8 +33,8 @@ interface MarkdownCodeBlockNodeProps {
   enableFontSizeControl?: boolean
   minWidth?: string | number
   maxWidth?: string | number
-  themes?: string[]
-  langs?: string[]
+  themes?: readonly string[]
+  langs?: readonly string[]
   showHeader?: boolean
   showCopyButton?: boolean
   showExpandButton?: boolean
@@ -58,8 +58,8 @@ const props = defineProps({
   enableFontSizeControl: { type: Boolean, default: true },
   minWidth: { type: [String, Number], default: undefined },
   maxWidth: { type: [String, Number], default: undefined },
-  themes: { type: Array as PropType<string[]>, default: undefined },
-  langs: { type: Array as PropType<string[]>, default: undefined },
+  themes: { type: Array as PropType<readonly string[]>, default: undefined },
+  langs: { type: Array as PropType<readonly string[]>, default: undefined },
   showHeader: { type: Boolean, default: true },
   showCopyButton: { type: Boolean, default: true },
   showExpandButton: { type: Boolean, default: true },
@@ -454,7 +454,7 @@ async function updateRendererWithFallback(code: string, rawLang?: string | null,
   }
 }
 
-async function ensureHighlightRegistered(themes?: readonly unknown[], langs?: readonly string[]): Promise<HighlightRegistrationStatus> {
+async function ensureHighlightRegistered(themes?: readonly unknown[], langs?: readonly unknown[]): Promise<HighlightRegistrationStatus> {
   if (!registerHighlight)
     return 'ready'
   const opts = getRegisterHighlightOptions(themes, langs)
@@ -484,7 +484,7 @@ async function ensureHighlightRegistered(themes?: readonly unknown[], langs?: re
   return 'ready'
 }
 
-async function waitForCurrentHighlightRegistration(themes: readonly unknown[] | undefined, langs: readonly string[] | undefined, key: string) {
+async function waitForCurrentHighlightRegistration(themes: readonly unknown[] | undefined, langs: readonly unknown[] | undefined, key: string) {
   const status = await ensureHighlightRegistered(themes, langs)
   if (status !== 'failed')
     return status

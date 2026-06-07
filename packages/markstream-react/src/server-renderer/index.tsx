@@ -25,6 +25,7 @@ import type {
   PreCodeNodeProps,
 } from '../types/component-props'
 import type { NodeComponentProps } from '../types/node-component'
+import { normalizeShikiLanguage } from 'markstream-core'
 import React from 'react'
 import {
   getMarkdown,
@@ -233,6 +234,24 @@ function getInfographicRenderProps(node: any, ctx: RenderContext) {
   return next
 }
 
+function getCustomCodeLanguageComponent(
+  customComponents: Record<string, any>,
+  rawLanguage: string,
+) {
+  if (!rawLanguage)
+    return null
+
+  const exact = customComponents[rawLanguage]
+  if (exact)
+    return exact
+
+  const normalized = normalizeShikiLanguage(rawLanguage)
+  if (normalized && normalized !== rawLanguage)
+    return customComponents[normalized] ?? null
+
+  return null
+}
+
 function renderCodeBlock(
   node: any,
   key: React.Key,
@@ -244,7 +263,7 @@ function renderCodeBlock(
     ? String(trimmedLanguage.split(/\s+/)[0] ?? '').split(':')[0].toLowerCase()
     : ''
   const language = normalizeLanguageIdentifier(rawLanguage)
-  const customForLanguage = rawLanguage ? customComponents[rawLanguage] : null
+  const customForLanguage = getCustomCodeLanguageComponent(customComponents, rawLanguage)
   if (language === 'mermaid') {
     const mermaidProps = getMermaidRenderProps(node, ctx)
     const customMermaid = customForLanguage || customComponents.mermaid

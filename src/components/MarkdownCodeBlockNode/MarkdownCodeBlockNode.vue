@@ -423,7 +423,7 @@ async function ensureStreamMarkdownLoaded() {
   return streamMarkdownLoadPromise
 }
 
-async function ensureHighlightRegistered(themes?: readonly unknown[], langs?: readonly string[]): Promise<HighlightRegistrationStatus> {
+async function ensureHighlightRegistered(themes?: readonly unknown[], langs?: readonly unknown[]): Promise<HighlightRegistrationStatus> {
   if (!registerHighlight)
     return 'ready'
   const opts = getRegisterHighlightOptions(themes, langs)
@@ -453,7 +453,7 @@ async function ensureHighlightRegistered(themes?: readonly unknown[], langs?: re
   return 'ready'
 }
 
-async function waitForCurrentHighlightRegistration(themes: readonly unknown[] | undefined, langs: readonly string[] | undefined, key: string) {
+async function waitForCurrentHighlightRegistration(themes: readonly unknown[] | undefined, langs: readonly unknown[] | undefined, key: string) {
   const status = await ensureHighlightRegistered(themes, langs)
   if (status !== 'failed')
     return status

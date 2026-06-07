@@ -333,7 +333,7 @@ export interface NodeRendererProps {
    * React/Vue2 consume it when a custom `code_block` or language renderer
    * uses MarkdownCodeBlockNode.
    */
-  langs?: string[]
+  langs?: readonly string[]
   /** Forces dark mode for built-in renderers such as Mermaid, D2, KaTeX, and code blocks. */
   isDark?: boolean
   /** Scope key used by `setCustomComponents()` and `data-custom-id` style overrides. */

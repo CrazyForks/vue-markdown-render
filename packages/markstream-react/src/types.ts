@@ -61,7 +61,7 @@ export interface NodeRendererProps {
    * The default React code block renderer is Monaco-backed. This prop is used
    * when a custom `code_block` or language renderer uses MarkdownCodeBlockNode.
    */
-  langs?: string[]
+  langs?: readonly string[]
   isDark?: boolean
   customId?: string
   indexKey?: number | string
@@ -121,7 +121,7 @@ export interface RenderContext {
     monacoOptions?: CodeBlockMonacoOptions
     minWidth?: string | number
     maxWidth?: string | number
-    langs?: string[]
+    langs?: readonly string[]
   }
   events: {
     onCopy?: (code: string) => void
