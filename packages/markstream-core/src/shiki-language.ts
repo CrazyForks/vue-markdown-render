@@ -144,7 +144,7 @@ export function getShikiThemes(themes?: readonly unknown[]) {
 }
 
 function getShikiThemesKey(themes?: readonly unknown[]) {
-  return getShikiThemes(themes)?.slice().sort().join('\u0000') ?? ''
+  return getShikiThemes(themes)?.join('\u0000') ?? ''
 }
 
 export function getShikiRendererOptions(

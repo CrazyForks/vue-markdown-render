@@ -1,4 +1,3 @@
-import { isDevEnvironment } from '../utils/devEnv'
 import { normalizeKaTeXRenderInput } from '../utils/normalizeKaTeXRenderInput'
 
 interface Pending {
@@ -30,15 +29,34 @@ function notifyDrainIfBelowCap() {
   }
 }
 
-let perfMonitor: any = null
+let recordRenderPerformance: ((metric: any) => void) | null = null
 try {
-  if (typeof window !== 'undefined' && isDevEnvironment()) {
-    import('../utils/performanceMonitor').then((a) => {
-      perfMonitor = a.perfMonitor
+  if (typeof window !== 'undefined' && import.meta.env.DEV) {
+    const monitorModuleId = ['../utils/performance', 'Monitor'].join('')
+    import(/* @vite-ignore */ monitorModuleId).then((a) => {
+      const monitor = a[['perf', 'Monitor'].join('')]
+      recordRenderPerformance = metric => monitor.recordRender(metric)
     })
   }
 }
 catch {}
+
+function recordKaTeXRender(type: 'cache-hit' | 'worker', startTime: number, formulaLength: number, success: boolean, error?: string) {
+  if (!recordRenderPerformance)
+    return
+
+  const metric: any = {
+    type,
+    duration: performance.now() - startTime,
+    formulaLength,
+    timestamp: Date.now(),
+    success,
+  }
+  if (error)
+    metric.error = error
+
+  recordRenderPerformance(metric)
+}
 
 export function setKaTeXWorker(w: Worker) {
   worker = w
@@ -111,15 +129,7 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
   const cacheKey = `${displayMode ? 'd' : 'i'}:${normalizedContent}`
   const cached = cache.get(cacheKey)
   if (cached) {
-    if (perfMonitor) {
-      perfMonitor.recordRender({
-        type: 'cache-hit',
-        duration: performance.now() - startTime,
-        formulaLength: normalizedContent.length,
-        timestamp: Date.now(),
-        success: true,
-      })
-    }
+    recordKaTeXRender('cache-hit', startTime, normalizedContent.length, true)
     return Promise.resolve(cached)
   }
   const wk = ensureWorker()
@@ -132,16 +142,7 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
     ;(err as any).busy = true
     ;(err as any).inFlight = pending.size
     ;(err as any).max = MAX_CONCURRENCY
-    if (perfMonitor) {
-      perfMonitor.recordRender({
-        type: 'worker',
-        duration: performance.now() - startTime,
-        formulaLength: normalizedContent.length,
-        timestamp: Date.now(),
-        success: false,
-        error: 'busy',
-      })
-    }
+    recordKaTeXRender('worker', startTime, normalizedContent.length, false, 'busy')
     return Promise.reject(err)
   }
 
@@ -158,16 +159,7 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
       const err = new Error('Worker render timed out')
       ;(err as any).name = 'WorkerTimeout'
       ;(err as any).code = 'WORKER_TIMEOUT'
-      if (perfMonitor) {
-        perfMonitor.recordRender({
-          type: 'worker',
-          duration: performance.now() - startTime,
-          formulaLength: normalizedContent.length,
-          timestamp: Date.now(),
-          success: false,
-          error: 'timeout',
-        })
-      }
+      recordKaTeXRender('worker', startTime, normalizedContent.length, false, 'timeout')
       reject(err)
       notifyDrainIfBelowCap()
     }, timeout)
@@ -190,30 +182,13 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
       resolve: (html: string) => {
         if (signal)
           signal.removeEventListener('abort', abortListener)
-        if (perfMonitor) {
-          perfMonitor.recordRender({
-            type: 'worker',
-            duration: performance.now() - startTime,
-            formulaLength: normalizedContent.length,
-            timestamp: Date.now(),
-            success: true,
-          })
-        }
+        recordKaTeXRender('worker', startTime, normalizedContent.length, true)
         resolve(html)
       },
       reject: (err: any) => {
         if (signal)
           signal.removeEventListener('abort', abortListener)
-        if (perfMonitor) {
-          perfMonitor.recordRender({
-            type: 'worker',
-            duration: performance.now() - startTime,
-            formulaLength: normalizedContent.length,
-            timestamp: Date.now(),
-            success: false,
-            error: err?.code || err?.message,
-          })
-        }
+        recordKaTeXRender('worker', startTime, normalizedContent.length, false, err?.code || err?.message)
         reject(err)
       },
       timeoutId,

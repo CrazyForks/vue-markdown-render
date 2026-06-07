@@ -246,7 +246,7 @@
     "test:smoke:minimal": "node scripts/smoke-minimal-install.mjs",
     "test:smoke:pack": "node scripts/smoke-packed-package.mjs",
     "test:smoke:pack:optional": "MARKSTREAM_SMOKE_WITH_OPTIONAL_PEERS=1 node scripts/smoke-packed-package.mjs",
-    "test:smoke:vue2-cjs": "pnpm run -C packages/markstream-core build && pnpm run -C packages/markstream-vue2 build && node -e \"const { createRequire } = require('node:module'); const path = require('node:path'); const req = createRequire(path.resolve('./packages/markstream-vue2/dist/index.cjs')); req('markstream-core')\"",
+    "test:smoke:vue2-cjs": "pnpm run build:parser && pnpm run -C packages/markstream-core build && pnpm run -C packages/markstream-vue2 build && node -e \"const path = require('node:path'); const entry = path.resolve('./packages/markstream-vue2/dist/index.cjs'); const mod = require(entry); for (const key of ['MarkdownRender', 'MarkdownCodeBlockNode', 'useSmoothMarkdownStream']) { if (!(key in mod)) throw new Error('markstream-vue2 CJS missing export: ' + key) }\"",
     "test:e2e:vue2-cli-smoke": "node scripts/e2e-vue2-cli-smoke.mjs",
     "test:e2e:math-streaming-stability": "node scripts/e2e-math-streaming-stability.mjs",
     "test:e2e:next14-ssr": "node scripts/e2e-next-ssr.mjs --playground playground-next14 --version next14",

@@ -15,7 +15,6 @@ export type { IconTheme } from '../icon-themes'
 export * from './katex-threshold'
 export * from './languageIcon'
 export * from './nodeLifecycle'
-export * from './performance-monitor'
 export * from './safeRaf'
 export * from 'stream-markdown-parser'
 

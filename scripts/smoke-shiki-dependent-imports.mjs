@@ -166,7 +166,11 @@ try {
     },
   }, null, 2)}\n`)
 
-  writeProjectFile('smoke.mjs', `const dependentPackages = [
+  writeProjectFile('smoke.mjs', `import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
+
+const dependentPackages = [
   'markstream-vue',
   'markstream-react',
   'markstream-vue2',
@@ -192,6 +196,12 @@ const streamMarkdown = await import('stream-markdown')
 for (const key of ['registerHighlight', 'createShikiStreamRenderer']) {
   if (typeof streamMarkdown[key] !== 'function')
     throw new Error(\`[smoke-shiki-dependent-imports] stream-markdown missing \${key}\`)
+}
+
+const vue2Cjs = require('markstream-vue2')
+for (const key of ['MarkdownRender', 'MarkdownCodeBlockNode', 'useSmoothMarkdownStream']) {
+  if (!(key in vue2Cjs))
+    throw new Error(\`[smoke-shiki-dependent-imports] markstream-vue2 CJS missing \${key}\`)
 }
 `)
 

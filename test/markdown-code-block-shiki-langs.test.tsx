@@ -276,10 +276,10 @@ describe('markdown code block Shiki langs', () => {
     )
   })
 
-  it('uses an order-insensitive registration key for Shiki theme preload sets', () => {
+  it('keeps Shiki theme order in the registration key', () => {
     expect(
       getHighlightRegistrationKey(['vitesse-light', 'vitesse-dark'], ['ts', 'js']),
-    ).toBe(
+    ).not.toBe(
       getHighlightRegistrationKey(['vitesse-dark', 'vitesse-light'], ['js', 'ts']),
     )
   })
@@ -1689,7 +1689,7 @@ describe('markdown code block Shiki langs', () => {
     overrideWrapper.unmount()
   })
 
-  it('does not reconfigure React renderer when theme preload order changes', async () => {
+  it('reconfigures React renderer when theme order changes', async () => {
     const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -1726,10 +1726,16 @@ describe('markdown code block Shiki langs', () => {
     })
 
     await flushReact()
+    await waitForReactRendererCount(initialRendererCount + 1)
 
-    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(1)
-    expect(renderer.dispose).not.toHaveBeenCalled()
-    expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenCalledTimes(initialRendererCount)
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith(
+      expect.objectContaining({ themes: ['b', 'a'], langs: ['typescript'] }),
+    )
+    expect(renderer.dispose).toHaveBeenCalledTimes(1)
+    expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenLastCalledWith(
+      expect.any(HTMLElement),
+      expect.objectContaining({ themes: ['b', 'a'], langs: ['typescript'] }),
+    )
 
     await act(async () => {
       root.unmount()

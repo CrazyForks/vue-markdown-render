@@ -1,5 +1,4 @@
 import { isKatexEnabled } from '../components/MathInlineNode/katex'
-import { isDevEnvironment } from '../utils/devEnv'
 import { normalizeKaTeXRenderInput } from '../utils/normalizeKaTeXRenderInput'
 
 interface Pending {
@@ -38,20 +37,35 @@ function notifyDrainIfBelowCap() {
 }
 
 // Performance monitoring (optional, dev-only by default)
-let perfMonitor: any = null
+let recordRenderPerformance: ((metric: any) => void) | null = null
 try {
-  // Only load in development without assuming a Vite-style import.meta.env.
-  if (typeof window !== 'undefined' && isDevEnvironment()) {
-    // Use an opaque dynamic import path so bundlers don't emit a chunk in prod builds.
-    // This runs only in dev; in production the whole block is tree-shaken.
-
-    import('../utils/performance-monitor').then((a) => {
-      perfMonitor = a.perfMonitor
+  if (typeof window !== 'undefined' && import.meta.env.DEV) {
+    const monitorModuleId = ['../utils/performance', 'monitor'].join('-')
+    import(/* @vite-ignore */ monitorModuleId).then((a) => {
+      const monitor = a[['perf', 'Monitor'].join('')]
+      recordRenderPerformance = metric => monitor.recordRender(metric)
     })
   }
 }
 catch {
   // Ignore errors
+}
+
+function recordKaTeXRender(type: 'cache-hit' | 'worker', startTime: number, formulaLength: number, success: boolean, error?: string) {
+  if (!recordRenderPerformance)
+    return
+
+  const metric: any = {
+    type,
+    duration: performance.now() - startTime,
+    formulaLength,
+    timestamp: Date.now(),
+    success,
+  }
+  if (error)
+    metric.error = error
+
+  recordRenderPerformance(metric)
 }
 
 /**
@@ -154,15 +168,7 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
   const cached = cache.get(cacheKey)
   if (cached) {
     // Record cache hit performance
-    if (perfMonitor) {
-      perfMonitor.recordRender({
-        type: 'cache-hit',
-        duration: performance.now() - startTime,
-        formulaLength: normalizedContent.length,
-        timestamp: Date.now(),
-        success: true,
-      })
-    }
+    recordKaTeXRender('cache-hit', startTime, normalizedContent.length, true)
     return Promise.resolve(cached)
   }
   // If workers are unavailable, reject to let caller fallback
@@ -179,16 +185,7 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
     ; (err as any).busy = true
     ; (err as any).inFlight = pending.size
     ; (err as any).max = MAX_CONCURRENCY
-    if (perfMonitor) {
-      perfMonitor.recordRender({
-        type: 'worker',
-        duration: performance.now() - startTime,
-        formulaLength: normalizedContent.length,
-        timestamp: Date.now(),
-        success: false,
-        error: 'busy',
-      })
-    }
+    recordKaTeXRender('worker', startTime, normalizedContent.length, false, 'busy')
     return Promise.reject(err)
   }
 
@@ -208,16 +205,7 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
       ; (err as any).code = 'WORKER_TIMEOUT'
 
       // Record timeout
-      if (perfMonitor) {
-        perfMonitor.recordRender({
-          type: 'worker',
-          duration: performance.now() - startTime,
-          formulaLength: normalizedContent.length,
-          timestamp: Date.now(),
-          success: false,
-          error: 'timeout',
-        })
-      }
+      recordKaTeXRender('worker', startTime, normalizedContent.length, false, 'timeout')
       reject(err)
       // a slot freed (this request is no longer pending)
       notifyDrainIfBelowCap()
@@ -240,28 +228,11 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
     const originalResolve = resolve
     const originalReject = reject
     const wrappedResolve = (val: string) => {
-      if (perfMonitor) {
-        perfMonitor.recordRender({
-          type: 'worker',
-          duration: performance.now() - startTime,
-          formulaLength: normalizedContent.length,
-          timestamp: Date.now(),
-          success: true,
-        })
-      }
+      recordKaTeXRender('worker', startTime, normalizedContent.length, true)
       originalResolve(val)
     }
     const wrappedReject = (err: any) => {
-      if (perfMonitor) {
-        perfMonitor.recordRender({
-          type: 'worker',
-          duration: performance.now() - startTime,
-          formulaLength: normalizedContent.length,
-          timestamp: Date.now(),
-          success: false,
-          error: err?.message || String(err),
-        })
-      }
+      recordKaTeXRender('worker', startTime, normalizedContent.length, false, err?.message || String(err))
       originalReject(err)
     }
 

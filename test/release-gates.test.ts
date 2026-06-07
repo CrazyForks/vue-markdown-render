@@ -166,6 +166,10 @@ describe('release dependency gates', () => {
     const smokeScript = readFileSync(resolve(process.cwd(), 'scripts/smoke-shiki-dependent-imports.mjs'), 'utf8')
 
     expect(scripts['test:smoke:shiki-dependent-imports']).toBe('node scripts/smoke-shiki-dependent-imports.mjs')
+    expect(scripts['test:smoke:vue2-cjs']).toContain('pnpm run build:parser')
+    expect(scripts['test:smoke:vue2-cjs']).toContain('require(entry)')
+    expect(scripts['test:smoke:vue2-cjs']).toContain('MarkdownRender')
+    expect(scripts['test:smoke:vue2-cjs']).toContain('useSmoothMarkdownStream')
     expect(scripts['release:verify']).toContain('pnpm run test:smoke:vue2-cjs')
     expect(scripts['release:verify']).toContain('pnpm run test:smoke:shiki-dependent-imports')
     expect(scripts['release:verify'].indexOf('pnpm run test:smoke:pack:optional')).toBeLessThan(
@@ -188,6 +192,18 @@ describe('release dependency gates', () => {
     expect(smokeScript).toContain('javascript')
     expect(smokeScript).toContain('typescript')
     expect(smokeScript).toContain('createShikiStreamRenderer')
+    expect(smokeScript).toContain('require(\'markstream-vue2\')')
+    expect(smokeScript).toContain('MarkdownRender')
+    expect(smokeScript).toContain('useSmoothMarkdownStream')
+  })
+
+  it('keeps stream-markdown-parser require export available for Vue2 CJS consumers', () => {
+    const parserPackageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'packages/markdown-parser/package.json'), 'utf8'))
+    const parserTsdownConfig = readFileSync(resolve(process.cwd(), 'packages/markdown-parser/tsdown.config.ts'), 'utf8')
+
+    expect(parserPackageJson.exports['.'].require).toBe('./dist/index.cjs')
+    expect(parserPackageJson.main).toBe('./dist/index.cjs')
+    expect(parserTsdownConfig).toContain('format: [\'esm\', \'cjs\']')
   })
 
   it('runs Shiki dependent import smoke in CI', () => {
