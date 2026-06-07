@@ -319,6 +319,7 @@ const warnedRendererErrors = new Set<string>()
 const isDevEnv = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV)
 let warnedMissingRegisterHighlightForLangs = false
 let streamMarkdownLoadPromise: Promise<void> | null = null
+let streamMarkdownUnavailable = false
 
 function nextRenderEpoch() {
   renderEpoch += 1
@@ -397,6 +398,8 @@ async function updateRendererWithFallback(code: string, rawLang?: string | null,
 async function ensureStreamMarkdownLoaded() {
   if (createShikiRenderer)
     return
+  if (streamMarkdownUnavailable)
+    return
   if (streamMarkdownLoadPromise)
     return streamMarkdownLoadPromise
 
@@ -407,6 +410,7 @@ async function ensureStreamMarkdownLoaded() {
       registerHighlight = mod.registerHighlight as NonNullable<typeof registerHighlight>
     }
     catch (e) {
+      streamMarkdownUnavailable = true
       if (isDevEnv)
         console.warn('[MarkdownCodeBlockNode] stream-markdown not available:', e)
     }

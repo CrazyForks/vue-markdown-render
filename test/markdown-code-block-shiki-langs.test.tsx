@@ -245,7 +245,7 @@ describe('markdown code block Shiki langs', () => {
   it('filters non-string Shiki themes from registration options', async () => {
     const themes = ['vitesse-light', { name: 'custom-theme' }, ' vitesse-dark ', '', 'vitesse-light'] as any[]
     const expected = {
-      themes: ['vitesse-light', 'vitesse-dark'],
+      themes: ['vitesse-dark', 'vitesse-light'],
     }
 
     expect(getRegisterHighlightOptions(themes)).toEqual(expected)
@@ -335,6 +335,25 @@ describe('markdown code block Shiki langs', () => {
       'start:python',
       'end:python',
     ])
+  })
+
+  it('retries failed highlight registration once and caches the successful retry', async () => {
+    const registerHighlight = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('first registration failed'))
+      .mockResolvedValueOnce(undefined)
+    const opts = { langs: ['typescript'] }
+    const key = getHighlightRegistrationKey(undefined, opts.langs)
+
+    await expect(registerHighlightOnce(registerHighlight, opts, key)).rejects.toThrow(
+      'first registration failed',
+    )
+    await expect(registerHighlightOnce(registerHighlight, opts, key)).resolves.toBe('ready')
+    await expect(registerHighlightOnce(registerHighlight, opts, key)).resolves.toBe('ready')
+
+    expect(registerHighlight).toHaveBeenCalledTimes(2)
+    expect(registerHighlight).toHaveBeenNthCalledWith(1, opts)
+    expect(registerHighlight).toHaveBeenNthCalledWith(2, opts)
   })
 
   it('passes langs to Vue registerHighlight and renderer', async () => {
@@ -2721,18 +2740,11 @@ describe('markdown code block Shiki langs', () => {
     })
   })
 
-  it('retries React stream-markdown import after a failed dynamic import', async () => {
+  it('does not retry React stream-markdown import after a failed dynamic import', async () => {
     let importAttempts = 0
     const retryStreamMarkdownFactory = async () => {
       importAttempts += 1
-      if (importAttempts === 1)
-        throw new Error('chunk load failed')
-
-      return {
-        createShikiStreamRenderer: streamMarkdownMock.createShikiStreamRenderer,
-        defaultLanguages: streamMarkdownMock.defaultLanguages,
-        registerHighlight: streamMarkdownMock.registerHighlight,
-      }
+      throw new Error('chunk load failed')
     }
 
     vi.doMock('stream-markdown', retryStreamMarkdownFactory)
@@ -2764,13 +2776,9 @@ describe('markdown code block Shiki langs', () => {
       }))
     })
     await flushReact()
-    await waitForReactRendererCreated()
 
-    expect(importAttempts).toBeGreaterThanOrEqual(2)
-    expect(streamMarkdownMock.createdRenderers.at(-1)?.updateCode).toHaveBeenLastCalledWith(
-      'const fresh = 2',
-      'typescript',
-    )
+    expect(importAttempts).toBe(1)
+    expect(streamMarkdownMock.createShikiStreamRenderer).not.toHaveBeenCalled()
 
     await act(async () => {
       root.unmount()

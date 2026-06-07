@@ -202,6 +202,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const lastCommittedRenderSignatureRef = useRef('')
   const createRendererRef = useRef<null | ((el: HTMLElement, opts: ShikiRendererOptions) => ShikiRenderer)>(null)
   const streamMarkdownLoadPromiseRef = useRef<Promise<void> | null>(null)
+  const streamMarkdownUnavailableRef = useRef(false)
   const registerHighlightRef = useRef<((opts?: RegisterHighlightOptions) => Promise<unknown> | unknown) | null>(null)
   const warnedMissingRegisterHighlightForLangsRef = useRef(false)
   const registeredKeyRef = useRef<string>('')
@@ -351,6 +352,8 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const ensureStreamMarkdownLoaded = useCallback(async () => {
     if (createRendererRef.current)
       return
+    if (streamMarkdownUnavailableRef.current)
+      return
     if (streamMarkdownLoadPromiseRef.current)
       return streamMarkdownLoadPromiseRef.current
 
@@ -361,6 +364,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
         registerHighlightRef.current = mod.registerHighlight ?? null
       }
       catch {
+        streamMarkdownUnavailableRef.current = true
         // optional peer
       }
       finally {

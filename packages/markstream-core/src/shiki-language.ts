@@ -128,7 +128,7 @@ export function getShikiThemes(themes?: readonly unknown[]) {
     .filter(Boolean)
 
   return normalized.length > 0
-    ? Array.from(new Set(normalized))
+    ? Array.from(new Set(normalized)).sort()
     : undefined
 }
 
