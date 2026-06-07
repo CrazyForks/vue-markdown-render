@@ -102,7 +102,16 @@ function getDiffBase(repoRoot) {
   if (cachedDiffBase)
     return cachedDiffBase
 
-  for (const ref of ['origin/main', 'origin/master', 'upstream/main', 'upstream/master']) {
+  const refs = [
+    process.env.GITHUB_BASE_REF ? `origin/${process.env.GITHUB_BASE_REF}` : '',
+    'origin/main',
+    'origin/master',
+    'upstream/main',
+    'upstream/master',
+    '@{upstream}',
+  ].filter(Boolean)
+
+  for (const ref of refs) {
     try {
       runGit(repoRoot, ['rev-parse', '--verify', ref], { ignoreStderr: true })
       const mergeBase = runGit(repoRoot, ['merge-base', 'HEAD', ref], { ignoreStderr: true })
@@ -116,13 +125,19 @@ function getDiffBase(repoRoot) {
     }
   }
 
-  cachedDiffBase = 'HEAD~1'
-  return cachedDiffBase
+  throw new Error(
+    '[check-core-published] Unable to determine git diff base. '
+    + 'Fetch origin/main or set GITHUB_BASE_SHA / MARKSTREAM_RELEASE_BASE_SHA / MARKSTREAM_DIFF_BASE.',
+  )
+}
+
+function formatError(err) {
+  return err instanceof Error ? err.message : String(err)
 }
 
 function hasGitChanges(repoRoot, relativePath) {
+  const base = getDiffBase(repoRoot)
   try {
-    const base = getDiffBase(repoRoot)
     const output = runGit(
       repoRoot,
       ['diff', '--name-only', `${base}...HEAD`, '--', relativePath],
@@ -130,14 +145,16 @@ function hasGitChanges(repoRoot, relativePath) {
     ).trim()
     return output.length > 0
   }
-  catch {
-    return false
+  catch (err) {
+    throw new Error(
+      `[check-core-published] Unable to diff ${relativePath} against ${base}: ${formatError(err)}`,
+    )
   }
 }
 
 function hasPackageVersionChanged(repoRoot, packageJsonRelativePath, targetVersion) {
+  const base = getDiffBase(repoRoot)
   try {
-    const base = getDiffBase(repoRoot)
     const previousRaw = runGit(
       repoRoot,
       ['show', `${base}:${packageJsonRelativePath}`],
@@ -146,8 +163,10 @@ function hasPackageVersionChanged(repoRoot, packageJsonRelativePath, targetVersi
     const previousPackageJson = JSON.parse(previousRaw)
     return previousPackageJson.version !== targetVersion
   }
-  catch {
-    return true
+  catch (err) {
+    throw new Error(
+      `[check-core-published] Unable to read previous ${packageJsonRelativePath} from ${base}: ${formatError(err)}`,
+    )
   }
 }
 

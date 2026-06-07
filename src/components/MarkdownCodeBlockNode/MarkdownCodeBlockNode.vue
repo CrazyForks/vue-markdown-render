@@ -208,6 +208,8 @@ function renderFallback(code: string) {
   renderObserver?.disconnect()
   renderObserver = undefined
   if (!code) {
+    clearRendererTarget()
+    lastCommittedRenderSignature = ''
     fallbackHtml.value = ''
     rendererReady.value = false
     return
@@ -612,6 +614,11 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
     return
   }
 
+  if (!code) {
+    renderFallback('')
+    return
+  }
+
   if (!renderer || rendererNeedsReconfigure()) {
     renderFallback(code)
     await safeInitRenderer(epoch)
@@ -619,7 +626,7 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
   }
   if (!isCurrentRenderEpoch(epoch))
     return
-  if (!renderer || !code)
+  if (!renderer)
     return
 
   if (props.stream === false && props.loading)
@@ -857,7 +864,7 @@ function previewCode() {
         @scroll="handleScroll"
       >
         <div ref="rendererTarget" class="code-block-render" />
-        <div v-if="!rendererReady" class="code-fallback-plain" v-html="fallbackHtml" />
+        <div v-if="!rendererReady && fallbackHtml" class="code-fallback-plain" v-html="fallbackHtml" />
       </div>
 
       <template #loading>

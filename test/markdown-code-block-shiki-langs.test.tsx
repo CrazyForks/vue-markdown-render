@@ -582,6 +582,32 @@ describe('markdown code block Shiki langs', () => {
     wrapper.unmount()
   })
 
+  it('clears Vue Shiki renderer DOM when code becomes empty', async () => {
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode('typescript', 'const value = 1'),
+        langs: ['typescript'],
+      },
+    })
+
+    await flushAll()
+    await waitForRendererCreated()
+
+    expect(wrapper.find('.code-block-render').text()).toContain('const value = 1')
+
+    await wrapper.setProps({
+      node: makeNode('typescript', ''),
+    })
+    await flushAll()
+
+    expect(wrapper.find('.code-block-render').text()).toBe('')
+    expect(wrapper.find('.code-fallback-plain').exists()).toBe(false)
+
+    wrapper.unmount()
+  })
+
   it('keeps Vue fallback visible while langs re-registration is pending', async () => {
     const initialLang = 'vue-pending-initial'
     const nextLang = 'vue-pending-next'

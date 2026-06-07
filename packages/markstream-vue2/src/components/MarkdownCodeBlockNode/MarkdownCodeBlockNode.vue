@@ -239,15 +239,17 @@ function escapeHtml(str: string) {
 function renderFallback(code: string, force = false) {
   renderObserver?.disconnect()
   renderObserver = undefined
-  if (!force && hasStableRender.value) {
-    fallbackHtml.value = ''
-    rendererReady.value = true
-    return
-  }
   if (!code) {
+    clearRendererTarget()
     fallbackHtml.value = ''
     rendererReady.value = false
     hasStableRender.value = false
+    lastCommittedRenderSignature = ''
+    return
+  }
+  if (!force && hasStableRender.value) {
+    fallbackHtml.value = ''
+    rendererReady.value = true
     return
   }
   fallbackHtml.value = `<pre class="shiki shiki-fallback"><code>${escapeHtml(code)}</code></pre>`
@@ -651,13 +653,7 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
   }
 
   if (!code) {
-    renderObserver?.disconnect()
-    renderObserver = undefined
-    rendererTarget.value.innerHTML = ''
-    fallbackHtml.value = ''
-    rendererReady.value = false
-    hasStableRender.value = false
-    lastCommittedRenderSignature = ''
+    renderFallback('')
     return
   }
 
@@ -668,7 +664,7 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
   }
   if (!isCurrentRenderEpoch(epoch))
     return
-  if (!renderer || !code)
+  if (!renderer)
     return
 
   if (props.stream === false && props.loading)
@@ -1014,7 +1010,7 @@ function previewCode() {
       @scroll="handleScroll"
     >
       <div ref="rendererTarget" class="code-block-render" />
-      <div v-if="!rendererReady" class="code-fallback-plain" v-html="fallbackHtml" />
+      <div v-if="!rendererReady && fallbackHtml" class="code-fallback-plain" v-html="fallbackHtml" />
     </div>
     <!-- Loading placeholder can be overridden via slot -->
     <div v-show="!stream && loading" class="code-loading-placeholder">

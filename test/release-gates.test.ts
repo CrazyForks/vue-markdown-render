@@ -15,9 +15,11 @@ describe('release dependency gates', () => {
     expect(prepublishOnly).toContain('pnpm run check:workspace-deps-published')
     expect(prepublishOnly).toContain('pnpm run test:smoke:pack')
     expect(prepublishOnly).toContain('pnpm run test:smoke:pack:optional')
+    expect(prepublishOnly).toContain('pnpm run test:smoke:shiki-dependent-imports')
     expect(prepublishOnly.indexOf('pnpm run build:parser')).toBeLessThan(prepublishOnly.indexOf('pnpm run check:workspace-deps-published'))
     expect(prepublishOnly.indexOf('pnpm run check:workspace-deps-published')).toBeLessThan(prepublishOnly.indexOf('pnpm run test:smoke:pack'))
     expect(prepublishOnly.indexOf('pnpm run test:smoke:pack')).toBeLessThan(prepublishOnly.indexOf('pnpm run test:smoke:pack:optional'))
+    expect(prepublishOnly.indexOf('pnpm run test:smoke:pack:optional')).toBeLessThan(prepublishOnly.indexOf('pnpm run test:smoke:shiki-dependent-imports'))
   })
 
   it('uses the workspace dependency publish gate in the release script', () => {
@@ -137,12 +139,32 @@ describe('release dependency gates', () => {
     const script = readFileSync(resolve(process.cwd(), 'scripts/check-core-published.mjs'), 'utf8')
 
     expect(script).toContain('process.env.GITHUB_BASE_SHA')
+    expect(script).toContain('process.env.GITHUB_BASE_REF')
     expect(script).toContain('process.env.MARKSTREAM_RELEASE_BASE_SHA')
     expect(script).toContain('process.env.MARKSTREAM_DIFF_BASE')
+    expect(script).toContain('Unable to determine git diff base')
+    expect(script).toMatch(/Unable to diff \$\{relativePath\} against \$\{base\}/)
+    expect(script).toMatch(/Unable to read previous \$\{packageJsonRelativePath\} from \$\{base\}/)
     expect(script).toMatch(/`\$\{base\}\.\.\.HEAD`/)
     expect(script).toContain('hasPackageVersionChanged')
     expect(script).toContain('local core files changed')
     expect(script).toMatch(/Bump \$\{args\.corePackageName\} before publishing dependents\./)
+  })
+
+  it('smoke-tests packed Shiki dependent package imports after packed smoke', () => {
+    const scripts = packageJson.scripts
+    const smokeScript = readFileSync(resolve(process.cwd(), 'scripts/smoke-shiki-dependent-imports.mjs'), 'utf8')
+
+    expect(scripts['test:smoke:shiki-dependent-imports']).toBe('node scripts/smoke-shiki-dependent-imports.mjs')
+    expect(scripts['release:verify']).toContain('pnpm run test:smoke:shiki-dependent-imports')
+    expect(scripts['release:verify'].indexOf('pnpm run test:smoke:pack:optional')).toBeLessThan(
+      scripts['release:verify'].indexOf('pnpm run test:smoke:shiki-dependent-imports'),
+    )
+    expect(smokeScript).toContain('markstream-react')
+    expect(smokeScript).toContain('markstream-vue2')
+    expect(smokeScript).toContain('normalizeShikiLanguage')
+    expect(smokeScript).toContain('registerHighlightOnce')
+    expect(smokeScript).toContain('getRegisterHighlightOptions')
   })
 
   it('keeps stream-markdown peer range aligned with the langs-capable release', () => {

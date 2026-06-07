@@ -232,16 +232,23 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     renderObserverRef.current = null
   }, [])
 
+  const clearRendererTarget = useCallback(() => {
+    if (rendererTargetRef.current)
+      rendererTargetRef.current.innerHTML = ''
+  }, [])
+
   const renderFallback = useCallback((code: string) => {
     disconnectRenderObserver()
     if (!code) {
+      clearRendererTarget()
+      lastCommittedRenderSignatureRef.current = ''
       setFallbackHtml('')
       setRendererReady(false)
       return
     }
     setFallbackHtml(`<pre class="shiki shiki-fallback"><code>${escapeHtml(code)}</code></pre>`)
     setRendererReady(false)
-  }, [disconnectRenderObserver])
+  }, [clearRendererTarget, disconnectRenderObserver])
 
   const clearFallback = useCallback(() => {
     disconnectRenderObserver()
@@ -253,11 +260,6 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     lastCommittedRenderSignatureRef.current = renderSignature
     clearFallback()
   }, [clearFallback])
-
-  const clearRendererTarget = useCallback(() => {
-    if (rendererTargetRef.current)
-      rendererTargetRef.current.innerHTML = ''
-  }, [])
 
   const hasRendererContent = useCallback(() => {
     const target = rendererTargetRef.current
