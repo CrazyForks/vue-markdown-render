@@ -203,6 +203,8 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const rendererRef = useRef<ShikiRenderer | null>(null)
   const rendererConfigKeyRef = useRef('')
   const lastCommittedRenderSignatureRef = useRef('')
+  const rendererMutationVersionRef = useRef(0)
+  const pendingRenderSignatureRef = useRef<string | null>(null)
   const createRendererRef = useRef<null | ((el: HTMLElement, opts: ShikiRendererOptions) => ShikiRenderer)>(null)
   const streamMarkdownLoadPromiseRef = useRef<Promise<void> | null>(null)
   const streamMarkdownLoadFailedRef = useRef(false)
@@ -223,9 +225,10 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     return props.isDark ? props.darkTheme : props.lightTheme
   }, [props.darkTheme, props.isDark, props.lightTheme])
 
-  const disconnectRenderObserver = useCallback(() => {
-    renderObserverRef.current?.disconnect()
-    renderObserverRef.current = null
+  const disconnectRenderObserver = useCallback((observer?: MutationObserver | null) => {
+    observer?.disconnect()
+    if (!observer || renderObserverRef.current === observer)
+      renderObserverRef.current = null
   }, [])
 
   const clearRendererTarget = useCallback(() => {
@@ -234,6 +237,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   }, [])
 
   const renderFallback = useCallback((code: string) => {
+    pendingRenderSignatureRef.current = null
     disconnectRenderObserver()
     if (!code) {
       clearRendererTarget()
@@ -266,23 +270,13 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     return Boolean(target.textContent?.trim().length)
   }, [])
 
-  const getRendererContentSnapshot = useCallback(() => {
-    const target = rendererTargetRef.current
-    if (!target)
-      return ''
-    return `${target.childNodes.length}\u0000${target.textContent ?? ''}\u0000${target.innerHTML}`
-  }, [])
-
-  const hasRendererContentChanged = useCallback((previousSnapshot: string) => {
-    return hasRendererContent() && getRendererContentSnapshot() !== previousSnapshot
-  }, [getRendererContentSnapshot, hasRendererContent])
-
   const disposeCurrentRenderer = useCallback((updateReady = true) => {
     const current = rendererRef.current
     disconnectRenderObserver()
     rendererRef.current = null
     rendererConfigKeyRef.current = ''
     lastCommittedRenderSignatureRef.current = ''
+    pendingRenderSignatureRef.current = null
     failedRendererLanguagesRef.current.clear()
 
     try {
@@ -308,46 +302,34 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     return mountedRef.current && renderSeqRef.current === seq
   }, [])
 
-  const clearFallbackWhenRendererReady = useCallback(async (
-    seq: number,
-    previousSnapshot: string,
-    renderSignature: string,
-  ) => {
-    await Promise.resolve()
-    if (!isCurrentRenderSeq(seq))
-      return
-
-    if (
-      hasRendererContentChanged(previousSnapshot)
-      || (lastCommittedRenderSignatureRef.current === renderSignature && hasRendererContent())
-    ) {
-      markRendererCommitted(renderSignature)
-      return
-    }
+  const startRendererReadyObserver = useCallback((seq: number, previousVersion: number) => {
+    disconnectRenderObserver()
 
     const target = rendererTargetRef.current
-    if (!target)
+    if (!target || typeof MutationObserver === 'undefined')
       return
 
-    if (typeof MutationObserver === 'undefined')
-      return
+    pendingRenderSignatureRef.current = null
 
-    disconnectRenderObserver()
     const observer = new MutationObserver(() => {
+      rendererMutationVersionRef.current += 1
+
+      const signature = pendingRenderSignatureRef.current
+      if (!signature)
+        return
+
       if (!isCurrentRenderSeq(seq)) {
-        observer.disconnect()
-        if (renderObserverRef.current === observer)
-          renderObserverRef.current = null
+        pendingRenderSignatureRef.current = null
+        disconnectRenderObserver(observer)
         return
       }
 
-      if (!hasRendererContentChanged(previousSnapshot))
+      if (rendererMutationVersionRef.current === previousVersion || !hasRendererContent())
         return
 
-      markRendererCommitted(renderSignature)
-      observer.disconnect()
-      if (renderObserverRef.current === observer)
-        renderObserverRef.current = null
+      pendingRenderSignatureRef.current = null
+      disconnectRenderObserver(observer)
+      markRendererCommitted(signature)
     })
 
     renderObserverRef.current = observer
@@ -360,7 +342,32 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   }, [
     disconnectRenderObserver,
     hasRendererContent,
-    hasRendererContentChanged,
+    isCurrentRenderSeq,
+    markRendererCommitted,
+  ])
+
+  const clearFallbackWhenRendererReady = useCallback(async (
+    seq: number,
+    previousVersion: number,
+    renderSignature: string,
+  ) => {
+    pendingRenderSignatureRef.current = renderSignature
+
+    await Promise.resolve()
+    if (!isCurrentRenderSeq(seq))
+      return
+
+    if (
+      (rendererMutationVersionRef.current !== previousVersion && hasRendererContent())
+      || (lastCommittedRenderSignatureRef.current === renderSignature && hasRendererContent())
+    ) {
+      pendingRenderSignatureRef.current = null
+      disconnectRenderObserver()
+      markRendererCommitted(renderSignature)
+    }
+  }, [
+    disconnectRenderObserver,
+    hasRendererContent,
     isCurrentRenderSeq,
     markRendererCommitted,
   ])
@@ -543,22 +550,49 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     if (!isCurrentRenderSeq(seq))
       return
 
-    const currentRegistrationConfig = createRuntimeHighlightRegistrationConfig(registrationInput)
-    const key = currentRegistrationConfig.key
+    let currentRegistrationConfig = createRuntimeHighlightRegistrationConfig(registrationInput)
+    let key = currentRegistrationConfig.key
     latestRegistrationKeyRef.current = key
 
-    if (rendererRef.current && rendererConfigKeyRef.current !== key) {
+    let needsRendererReconfigure = Boolean(rendererRef.current && rendererConfigKeyRef.current !== key)
+    if (needsRendererReconfigure)
       renderFallback(code)
-      disposeCurrentRenderer()
+
+    let highlightStatus = await waitForCurrentHighlightRegistration(currentRegistrationConfig)
+
+    if (highlightStatus === 'failed' && currentRegistrationConfig.rendererOptions.langs?.length) {
+      if (isDevEnv && typeof console !== 'undefined') {
+        console.warn(
+          '[MarkdownCodeBlockNode] Failed to register configured Shiki languages; retrying without `langs`.',
+          { langs: currentRegistrationConfig.rendererOptions.langs },
+        )
+      }
+
+      currentRegistrationConfig = createRuntimeHighlightRegistrationConfig({
+        key: getHighlightRegistrationKey(registrationInput?.themes, undefined),
+        themes: registrationInput?.themes,
+        langs: undefined,
+      })
+      key = currentRegistrationConfig.key
+      latestRegistrationKeyRef.current = key
+
+      highlightStatus = await waitForCurrentHighlightRegistration(currentRegistrationConfig)
     }
 
-    const highlightStatus = await waitForCurrentHighlightRegistration(currentRegistrationConfig)
     if (!isCurrentRenderSeq(seq) || highlightStatus === 'stale')
       return
+
+    needsRendererReconfigure = Boolean(rendererRef.current && rendererConfigKeyRef.current !== key)
     if (highlightStatus === 'failed') {
-      renderFallback(code)
+      if (needsRendererReconfigure && rendererRef.current && hasRendererContent())
+        clearFallback()
+      else
+        renderFallback(code)
       return
     }
+
+    if (needsRendererReconfigure)
+      disposeCurrentRenderer()
 
     if (!codeBlockContentRef.current || !rendererTargetRef.current) {
       renderFallback(code)
@@ -586,16 +620,21 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     }
 
     renderFallback(code)
-    const previousSnapshot = getRendererContentSnapshot()
+    const previousMutationVersion = rendererMutationVersionRef.current
+    startRendererReadyObserver(seq, previousMutationVersion)
     const renderedLang = await updateRendererWithFallback(code, rawLang, seq)
     if (!isCurrentRenderSeq(seq))
       return
     if (renderedLang) {
       await clearFallbackWhenRendererReady(
         seq,
-        previousSnapshot,
+        previousMutationVersion,
         getRenderSignature(key, renderedLang, code),
       )
+    }
+    else {
+      pendingRenderSignatureRef.current = null
+      disconnectRenderObserver()
     }
   }, [
     nextRenderSeq,
@@ -609,11 +648,14 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     createRuntimeHighlightRegistrationConfig,
     waitForCurrentHighlightRegistration,
     disposeCurrentRenderer,
+    clearFallback,
     getPreferredColorScheme,
-    getRendererContentSnapshot,
+    hasRendererContent,
     renderFallback,
+    startRendererReadyObserver,
     updateRendererWithFallback,
     clearFallbackWhenRendererReady,
+    disconnectRenderObserver,
     isCurrentRenderSeq,
   ])
 

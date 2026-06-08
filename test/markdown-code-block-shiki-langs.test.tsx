@@ -831,7 +831,7 @@ describe('markdown code block Shiki langs', () => {
     await wrapper.setProps({ langs: [nextLang] })
     await flushAll()
 
-    expect(wrapper.find('.code-block-render').text()).toBe('')
+    expect(wrapper.find('.code-block-render').text()).toContain('const value = 1')
     expect(wrapper.find('.code-fallback-plain').text()).toContain('const value = 1')
 
     pendingRegistration.resolve()
@@ -878,7 +878,7 @@ describe('markdown code block Shiki langs', () => {
     wrapper.unmount()
   })
 
-  it('clears stale Vue renderer when re-registration for new langs fails', async () => {
+  it('keeps previous Vue renderer when re-registration for new langs fails', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
     const wrapper = mount(MarkdownCodeBlockNode, {
@@ -900,10 +900,52 @@ describe('markdown code block Shiki langs', () => {
       await wrapper.setProps({ langs: ['python'] })
       await flushAll()
 
-      expect(oldRenderer.dispose).toHaveBeenCalledTimes(1)
+      expect(oldRenderer.dispose).not.toHaveBeenCalled()
       expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenCalledTimes(initialRendererCount)
-      expect((wrapper.find('.code-block-render').element as HTMLElement).textContent).toBe('')
-      expect(wrapper.find('.code-fallback-plain').text()).toContain('const value = 1')
+      expect((wrapper.find('.code-block-render').element as HTMLElement).textContent).toContain('const value = 1')
+      expect(wrapper.find('.code-fallback-plain').exists()).toBe(false)
+    }
+    finally {
+      wrapper.unmount()
+      warnSpy.mockRestore()
+    }
+  })
+
+  it('retries Vue Shiki registration without langs when configured langs fail', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const invalidLang = 'vue-invalid-configured-lang'
+    const theme = 'vue-invalid-lang-fallback-theme'
+    streamMarkdownMock.registerHighlight.mockImplementation(async (opts?: { langs?: readonly string[] }) => {
+      if (opts?.langs?.includes(invalidLang))
+        throw new Error('invalid language')
+      streamMarkdownMock.loadLangs(opts)
+    })
+
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode('typescript'),
+        themes: [theme],
+        langs: ['typescript', invalidLang],
+      },
+    })
+
+    try {
+      await flushAll()
+      await waitForRendererCreated()
+
+      expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith({
+        themes: [theme],
+      })
+      expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenLastCalledWith(
+        expect.any(HTMLElement),
+        expect.not.objectContaining({ langs: expect.any(Array) }),
+      )
+      expect(streamMarkdownMock.createdRenderers.at(-1)?.updateCode).toHaveBeenLastCalledWith(
+        'const value = 1',
+        'typescript',
+      )
     }
     finally {
       wrapper.unmount()
@@ -1464,7 +1506,7 @@ describe('markdown code block Shiki langs', () => {
     wrapper.unmount()
   })
 
-  it('keeps Vue2 fallback forced when Shiki re-registration fails after a stable render', async () => {
+  it('keeps previous Vue2 renderer when Shiki re-registration fails after a stable render', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const initialLang = 'vue2-fallback-forced-initial'
     const nextLang = 'vue2-fallback-forced-next'
@@ -1502,14 +1544,56 @@ describe('markdown code block Shiki langs', () => {
       await flushAll()
       const childState = (wrapper.findComponent(Vue2MarkdownCodeBlockNode as any).vm as any).$.setupState
       await childState.safeInitRenderer()
-      for (let i = 0; i < 10 && oldRenderer.dispose.mock.calls.length === 0; i++)
+      for (let i = 0; i < 10 && streamMarkdownMock.registerHighlight.mock.calls.length < 3; i++)
         await flushAll()
 
-      expect(oldRenderer.dispose).toHaveBeenCalledTimes(1)
+      expect(oldRenderer.dispose).not.toHaveBeenCalled()
       expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenCalledTimes(initialRendererCount)
-      expect(wrapper.find('.code-block-render').text()).toBe('')
-      expect(childState.rendererReady).toBe(false)
-      expect(childState.fallbackHtml).toContain('const value = 1')
+      expect(wrapper.find('.code-block-render').text()).toContain('const value = 1')
+      expect(childState.rendererReady).toBe(true)
+      expect(childState.fallbackHtml).toBe('')
+    }
+    finally {
+      wrapper.unmount()
+      warnSpy.mockRestore()
+    }
+  })
+
+  it('retries Vue2 Shiki registration without langs when configured langs fail', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const invalidLang = 'vue2-invalid-configured-lang'
+    const theme = 'vue2-invalid-lang-fallback-theme'
+    streamMarkdownMock.registerHighlight.mockImplementation(async (opts?: { langs?: readonly string[] }) => {
+      if (opts?.langs?.includes(invalidLang))
+        throw new Error('invalid language')
+      streamMarkdownMock.loadLangs(opts)
+    })
+
+    const { default: Vue2MarkdownCodeBlockNode } = await import('../packages/markstream-vue2/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(Vue2MarkdownCodeBlockNode as any, {
+      props: {
+        loading: false,
+        node: makeNode('typescript'),
+        themes: [theme],
+        langs: ['typescript', invalidLang],
+      },
+    })
+
+    try {
+      await flushAll()
+      await waitForRendererCreated()
+
+      expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith({
+        themes: [theme],
+      })
+      expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenLastCalledWith(
+        expect.any(HTMLElement),
+        expect.not.objectContaining({ langs: expect.any(Array) }),
+      )
+      expect(streamMarkdownMock.createdRenderers.at(-1)?.updateCode).toHaveBeenLastCalledWith(
+        'const value = 1',
+        'typescript',
+      )
     }
     finally {
       wrapper.unmount()
@@ -2612,7 +2696,7 @@ describe('markdown code block Shiki langs', () => {
     })
     await flushReact()
 
-    expect(host.querySelector('.code-block-render')?.textContent).toBe('')
+    expect(host.querySelector('.code-block-render')?.textContent).toContain('const value = 1')
     expect(host.querySelector('.code-fallback-plain')?.textContent).toContain('const value = 1')
 
     await act(async () => {
@@ -2675,7 +2759,7 @@ describe('markdown code block Shiki langs', () => {
     })
   })
 
-  it('clears stale React renderer when re-registration for new langs fails', async () => {
+  it('keeps previous React renderer when re-registration for new langs fails', async () => {
     const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -2709,14 +2793,64 @@ describe('markdown code block Shiki langs', () => {
 
     await flushReact()
 
-    expect(oldRenderer.dispose).toHaveBeenCalledTimes(1)
+    expect(oldRenderer.dispose).not.toHaveBeenCalled()
     expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenCalledTimes(initialRendererCount)
-    expect(host.querySelector('.code-block-render')?.textContent).toBe('')
-    expect(host.querySelector('.code-fallback-plain')?.textContent).toContain('const value = 1')
+    expect(host.querySelector('.code-block-render')?.textContent).toContain('const value = 1')
+    expect(host.querySelector('.code-fallback-plain')).toBeNull()
 
     await act(async () => {
       root.unmount()
     })
+  })
+
+  it('retries React Shiki registration without langs when configured langs fail', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const invalidLang = 'react-invalid-configured-lang'
+    const theme = 'react-invalid-lang-fallback-theme'
+    streamMarkdownMock.registerHighlight.mockImplementation(async (opts?: { langs?: readonly string[] }) => {
+      if (opts?.langs?.includes(invalidLang))
+        throw new Error('invalid language')
+      streamMarkdownMock.loadLangs(opts)
+    })
+
+    const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    try {
+      await act(async () => {
+        root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+          loading: false,
+          node: makeNode('typescript'),
+          themes: [theme],
+          langs: ['typescript', invalidLang],
+        }))
+      })
+
+      await flushReact()
+      await waitForReactRendererCreated()
+
+      expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith({
+        themes: [theme],
+      })
+      expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenLastCalledWith(
+        expect.any(HTMLElement),
+        expect.not.objectContaining({ langs: expect.any(Array) }),
+      )
+      expect(streamMarkdownMock.createdRenderers.at(-1)?.updateCode).toHaveBeenLastCalledWith(
+        'const value = 1',
+        'typescript',
+      )
+    }
+    finally {
+      await act(async () => {
+        root.unmount()
+      })
+      warnSpy.mockRestore()
+    }
   })
 
   it('does not treat React langs as a hard allow-list when a language is already available', async () => {

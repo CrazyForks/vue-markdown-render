@@ -91,6 +91,8 @@ const fallbackHtml = ref('')
 const rendererReady = ref(false)
 let renderObserver: MutationObserver | undefined
 let lastCommittedRenderSignature = ''
+let rendererMutationVersion = 0
+let pendingRenderSignature: string | null = null
 const registerVisibility = useViewportPriority()
 const viewportHandle = shallowRef<ReturnType<typeof registerVisibility> | null>(null)
 const viewportReady = ref(typeof window === 'undefined')
@@ -221,8 +223,8 @@ function escapeHtml(str: string) {
 }
 
 function renderFallback(code: string) {
-  renderObserver?.disconnect()
-  renderObserver = undefined
+  pendingRenderSignature = null
+  disconnectReadyObserver()
   if (!code) {
     clearRendererTarget()
     lastCommittedRenderSignature = ''
@@ -253,17 +255,6 @@ function hasRendererContent() {
   return Boolean(target.textContent?.trim().length)
 }
 
-function getRendererContentSnapshot() {
-  const target = rendererTarget.value
-  if (!target)
-    return ''
-  return `${target.childNodes.length}\u0000${target.textContent ?? ''}\u0000${target.innerHTML}`
-}
-
-function hasRendererContentChanged(previousSnapshot: string) {
-  return hasRendererContent() && getRendererContentSnapshot() !== previousSnapshot
-}
-
 function getRenderSignature(configKey: string | null | undefined, lang: string, code: string) {
   return `${configKey ?? ''}\u0000${lang}\u0000${code}`
 }
@@ -273,37 +264,42 @@ function markRendererCommitted(renderSignature: string) {
   clearFallback()
 }
 
-async function clearFallbackWhenRendererReady(epoch: number, previousSnapshot: string, renderSignature: string) {
-  await nextTick()
-  if (!isCurrentRenderEpoch(epoch))
-    return
-  if (
-    hasRendererContentChanged(previousSnapshot)
-    || (lastCommittedRenderSignature === renderSignature && hasRendererContent())
-  ) {
-    markRendererCommitted(renderSignature)
-    return
-  }
+function disconnectReadyObserver(observer?: MutationObserver) {
+  observer?.disconnect()
+  if (!observer || renderObserver === observer)
+    renderObserver = undefined
+}
+
+function startRendererReadyObserver(epoch: number, previousVersion: number) {
+  disconnectReadyObserver()
+
   const target = rendererTarget.value
-  if (!target)
+  if (!target || typeof MutationObserver === 'undefined')
     return
-  if (typeof MutationObserver === 'undefined')
-    return
-  renderObserver?.disconnect()
+
+  pendingRenderSignature = null
+
   const observer = new MutationObserver(() => {
+    rendererMutationVersion += 1
+
+    const signature = pendingRenderSignature
+    if (!signature)
+      return
+
     if (!isCurrentRenderEpoch(epoch)) {
-      observer.disconnect()
-      if (renderObserver === observer)
-        renderObserver = undefined
+      pendingRenderSignature = null
+      disconnectReadyObserver(observer)
       return
     }
-    if (!hasRendererContentChanged(previousSnapshot))
+
+    if (rendererMutationVersion === previousVersion || !hasRendererContent())
       return
-    markRendererCommitted(renderSignature)
-    observer.disconnect()
-    if (renderObserver === observer)
-      renderObserver = undefined
+
+    pendingRenderSignature = null
+    disconnectReadyObserver(observer)
+    markRendererCommitted(signature)
   })
+
   renderObserver = observer
   observer.observe(target, {
     childList: true,
@@ -311,6 +307,23 @@ async function clearFallbackWhenRendererReady(epoch: number, previousSnapshot: s
     characterData: true,
     attributes: true,
   })
+}
+
+async function clearFallbackWhenRendererReady(epoch: number, previousVersion: number, renderSignature: string) {
+  pendingRenderSignature = renderSignature
+
+  await nextTick()
+  if (!isCurrentRenderEpoch(epoch))
+    return
+
+  if (
+    (rendererMutationVersion !== previousVersion && hasRendererContent())
+    || (lastCommittedRenderSignature === renderSignature && hasRendererContent())
+  ) {
+    pendingRenderSignature = null
+    disconnectReadyObserver()
+    markRendererCommitted(renderSignature)
+  }
 }
 interface ShikiRenderer {
   updateCode: (code: string, lang?: string) => void | Promise<void>
@@ -354,6 +367,7 @@ function disposeCurrentRenderer() {
   renderer = undefined
   rendererConfigKey = null
   lastCommittedRenderSignature = ''
+  pendingRenderSignature = null
   failedRendererLanguages.clear()
 
   try {
@@ -567,29 +581,61 @@ async function initRenderer(epoch: number) {
     props.themes,
     props.langs,
   )
-  const rendererOptions = normalizeRuntimeShikiOptions(requestedRendererOptions)
-  const nextRendererConfigKey = getHighlightRegistrationKey(
+  let rendererOptions = normalizeRuntimeShikiOptions(requestedRendererOptions)
+  let nextRendererConfigKey = getHighlightRegistrationKey(
     rendererOptions.themes,
     rendererOptions.langs,
   )
   latestHighlightRegistrationKey = nextRendererConfigKey
 
-  if (renderer && rendererConfigKey !== nextRendererConfigKey) {
+  let needsRendererReconfigure = Boolean(renderer && rendererConfigKey !== nextRendererConfigKey)
+  if (needsRendererReconfigure)
     renderFallback(props.node.code)
-    disposeCurrentRenderer()
-  }
 
-  const highlightStatus = await waitForCurrentHighlightRegistration(
+  let highlightStatus = await waitForCurrentHighlightRegistration(
     rendererOptions.themes,
     rendererOptions.langs,
     nextRendererConfigKey,
   )
+
+  if (highlightStatus === 'failed' && rendererOptions.langs?.length) {
+    if (isDevEnv) {
+      console.warn(
+        '[MarkdownCodeBlockNode] Failed to register configured Shiki languages; retrying without `langs`.',
+        { langs: rendererOptions.langs },
+      )
+    }
+
+    rendererOptions = normalizeRuntimeShikiOptions(
+      getRegisterHighlightOptions(props.themes, undefined),
+    )
+    nextRendererConfigKey = getHighlightRegistrationKey(
+      rendererOptions.themes,
+      rendererOptions.langs,
+    )
+    latestHighlightRegistrationKey = nextRendererConfigKey
+
+    highlightStatus = await waitForCurrentHighlightRegistration(
+      rendererOptions.themes,
+      rendererOptions.langs,
+      nextRendererConfigKey,
+    )
+  }
+
   if (!isCurrentRenderEpoch(epoch) || highlightStatus === 'stale')
     return
+
+  needsRendererReconfigure = Boolean(renderer && rendererConfigKey !== nextRendererConfigKey)
   if (highlightStatus === 'failed') {
-    renderFallback(props.node.code)
+    if (needsRendererReconfigure && renderer && hasRendererContent())
+      clearFallback()
+    else
+      renderFallback(props.node.code)
     return
   }
+
+  if (needsRendererReconfigure)
+    disposeCurrentRenderer()
 
   if (!renderer && createShikiRenderer) {
     renderer = createShikiRenderer(rendererTarget.value, {
@@ -611,16 +657,21 @@ async function initRenderer(epoch: number) {
   }
 
   renderFallback(props.node.code)
-  const previousSnapshot = getRendererContentSnapshot()
+  const previousMutationVersion = rendererMutationVersion
+  startRendererReadyObserver(epoch, previousMutationVersion)
   const renderedLang = await updateRendererWithFallback(props.node.code, props.node.language, epoch)
   if (!isCurrentRenderEpoch(epoch))
     return
   if (renderedLang) {
     await clearFallbackWhenRendererReady(
       epoch,
-      previousSnapshot,
+      previousMutationVersion,
       getRenderSignature(nextRendererConfigKey, renderedLang, props.node.code),
     )
+  }
+  else {
+    pendingRenderSignature = null
+    disconnectReadyObserver()
   }
 }
 
@@ -650,6 +701,7 @@ onBeforeUnmount(() => {
   viewportHandle.value = null
   renderObserver?.disconnect()
   renderObserver = undefined
+  pendingRenderSignature = null
   disposeCurrentRenderer()
 })
 
@@ -718,16 +770,21 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
     return
 
   renderFallback(code)
-  const previousSnapshot = getRendererContentSnapshot()
+  const previousMutationVersion = rendererMutationVersion
+  startRendererReadyObserver(epoch, previousMutationVersion)
   const renderedLang = await updateRendererWithFallback(code, lang, epoch)
   if (!isCurrentRenderEpoch(epoch))
     return
   if (renderedLang) {
     await clearFallbackWhenRendererReady(
       epoch,
-      previousSnapshot,
+      previousMutationVersion,
       getRenderSignature(rendererConfigKey ?? highlightRegistrationKey.value, renderedLang, code),
     )
+  }
+  else {
+    pendingRenderSignature = null
+    disconnectReadyObserver()
   }
 })
 
