@@ -58,9 +58,12 @@ interface HighlightRegistrationConfig {
 }
 
 interface HighlightRegistrationInput {
-  key: string
   themes?: readonly unknown[]
   langs?: readonly unknown[]
+}
+
+interface HighlightRegistrationSnapshot extends HighlightRegistrationInput {
+  key: string
 }
 
 function escapeHtml(str: string) {
@@ -177,7 +180,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const [fontSize, setFontSize] = useState<number>(defaultFontSize)
   const tooltipsEnabled = useMemo(() => props.showTooltips !== false, [props.showTooltips])
   const registrationInputKey = getHighlightRegistrationKey(props.themes, props.langs)
-  const registrationInputRef = useRef<HighlightRegistrationInput | null>(null)
+  const registrationInputRef = useRef<HighlightRegistrationSnapshot | null>(null)
   if (!registrationInputRef.current || registrationInputRef.current.key !== registrationInputKey) {
     registrationInputRef.current = {
       key: registrationInputKey,
@@ -202,6 +205,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const registerHighlightRef = useRef<((opts?: RegisterHighlightOptions) => Promise<unknown> | unknown) | null>(null)
   const warnedMissingRegisterHighlightForLangsRef = useRef(false)
   const failedRendererLanguagesRef = useRef<Set<string>>(new Set())
+  const failedHighlightRegistrationKeysRef = useRef<Set<string>>(new Set())
   const registeredKeyRef = useRef<string>('')
   const highlightRegistrationSeqRef = useRef(0)
   const latestRegistrationKeyRef = useRef(registrationInputKey)
@@ -462,10 +466,16 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const createRuntimeHighlightRegistrationConfig = useCallback((
     input: HighlightRegistrationInput | null | undefined,
   ): HighlightRegistrationConfig => {
-    const runtimeConfig = getRuntimeShikiRegistrationConfig(input?.themes, input?.langs, {
+    const capabilities = {
       hasRegisterHighlight: Boolean(registerHighlightRef.current),
       hasCreateRenderer: Boolean(createRendererRef.current),
-    })
+    }
+
+    const runtimeConfig = getRuntimeShikiRegistrationConfig(input?.themes, input?.langs, capabilities)
+    const effectiveRuntimeConfig = runtimeConfig.rendererOptions.langs?.length
+      && failedHighlightRegistrationKeysRef.current.has(runtimeConfig.key)
+      ? getRuntimeShikiRegistrationConfig(input?.themes, undefined, capabilities)
+      : runtimeConfig
 
     if (runtimeConfig.ignoredLangs && isDevEnv && !warnedMissingRegisterHighlightForLangsRef.current && typeof console !== 'undefined') {
       warnedMissingRegisterHighlightForLangsRef.current = true
@@ -476,9 +486,9 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     }
 
     return {
-      key: runtimeConfig.key,
-      registerOptions: runtimeConfig.registerOptions,
-      rendererOptions: runtimeConfig.rendererOptions,
+      key: effectiveRuntimeConfig.key,
+      registerOptions: effectiveRuntimeConfig.registerOptions,
+      rendererOptions: effectiveRuntimeConfig.rendererOptions,
     }
   }, [])
 
@@ -551,6 +561,8 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     let highlightStatus = await waitForCurrentHighlightRegistration(currentRegistrationConfig)
 
     if (highlightStatus === 'failed' && currentRegistrationConfig.rendererOptions.langs?.length) {
+      failedHighlightRegistrationKeysRef.current.add(currentRegistrationConfig.key)
+
       if (isDevEnv && typeof console !== 'undefined') {
         console.warn(
           '[MarkdownCodeBlockNode] Failed to register configured Shiki languages; retrying without `langs`.',
@@ -559,7 +571,6 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       }
 
       currentRegistrationConfig = createRuntimeHighlightRegistrationConfig({
-        key: getHighlightRegistrationKey(registrationInput?.themes, undefined),
         themes: registrationInput?.themes,
         langs: undefined,
       })

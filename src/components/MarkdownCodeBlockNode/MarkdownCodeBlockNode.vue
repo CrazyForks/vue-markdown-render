@@ -352,6 +352,7 @@ let renderEpoch = 0
 let disposed = false
 const warnedRendererErrors = new Set<string>()
 const failedRendererLanguages = new Set<string>()
+const failedHighlightRegistrationKeys = new Set<string>()
 const isDevEnv = isDevEnvironment()
 let warnedMissingRegisterHighlightForLangs = false
 let streamMarkdownLoadPromise: Promise<void> | null = null
@@ -392,12 +393,32 @@ const highlightRegistrationKey = computed(() =>
   getHighlightRegistrationKey(props.themes, props.langs),
 )
 
-function rendererNeedsReconfigure() {
-  const runtimeConfig = getRuntimeShikiRegistrationConfig(props.themes, props.langs, {
+function getShikiRuntimeCapabilities() {
+  return {
     hasRegisterHighlight: Boolean(registerHighlight),
     hasCreateRenderer: Boolean(createShikiRenderer),
-  })
+  }
+}
 
+function getRuntimeConfigWithFailedLangsFallback(
+  themes?: readonly unknown[],
+  langs?: readonly unknown[],
+) {
+  const capabilities = getShikiRuntimeCapabilities()
+  const runtimeConfig = getRuntimeShikiRegistrationConfig(themes, langs, capabilities)
+
+  if (
+    runtimeConfig.rendererOptions.langs?.length
+    && failedHighlightRegistrationKeys.has(runtimeConfig.key)
+  ) {
+    return getRuntimeShikiRegistrationConfig(themes, undefined, capabilities)
+  }
+
+  return runtimeConfig
+}
+
+function rendererNeedsReconfigure() {
+  const runtimeConfig = getRuntimeConfigWithFailedLangsFallback(props.themes, props.langs)
   return Boolean(renderer && rendererConfigKey !== runtimeConfig.key)
 }
 
@@ -567,10 +588,7 @@ async function initRenderer(epoch: number) {
     return
   }
 
-  let runtimeConfig = getRuntimeShikiRegistrationConfig(props.themes, props.langs, {
-    hasRegisterHighlight: Boolean(registerHighlight),
-    hasCreateRenderer: Boolean(createShikiRenderer),
-  })
+  let runtimeConfig = getRuntimeConfigWithFailedLangsFallback(props.themes, props.langs)
   if (runtimeConfig.ignoredLangs && isDevEnv && !warnedMissingRegisterHighlightForLangs) {
     warnedMissingRegisterHighlightForLangs = true
     console.warn(
@@ -590,6 +608,8 @@ async function initRenderer(epoch: number) {
   let highlightStatus = await waitForCurrentHighlightRegistration(runtimeConfig.registerOptions, nextRendererConfigKey)
 
   if (highlightStatus === 'failed' && rendererOptions.langs?.length) {
+    failedHighlightRegistrationKeys.add(nextRendererConfigKey)
+
     if (isDevEnv) {
       console.warn(
         '[MarkdownCodeBlockNode] Failed to register configured Shiki languages; retrying without `langs`.',
@@ -597,10 +617,7 @@ async function initRenderer(epoch: number) {
       )
     }
 
-    runtimeConfig = getRuntimeShikiRegistrationConfig(props.themes, undefined, {
-      hasRegisterHighlight: Boolean(registerHighlight),
-      hasCreateRenderer: Boolean(createShikiRenderer),
-    })
+    runtimeConfig = getRuntimeShikiRegistrationConfig(props.themes, undefined, getShikiRuntimeCapabilities())
     rendererOptions = runtimeConfig.rendererOptions
     nextRendererConfigKey = runtimeConfig.key
     latestHighlightRegistrationKey = nextRendererConfigKey

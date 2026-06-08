@@ -207,6 +207,13 @@ async function waitForLastRegisterHighlightLangs(langs: string[]) {
   )
 }
 
+function countRegisterHighlightCallsForLang(lang: string) {
+  return streamMarkdownMock.registerHighlight.mock.calls.filter(([opts]) => {
+    const registerOptions = opts as { langs?: readonly string[] } | undefined
+    return registerOptions?.langs?.includes(lang)
+  }).length
+}
+
 async function waitForReactRendererCreated() {
   await waitUntil(
     () => streamMarkdownMock.createShikiStreamRenderer.mock.calls.length > 0,
@@ -1153,6 +1160,18 @@ describe('markdown code block Shiki langs', () => {
         'const value = 1',
         'typescript',
       )
+
+      const invalidLangCallsAfterFallback = countRegisterHighlightCallsForLang(invalidLang)
+      const renderer = streamMarkdownMock.createdRenderers.at(-1)
+      const updateCount = renderer?.updateCode.mock.calls.length ?? 0
+
+      await wrapper.setProps({
+        node: makeNode('typescript', 'const value = 2'),
+      })
+      await flushAll()
+      await waitForRendererUpdateCall(renderer, updateCount + 1)
+
+      expect(countRegisterHighlightCallsForLang(invalidLang)).toBe(invalidLangCallsAfterFallback)
     }
     finally {
       wrapper.unmount()
@@ -1848,14 +1867,17 @@ describe('markdown code block Shiki langs', () => {
     })
 
     const { default: Vue2MarkdownCodeBlockNode } = await import('../packages/markstream-vue2/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
-    const wrapper = mount(Vue2MarkdownCodeBlockNode as any, {
-      props: {
-        loading: false,
-        node: makeNode('typescript'),
-        themes: [theme],
-        langs: ['typescript', invalidLang],
+    const node = ref(makeNode('typescript'))
+    const wrapper = mount(defineComponent({
+      setup() {
+        return () => h(Vue2MarkdownCodeBlockNode as any, {
+          loading: false,
+          node: node.value,
+          themes: [theme],
+          langs: ['typescript', invalidLang],
+        })
       },
-    })
+    }))
 
     try {
       await flushAll()
@@ -1872,6 +1894,16 @@ describe('markdown code block Shiki langs', () => {
         'const value = 1',
         'typescript',
       )
+
+      const invalidLangCallsAfterFallback = countRegisterHighlightCallsForLang(invalidLang)
+
+      node.value = makeNode('typescript', 'const value = 2')
+      await flushAll()
+      const childState = (wrapper.findComponent(Vue2MarkdownCodeBlockNode as any).vm as any).$.setupState
+      await childState.safeInitRenderer()
+      await flushAll()
+
+      expect(countRegisterHighlightCallsForLang(invalidLang)).toBe(invalidLangCallsAfterFallback)
     }
     finally {
       wrapper.unmount()
@@ -3158,6 +3190,23 @@ describe('markdown code block Shiki langs', () => {
         'const value = 1',
         'typescript',
       )
+
+      const invalidLangCallsAfterFallback = countRegisterHighlightCallsForLang(invalidLang)
+      const renderer = streamMarkdownMock.createdRenderers.at(-1)
+      const updateCount = renderer?.updateCode.mock.calls.length ?? 0
+
+      await act(async () => {
+        root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+          loading: false,
+          node: makeNode('typescript', 'const value = 2'),
+          themes: [theme],
+          langs: ['typescript', invalidLang],
+        }))
+      })
+      await flushReact()
+      await waitForRendererUpdateCall(renderer, updateCount + 1)
+
+      expect(countRegisterHighlightCallsForLang(invalidLang)).toBe(invalidLangCallsAfterFallback)
     }
     finally {
       await act(async () => {
