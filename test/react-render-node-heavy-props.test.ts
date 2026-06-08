@@ -6,6 +6,8 @@ import type { RenderContext } from '../packages/markstream-react/src/types'
 import { createRequire } from 'node:module'
 import { describe, expect, it } from 'vitest'
 import { HtmlBlockNode as ReactHtmlBlockNode } from '../packages/markstream-react/src/components/HtmlBlockNode/HtmlBlockNode'
+import { NodeRenderer } from '../packages/markstream-react/src/components/NodeRenderer'
+import { removeCustomComponents, setCustomComponents } from '../packages/markstream-react/src/customComponents'
 import { renderNode as clientRenderNode } from '../packages/markstream-react/src/renderers/renderNode'
 import {
   HtmlBlockNode as ReactServerHtmlBlockNode,
@@ -38,6 +40,16 @@ function CustomD2Probe() {
 
 function CustomD2LangProbe() {
   return null
+}
+
+function CodeBlockForwardingProbe(props: any) {
+  return React.createElement('div', {
+    'className': 'code-block-forwarding-probe',
+    'data-dark-theme': String(props.darkTheme ?? ''),
+    'data-light-theme': String(props.lightTheme ?? ''),
+    'data-themes': Array.isArray(props.themes) ? props.themes.join(',') : '',
+    'data-langs': Array.isArray(props.langs) ? props.langs.join(',') : '',
+  })
 }
 
 describe('markstream-react heavy-node prop forwarding', () => {
@@ -197,6 +209,37 @@ describe('markstream-react heavy-node prop forwarding', () => {
     expect(genericElement?.type).toBe(GenericCodeBlockProbe)
     expect(genericElement?.props?.node?.language).toBe('ts')
     expect(genericElement?.props?.ctx?.codeBlockProps).toEqual({ showHeader: false })
+  })
+
+  it('forwards top-level Shiki themes and langs through React NodeRenderer custom code_block renderers', () => {
+    const customId = 'react-node-renderer-shiki-forwarding'
+
+    try {
+      setCustomComponents(customId, {
+        code_block: CodeBlockForwardingProbe as any,
+      })
+
+      const html = renderToStaticMarkup(
+        React.createElement(NodeRenderer, {
+          customId,
+          content: '```ts\nconst value = 1\n```',
+          final: true,
+          renderCodeBlocksAsPre: false,
+          codeBlockDarkTheme: 'github-dark',
+          codeBlockLightTheme: 'github-light',
+          themes: ['github-dark', 'github-light'],
+          langs: ['ts', 'js'],
+        }),
+      )
+
+      expect(html).toContain('data-dark-theme="github-dark"')
+      expect(html).toContain('data-light-theme="github-light"')
+      expect(html).toContain('data-themes="github-dark,github-light"')
+      expect(html).toContain('data-langs="ts,js"')
+    }
+    finally {
+      removeCustomComponents(customId)
+    }
   })
 
   it('keeps specialized mermaid routing ahead of code_block fallback on the client renderer', () => {

@@ -5531,10 +5531,10 @@ function getBindingsFor(node: ParsedNode, language?: string, component?: unknown
   }
 
   if (lang === 'mermaid')
-    return mermaidBindings.value
+    return getMermaidBindingsFor(node)
 
   if (lang === 'infographic')
-    return infographicBindings.value
+    return getInfographicBindingsFor(node)
 
   if (lang === 'd2' || lang === 'd2lang')
     return d2Bindings.value

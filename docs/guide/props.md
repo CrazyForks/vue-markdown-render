@@ -8,7 +8,7 @@ Use this page when you need to fine-tune streaming behaviour, control heavy node
 
 ## 1.0 API tiers
 
-Stable props for 1.x: `content`, `nodes`, `final`, `parseOptions`, `customMarkdownIt`, `customHtmlTags`, `htmlPolicy`, `mode`, `showTooltips`, `isDark`, `customId`, `typewriter`, `smoothStreaming`, `smoothStreamingOptions`, `renderCodeBlocksAsPre`, `codeBlockStream`, `codeBlockProps`, `codeBlockMonacoOptions`, `codeBlockDarkTheme`, `codeBlockLightTheme`, `mermaidProps`, `d2Props`, `infographicProps`, `batchRendering`, `deferNodesUntilVisible`, `maxLiveNodes`, `liveNodeBuffer`, `nodeVirtual`, and `virtualScroll`.
+Stable props for 1.x: `content`, `nodes`, `final`, `parseOptions`, `customMarkdownIt`, `customHtmlTags`, `htmlPolicy`, `mode`, `showTooltips`, `isDark`, `customId`, `typewriter`, `smoothStreaming`, `smoothStreamingOptions`, `renderCodeBlocksAsPre`, `codeBlockStream`, `codeBlockProps`, `codeBlockMonacoOptions`, `codeBlockDarkTheme`, `codeBlockLightTheme`, `langs`, `mermaidProps`, `d2Props`, `infographicProps`, `batchRendering`, `deferNodesUntilVisible`, `maxLiveNodes`, `liveNodeBuffer`, `nodeVirtual`, and `virtualScroll`.
 
 Advanced performance tuning prop: `parseCoalesceMs` is available in 1.x, but its scheduling semantics may be refined.
 

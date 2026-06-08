@@ -40,7 +40,7 @@ function notifyDrainIfBelowCap() {
 let recordRenderPerformance: ((metric: any) => void) | null = null
 try {
   // Keep this as a literal Vite guard so production builds can drop the dev-only import.
-  if (typeof window !== 'undefined' && import.meta.env?.DEV) {
+  if (typeof window !== 'undefined' && import.meta.env.DEV) {
     import('../utils/performance-monitor')
       .then(({ perfMonitor }) => {
         recordRenderPerformance = metric => perfMonitor.recordRender(metric)
