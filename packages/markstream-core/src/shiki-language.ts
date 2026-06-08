@@ -1,12 +1,12 @@
 export interface RegisterHighlightOptions {
-  themes?: string[]
-  langs?: string[]
+  themes?: readonly string[]
+  langs?: readonly string[]
 }
 
 export interface ShikiRendererOptions {
   theme?: string
-  themes?: string[]
-  langs?: string[]
+  themes?: readonly string[]
+  langs?: readonly string[]
 }
 
 export type RegisterHighlightFn

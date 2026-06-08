@@ -278,15 +278,25 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   }, [getRendererContentSnapshot, hasRendererContent])
 
   const disposeCurrentRenderer = useCallback((updateReady = true) => {
+    const current = rendererRef.current
     disconnectRenderObserver()
-    rendererRef.current?.dispose()
     rendererRef.current = null
     rendererConfigKeyRef.current = ''
     lastCommittedRenderSignatureRef.current = ''
     failedRendererLanguagesRef.current.clear()
-    clearRendererTarget()
-    if (updateReady)
-      setRendererReady(false)
+
+    try {
+      current?.dispose()
+    }
+    catch (err) {
+      if (isDevEnv && typeof console !== 'undefined')
+        console.warn('[MarkdownCodeBlockNode] Failed to dispose Shiki renderer.', err)
+    }
+    finally {
+      clearRendererTarget()
+      if (updateReady)
+        setRendererReady(false)
+    }
   }, [clearRendererTarget, disconnectRenderObserver])
 
   const nextRenderSeq = useCallback(() => {

@@ -387,15 +387,25 @@ function isCurrentRenderEpoch(epoch = renderEpoch) {
 }
 
 function disposeCurrentRenderer(options: { resetStableRender?: boolean } = {}) {
-  renderer?.dispose()
+  const current = renderer
   renderer = undefined
   rendererConfigKey = null
   lastCommittedRenderSignature = ''
   failedRendererLanguages.clear()
-  clearRendererTarget()
-  rendererReady.value = false
-  if (options.resetStableRender)
-    hasStableRender.value = false
+
+  try {
+    current?.dispose()
+  }
+  catch (err) {
+    if (isDevEnv)
+      console.warn('[MarkdownCodeBlockNode] Failed to dispose Shiki renderer.', err)
+  }
+  finally {
+    clearRendererTarget()
+    rendererReady.value = false
+    if (options.resetStableRender)
+      hasStableRender.value = false
+  }
 }
 
 const highlightRegistrationKey = computed(() =>

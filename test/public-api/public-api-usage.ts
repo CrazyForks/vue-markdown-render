@@ -33,6 +33,8 @@ import type {
   NodeRendererProps,
   SmoothMarkdownStreamOptions,
 } from 'markstream-vue'
+import type { CodeBlockNodeProps as ReactCodeBlockNodeProps } from '../../packages/markstream-react/src/types/component-props'
+import type { CodeBlockNodeProps as Vue2CodeBlockNodeProps } from '../../packages/markstream-vue2/src/types/component-props'
 import { full as markdownItEmojiFull } from 'markdown-it-emoji'
 import MarkdownRender, {
   clearGlobalCustomComponents,
@@ -163,6 +165,18 @@ const safeMermaidSvgElement: SVGElement | null = toSafeSvgElement<SVGElement>('<
 const brokenMermaidSvg: boolean = isBrokenMermaidSvg('<svg viewBox="0 0 0 10"><rect width="10" height="10" /></svg>')
 
 const codeBlockProps: Partial<CodeBlockNodeProps> = {}
+const vueCodeBlockPropsAcceptsLangs = {
+  node: nodes[0] as CodeBlockNodeProps['node'],
+  langs: ['typescript', 'vue'] as const,
+} satisfies CodeBlockNodeProps
+const reactCodeBlockPropsAcceptsLangs = {
+  node: nodes[0] as ReactCodeBlockNodeProps['node'],
+  langs: ['typescript', 'tsx'] as const,
+} satisfies ReactCodeBlockNodeProps
+const vue2CodeBlockPropsAcceptsLangs = {
+  node: nodes[0] as Vue2CodeBlockNodeProps['node'],
+  langs: ['javascript', 'vue'] as const,
+} satisfies Vue2CodeBlockNodeProps
 const nodeRendererCodeBlockPropsWithMonacoThemeObject: NodeRendererProps = {
   content: '```ts\nconsole.log(1)\n```',
   codeBlockProps: {
@@ -358,6 +372,9 @@ void safeMermaidSvgMarkup
 void safeMermaidSvgElement
 void brokenMermaidSvg
 void codeBlockProps
+void vueCodeBlockPropsAcceptsLangs
+void reactCodeBlockPropsAcceptsLangs
+void vue2CodeBlockPropsAcceptsLangs
 void nodeRendererCodeBlockPropsWithMonacoThemeObject
 void nodeRendererCodeBlockPropsWithShikiOptions
 void mermaidProps

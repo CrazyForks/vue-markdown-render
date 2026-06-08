@@ -115,6 +115,11 @@ export interface CodeBlockNodeProps extends CommonCodeBlockProps {
   minWidth?: string | number
   maxWidth?: string | number
   themes?: CodeBlockMonacoTheme[]
+  /**
+   * Shiki language preload request forwarded to stream-markdown's registerHighlight().
+   * This is not a rendering allow-list; already available Shiki languages may still highlight.
+   */
+  langs?: readonly string[]
   showPreviewButton?: boolean
   showCollapseButton?: boolean
   showFontSizeButtons?: boolean

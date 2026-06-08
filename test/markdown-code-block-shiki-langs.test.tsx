@@ -18,12 +18,12 @@ const streamMarkdownMock = vi.hoisted(() => {
   const loadedLangs = new Set<string>()
   let omitRegisterHighlight = false
   const defaultLanguages = ['typescript', 'javascript', 'python', 'objective-c', 'objective-cpp', 'plaintext']
-  const loadLangs = (opts?: { langs?: string[] }) => {
+  const loadLangs = (opts?: { langs?: readonly string[] }) => {
     const langs = opts?.langs?.length ? opts.langs : defaultLanguages
     for (const lang of langs)
       loadedLangs.add(lang)
   }
-  const registerHighlight = vi.fn(async (opts?: { langs?: string[] }) => {
+  const registerHighlight = vi.fn(async (opts?: { langs?: readonly string[] }) => {
     loadLangs(opts)
   })
   const createShikiStreamRenderer = vi.fn((el: HTMLElement) => {
@@ -189,7 +189,7 @@ async function waitForLastRegisterHighlightLangs(langs: string[]) {
   await waitUntil(
     () => {
       const calls = streamMarkdownMock.registerHighlight.mock.calls
-      const lastCall = calls[calls.length - 1]?.[0] as { langs?: string[] } | undefined
+      const lastCall = calls[calls.length - 1]?.[0] as { langs?: readonly string[] } | undefined
       return JSON.stringify(lastCall?.langs) === JSON.stringify(langs)
     },
     () => {
@@ -238,7 +238,7 @@ function resetStreamMarkdownMock() {
   streamMarkdownMock.omitRegisterHighlight = false
   streamMarkdownMock.createShikiStreamRenderer.mockClear()
   streamMarkdownMock.registerHighlight.mockReset()
-  streamMarkdownMock.registerHighlight.mockImplementation(async (opts?: { langs?: string[] }) => {
+  streamMarkdownMock.registerHighlight.mockImplementation(async (opts?: { langs?: readonly string[] }) => {
     streamMarkdownMock.loadLangs(opts)
   })
 }
@@ -341,7 +341,7 @@ describe('markdown code block Shiki langs', () => {
   it('serializes different highlight registration keys for the same registerHighlight function', async () => {
     const first = createDeferred()
     const events: string[] = []
-    const registerHighlight = vi.fn((opts?: { langs?: string[] }) => {
+    const registerHighlight = vi.fn((opts?: { langs?: readonly string[] }) => {
       const lang = opts?.langs?.[0] ?? 'none'
       events.push(`start:${lang}`)
 
@@ -411,6 +411,26 @@ describe('markdown code block Shiki langs', () => {
       expect.any(HTMLElement),
       expect.objectContaining({ langs: ['typescript'] }),
     )
+
+    wrapper.unmount()
+  })
+
+  it('lets codeBlockProps.langs override top-level langs in Vue Shiki mode', async () => {
+    const { default: NodeRenderer } = await import('../src/components/NodeRenderer')
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '```ts\nconst value = 1\n```',
+        final: true,
+        codeRenderer: 'shiki',
+        langs: ['python'],
+        codeBlockProps: {
+          langs: ['typescript'],
+        },
+      },
+    })
+
+    await flushAll()
+    await waitForLastRegisterHighlightLangs(['typescript'])
 
     wrapper.unmount()
   })
@@ -787,7 +807,7 @@ describe('markdown code block Shiki langs', () => {
     const nextLang = 'vue-pending-next'
     const pendingRegistration = createDeferred()
     streamMarkdownMock.registerHighlight
-      .mockImplementationOnce(async (opts?: { langs?: string[] }) => {
+      .mockImplementationOnce(async (opts?: { langs?: readonly string[] }) => {
         streamMarkdownMock.loadLangs(opts)
       })
       .mockImplementationOnce(() => pendingRegistration.promise.then(() => {
@@ -1143,7 +1163,7 @@ describe('markdown code block Shiki langs', () => {
   it('keeps Vue renderer reconfiguration when code updates during pending langs registration', async () => {
     const second = createDeferred()
     streamMarkdownMock.registerHighlight
-      .mockImplementationOnce(async (opts?: { langs?: string[] }) => {
+      .mockImplementationOnce(async (opts?: { langs?: readonly string[] }) => {
         streamMarkdownMock.loadLangs(opts)
       })
       .mockImplementationOnce(() => second.promise.then(() => {
@@ -2330,7 +2350,7 @@ describe('markdown code block Shiki langs', () => {
     const firstRegistration = createDeferred()
     streamMarkdownMock.registerHighlight
       .mockImplementationOnce(() => firstRegistration.promise)
-      .mockImplementation(async (opts?: { langs?: string[] }) => {
+      .mockImplementation(async (opts?: { langs?: readonly string[] }) => {
         streamMarkdownMock.loadLangs(opts)
       })
 
@@ -2555,7 +2575,7 @@ describe('markdown code block Shiki langs', () => {
     const nextLang = 'react-pending-next'
     const pendingRegistration = createDeferred()
     streamMarkdownMock.registerHighlight
-      .mockImplementationOnce(async (opts?: { langs?: string[] }) => {
+      .mockImplementationOnce(async (opts?: { langs?: readonly string[] }) => {
         streamMarkdownMock.loadLangs(opts)
       })
       .mockImplementationOnce(() => pendingRegistration.promise.then(() => {
