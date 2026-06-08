@@ -190,6 +190,8 @@ export async function registerHighlightOnce(
   if (cached)
     return cached
 
+  // stream-markdown/Shiki registration mutates shared highlighter state, so
+  // calls for the same registerHighlight implementation are serialized.
   const task = state.tail
     .catch(() => {})
     .then(() => registerHighlight(opts))

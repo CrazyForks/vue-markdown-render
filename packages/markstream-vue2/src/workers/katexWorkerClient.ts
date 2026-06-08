@@ -1,7 +1,6 @@
 /// <reference types="vite/client" />
 
 import { isKatexEnabled } from '../components/MathInlineNode/katex'
-import { isDevEnvironment } from '../utils/devEnv'
 import { normalizeKaTeXRenderInput } from '../utils/normalizeKaTeXRenderInput'
 
 interface Pending {
@@ -42,7 +41,7 @@ function notifyDrainIfBelowCap() {
 // Performance monitoring (optional, dev-only by default)
 let recordRenderPerformance: ((metric: any) => void) | null = null
 try {
-  if (typeof window !== 'undefined' && isDevEnvironment()) {
+  if (typeof window !== 'undefined' && import.meta.env.DEV) {
     import('../utils/performance-monitor')
       .then(({ perfMonitor }) => {
         recordRenderPerformance = metric => perfMonitor.recordRender(metric)

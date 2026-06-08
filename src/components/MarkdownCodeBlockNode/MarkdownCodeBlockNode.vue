@@ -7,7 +7,7 @@ import {
   normalizeShikiLanguage,
   registerHighlightOnce,
 } from 'markstream-core'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
@@ -92,24 +92,40 @@ const rendererReady = ref(false)
 let renderObserver: MutationObserver | undefined
 let lastCommittedRenderSignature = ''
 const registerVisibility = useViewportPriority()
-const viewportHandle = ref<ReturnType<typeof registerVisibility> | null>(null)
+const viewportHandle = shallowRef<ReturnType<typeof registerVisibility> | null>(null)
 const viewportReady = ref(typeof window === 'undefined')
 
 if (typeof window !== 'undefined') {
   watch(
     () => container.value,
-    (el) => {
+    (el, _oldEl, onCleanup) => {
       viewportHandle.value?.destroy()
       viewportHandle.value = null
+
       if (!el) {
         viewportReady.value = false
         return
       }
+
+      let active = true
       const handle = registerVisibility(el, { rootMargin: '400px' })
+
       viewportHandle.value = handle
       viewportReady.value = handle.isVisible.value
-      handle.whenVisible.then(() => {
-        viewportReady.value = true
+
+      handle.whenVisible
+        .then(() => {
+          if (active && viewportHandle.value === handle)
+            viewportReady.value = true
+        })
+        .catch(() => {})
+
+      onCleanup(() => {
+        active = false
+        handle.destroy()
+
+        if (viewportHandle.value === handle)
+          viewportHandle.value = null
       })
     },
     { immediate: true },

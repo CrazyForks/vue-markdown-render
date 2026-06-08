@@ -1,4 +1,5 @@
-import { isDevEnvironment } from '../utils/devEnv'
+/// <reference types="vite/client" />
+
 import { normalizeKaTeXRenderInput } from '../utils/normalizeKaTeXRenderInput'
 
 interface Pending {
@@ -32,7 +33,7 @@ function notifyDrainIfBelowCap() {
 
 let recordRenderPerformance: ((metric: any) => void) | null = null
 try {
-  if (typeof window !== 'undefined' && isDevEnvironment()) {
+  if (typeof window !== 'undefined' && import.meta.env.DEV) {
     import('../utils/performanceMonitor')
       .then(({ perfMonitor }) => {
         recordRenderPerformance = metric => perfMonitor.recordRender(metric)

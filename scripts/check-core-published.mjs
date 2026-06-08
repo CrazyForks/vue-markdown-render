@@ -85,6 +85,35 @@ function runGit(repoRoot, args, { ignoreStderr = false } = {}) {
   ).trim()
 }
 
+function hasGitCommit(repoRoot, ref) {
+  try {
+    runGit(repoRoot, ['cat-file', '-e', `${ref}^{commit}`], { ignoreStderr: true })
+    return true
+  }
+  catch {
+    return false
+  }
+}
+
+function ensureGitCommitAvailable(repoRoot, ref) {
+  if (!ref || hasGitCommit(repoRoot, ref))
+    return
+
+  for (const remote of ['origin', 'upstream']) {
+    try {
+      runGit(repoRoot, ['fetch', '--no-tags', '--depth=1', remote, ref], {
+        ignoreStderr: true,
+      })
+
+      if (hasGitCommit(repoRoot, ref))
+        return
+    }
+    catch {
+      // Try next remote.
+    }
+  }
+}
+
 function getExplicitDiffBase() {
   const direct = (
     process.env.GITHUB_BASE_SHA
@@ -117,8 +146,12 @@ function getExplicitDiffBase() {
 
 function getDiffBase(repoRoot) {
   const explicit = getExplicitDiffBase()
-  if (explicit)
-    return explicit
+  if (explicit) {
+    ensureGitCommitAvailable(repoRoot, explicit)
+
+    if (hasGitCommit(repoRoot, explicit))
+      return explicit
+  }
 
   if (cachedDiffBase)
     return cachedDiffBase
@@ -167,6 +200,8 @@ function isGitWorktree(repoRoot) {
 
 function hasGitChanges(repoRoot, relativePath) {
   const base = getDiffBase(repoRoot)
+  ensureGitCommitAvailable(repoRoot, base)
+
   try {
     const output = runGit(
       repoRoot,
@@ -184,6 +219,8 @@ function hasGitChanges(repoRoot, relativePath) {
 
 function hasPackageVersionChanged(repoRoot, packageJsonRelativePath, targetVersion) {
   const base = getDiffBase(repoRoot)
+  ensureGitCommitAvailable(repoRoot, base)
+
   try {
     const previousRaw = runGit(
       repoRoot,
