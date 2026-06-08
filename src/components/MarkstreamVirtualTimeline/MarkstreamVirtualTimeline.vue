@@ -1945,15 +1945,24 @@ function hasReadyMarkdownRestoreMetrics(record: TimelineRecord, el: HTMLElement)
   const metrics = state?.metrics
   const totalHeight = Number(metrics?.totalHeight ?? 0)
 
-  return Number.isFinite(totalHeight)
-    && totalHeight > 0
-    && (
-      metrics?.stable === true
-      || metrics?.final === true
-      || metrics?.confidence === 'measured'
-      || metrics?.confidence === 'final'
-      || metrics?.confidence === 'mixed'
-    )
+  if (!Number.isFinite(totalHeight) || totalHeight <= 0)
+    return false
+
+  const measuredCount = Number(metrics?.measuredCount ?? 0)
+  const estimatedCount = Number(metrics?.estimatedCount ?? 0)
+  const nodeCount = Number(metrics?.nodeCount ?? 0)
+
+  const hasCompleteMeasurement = nodeCount <= 0
+    || (measuredCount >= nodeCount && estimatedCount <= 0)
+
+  const hasStableHeight = metrics?.stable === true
+    || metrics?.confidence === 'measured'
+    || metrics?.confidence === 'final'
+
+  if (activeThreadRestoreRequiresColdMarkdownMetrics)
+    return hasCompleteMeasurement && hasStableHeight
+
+  return hasStableHeight || metrics?.final === true
 }
 
 function isRestoreViewportReady() {
