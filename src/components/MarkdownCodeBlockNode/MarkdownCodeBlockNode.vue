@@ -316,9 +316,14 @@ async function clearFallbackWhenRendererReady(epoch: number, previousVersion: nu
   if (!isCurrentRenderEpoch(epoch))
     return
 
+  const rendererHasContent = hasRendererContent()
   if (
-    (rendererMutationVersion !== previousVersion && hasRendererContent())
-    || (lastCommittedRenderSignature === renderSignature && hasRendererContent())
+    rendererHasContent
+    && (
+      !lastCommittedRenderSignature
+      || rendererMutationVersion !== previousVersion
+      || lastCommittedRenderSignature === renderSignature
+    )
   ) {
     pendingRenderSignature = null
     disconnectReadyObserver()

@@ -361,9 +361,14 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     if (!isCurrentRenderSeq(seq))
       return
 
+    const rendererHasContent = hasRendererContent()
     if (
-      (rendererMutationVersionRef.current !== previousVersion && hasRendererContent())
-      || (lastCommittedRenderSignatureRef.current === renderSignature && hasRendererContent())
+      rendererHasContent
+      && (
+        !lastCommittedRenderSignatureRef.current
+        || rendererMutationVersionRef.current !== previousVersion
+        || lastCommittedRenderSignatureRef.current === renderSignature
+      )
     ) {
       pendingRenderSignatureRef.current = null
       disconnectRenderObserver()

@@ -1,3 +1,4 @@
+import type { RegisterHighlightOptions } from '../packages/markstream-core/src'
 import { mount } from '@vue/test-utils'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -316,6 +317,39 @@ describe('markdown code block Shiki langs', () => {
     ).not.toBe(
       getHighlightRegistrationKey(['vitesse-dark', 'vitesse-light'], ['js', 'ts']),
     )
+  })
+
+  it('treats Shiki theme registration as set-based while renderer keys keep caller priority', async () => {
+    const calls: RegisterHighlightOptions[] = []
+    const registerHighlight = vi.fn(async (opts?: RegisterHighlightOptions) => {
+      calls.push(opts ?? {})
+    })
+
+    await registerHighlightOnce(registerHighlight, getRegisterHighlightOptions(['vitesse-light', 'vitesse-dark']))
+    await registerHighlightOnce(registerHighlight, getRegisterHighlightOptions(['vitesse-dark', 'vitesse-light']))
+
+    expect(calls).toEqual([
+      { themes: ['vitesse-light', 'vitesse-dark'] },
+    ])
+    expect(getHighlightRegistrationKey(['vitesse-light', 'vitesse-dark'])).not.toBe(
+      getHighlightRegistrationKey(['vitesse-dark', 'vitesse-light']),
+    )
+  })
+
+  it('does not forget cumulative registrations after default Shiki registration', async () => {
+    const calls: RegisterHighlightOptions[] = []
+    const registerHighlight = vi.fn(async (opts?: RegisterHighlightOptions) => {
+      calls.push(opts ?? {})
+    })
+
+    await registerHighlightOnce(registerHighlight, getRegisterHighlightOptions(undefined, ['ts']))
+    await registerHighlightOnce(registerHighlight, {})
+    await registerHighlightOnce(registerHighlight, getRegisterHighlightOptions(undefined, ['typescript']))
+
+    expect(calls).toEqual([
+      { langs: ['typescript'] },
+      {},
+    ])
   })
 
   it('coalesces concurrent highlight registration calls for the same key', async () => {
@@ -1227,6 +1261,35 @@ describe('markdown code block Shiki langs', () => {
     wrapper.unmount()
   })
 
+  it('clears Vue Shiki fallback when MutationObserver is unavailable but renderer wrote content', async () => {
+    const OriginalMutationObserver = globalThis.MutationObserver
+    ;(globalThis as any).MutationObserver = undefined
+
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode('typescript', 'const value = 1'),
+        langs: ['typescript'],
+      },
+    })
+
+    try {
+      await flushAll()
+
+      await waitUntil(
+        () => !wrapper.find('.code-fallback-plain').exists(),
+        () => 'Vue fallback should be removed after synchronous renderer content is written.',
+      )
+
+      expect(wrapper.text()).toContain('typescript:const value = 1')
+    }
+    finally {
+      wrapper.unmount()
+      ;(globalThis as any).MutationObserver = OriginalMutationObserver
+    }
+  })
+
   it('keeps Vue renderer reconfiguration when code updates during pending langs registration', async () => {
     const second = createDeferred()
     streamMarkdownMock.registerHighlight
@@ -1891,7 +1954,7 @@ describe('markdown code block Shiki langs', () => {
     overrideWrapper.unmount()
   })
 
-  it('reconfigures React renderer when theme order changes', async () => {
+  it('reconfigures React renderer when theme order changes without repeating covered theme registration', async () => {
     const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -1915,6 +1978,7 @@ describe('markdown code block Shiki langs', () => {
     expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith(
       expect.objectContaining({ themes: ['a', 'b'], langs: ['typescript'] }),
     )
+    const registerCallCount = streamMarkdownMock.registerHighlight.mock.calls.length
     const initialRendererCount = streamMarkdownMock.createdRenderers.length
     const renderer = streamMarkdownMock.createdRenderers[initialRendererCount - 1]
 
@@ -1930,9 +1994,7 @@ describe('markdown code block Shiki langs', () => {
     await flushReact()
     await waitForReactRendererCount(initialRendererCount + 1)
 
-    expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith(
-      expect.objectContaining({ themes: ['b', 'a'], langs: ['typescript'] }),
-    )
+    expect(streamMarkdownMock.registerHighlight).toHaveBeenCalledTimes(registerCallCount)
     expect(renderer.dispose).toHaveBeenCalledTimes(1)
     expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenLastCalledWith(
       expect.any(HTMLElement),
@@ -2200,6 +2262,43 @@ describe('markdown code block Shiki langs', () => {
     await act(async () => {
       root.unmount()
     })
+  })
+
+  it('clears React Shiki fallback when MutationObserver is unavailable but renderer wrote content', async () => {
+    const OriginalMutationObserver = globalThis.MutationObserver
+    ;(globalThis as any).MutationObserver = undefined
+
+    const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    try {
+      await act(async () => {
+        root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+          loading: false,
+          node: makeNode('typescript', 'const value = 1'),
+          langs: ['typescript'],
+        }))
+      })
+      await flushReact()
+
+      await waitUntil(
+        () => host.querySelector('.code-fallback-plain') === null,
+        () => 'React fallback should be removed after synchronous renderer content is written.',
+        flushReact,
+      )
+
+      expect(host.textContent).toContain('typescript:const value = 1')
+    }
+    finally {
+      await act(async () => {
+        root.unmount()
+      })
+      ;(globalThis as any).MutationObserver = OriginalMutationObserver
+    }
   })
 
   it('keeps React fallback over stale renderer DOM until the next async Shiki write lands', async () => {

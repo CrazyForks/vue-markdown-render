@@ -17,6 +17,7 @@ describe('release dependency gates', () => {
     expect(prepublishOnly).toContain('pnpm run test:smoke:pack:optional')
     expect(prepublishOnly).toContain('pnpm run test:smoke:vue2-cjs')
     expect(prepublishOnly).toContain('pnpm run test:smoke:shiki-dependent-imports')
+    expect(prepublishOnly).not.toContain('MARKSTREAM_SMOKE_SKIP_BUILD=1 pnpm run test:smoke:shiki-dependent-imports')
     expect(prepublishOnly).toContain('node scripts/check-no-vite-client-leak.mjs')
     expect(prepublishOnly.indexOf('pnpm run build:parser')).toBeLessThan(prepublishOnly.indexOf('pnpm run check:workspace-deps-published'))
     expect(prepublishOnly.indexOf('pnpm run check:workspace-deps-published')).toBeLessThan(prepublishOnly.indexOf('pnpm run test:smoke:pack'))
@@ -222,6 +223,7 @@ describe('release dependency gates', () => {
     const ci = readFileSync(resolve(process.cwd(), '.github/workflows/ci.yml'), 'utf8')
 
     expect(ci).toContain('test:smoke:shiki-dependent-imports')
+    expect(ci).not.toContain('MARKSTREAM_SMOKE_SKIP_BUILD=1 pnpm run test:smoke:shiki-dependent-imports')
     expect(ci.indexOf('test:smoke:pack:optional')).toBeLessThan(
       ci.indexOf('test:smoke:shiki-dependent-imports'),
     )

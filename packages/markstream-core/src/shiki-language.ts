@@ -76,22 +76,12 @@ function hasAllValues(registered: readonly string[], requested?: readonly string
   return requested.every(value => registeredSet.has(value))
 }
 
-function hasThemeOrder(registered: readonly string[], requested?: readonly string[]) {
-  if (!requested?.length)
-    return true
-
-  if (requested.length > registered.length)
-    return false
-
-  return requested.every((value, index) => registered[index] === value)
-}
-
 function isRegistrationCovered(
   state: HighlightRegistrationState,
   opts: RegisterHighlightOptions,
 ) {
   return hasAnyRegisterValues(opts)
-    && hasThemeOrder(state.registeredThemes, opts.themes)
+    && hasAllValues(state.registeredThemes, opts.themes)
     && hasAllValues(state.registeredLangs, opts.langs)
 }
 
@@ -102,9 +92,7 @@ function getCumulativeRegisterOptions(
   if (!hasAnyRegisterValues(opts))
     return opts
 
-  const nextThemes = opts.themes?.length
-    ? appendUnique(opts.themes, state.registeredThemes)
-    : [...state.registeredThemes]
+  const nextThemes = appendUnique(state.registeredThemes, opts.themes)
   const nextLangs = appendUnique(state.registeredLangs, opts.langs)
 
   return {
@@ -288,8 +276,14 @@ export async function registerHighlightOnce(
       }
 
       return Promise.resolve(registerHighlight(cumulativeOptions)).then(() => {
-        state.registeredThemes = cumulativeOptions.themes ? [...cumulativeOptions.themes] : []
-        state.registeredLangs = cumulativeOptions.langs ? [...cumulativeOptions.langs] : []
+        if (hasAnyRegisterValues(cumulativeOptions)) {
+          state.registeredThemes = cumulativeOptions.themes
+            ? [...cumulativeOptions.themes]
+            : state.registeredThemes
+          state.registeredLangs = cumulativeOptions.langs
+            ? [...cumulativeOptions.langs]
+            : state.registeredLangs
+        }
         state.completed.add(cumulativeKey)
         return 'ready' as const
       })
