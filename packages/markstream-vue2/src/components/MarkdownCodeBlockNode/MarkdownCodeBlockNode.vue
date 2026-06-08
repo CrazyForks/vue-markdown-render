@@ -381,6 +381,8 @@ type HighlightRegistrationStatus = 'ready' | 'failed' | 'stale'
 
 let renderer: ShikiRenderer | undefined
 let rendererConfigKey: string | null = null
+let rendererTheme: string | undefined
+let rendererThemeSyncQueued = false
 let createShikiRenderer:
   | ((el: HTMLElement, opts: ShikiRendererOptions) => ShikiRenderer)
   | undefined
@@ -414,6 +416,7 @@ function disposeCurrentRenderer(options: { resetStableRender?: boolean } = {}) {
   const current = renderer
   renderer = undefined
   rendererConfigKey = null
+  rendererTheme = undefined
   lastCommittedRenderSignature = ''
   pendingRenderSignature = null
   failedRendererLanguages.clear()
@@ -431,6 +434,30 @@ function disposeCurrentRenderer(options: { resetStableRender?: boolean } = {}) {
     if (options.resetStableRender)
       hasStableRender.value = false
   }
+}
+
+async function syncRendererTheme() {
+  if (!renderer)
+    return
+
+  const theme = getPreferredColorScheme()
+  if (rendererTheme === theme)
+    return
+
+  await renderer.setTheme(theme)
+  rendererTheme = theme
+}
+
+function getRendererThemeSyncKey(isDark: boolean, darkTheme: string, lightTheme: string) {
+  const theme = isDark ? darkTheme : lightTheme
+  if (theme !== rendererTheme && !rendererThemeSyncQueued) {
+    rendererThemeSyncQueued = true
+    void nextTick(async () => {
+      rendererThemeSyncQueued = false
+      await handleRendererThemeChange()
+    })
+  }
+  return theme
 }
 
 const highlightRegistrationKey = computed(() =>
@@ -683,10 +710,12 @@ async function initRenderer(epoch: number) {
     disposeCurrentRenderer({ resetStableRender: true })
 
   if (!renderer && createShikiRenderer) {
+    const theme = getPreferredColorScheme()
     renderer = createShikiRenderer(rendererTarget.value, {
-      theme: getPreferredColorScheme(),
+      theme,
       ...rendererOptions,
     })
+    rendererTheme = theme
     rendererConfigKey = nextRendererConfigKey
     rendererReady.value = true
   }
@@ -838,17 +867,14 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
   }
 })
 
-watch(
-  () => [props.darkTheme, props.lightTheme, props.isDark],
-  async () => {
-    if (!codeBlockContent.value || !rendererTarget.value)
-      return
-    if (!renderer)
-      await safeInitRenderer()
-    await renderer?.setTheme(getPreferredColorScheme())
-    syncRenderedCssVars()
-  },
-)
+async function handleRendererThemeChange() {
+  if (!codeBlockContent.value || !rendererTarget.value)
+    return
+  if (!renderer)
+    await safeInitRenderer()
+  await syncRendererTheme()
+  syncRenderedCssVars()
+}
 
 // Auto-scroll to bottom when content changes (if not expanded and auto-scroll is enabled)
 watch(() => props.node.code, async () => {
@@ -1034,6 +1060,7 @@ function previewCode() {
     }"
     class="code-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
     :class="[props.isDark ? 'border-gray-700/30 bg-gray-900' : 'border-gray-200 bg-white', props.isDark ? 'is-dark' : '']"
+    :data-markstream-code-theme="getRendererThemeSyncKey(props.isDark, props.darkTheme, props.lightTheme)"
   >
     <div
       v-if="props.showHeader"

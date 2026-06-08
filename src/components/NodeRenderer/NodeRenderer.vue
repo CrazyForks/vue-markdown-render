@@ -5041,7 +5041,7 @@ const MermaidBlockNodeAsync = defineAsyncComponent({
     }
     catch (e) {
       console.warn(
-        '[markstream-vue] MermaidBlockNode unavailable.',
+        '[markstream-vue] Optional peer dependencies for MermaidBlockNode are missing. Falling back to preformatted code rendering. To enable Mermaid rendering, please install "mermaid".',
         e,
       )
       return PreCodeNode
@@ -5059,7 +5059,7 @@ const InfographicBlockNodeAsync = defineAsyncComponent({
     }
     catch (e) {
       console.warn(
-        '[markstream-vue] InfographicBlockNode unavailable.',
+        '[markstream-vue] Failed to load InfographicBlockNode. Falling back to preformatted code rendering. To enable Infographic rendering, install "@antv/infographic" and configure setInfographicLoader with a dynamic loader.',
         e,
       )
       return PreCodeNode
@@ -5076,7 +5076,7 @@ const D2BlockNodeAsync = defineAsyncComponent(async () => {
   }
   catch (e) {
     console.warn(
-      '[markstream-vue] D2BlockNode unavailable.',
+      '[markstream-vue] Optional peer dependencies for D2BlockNode are missing. Falling back to preformatted code rendering. To enable D2 rendering, please install "@terrastruct/d2".',
       e,
     )
     return PreCodeNode

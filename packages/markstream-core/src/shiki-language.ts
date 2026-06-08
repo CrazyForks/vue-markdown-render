@@ -234,22 +234,29 @@ export function getHighlightRegistrationKey(themes?: readonly unknown[], langs?:
 
 export async function registerHighlightOnce(
   registerHighlight: RegisterHighlightFn | undefined,
-  opts: RegisterHighlightOptions,
-  key = getHighlightRegistrationKey(opts.themes, opts.langs),
+  opts: RegisterHighlightOptions = {},
+  key?: string,
 ): Promise<SharedHighlightRegistrationStatus> {
   if (!registerHighlight)
     return 'ready'
 
+  const normalizedOpts = getRegisterHighlightOptions(opts.themes, opts.langs)
+  const normalizedKey = getHighlightRegistrationKey(
+    normalizedOpts.themes,
+    normalizedOpts.langs,
+  )
+  const registrationKey = key && key === normalizedKey ? key : normalizedKey
+
   const state = getHighlightRegistrationState(registerHighlight)
-  if (state.completed.has(key))
+  if (state.completed.has(registrationKey))
     return 'ready'
 
-  if (isRegistrationCovered(state, opts)) {
-    state.completed.add(key)
+  if (isRegistrationCovered(state, normalizedOpts)) {
+    state.completed.add(registrationKey)
     return 'ready'
   }
 
-  const cached = state.inFlight.get(key)
+  const cached = state.inFlight.get(registrationKey)
   if (cached)
     return cached
 
@@ -258,19 +265,19 @@ export async function registerHighlightOnce(
   const task = state.tail
     .catch(() => {})
     .then(() => {
-      if (state.completed.has(key) || isRegistrationCovered(state, opts)) {
-        state.completed.add(key)
+      if (state.completed.has(registrationKey) || isRegistrationCovered(state, normalizedOpts)) {
+        state.completed.add(registrationKey)
         return 'ready' as const
       }
 
-      const cumulativeOptions = getCumulativeRegisterOptions(state, opts)
+      const cumulativeOptions = getCumulativeRegisterOptions(state, normalizedOpts)
       const cumulativeKey = getHighlightRegistrationKey(
         cumulativeOptions.themes,
         cumulativeOptions.langs,
       )
 
       if (state.completed.has(cumulativeKey) || isRegistrationCovered(state, cumulativeOptions)) {
-        state.completed.add(key)
+        state.completed.add(registrationKey)
         state.completed.add(cumulativeKey)
         return 'ready' as const
       }
@@ -289,15 +296,15 @@ export async function registerHighlightOnce(
       })
     })
     .then(() => {
-      state.completed.add(key)
+      state.completed.add(registrationKey)
       return 'ready' as const
     })
     .finally(() => {
-      if (state.inFlight.get(key) === task)
-        state.inFlight.delete(key)
+      if (state.inFlight.get(registrationKey) === task)
+        state.inFlight.delete(registrationKey)
     })
 
-  state.inFlight.set(key, task)
+  state.inFlight.set(registrationKey, task)
   state.tail = task.catch(() => {})
   return task
 }

@@ -277,6 +277,25 @@ describe('markdown code block Shiki langs', () => {
     )
   })
 
+  it('normalizes direct registerHighlightOnce options before registering or caching', async () => {
+    const registerHighlight = vi.fn(async () => {})
+
+    await registerHighlightOnce(registerHighlight, {
+      langs: ['ts', 'js', 'ts'],
+    })
+
+    expect(registerHighlight).toHaveBeenCalledTimes(1)
+    expect(registerHighlight).toHaveBeenLastCalledWith({
+      langs: ['javascript', 'typescript'],
+    })
+
+    await registerHighlightOnce(registerHighlight, {
+      langs: ['typescript', 'javascript'],
+    })
+
+    expect(registerHighlight).toHaveBeenCalledTimes(1)
+  })
+
   it('dedupes Shiki themes without reordering caller priority', () => {
     const themes = ['vitesse-light', { name: 'custom-theme' }, ' vitesse-dark ', '', 'vitesse-light'] as any[]
     const expected = {
@@ -1355,6 +1374,38 @@ describe('markdown code block Shiki langs', () => {
       expect.any(HTMLElement),
       expect.objectContaining({ langs: ['typescript'] }),
     )
+
+    wrapper.unmount()
+  })
+
+  it('updates Vue2 Shiki renderer theme when isDark changes', async () => {
+    const { default: Vue2MarkdownCodeBlockNode } = await import('../packages/markstream-vue2/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(Vue2MarkdownCodeBlockNode as any, {
+      props: {
+        loading: false,
+        node: makeNode('typescript'),
+        langs: ['typescript'],
+        isDark: false,
+        lightTheme: 'vitesse-light',
+        darkTheme: 'vitesse-dark',
+      },
+    })
+
+    await flushAll()
+    await waitForRendererCreated()
+
+    const renderer = streamMarkdownMock.createdRenderers.at(-1)
+    renderer?.setTheme.mockClear()
+
+    await wrapper.setProps({ isDark: true })
+    await flushAll()
+
+    await waitUntil(
+      () => renderer?.setTheme.mock.calls.some(([theme]: [string]) => theme === 'vitesse-dark'),
+      () => `Timed out waiting for Vue2 setTheme("vitesse-dark"); calls=${JSON.stringify(renderer?.setTheme.mock.calls ?? [])}`,
+    )
+
+    expect(renderer?.setTheme).toHaveBeenLastCalledWith('vitesse-dark')
 
     wrapper.unmount()
   })
