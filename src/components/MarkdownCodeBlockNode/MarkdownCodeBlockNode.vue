@@ -1025,6 +1025,7 @@ function previewCode() {
 <style scoped>
 /* ── Code content ── */
 .code-block-content {
+  position: relative;
   display: grid;
   max-height: min(70vh, var(--ms-size-code-max-height));
   overflow: auto;
@@ -1072,19 +1073,31 @@ function previewCode() {
 }
 
 :deep(.code-block-content .shiki-fallback) {
-  background: transparent;
-  color: inherit;
+  background: var(--vscode-editor-background, hsl(var(--ms-background, 0 0% 100%)));
+  color: var(--vscode-editor-foreground, inherit);
   white-space: pre;
 }
 
+.code-block-container.dark :deep(.code-block-content .shiki-fallback) {
+  background: var(--vscode-editor-background, #111827);
+  color: var(--vscode-editor-foreground, #e5e7eb);
+}
+
 .code-fallback-plain {
+  position: relative;
+  z-index: 1;
   white-space: pre;
   overflow: auto;
-  background: transparent;
-  color: inherit;
+  background: var(--vscode-editor-background, hsl(var(--ms-background, 0 0% 100%)));
+  color: var(--vscode-editor-foreground, inherit);
   font-size: inherit;
   line-height: inherit;
   font-family: inherit;
+}
+
+.code-block-container.dark .code-fallback-plain {
+  background: var(--vscode-editor-background, #111827);
+  color: var(--vscode-editor-foreground, #e5e7eb);
 }
 
 /* ── Loading placeholder ── */

@@ -68,7 +68,7 @@ export async function getD2(): Promise<D2Module | null> {
   }
   catch (err) {
     if (loader === defaultD2Loader) {
-      throw new Error('Missing "@terrastruct/d2".')
+      throw new Error('Optional dependency "@terrastruct/d2" is not installed. Please install it to enable D2 diagrams.')
     }
     throw err
   }

@@ -133,7 +133,7 @@ export function clearKaTeXWorker() {
 
 function ensureWorker() {
   if (!worker) {
-    workerInitError = new Error('[katexWorkerClient] Worker not set.')
+    workerInitError = new Error('[katexWorkerClient] No worker instance set. Please inject a Worker via setKaTeXWorker().')
     ; (workerInitError as any).name = 'WorkerInitError'
     ; (workerInitError as any).code = 'WORKER_INIT_ERROR'
     return null

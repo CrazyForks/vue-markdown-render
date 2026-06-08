@@ -1166,6 +1166,8 @@ function previewCode() {
 }
 
 .code-block-content {
+  position: relative;
+  display: grid;
   max-height: min(70vh, 500px);
   overflow: auto;
   transition: max-height 0.3s ease;
@@ -1174,7 +1176,14 @@ function previewCode() {
 }
 
 .code-block-render {
+  grid-area: 1 / 1;
+  min-width: 0;
   min-height: 1px;
+}
+
+.code-fallback-plain {
+  grid-area: 1 / 1;
+  min-width: 0;
 }
 
 .code-block-container ::v-deep .code-block-render pre,
@@ -1189,8 +1198,8 @@ function previewCode() {
 .code-block-container ::v-deep .code-block-content .shiki-fallback {
   padding: 1rem;
   margin: 0;
-  background: transparent;
-  color: inherit;
+  background: var(--vscode-editor-background, var(--markstream-code-fallback-bg));
+  color: var(--vscode-editor-foreground, var(--markstream-code-fallback-fg));
   white-space: pre;
   font-family: inherit;
   font-size: inherit;
@@ -1198,10 +1207,12 @@ function previewCode() {
 }
 
 .code-fallback-plain {
+  position: relative;
+  z-index: 1;
   white-space: pre;
   overflow: auto;
-  background: transparent;
-  color: inherit;
+  background: var(--vscode-editor-background, var(--markstream-code-fallback-bg));
+  color: var(--vscode-editor-foreground, var(--markstream-code-fallback-fg));
   font-size: inherit;
   line-height: inherit;
   font-family: inherit;

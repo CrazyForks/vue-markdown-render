@@ -1400,6 +1400,7 @@ li .paragraph-node {
 }
 
 .code-block-content {
+  display: grid;
   max-height: min(70vh, 500px);
   overflow: auto;
   transition: max-height 0.3s ease;
@@ -1407,19 +1408,45 @@ li .paragraph-node {
   line-height: var(--vscode-editor-line-height, 1.5);
 }
 
+.code-block-render,
+.code-fallback-plain {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+
 .code-block-render {
   min-height: 1px;
 }
 
+.code-block-render pre,
+.code-block-content .shiki {
+  margin: 0;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.code-block-content .shiki-fallback {
+  margin: 0;
+  padding: 1rem;
+  background: inherit;
+  color: inherit;
+  white-space: pre;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
 .code-fallback-plain {
+  position: relative;
+  z-index: 1;
   white-space: pre;
   overflow: auto;
-  background: transparent;
-  color: inherit;
-  /* Match Monaco defaults to avoid a jarring swap while it loads */
-  font-size: var(--vscode-editor-font-size, 12px);
-  line-height: var(--vscode-editor-line-height, 18px);
-  font-family: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+  background: var(--vscode-editor-background, var(--markstream-code-fallback-bg));
+  color: var(--vscode-editor-foreground, var(--markstream-code-fallback-fg));
+  font-size: inherit;
+  line-height: inherit;
+  font-family: inherit;
   font-weight: var(--vscode-editor-font-weight, 400);
 }
 

@@ -133,7 +133,7 @@ export async function getMermaid(): Promise<MermaidModule | null> {
   }
   catch (err) {
     if (loader === defaultMermaidLoader) {
-      throw new Error('Missing "mermaid".')
+      throw new Error('Optional dependency "mermaid" is not installed. Please install it to enable Mermaid diagrams.')
     }
     throw err
   }
