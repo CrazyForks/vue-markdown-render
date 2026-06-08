@@ -209,7 +209,20 @@ async function main() {
       waitUntil: 'networkidle',
     })
     await page.waitForSelector('.monaco-diff-editor', { timeout: 30000 })
-    await page.waitForSelector('.stream-monaco-unchanged-metadata-label', { timeout: 30000 })
+    await page.waitForFunction(() => {
+      return Array.from(document.querySelectorAll('.stream-monaco-unchanged-metadata-label'))
+        .some((node) => {
+          if (!(node instanceof HTMLElement))
+            return false
+          const style = window.getComputedStyle(node)
+          const rect = node.getBoundingClientRect()
+          return style.display !== 'none'
+            && style.visibility !== 'hidden'
+            && Number.parseFloat(style.opacity || '1') > 0.05
+            && rect.width > 0
+            && rect.height > 0
+        })
+    }, { timeout: 30000 })
     await page.waitForTimeout(400)
 
     const initial = await snapshot(page)
