@@ -84,13 +84,22 @@ function renderCustomCodeBlockComponent(
 ) {
   const extraProps = getCodeBlockExtraProps(ctx.codeBlockProps)
   const onPreviewCode = ctx.events.onHandleArtifactClick
-    ? (payload: { type: string, content: string, title: string }) => {
-        const artifactType = payload.type === 'image/svg+xml' ? 'image/svg+xml' : 'text/html'
+    ? (payload: { type?: string, content?: string, title?: string }) => {
+        const artifactType = payload.type === 'image/svg+xml'
+          ? 'image/svg+xml'
+          : 'text/html'
 
         ctx.events.onHandleArtifactClick?.({
-          node,
+          node: payload.content == null
+            ? node
+            : {
+                ...node,
+                code: payload.content,
+              },
           artifactType,
-          artifactTitle: payload.title,
+          artifactTitle: payload.title || (
+            artifactType === 'image/svg+xml' ? 'SVG Preview' : 'HTML Preview'
+          ),
           id: String(key),
         })
       }

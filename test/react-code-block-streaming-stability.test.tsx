@@ -199,6 +199,9 @@ describe('markstream-react code block streaming stability', () => {
     expect(onHandleArtifactClick).toHaveBeenCalledWith(expect.objectContaining({
       artifactType: 'text/html',
       artifactTitle: 'HTML Preview',
+      node: expect.objectContaining({
+        code: '<div>preview</div>',
+      }),
     }))
 
     await act(async () => {
