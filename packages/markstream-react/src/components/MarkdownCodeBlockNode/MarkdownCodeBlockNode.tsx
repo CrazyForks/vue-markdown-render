@@ -180,7 +180,11 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const [copied, setCopied] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
-  const [fallbackHtml, setFallbackHtml] = useState('')
+  const [fallbackHtml, setFallbackHtml] = useState(() =>
+    props.node.code
+      ? `<pre class="shiki shiki-fallback"><code>${escapeHtml(props.node.code)}</code></pre>`
+      : '',
+  )
   const [rendererReady, setRendererReady] = useState(false)
 
   const [defaultFontSize, setDefaultFontSize] = useState<number>(14)

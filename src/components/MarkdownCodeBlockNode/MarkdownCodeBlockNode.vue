@@ -687,6 +687,9 @@ async function safeInitRenderer(epoch = nextRenderEpoch()) {
     renderFallback(props.node.code)
   }
 }
+
+renderFallback(props.node.code)
+
 onMounted(() => {
   if (!viewportReady.value) {
     renderFallback(props.node.code)

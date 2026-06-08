@@ -721,8 +721,8 @@ export const greet = (name: string) => \`hello \${name}\`
       node: {
         type: 'code_block',
         language: 'ts',
-        code: 'export const value = 1',
-        raw: '```ts\nexport const value = 1\n```',
+        code: 'const value = "<safe>"',
+        raw: '```ts\nconst value = "<safe>"\n```',
       },
       loading: false,
       stream: false,
@@ -732,6 +732,8 @@ export const greet = (name: string) => \`hello \${name}\`
     expect(html).toContain('code-block-header')
     expect(html).toContain('code-block-content')
     expect(html).toContain('Typescript')
+    expect(html).toContain('shiki-fallback')
+    expect(html).toContain('const value = &quot;&lt;safe&gt;&quot;')
   })
 
   it('renders KaTeX HTML during SSR when a sync loader is configured', async () => {

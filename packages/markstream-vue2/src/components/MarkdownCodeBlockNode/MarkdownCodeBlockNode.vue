@@ -241,6 +241,8 @@ function escapeHtml(str: string) {
 function renderFallback(code: string, force = false) {
   pendingRenderSignature = null
   disconnectReadyObserver()
+  const fallbackEl = codeBlockContent.value?.querySelector('.code-fallback-plain') as HTMLElement | null
+  fallbackEl?.style.removeProperty('display')
   if (!code) {
     clearRendererTarget()
     fallbackHtml.value = ''
@@ -262,7 +264,15 @@ function clearFallback() {
   fallbackHtml.value = ''
   rendererReady.value = true
   hasStableRender.value = true
-  void nextTick().then(() => {
+  const fallbackEl = codeBlockContent.value?.querySelector('.code-fallback-plain') as HTMLElement | null
+  if (fallbackEl)
+    fallbackEl.style.display = 'none'
+  void nextTick().then(async () => {
+    await nextTick()
+    if (!fallbackHtml.value && rendererReady.value) {
+      rendererReady.value = false
+      rendererReady.value = true
+    }
     syncRenderedCssVars()
   })
 }
@@ -352,7 +362,8 @@ async function clearFallbackWhenRendererReady(epoch: number, previousVersion: nu
     return
 
   if (
-    (rendererMutationVersion !== previousVersion && hasRendererContent())
+    (!lastCommittedRenderSignature && hasRendererContent())
+    || (rendererMutationVersion !== previousVersion && hasRendererContent())
     || (lastCommittedRenderSignature === renderSignature && hasRendererContent())
   ) {
     pendingRenderSignature = null
@@ -736,6 +747,8 @@ function cleanupRenderer() {
   disposeCurrentRenderer({ resetStableRender: true })
 }
 
+renderFallback(props.node.code, true)
+
 if (getCurrentInstance()) {
   onMounted(() => {
     void safeInitRenderer()
@@ -743,7 +756,19 @@ if (getCurrentInstance()) {
   onBeforeUnmount(cleanupRenderer)
 }
 else {
-  void nextTick(() => safeInitRenderer())
+  void nextTick(async () => {
+    await nextTick()
+    await safeInitRenderer()
+    if (!lastCommittedRenderSignature && hasRendererContent()) {
+      markRendererCommitted(
+        getRenderSignature(
+          rendererConfigKey ?? highlightRegistrationKey.value,
+          normalizeRendererLanguage(props.node.language),
+          props.node.code,
+        ),
+      )
+    }
+  })
 }
 
 watch(highlightRegistrationKey, async () => {

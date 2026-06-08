@@ -342,16 +342,16 @@ describe('markdown code block Shiki langs', () => {
     const first = createDeferred()
     const events: string[] = []
     const registerHighlight = vi.fn((opts?: { langs?: readonly string[] }) => {
-      const lang = opts?.langs?.[0] ?? 'none'
-      events.push(`start:${lang}`)
+      const langs = opts?.langs?.join(',') ?? 'none'
+      events.push(`start:${langs}`)
 
-      if (lang === 'typescript') {
+      if (langs === 'typescript') {
         return first.promise.then(() => {
           events.push('end:typescript')
         })
       }
 
-      events.push(`end:${lang}`)
+      events.push(`end:${langs}`)
     })
 
     const p1 = registerHighlightOnce(registerHighlight, { langs: ['typescript'] }, 'ts')
@@ -367,8 +367,33 @@ describe('markdown code block Shiki langs', () => {
     expect(events).toEqual([
       'start:typescript',
       'end:typescript',
-      'start:python',
-      'end:python',
+      'start:typescript,python',
+      'end:typescript,python',
+    ])
+  })
+
+  it('registers cumulative Shiki langs without repeating covered subsets', async () => {
+    const calls: Array<{ langs?: readonly string[] }> = []
+    const registerHighlight = vi.fn(async (opts?: { langs?: readonly string[] }) => {
+      calls.push(opts ?? {})
+    })
+
+    await registerHighlightOnce(
+      registerHighlight,
+      getRegisterHighlightOptions(undefined, ['ts']),
+    )
+    await registerHighlightOnce(
+      registerHighlight,
+      getRegisterHighlightOptions(undefined, ['ts', 'vue']),
+    )
+    await registerHighlightOnce(
+      registerHighlight,
+      getRegisterHighlightOptions(undefined, ['ts']),
+    )
+
+    expect(calls).toEqual([
+      { langs: ['typescript'] },
+      { langs: ['typescript', 'vue'] },
     ])
   })
 
@@ -760,7 +785,7 @@ describe('markdown code block Shiki langs', () => {
     await waitForRendererCount(initialRendererCount + 1)
 
     expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith(
-      expect.objectContaining({ langs: ['python'] }),
+      expect.objectContaining({ langs: ['typescript', 'python'] }),
     )
     expect(renderer.dispose).toHaveBeenCalledTimes(1)
     expect(renderer.updateCode).not.toHaveBeenCalled()
@@ -976,11 +1001,11 @@ describe('markdown code block Shiki langs', () => {
 
     ;(wrapper.vm.langs as string[]).splice(0, 1, 'python')
     await flushAll()
-    await waitForLastRegisterHighlightLangs(['python'])
+    await waitForLastRegisterHighlightLangs(['typescript', 'python'])
     await waitForRendererCount(initialRendererCount + 1)
 
     expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith(
-      expect.objectContaining({ langs: ['python'] }),
+      expect.objectContaining({ langs: ['typescript', 'python'] }),
     )
     expect(renderer.dispose).toHaveBeenCalledTimes(1)
     expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenLastCalledWith(
@@ -1237,7 +1262,7 @@ describe('markdown code block Shiki langs', () => {
     await waitForRendererCount(initialRendererCount + 1)
 
     expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith(
-      expect.objectContaining({ langs: ['python'] }),
+      expect.objectContaining({ langs: ['typescript', 'python'] }),
     )
     expect(streamMarkdownMock.createdRenderers.at(-1)?.updateCode).toHaveBeenLastCalledWith(
       'fresh_value = 2',
@@ -1533,7 +1558,17 @@ describe('markdown code block Shiki langs', () => {
       await flushAll()
 
       expect(wrapper.find('.code-block-render').text()).toContain('const value = 1')
-      expect(wrapper.find('.code-fallback-plain').exists()).toBe(false)
+      await waitUntil(
+        () => {
+          const fallback = wrapper.find('.code-fallback-plain')
+          return !fallback.exists() || !fallback.isVisible()
+        },
+        () => {
+          const state = (wrapper.findComponent(Vue2MarkdownCodeBlockNode as any).vm as any).$.setupState
+          return `Timed out waiting for Vue2 fallback to hide after stable render: ready=${state.rendererReady} fallback=${JSON.stringify(state.fallbackHtml)} stable=${state.hasStableRender} committed=${state.lastCommittedRenderSignature}`
+        },
+        flushAll,
+      )
 
       const initialRendererCount = streamMarkdownMock.createdRenderers.length
       const oldRenderer = streamMarkdownMock.createdRenderers[initialRendererCount - 1]
@@ -2636,7 +2671,7 @@ describe('markdown code block Shiki langs', () => {
     await waitForReactRendererCount(initialRendererCount + 1)
 
     expect(streamMarkdownMock.registerHighlight).toHaveBeenLastCalledWith(
-      expect.objectContaining({ langs: ['python'] }),
+      expect.objectContaining({ langs: ['typescript', 'python'] }),
     )
     expect(renderer.dispose).toHaveBeenCalledTimes(1)
     expect(renderer.updateCode).not.toHaveBeenCalled()
