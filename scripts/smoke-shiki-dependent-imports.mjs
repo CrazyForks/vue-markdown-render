@@ -74,6 +74,39 @@ function ensureBuiltPackage(pkg) {
   run('pnpm', pkg.build)
 }
 
+function parsePnpmPackJsonOutput(output, packageName) {
+  const chunks = [
+    output.trim(),
+    ...output.trim().split(/\r?\n/).reverse(),
+  ]
+
+  for (const chunk of chunks) {
+    const trimmed = chunk.trim()
+    if (!trimmed)
+      continue
+
+    const objectStart = trimmed.indexOf('{')
+    const arrayStart = trimmed.indexOf('[')
+    const start = arrayStart === -1
+      ? objectStart
+      : objectStart === -1
+        ? arrayStart
+        : Math.min(arrayStart, objectStart)
+
+    if (start === -1)
+      continue
+
+    try {
+      return JSON.parse(trimmed.slice(start))
+    }
+    catch {}
+  }
+
+  throw new Error(
+    `[smoke-shiki-dependent-imports] Failed to parse pnpm pack --json output for ${packageName}:\n${output}`,
+  )
+}
+
 function packPackage(pkg) {
   const output = execFileSync('pnpm', ['pack', '--pack-destination', tmp, '--json'], {
     cwd: path.join(repoRoot, pkg.dir),
@@ -81,7 +114,7 @@ function packPackage(pkg) {
     env: process.env,
     stdio: ['ignore', 'pipe', 'pipe'],
   }).trim()
-  const parsed = JSON.parse(output)
+  const parsed = parsePnpmPackJsonOutput(output, pkg.name)
   const filename = Array.isArray(parsed) ? parsed[0]?.filename : parsed?.filename
   if (!filename)
     throw new Error(`[smoke-shiki-dependent-imports] pnpm pack returned no filename for ${pkg.name}.`)

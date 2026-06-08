@@ -37,8 +37,6 @@ jobs:
           git config --global core.eol lf
 
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Enable Corepack
         run: corepack enable
@@ -66,7 +64,15 @@ jobs:
         run: nr typecheck
 
       - name: Run tests
-        run: pnpm run build:parser && pnpm run build:core && nr test -- --run
+        run: pnpm run build:parser && pnpm run build:core && nr test -- --run --reporter=default --reporter=junit --outputFile.junit=vitest-results.xml
+
+      - name: Upload Vitest report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-results-${{ matrix.os }}
+          path: vitest-results.xml
+          if-no-files-found: ignore
 
       - name: Run SSR check
         run: nr check:ssr

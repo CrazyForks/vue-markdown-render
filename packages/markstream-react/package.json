@@ -92,7 +92,7 @@
     "typecheck": "tsc --noEmit",
     "size:check": "node ../../scripts/check-package-size.mjs",
     "check:core-published": "node ../../scripts/check-core-published.mjs --package-json package.json --core-package-json ../markstream-core/package.json",
-    "release": "pnpm run check:core-published && pnpm -w run test:smoke:shiki-dependent-imports && bumpp --commit --no-tag --no-push && pnpm publish --access public && node ../../scripts/tag-package.mjs --package-json package.json --push"
+    "release": "pnpm run check:core-published && bumpp --commit --no-tag --no-push && pnpm publish --access public && node ../../scripts/tag-package.mjs --package-json package.json --push"
   },
   "peerDependencies": {
     "@antv/infographic": "^0.2.3",

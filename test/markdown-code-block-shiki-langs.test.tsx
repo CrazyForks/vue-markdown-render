@@ -135,55 +135,91 @@ async function flushReact() {
   })
 }
 
-async function waitForRendererCreated() {
-  for (let i = 0; i < 10; i++) {
-    if (streamMarkdownMock.createShikiStreamRenderer.mock.calls.length > 0)
+const ASYNC_WAIT_ATTEMPTS = process.platform === 'win32' ? 50 : 20
+
+async function waitUntil(
+  predicate: () => boolean,
+  message: () => string,
+  flush: () => Promise<void> = flushAll,
+) {
+  for (let i = 0; i < ASYNC_WAIT_ATTEMPTS; i++) {
+    if (predicate())
       return
-    await flushAll()
+
+    await flush()
+
+    if (predicate())
+      return
   }
+
+  throw new Error(message())
+}
+
+async function waitForRendererCreated() {
+  await waitUntil(
+    () => streamMarkdownMock.createShikiStreamRenderer.mock.calls.length > 0,
+    () =>
+      `Timed out waiting for renderer creation; calls=${
+        streamMarkdownMock.createShikiStreamRenderer.mock.calls.length
+      }`,
+  )
 }
 
 async function waitForRendererCount(count: number) {
-  for (let i = 0; i < 10; i++) {
-    if (streamMarkdownMock.createShikiStreamRenderer.mock.calls.length >= count)
-      return
-    await flushAll()
-  }
+  await waitUntil(
+    () => streamMarkdownMock.createShikiStreamRenderer.mock.calls.length >= count,
+    () =>
+      `Timed out waiting for renderer count ${count}; calls=${
+        streamMarkdownMock.createShikiStreamRenderer.mock.calls.length
+      }`,
+  )
 }
 
 async function waitForRendererUpdateCall(renderer: any, count: number) {
-  for (let i = 0; i < 10; i++) {
-    if (renderer?.updateCode.mock.calls.length >= count)
-      return
-    await flushAll()
-  }
-  throw new Error(`Timed out waiting for renderer update call ${count}`)
+  await waitUntil(
+    () => renderer?.updateCode.mock.calls.length >= count,
+    () =>
+      `Timed out waiting for renderer update call ${count}; calls=${
+        renderer?.updateCode.mock.calls.length ?? 0
+      }`,
+  )
 }
 
 async function waitForLastRegisterHighlightLangs(langs: string[]) {
-  for (let i = 0; i < 10; i++) {
-    const calls = streamMarkdownMock.registerHighlight.mock.calls
-    const lastCall = calls[calls.length - 1]?.[0] as { langs?: string[] } | undefined
-    if (JSON.stringify(lastCall?.langs) === JSON.stringify(langs))
-      return
-    await flushAll()
-  }
+  await waitUntil(
+    () => {
+      const calls = streamMarkdownMock.registerHighlight.mock.calls
+      const lastCall = calls[calls.length - 1]?.[0] as { langs?: string[] } | undefined
+      return JSON.stringify(lastCall?.langs) === JSON.stringify(langs)
+    },
+    () => {
+      const calls = streamMarkdownMock.registerHighlight.mock.calls
+      const lastCall = calls[calls.length - 1]?.[0]
+      return `Timed out waiting for registerHighlight langs ${JSON.stringify(langs)}; last=${JSON.stringify(lastCall)}`
+    },
+  )
 }
 
 async function waitForReactRendererCreated() {
-  for (let i = 0; i < 10; i++) {
-    if (streamMarkdownMock.createShikiStreamRenderer.mock.calls.length > 0)
-      return
-    await flushReact()
-  }
+  await waitUntil(
+    () => streamMarkdownMock.createShikiStreamRenderer.mock.calls.length > 0,
+    () =>
+      `Timed out waiting for React renderer creation; calls=${
+        streamMarkdownMock.createShikiStreamRenderer.mock.calls.length
+      }`,
+    flushReact,
+  )
 }
 
 async function waitForReactRendererCount(count: number) {
-  for (let i = 0; i < 10; i++) {
-    if (streamMarkdownMock.createShikiStreamRenderer.mock.calls.length >= count)
-      return
-    await flushReact()
-  }
+  await waitUntil(
+    () => streamMarkdownMock.createShikiStreamRenderer.mock.calls.length >= count,
+    () =>
+      `Timed out waiting for React renderer count ${count}; calls=${
+        streamMarkdownMock.createShikiStreamRenderer.mock.calls.length
+      }`,
+    flushReact,
+  )
 }
 
 function createDeferred() {
@@ -2146,6 +2182,18 @@ describe('markdown code block Shiki langs', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const root = createRoot(host)
+
+    await act(async () => {
+      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+        key: 'first',
+        loading: false,
+        node: makeNode('typescript'),
+        langs: ['typescript'],
+      }))
+    })
+
+    await flushReact()
+    await waitForReactRendererCreated()
 
     await act(async () => {
       root.render(React.createElement(React.Fragment, null, [

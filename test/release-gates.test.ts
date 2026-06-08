@@ -16,12 +16,11 @@ describe('release dependency gates', () => {
     expect(prepublishOnly).toContain('pnpm run test:smoke:pack')
     expect(prepublishOnly).toContain('pnpm run test:smoke:pack:optional')
     expect(prepublishOnly).toContain('pnpm run test:smoke:vue2-cjs')
-    expect(prepublishOnly).toContain('pnpm run test:smoke:shiki-dependent-imports')
+    expect(prepublishOnly).not.toContain('pnpm run test:smoke:shiki-dependent-imports')
     expect(prepublishOnly.indexOf('pnpm run build:parser')).toBeLessThan(prepublishOnly.indexOf('pnpm run check:workspace-deps-published'))
     expect(prepublishOnly.indexOf('pnpm run check:workspace-deps-published')).toBeLessThan(prepublishOnly.indexOf('pnpm run test:smoke:pack'))
     expect(prepublishOnly.indexOf('pnpm run test:smoke:pack')).toBeLessThan(prepublishOnly.indexOf('pnpm run test:smoke:pack:optional'))
     expect(prepublishOnly.indexOf('pnpm run test:smoke:pack:optional')).toBeLessThan(prepublishOnly.indexOf('pnpm run test:smoke:vue2-cjs'))
-    expect(prepublishOnly.indexOf('pnpm run test:smoke:vue2-cjs')).toBeLessThan(prepublishOnly.indexOf('pnpm run test:smoke:shiki-dependent-imports'))
   })
 
   it('uses the workspace dependency publish gate in the release script', () => {
@@ -178,12 +177,13 @@ describe('release dependency gates', () => {
     expect(scripts['release:verify'].indexOf('pnpm run test:smoke:vue2-cjs')).toBeLessThan(
       scripts['release:verify'].indexOf('pnpm run test:smoke:shiki-dependent-imports'),
     )
-    expect(reactPackageJson.scripts.release).toContain('pnpm -w run test:smoke:shiki-dependent-imports')
-    expect(vue2PackageJson.scripts.release).toContain('pnpm -w run test:smoke:shiki-dependent-imports')
+    expect(reactPackageJson.scripts.release).not.toContain('pnpm -w run test:smoke:shiki-dependent-imports')
+    expect(vue2PackageJson.scripts.release).not.toContain('pnpm -w run test:smoke:shiki-dependent-imports')
     expect(smokeScript).toContain('markstream-react')
     expect(smokeScript).toContain('markstream-vue2')
     expect(smokeScript).toContain('stream-markdown')
     expect(smokeScript).toContain('shiki')
+    expect(smokeScript).toContain('parsePnpmPackJsonOutput')
     expect(smokeScript).toContain('readPackedPackageJson')
     expect(smokeScript).toContain('assertDependsOnPackedCore')
     expect(smokeScript).toContain('normalizeShikiLanguage')
