@@ -16,9 +16,16 @@ export function getCodeBlockExtraProps(source: unknown) {
   if (!source || typeof source !== 'object')
     return extraProps
 
-  for (const [key, value] of Object.entries(source as Record<string, unknown>)) {
-    if (!RESERVED_CODE_BLOCK_EXTRA_PROPS.has(key))
-      extraProps[key] = value
+  const descriptors = Object.getOwnPropertyDescriptors(source)
+
+  for (const [key, descriptor] of Object.entries(descriptors)) {
+    if (RESERVED_CODE_BLOCK_EXTRA_PROPS.has(key))
+      continue
+
+    if (!('value' in descriptor))
+      continue
+
+    extraProps[key] = descriptor.value
   }
 
   return extraProps

@@ -383,6 +383,7 @@ let renderer: ShikiRenderer | undefined
 let rendererConfigKey: string | null = null
 let rendererTheme: string | undefined
 let rendererThemeSyncQueued = false
+let rendererThemeObserver: MutationObserver | undefined
 let createShikiRenderer:
   | ((el: HTMLElement, opts: ShikiRendererOptions) => ShikiRenderer)
   | undefined
@@ -440,7 +441,7 @@ async function syncRendererTheme() {
   if (!renderer)
     return
 
-  const theme = getPreferredColorScheme()
+  const theme = getRenderedColorScheme()
   if (rendererTheme === theme)
     return
 
@@ -448,16 +449,42 @@ async function syncRendererTheme() {
   rendererTheme = theme
 }
 
-function getRendererThemeSyncKey(isDark: boolean, darkTheme: string, lightTheme: string) {
-  const theme = isDark ? darkTheme : lightTheme
-  if (theme !== rendererTheme && !rendererThemeSyncQueued) {
-    rendererThemeSyncQueued = true
-    void nextTick(async () => {
-      rendererThemeSyncQueued = false
-      await handleRendererThemeChange()
-    })
-  }
-  return theme
+function queueRendererThemeChange() {
+  const theme = getRenderedColorScheme()
+  if (!renderer || theme === rendererTheme || rendererThemeSyncQueued)
+    return
+
+  rendererThemeSyncQueued = true
+  void nextTick(() => {
+    rendererThemeSyncQueued = false
+    void handleRendererThemeChange()
+  })
+}
+
+function startRendererThemeObserver() {
+  if (rendererThemeObserver || typeof MutationObserver === 'undefined')
+    return
+
+  const rootEl = container.value
+  if (!rootEl)
+    return
+
+  rendererThemeObserver = new MutationObserver(() => {
+    queueRendererThemeChange()
+  })
+  rendererThemeObserver.observe(rootEl, {
+    attributes: true,
+    attributeFilter: ['data-markstream-code-theme'],
+  })
+}
+
+function disconnectRendererThemeObserver() {
+  rendererThemeObserver?.disconnect()
+  rendererThemeObserver = undefined
+}
+
+function getRenderedColorScheme() {
+  return container.value?.getAttribute('data-markstream-code-theme') || getPreferredColorScheme()
 }
 
 const highlightRegistrationKey = computed(() =>
@@ -710,7 +737,7 @@ async function initRenderer(epoch: number) {
     disposeCurrentRenderer({ resetStableRender: true })
 
   if (!renderer && createShikiRenderer) {
-    const theme = getPreferredColorScheme()
+    const theme = getRenderedColorScheme()
     renderer = createShikiRenderer(rendererTarget.value, {
       theme,
       ...rendererOptions,
@@ -772,6 +799,7 @@ function cleanupRenderer() {
   renderEpoch += 1
   renderObserver?.disconnect()
   renderObserver = undefined
+  disconnectRendererThemeObserver()
   pendingRenderSignature = null
   disposeCurrentRenderer({ resetStableRender: true })
 }
@@ -780,6 +808,7 @@ renderFallback(props.node.code, true)
 
 if (getCurrentInstance()) {
   onMounted(() => {
+    startRendererThemeObserver()
     void safeInitRenderer()
   })
   onBeforeUnmount(cleanupRenderer)
@@ -787,6 +816,7 @@ if (getCurrentInstance()) {
 else {
   void nextTick(async () => {
     await nextTick()
+    startRendererThemeObserver()
     await safeInitRenderer()
     if (!lastCommittedRenderSignature && hasRendererContent()) {
       markRendererCommitted(
@@ -1060,7 +1090,7 @@ function previewCode() {
     }"
     class="code-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
     :class="[props.isDark ? 'border-gray-700/30 bg-gray-900' : 'border-gray-200 bg-white', props.isDark ? 'is-dark' : '']"
-    :data-markstream-code-theme="getRendererThemeSyncKey(props.isDark, props.darkTheme, props.lightTheme)"
+    :data-markstream-code-theme="props.isDark ? props.darkTheme : props.lightTheme"
   >
     <div
       v-if="props.showHeader"

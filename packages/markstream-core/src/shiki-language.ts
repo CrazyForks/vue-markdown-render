@@ -23,6 +23,7 @@ interface HighlightRegistrationState {
   inFlight: HighlightRegistrationTaskMap
   completed: Set<string>
   tail: Promise<unknown>
+  registeredAllLangs: boolean
   registeredThemes: string[]
   registeredLangs: string[]
 }
@@ -38,6 +39,7 @@ function getHighlightRegistrationState(registerHighlight: RegisterHighlightFn) {
     state = {
       inFlight: new Map(),
       completed: new Set(),
+      registeredAllLangs: false,
       registeredThemes: [],
       registeredLangs: [],
       tail: Promise.resolve(),
@@ -76,13 +78,21 @@ function hasAllValues(registered: readonly string[], requested?: readonly string
   return requested.every(value => registeredSet.has(value))
 }
 
+function hasAllLangValues(state: HighlightRegistrationState, requested?: readonly string[]) {
+  if (!requested?.length)
+    return true
+  if (state.registeredAllLangs)
+    return true
+  return hasAllValues(state.registeredLangs, requested)
+}
+
 function isRegistrationCovered(
   state: HighlightRegistrationState,
   opts: RegisterHighlightOptions,
 ) {
   return hasAnyRegisterValues(opts)
     && hasAllValues(state.registeredThemes, opts.themes)
-    && hasAllValues(state.registeredLangs, opts.langs)
+    && hasAllLangValues(state, opts.langs)
 }
 
 function getCumulativeRegisterOptions(
@@ -93,7 +103,9 @@ function getCumulativeRegisterOptions(
     return opts
 
   const nextThemes = appendUnique(state.registeredThemes, opts.themes)
-  const nextLangs = appendUnique(state.registeredLangs, opts.langs)
+  const nextLangs = state.registeredAllLangs
+    ? []
+    : appendUnique(state.registeredLangs, opts.langs)
 
   return {
     ...(nextThemes.length ? { themes: nextThemes } : {}),
@@ -283,7 +295,10 @@ export async function registerHighlightOnce(
       }
 
       return Promise.resolve(registerHighlight(cumulativeOptions)).then(() => {
-        if (hasAnyRegisterValues(cumulativeOptions)) {
+        if (!hasAnyRegisterValues(cumulativeOptions)) {
+          state.registeredAllLangs = true
+        }
+        else {
           state.registeredThemes = cumulativeOptions.themes
             ? [...cumulativeOptions.themes]
             : state.registeredThemes

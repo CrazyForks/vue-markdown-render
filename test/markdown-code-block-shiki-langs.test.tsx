@@ -371,6 +371,37 @@ describe('markdown code block Shiki langs', () => {
     ])
   })
 
+  it('treats default language registration as covering later scoped lang registrations', async () => {
+    const calls: RegisterHighlightOptions[] = []
+    const registerHighlight = vi.fn(async (opts?: RegisterHighlightOptions) => {
+      calls.push(opts ?? {})
+    })
+
+    await registerHighlightOnce(registerHighlight, {})
+    await registerHighlightOnce(registerHighlight, { langs: ['ts'] })
+    await registerHighlightOnce(registerHighlight, { langs: ['javascript', 'typescript'] })
+
+    expect(calls).toEqual([{}])
+  })
+
+  it('still registers a new theme after default language registration', async () => {
+    const calls: RegisterHighlightOptions[] = []
+    const registerHighlight = vi.fn(async (opts?: RegisterHighlightOptions) => {
+      calls.push(opts ?? {})
+    })
+
+    await registerHighlightOnce(registerHighlight, {})
+    await registerHighlightOnce(registerHighlight, {
+      themes: ['vitesse-dark'],
+      langs: ['ts'],
+    })
+
+    expect(calls).toEqual([
+      {},
+      { themes: ['vitesse-dark'] },
+    ])
+  })
+
   it('coalesces concurrent highlight registration calls for the same key', async () => {
     const deferred = createDeferred()
     const registerHighlight = vi.fn(() => deferred.promise)
