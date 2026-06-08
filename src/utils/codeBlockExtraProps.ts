@@ -30,7 +30,7 @@ export function getCodeBlockExtraProps(
     if (RESERVED_CODE_BLOCK_EXTRA_PROPS.has(key) || omittedProps.has(key))
       continue
 
-    if (!('value' in descriptor))
+    if (!descriptor.enumerable || !('value' in descriptor))
       continue
 
     extraProps[key] = descriptor.value

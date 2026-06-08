@@ -10,16 +10,25 @@ const implementations = [
 ] as const
 
 describe('getCodeBlockExtraProps', () => {
-  it.each(implementations)('%s does not invoke accessors while copying extra props', (_, getCodeBlockExtraProps) => {
+  it.each(implementations)('%s forwards enumerable data props only', (_, getCodeBlockExtraProps) => {
     let getterCalled = false
-    const source = {
+    const source: Record<string, unknown> = {
       showHeader: false,
       node: 'reserved',
-      get dangerous() {
+    }
+
+    Object.defineProperty(source, 'hidden', {
+      value: 'secret',
+      enumerable: false,
+    })
+
+    Object.defineProperty(source, 'dangerous', {
+      enumerable: true,
+      get() {
         getterCalled = true
         throw new Error('getter should not run')
       },
-    }
+    })
 
     expect(getCodeBlockExtraProps(source)).toEqual({
       showHeader: false,

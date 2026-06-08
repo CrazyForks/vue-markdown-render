@@ -145,7 +145,7 @@
     "check:ssr": "vitest --run test/ssr-import.test.ts test/ssr-render-to-string.test.ts",
     "release:verify": "pnpm run build:parser && pnpm run build:core && pnpm lint && pnpm typecheck && pnpm exec vitest --run --testTimeout=10000 && pnpm run test:api:strict && pnpm run test:smoke:vue2-cjs && MARKSTREAM_SMOKE_SKIP_BUILD=1 pnpm run test:smoke:pack && MARKSTREAM_SMOKE_SKIP_BUILD=1 pnpm run test:smoke:pack:optional",
     "release:verify:e2e": "pnpm run release:verify && pnpm run test:e2e:virtual-scroll && pnpm run test:e2e:virtual-scroll:stress",
-    "prepublishOnly": "pnpm run build:parser && npm run build:pack && pnpm run check:workspace-deps-published && MARKSTREAM_SMOKE_SKIP_BUILD=1 pnpm run test:smoke:pack && MARKSTREAM_SMOKE_SKIP_BUILD=1 pnpm run test:smoke:pack:optional",
+    "prepublishOnly": "pnpm run build:parser && npm run build:pack && pnpm run check:workspace-deps-published && pnpm run test:smoke:vue2-cjs && MARKSTREAM_SMOKE_SKIP_BUILD=1 pnpm run test:smoke:pack && MARKSTREAM_SMOKE_SKIP_BUILD=1 pnpm run test:smoke:pack:optional",
     "play": "pnpm run -C playground dev",
     "play:angular": "pnpm run -C playground-angular dev",
     "play:vue2": "pnpm run -C playground-vue2 dev",
