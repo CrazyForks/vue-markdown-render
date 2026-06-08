@@ -1,5 +1,4 @@
 import { isKatexEnabled } from '../components/MathInlineNode/katex'
-import { isDevEnvironment } from '../utils/devEnv'
 import { normalizeKaTeXRenderInput } from '../utils/normalizeKaTeXRenderInput'
 
 interface Pending {
@@ -40,7 +39,8 @@ function notifyDrainIfBelowCap() {
 // Performance monitoring (optional, dev-only by default)
 let recordRenderPerformance: ((metric: any) => void) | null = null
 try {
-  if (typeof window !== 'undefined' && isDevEnvironment()) {
+  // Keep this as a literal Vite guard so production builds can drop the dev-only import.
+  if (typeof window !== 'undefined' && import.meta.env.DEV) {
     import('../utils/performance-monitor')
       .then(({ perfMonitor }) => {
         recordRenderPerformance = metric => perfMonitor.recordRender(metric)
@@ -133,7 +133,7 @@ export function clearKaTeXWorker() {
 
 function ensureWorker() {
   if (!worker) {
-    workerInitError = new Error('[katexWorkerClient] No worker instance set. Please inject a Worker via setKaTeXWorker().')
+    workerInitError = new Error('[katexWorkerClient] Worker not set.')
     ; (workerInitError as any).name = 'WorkerInitError'
     ; (workerInitError as any).code = 'WORKER_INIT_ERROR'
     return null

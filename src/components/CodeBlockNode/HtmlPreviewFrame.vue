@@ -30,7 +30,7 @@ function warnDangerousHtmlPreviewSandbox(value: string) {
   const tokens = normalizeSandboxTokens(value)
   if (tokens.has('allow-scripts') && tokens.has('allow-same-origin')) {
     lastWarnedDangerousSandbox = value
-    console.warn('[markstream-vue] htmlPreviewSandbox contains both allow-scripts and allow-same-origin. Use this only for fully trusted content served from an isolated origin.')
+    console.warn('[markstream-vue] htmlPreviewSandbox with allow-scripts and allow-same-origin needs trusted isolated content.')
   }
 }
 

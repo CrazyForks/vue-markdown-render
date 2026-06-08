@@ -11,7 +11,6 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch 
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
-import { isDevEnvironment } from '../../utils/devEnv'
 import {
   getLanguageIcon,
   languageIconsRevision,
@@ -333,7 +332,7 @@ let highlightRegistrationSeq = 0
 let renderEpoch = 0
 let disposed = false
 const warnedRendererErrors = new Set<string>()
-const isDevEnv = isDevEnvironment()
+const isDevEnv = import.meta.env.DEV
 let warnedMissingRegisterHighlightForLangs = false
 let streamMarkdownLoadPromise: Promise<void> | null = null
 let warnedStreamMarkdownUnavailable = false

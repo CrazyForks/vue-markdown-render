@@ -16,7 +16,7 @@ import type {
   NodeRendererMode,
   NodeRendererProps,
 } from '../../types/node-renderer-props'
-import { getShikiLangs, getShikiThemes, normalizeShikiLanguage } from 'markstream-core'
+import { getHighlightRegistrationKey, normalizeShikiLanguage } from 'markstream-core'
 import { computed, defineAsyncComponent, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
@@ -58,7 +58,6 @@ import {
   registerHeightEstimationRendererController,
 } from '../../internal/heightEstimationExperiment'
 import { getCodeBlockExtraProps } from '../../utils/codeBlockExtraProps'
-import { isDevEnvironment } from '../../utils/devEnv'
 import { clampInfographicPreviewHeight, clampMermaidPreviewHeight, estimateInfographicPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber } from '../../utils/diagramHeight'
 import { getCustomNodeAttrs, getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from '../../utils/htmlRenderer'
 import { normalizeLanguageIdentifier } from '../../utils/languageIcon'
@@ -1769,12 +1768,6 @@ function getVirtualRendererLayoutKey() {
   const monaco = renderer === 'monaco' ? props.codeBlockMonacoOptions : undefined
   const codeProps = props.codeBlockProps as Record<string, unknown> | undefined
   const includeShikiCodeOptions = renderer === 'shiki'
-  const shikiThemesKey = includeShikiCodeOptions
-    ? getShikiThemes((codeProps?.themes ?? props.themes) as readonly unknown[] | undefined)?.join('\u0000') ?? ''
-    : ''
-  const shikiLangsKey = includeShikiCodeOptions
-    ? getShikiLangs((codeProps?.langs ?? props.langs) as readonly unknown[] | undefined)?.join('\u0000') ?? ''
-    : ''
 
   return [
     props.isDark ? 'dark' : 'light',
@@ -1786,7 +1779,12 @@ function getVirtualRendererLayoutKey() {
     rendererProps.codeBlockStream === false ? 'code-static' : 'code-stream',
     stringifyVirtualToken(props.codeBlockMinWidth),
     stringifyVirtualToken(props.codeBlockMaxWidth),
-    ...(includeShikiCodeOptions ? [shikiThemesKey, shikiLangsKey] : []),
+    ...(includeShikiCodeOptions
+      ? [getHighlightRegistrationKey(
+          (codeProps?.themes ?? props.themes) as readonly unknown[] | undefined,
+          (codeProps?.langs ?? props.langs) as readonly unknown[] | undefined,
+        )]
+      : []),
     stringifyVirtualToken(monaco?.fontSize),
     stringifyVirtualToken(monaco?.lineHeight),
     stringifyVirtualToken(monaco?.fontFamily),
@@ -3029,7 +3027,7 @@ function warnStandaloneHeightCacheIgnored(reason: string) {
   if (
     warnedStandaloneHeightCacheWithoutSignature
     || typeof console === 'undefined'
-    || !isDevEnvironment()
+    || !import.meta.env.DEV
   ) {
     return
   }
@@ -4339,7 +4337,7 @@ function autoDisableViewportPriority(reason: 'too-many-targets') {
   if (viewportPriorityAutoDisabled.value)
     return
   viewportPriorityAutoDisabled.value = true
-  if (isDevEnvironment() && typeof console !== 'undefined')
+  if (import.meta.env.DEV && typeof console !== 'undefined')
     console.warn('[markstream-vue] viewportPriority auto-disabled:', reason)
 
   destroyNodeVisibilityState()
@@ -5040,7 +5038,7 @@ const MermaidBlockNodeAsync = defineAsyncComponent({
     }
     catch (e) {
       console.warn(
-        '[markstream-vue] Optional peer dependencies for MermaidBlockNode are missing. Falling back to preformatted code rendering. To enable Mermaid rendering, please install "mermaid".',
+        '[markstream-vue] MermaidBlockNode unavailable.',
         e,
       )
       return PreCodeNode
@@ -5058,7 +5056,7 @@ const InfographicBlockNodeAsync = defineAsyncComponent({
     }
     catch (e) {
       console.warn(
-        '[markstream-vue] Optional peer dependencies for InfographicBlockNode are missing. Falling back to preformatted code rendering.',
+        '[markstream-vue] InfographicBlockNode unavailable.',
         e,
       )
       return PreCodeNode
@@ -5075,7 +5073,7 @@ const D2BlockNodeAsync = defineAsyncComponent(async () => {
   }
   catch (e) {
     console.warn(
-      '[markstream-vue] Optional peer dependencies for D2BlockNode are missing. Falling back to preformatted code rendering. To enable D2 rendering, please install "@terrastruct/d2".',
+      '[markstream-vue] D2BlockNode unavailable.',
       e,
     )
     return PreCodeNode
@@ -5310,7 +5308,10 @@ const renderedItems = computed(() => {
       }
     }
 
-    const usesPreCodeBindings = shouldUsePreCodeBindings(node, language, component)
+    const usesPreCodeBindings = node.type === 'code_block'
+      && resolvedCodeRenderer.value === 'pre'
+      && component === PreCodeNode
+      && !getCustomCodeLanguageComponent(customComponentsMap.value, language)
     let bindings = { ...getBindingsFor(node, language, component) } as Record<string, unknown>
     const estimatedHeight = estimatedNodeHeights.value[item.index]
     if (node.type === 'code_block' && estimatedHeight?.kind === 'code-block') {
@@ -5407,51 +5408,29 @@ function getCustomCodeLanguageComponent(
   return undefined
 }
 
-function hasCodeLanguageOverride(language: string) {
-  return Boolean(language && getCustomCodeLanguageComponent(customComponentsMap.value, language))
-}
-
-function isCustomCodeBlockComponent(component: unknown) {
-  return Boolean(component && component === customComponentsMap.value.code_block)
-}
-
-function isCustomLanguageCodeBlockComponent(component: unknown, language?: string) {
-  return Boolean(component && language && component === getCustomCodeLanguageComponent(customComponentsMap.value, language))
-}
-
-function shouldUsePreCodeBindings(
+function getPreviewBindingsFor(
+  source: { value: Record<string, any> },
   node: ParsedNode,
-  language: string,
-  component: unknown,
+  estimate: (code: string) => number,
+  clamp: (height: number, minHeight?: number, maxHeight?: number | null) => number,
 ) {
-  return node.type === 'code_block'
-    && resolvedCodeRenderer.value === 'pre'
-    && !hasCodeLanguageOverride(language)
-    && component === PreCodeNode
+  const bindings = { ...source.value } as Record<string, any>
+  if (parsePositiveNumber(bindings.estimatedPreviewHeightPx) == null) {
+    bindings.estimatedPreviewHeightPx = clamp(
+      estimate(String((node as RuntimeCodeBlockNode)?.code ?? '')),
+      undefined,
+      bindings.maxHeight === 'none' ? null : (parsePositiveNumber(bindings.maxHeight) ?? undefined),
+    )
+  }
+  return bindings
 }
 
 function getMermaidBindingsFor(node: ParsedNode) {
-  const bindings = { ...mermaidBindings.value } as Record<string, any>
-  if (parsePositiveNumber(bindings.estimatedPreviewHeightPx) == null) {
-    bindings.estimatedPreviewHeightPx = clampMermaidPreviewHeight(
-      estimateMermaidPreviewHeight(String((node as RuntimeCodeBlockNode)?.code ?? '')),
-      undefined,
-      bindings.maxHeight === 'none' ? null : (parsePositiveNumber(bindings.maxHeight) ?? undefined),
-    )
-  }
-  return bindings
+  return getPreviewBindingsFor(mermaidBindings, node, estimateMermaidPreviewHeight, clampMermaidPreviewHeight)
 }
 
 function getInfographicBindingsFor(node: ParsedNode) {
-  const bindings = { ...infographicBindings.value } as Record<string, any>
-  if (parsePositiveNumber(bindings.estimatedPreviewHeightPx) == null) {
-    bindings.estimatedPreviewHeightPx = clampInfographicPreviewHeight(
-      estimateInfographicPreviewHeight(String((node as RuntimeCodeBlockNode)?.code ?? '')),
-      undefined,
-      bindings.maxHeight === 'none' ? null : (parsePositiveNumber(bindings.maxHeight) ?? undefined),
-    )
-  }
-  return bindings
+  return getPreviewBindingsFor(infographicBindings, node, estimateInfographicPreviewHeight, clampInfographicPreviewHeight)
 }
 
 // Decide which component to use for a given node. Ensure that code blocks
@@ -5514,27 +5493,39 @@ function getNodeComponent(node: ParsedNode, language?: string) {
 
 function getBindingsFor(node: ParsedNode, language?: string, component?: unknown) {
   const lang = language ?? getCodeBlockLanguage(node)
-  if (component && shouldUsePreCodeBindings(node, lang, component))
-    return preCodeBlockBindings.value
+  if (node.type === 'code_block') {
+    const customLanguageComponent = lang
+      ? getCustomCodeLanguageComponent(customComponentsMap.value, lang)
+      : undefined
 
-  if (node.type === 'code_block' && isCustomLanguageCodeBlockComponent(component, lang)) {
-    if (lang === 'mermaid')
-      return getMermaidBindingsFor(node)
+    if (
+      component
+      && resolvedCodeRenderer.value === 'pre'
+      && !customLanguageComponent
+      && component === PreCodeNode
+    ) {
+      return preCodeBlockBindings.value
+    }
 
-    if (lang === 'infographic')
-      return getInfographicBindingsFor(node)
+    if (component && lang && component === customLanguageComponent) {
+      if (lang === 'mermaid')
+        return getMermaidBindingsFor(node)
 
-    if (lang === 'd2' || lang === 'd2lang')
-      return d2Bindings.value
+      if (lang === 'infographic')
+        return getInfographicBindingsFor(node)
 
-    return customCodeBlockBindings.value
+      if (lang === 'd2' || lang === 'd2lang')
+        return d2Bindings.value
+
+      return customCodeBlockBindings.value
+    }
+
+    if (component && component === customComponentsMap.value.code_block)
+      return customCodeBlockBindings.value
+
+    if (isMarkdownCodeBlockComponent(component))
+      return shikiCodeBlockBindings.value
   }
-
-  if (node.type === 'code_block' && isCustomCodeBlockComponent(component))
-    return customCodeBlockBindings.value
-
-  if (node.type === 'code_block' && isMarkdownCodeBlockComponent(component))
-    return shikiCodeBlockBindings.value
 
   if (lang === 'mermaid')
     return mermaidBindings.value

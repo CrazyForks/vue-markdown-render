@@ -16,11 +16,14 @@ describe('release dependency gates', () => {
     expect(prepublishOnly).toContain('pnpm run test:smoke:pack')
     expect(prepublishOnly).toContain('pnpm run test:smoke:pack:optional')
     expect(prepublishOnly).toContain('pnpm run test:smoke:vue2-cjs')
-    expect(prepublishOnly).not.toContain('pnpm run test:smoke:shiki-dependent-imports')
+    expect(prepublishOnly).toContain('pnpm run test:smoke:shiki-dependent-imports')
+    expect(prepublishOnly).toContain('node scripts/check-no-vite-client-leak.mjs')
     expect(prepublishOnly.indexOf('pnpm run build:parser')).toBeLessThan(prepublishOnly.indexOf('pnpm run check:workspace-deps-published'))
     expect(prepublishOnly.indexOf('pnpm run check:workspace-deps-published')).toBeLessThan(prepublishOnly.indexOf('pnpm run test:smoke:pack'))
     expect(prepublishOnly.indexOf('pnpm run test:smoke:pack')).toBeLessThan(prepublishOnly.indexOf('pnpm run test:smoke:pack:optional'))
     expect(prepublishOnly.indexOf('pnpm run test:smoke:pack:optional')).toBeLessThan(prepublishOnly.indexOf('pnpm run test:smoke:vue2-cjs'))
+    expect(prepublishOnly.indexOf('pnpm run test:smoke:vue2-cjs')).toBeLessThan(prepublishOnly.indexOf('pnpm run test:smoke:shiki-dependent-imports'))
+    expect(prepublishOnly.indexOf('pnpm run test:smoke:shiki-dependent-imports')).toBeLessThan(prepublishOnly.indexOf('node scripts/check-no-vite-client-leak.mjs'))
   })
 
   it('uses the workspace dependency publish gate in the release script', () => {
