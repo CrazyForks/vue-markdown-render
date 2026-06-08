@@ -158,7 +158,6 @@ try {
     dependencies: {
       'markstream-vue': `file:${packed.get('markstream-vue')}`,
       'markstream-react': `file:${packed.get('markstream-react')}`,
-      'markstream-vue2': `file:${packed.get('markstream-vue2')}`,
       'markstream-core': `file:${packed.get('markstream-core')}`,
       'stream-markdown-parser': `file:${packed.get('stream-markdown-parser')}`,
       'stream-markdown': '^0.0.15',
@@ -182,7 +181,6 @@ const require = createRequire(import.meta.url)
 const dependentPackages = [
   'markstream-vue',
   'markstream-react',
-  'markstream-vue2',
 ]
 
 for (const name of dependentPackages) {
@@ -206,16 +204,68 @@ for (const key of ['registerHighlight', 'createShikiStreamRenderer']) {
   if (typeof streamMarkdown[key] !== 'function')
     throw new Error(\`[smoke-shiki-dependent-imports] stream-markdown missing \${key}\`)
 }
+`)
 
-const vue2Cjs = require('markstream-vue2')
-for (const key of ['MarkdownRender', 'MarkdownCodeBlockNode', 'useSmoothMarkdownStream']) {
-  if (!(key in vue2Cjs))
-    throw new Error(\`[smoke-shiki-dependent-imports] markstream-vue2 CJS missing \${key}\`)
+  writeProjectFile('vue2/package.json', `${JSON.stringify({
+    private: true,
+    type: 'module',
+    packageManager: rootPackageJson.packageManager,
+    scripts: {
+      smoke: 'node smoke.mjs',
+    },
+    dependencies: {
+      'markstream-vue2': `file:${packed.get('markstream-vue2')}`,
+      'markstream-core': `file:${packed.get('markstream-core')}`,
+      'stream-markdown-parser': `file:${packed.get('stream-markdown-parser')}`,
+      'stream-markdown': '^0.0.15',
+      'shiki': '^4.0.2',
+      'vue': '2.6.14',
+      '@vue/composition-api': '^1.7.2',
+      'vue-demi': '^0.14.10',
+    },
+    pnpm: {
+      overrides: {
+        'markstream-core': `file:${packed.get('markstream-core')}`,
+        'stream-markdown-parser': `file:${packed.get('stream-markdown-parser')}`,
+      },
+    },
+  }, null, 2)}\n`)
+
+  writeProjectFile('vue2/smoke.mjs', `import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
+
+const vue = require('vue')
+if (!String(vue.version || '').startsWith('2.'))
+  throw new Error(\`[smoke-shiki-dependent-imports] expected Vue 2, got \${vue.version}\`)
+
+const cjsCompositionApi = require('@vue/composition-api')
+const esmCompositionApi = await import('@vue/composition-api')
+vue.use(cjsCompositionApi.default || cjsCompositionApi)
+vue.use(esmCompositionApi.default || esmCompositionApi)
+
+const vueDemi = require('vue-demi')
+if (vueDemi.isVue2 !== true)
+  throw new Error('[smoke-shiki-dependent-imports] vue-demi is not in Vue 2 mode')
+
+const esm = await import('markstream-vue2')
+const cjs = require('markstream-vue2')
+
+for (const [format, mod] of [['esm', esm], ['cjs', cjs]]) {
+  for (const key of ['MarkdownRender', 'MarkdownCodeBlockNode', 'useSmoothMarkdownStream']) {
+    if (!(key in mod))
+      throw new Error(\`[smoke-shiki-dependent-imports] markstream-vue2 \${format} missing \${key}\`)
+  }
 }
 `)
 
   run('pnpm', ['install', '--ignore-workspace', '--strict-peer-dependencies=false'], { cwd: tmp })
   run('pnpm', ['run', 'smoke'], { cwd: tmp })
+
+  const vue2Tmp = path.join(tmp, 'vue2')
+  run('pnpm', ['install', '--ignore-workspace', '--strict-peer-dependencies=false'], { cwd: vue2Tmp })
+  run('pnpm', ['exec', 'vue-demi-switch', '2'], { cwd: vue2Tmp })
+  run('pnpm', ['run', 'smoke'], { cwd: vue2Tmp })
 
   console.log('[smoke-shiki-dependent-imports] Packed dependent imports passed.')
 }

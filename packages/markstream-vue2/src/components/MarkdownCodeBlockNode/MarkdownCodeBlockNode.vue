@@ -712,7 +712,7 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
 })
 
 watch(
-  () => [props.darkTheme, props.lightTheme],
+  () => [props.darkTheme, props.lightTheme, props.isDark],
   async () => {
     if (!codeBlockContent.value || !rendererTarget.value)
       return
