@@ -36,4 +36,9 @@ for (const key of [
   }
 }
 
+const parser = req('stream-markdown-parser')
+if (typeof parser.parseMarkdownToStructure !== 'function') {
+  throw new TypeError('stream-markdown-parser CJS export parseMarkdownToStructure is missing or not a function.')
+}
+
 console.log('[smoke-vue2-cjs] ok')

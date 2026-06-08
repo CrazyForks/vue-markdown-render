@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
@@ -22,6 +23,35 @@ const workspaceDeps = [
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, 'utf8'))
+}
+
+function parseArgs(argv) {
+  const args = {
+    packageJson: 'package.json',
+  }
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const token = argv[i]
+    if (token === '--package-json') {
+      args.packageJson = argv[i + 1] ?? args.packageJson
+      i += 1
+      continue
+    }
+    if (token === '--help' || token === '-h') {
+      console.log('Usage: node scripts/check-workspace-deps-published.mjs --package-json <path>')
+      process.exit(0)
+    }
+    throw new Error(`[check-workspace-deps-published] Unknown argument: ${token}`)
+  }
+
+  return args
+}
+
+function resolvePackageJsonPath(packageJson) {
+  const fromCwd = resolve(process.cwd(), packageJson)
+  if (existsSync(fromCwd))
+    return fromCwd
+  return resolve(root, packageJson)
 }
 
 function npmViewVersion(packageName, version) {
@@ -71,12 +101,17 @@ async function waitForPublishedVersion(packageName, version) {
   )
 }
 
-const rootPackageJson = readJson(resolve(root, 'package.json'))
+const args = parseArgs(process.argv.slice(2))
+const packageJsonPath = resolvePackageJsonPath(args.packageJson)
+const packageJson = readJson(packageJsonPath)
+let checked = 0
 
 for (const dep of workspaceDeps) {
-  const dependencyVersion = rootPackageJson.dependencies?.[dep.name]
+  const dependencyVersion = packageJson.dependencies?.[dep.name]
   if (!dependencyVersion)
-    throw new Error(`[check-workspace-deps-published] ${rootPackageJson.name} does not depend on ${dep.name}.`)
+    continue
+
+  checked += 1
 
   const depPackageJson = readJson(resolve(root, dep.packageJson))
   const targetVersion = depPackageJson.version
@@ -91,5 +126,8 @@ for (const dep of workspaceDeps) {
 
   await waitForPublishedVersion(dep.name, targetVersion)
 
-  console.log(`[check-workspace-deps-published] OK: ${dep.name}@${targetVersion} is published.`)
+  console.log(`[check-workspace-deps-published] OK: ${packageJson.name} -> ${dep.name}@${targetVersion} is published.`)
 }
+
+if (checked === 0)
+  console.log(`[check-workspace-deps-published] Skip: ${packageJson.name} has no tracked workspace deps.`)
