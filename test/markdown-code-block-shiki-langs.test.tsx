@@ -2728,6 +2728,54 @@ describe('markdown code block Shiki langs', () => {
     })
   })
 
+  it('caches failed React Shiki language and falls back to plaintext on later streaming updates', async () => {
+    const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
+    ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+
+    try {
+      await act(async () => {
+        root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+          loading: false,
+          node: makeNode('unknown-lang', 'first'),
+          stream: true,
+        }))
+      })
+
+      await flushReact()
+      await waitForReactRendererCreated()
+      const renderer = streamMarkdownMock.createdRenderers[0]
+      await waitForRendererUpdateCall(renderer, 2)
+
+      expect(renderer.updateCode).toHaveBeenCalledWith('first', 'unknown-lang')
+      expect(renderer.updateCode).toHaveBeenCalledWith('first', 'plaintext')
+
+      renderer.updateCode.mockClear()
+
+      await act(async () => {
+        root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+          loading: false,
+          node: makeNode('unknown-lang', 'second'),
+          stream: true,
+        }))
+      })
+
+      await flushReact()
+      await waitForRendererUpdateCall(renderer, 1)
+
+      expect(renderer.updateCode).toHaveBeenCalledWith('second', 'plaintext')
+      expect(renderer.updateCode).not.toHaveBeenCalledWith('second', 'unknown-lang')
+    }
+    finally {
+      await act(async () => {
+        root.unmount()
+      })
+    }
+  })
+
   it('retries React registerHighlight when the previous registration failed', async () => {
     streamMarkdownMock.registerHighlight.mockRejectedValueOnce(new Error('load failed'))
 
@@ -2818,24 +2866,15 @@ describe('markdown code block Shiki langs', () => {
     })
   })
 
-  it('retries Vue stream-markdown import after a failed dynamic import', async () => {
+  it('does not repeatedly import Vue stream-markdown after a failed dynamic import', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     let importAttempts = 0
-    const retryStreamMarkdownFactory = () => {
+    const missingStreamMarkdownFactory = () => {
       importAttempts += 1
-      if (importAttempts === 1)
-        throw new Error('chunk load failed')
-
-      return {
-        createShikiStreamRenderer: streamMarkdownMock.createShikiStreamRenderer,
-        defaultLanguages: streamMarkdownMock.defaultLanguages,
-        get registerHighlight() {
-          return streamMarkdownMock.registerHighlight
-        },
-      }
+      throw new Error('missing optional peer')
     }
 
-    vi.doMock('stream-markdown', retryStreamMarkdownFactory)
+    vi.doMock('stream-markdown', missingStreamMarkdownFactory)
 
     const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
     const wrapper = mount(MarkdownCodeBlockNode, {
@@ -2856,14 +2895,10 @@ describe('markdown code block Shiki langs', () => {
         node: makeNode('typescript', 'const fresh = 2'),
       })
       await flushAll()
-      await waitForRendererCreated()
 
-      expect(importAttempts).toBe(2)
-      expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenCalledTimes(1)
-      expect(streamMarkdownMock.createdRenderers.at(-1)?.updateCode).toHaveBeenLastCalledWith(
-        'const fresh = 2',
-        'typescript',
-      )
+      expect(importAttempts).toBe(1)
+      expect(streamMarkdownMock.createShikiStreamRenderer).not.toHaveBeenCalled()
+      expect(warnSpy).toHaveBeenCalledTimes(1)
     }
     finally {
       wrapper.unmount()
@@ -2871,24 +2906,16 @@ describe('markdown code block Shiki langs', () => {
     }
   })
 
-  it('retries React stream-markdown import after a failed dynamic import', async () => {
+  it('does not repeatedly import React stream-markdown after a failed dynamic import', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     let importAttempts = 0
-    const retryStreamMarkdownFactory = () => {
+    const missingStreamMarkdownFactory = () => {
       importAttempts += 1
-      if (importAttempts === 1)
-        throw new Error('chunk load failed')
-
-      return {
-        createShikiStreamRenderer: streamMarkdownMock.createShikiStreamRenderer,
-        defaultLanguages: streamMarkdownMock.defaultLanguages,
-        get registerHighlight() {
-          return streamMarkdownMock.registerHighlight
-        },
-      }
+      throw new Error('missing optional peer')
     }
 
-    vi.doMock('stream-markdown', retryStreamMarkdownFactory)
-    vi.doMock('../packages/markstream-react/node_modules/stream-markdown', retryStreamMarkdownFactory)
+    vi.doMock('stream-markdown', missingStreamMarkdownFactory)
+    vi.doMock('../packages/markstream-react/node_modules/stream-markdown', missingStreamMarkdownFactory)
 
     const { MarkdownCodeBlockNode: ReactMarkdownCodeBlockNode } = await import('../packages/markstream-react/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode')
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
@@ -2897,36 +2924,36 @@ describe('markdown code block Shiki langs', () => {
     document.body.appendChild(host)
     const root = createRoot(host)
 
-    await act(async () => {
-      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
-        loading: false,
-        node: makeNode('typescript', 'const stale = 1'),
-        langs: ['typescript'],
-      }))
-    })
-    await flushReact()
+    try {
+      await act(async () => {
+        root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+          loading: false,
+          node: makeNode('typescript', 'const stale = 1'),
+          langs: ['typescript'],
+        }))
+      })
+      await flushReact()
 
-    expect(streamMarkdownMock.createShikiStreamRenderer).not.toHaveBeenCalled()
+      expect(streamMarkdownMock.createShikiStreamRenderer).not.toHaveBeenCalled()
 
-    await act(async () => {
-      root.render(React.createElement(ReactMarkdownCodeBlockNode, {
-        loading: false,
-        node: makeNode('typescript', 'const fresh = 2'),
-        langs: ['typescript'],
-      }))
-    })
-    await flushReact()
-    await waitForReactRendererCreated()
+      await act(async () => {
+        root.render(React.createElement(ReactMarkdownCodeBlockNode, {
+          loading: false,
+          node: makeNode('typescript', 'const fresh = 2'),
+          langs: ['typescript'],
+        }))
+      })
+      await flushReact()
 
-    expect(importAttempts).toBe(2)
-    expect(streamMarkdownMock.createShikiStreamRenderer).toHaveBeenCalledTimes(1)
-    expect(streamMarkdownMock.createdRenderers.at(-1)?.updateCode).toHaveBeenLastCalledWith(
-      'const fresh = 2',
-      'typescript',
-    )
-
-    await act(async () => {
-      root.unmount()
-    })
+      expect(importAttempts).toBe(1)
+      expect(streamMarkdownMock.createShikiStreamRenderer).not.toHaveBeenCalled()
+      expect(warnSpy).toHaveBeenCalledTimes(1)
+    }
+    finally {
+      await act(async () => {
+        root.unmount()
+      })
+      warnSpy.mockRestore()
+    }
   })
 })

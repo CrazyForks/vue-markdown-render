@@ -205,8 +205,11 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const lastCommittedRenderSignatureRef = useRef('')
   const createRendererRef = useRef<null | ((el: HTMLElement, opts: ShikiRendererOptions) => ShikiRenderer)>(null)
   const streamMarkdownLoadPromiseRef = useRef<Promise<void> | null>(null)
+  const streamMarkdownLoadFailedRef = useRef(false)
+  const warnedStreamMarkdownUnavailableRef = useRef(false)
   const registerHighlightRef = useRef<((opts?: RegisterHighlightOptions) => Promise<unknown> | unknown) | null>(null)
   const warnedMissingRegisterHighlightForLangsRef = useRef(false)
+  const failedRendererLanguagesRef = useRef<Set<string>>(new Set())
   const registeredKeyRef = useRef<string>('')
   const highlightRegistrationSeqRef = useRef(0)
   const latestRegistrationKeyRef = useRef(registrationInputKey)
@@ -280,6 +283,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     rendererRef.current = null
     rendererConfigKeyRef.current = ''
     lastCommittedRenderSignatureRef.current = ''
+    failedRendererLanguagesRef.current.clear()
     clearRendererTarget()
     if (updateReady)
       setRendererReady(false)
@@ -352,19 +356,41 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   ])
 
   const ensureStreamMarkdownLoaded = useCallback(async () => {
-    if (createRendererRef.current)
+    if (createRendererRef.current || streamMarkdownLoadFailedRef.current)
       return
     if (streamMarkdownLoadPromiseRef.current)
       return streamMarkdownLoadPromiseRef.current
 
     streamMarkdownLoadPromiseRef.current = (async () => {
       try {
-        const mod: any = await import('stream-markdown')
-        createRendererRef.current = mod.createShikiStreamRenderer
-        registerHighlightRef.current = mod.registerHighlight ?? null
+        const mod = await import('stream-markdown')
+        const nextCreateRenderer = (mod as {
+          createShikiStreamRenderer?: unknown
+        }).createShikiStreamRenderer
+
+        if (typeof nextCreateRenderer !== 'function')
+          throw new TypeError('stream-markdown.createShikiStreamRenderer is not available')
+
+        createRendererRef.current = nextCreateRenderer as NonNullable<typeof createRendererRef.current>
+
+        const nextRegisterHighlight = (mod as {
+          registerHighlight?: unknown
+        }).registerHighlight
+
+        registerHighlightRef.current = typeof nextRegisterHighlight === 'function'
+          ? nextRegisterHighlight as NonNullable<typeof registerHighlightRef.current>
+          : null
+
+        streamMarkdownLoadFailedRef.current = false
+        warnedStreamMarkdownUnavailableRef.current = false
       }
-      catch {
-        // optional peer or transient dynamic-import failure
+      catch (e) {
+        streamMarkdownLoadFailedRef.current = true
+
+        if (isDevEnv && !warnedStreamMarkdownUnavailableRef.current && typeof console !== 'undefined') {
+          warnedStreamMarkdownUnavailableRef.current = true
+          console.warn('[MarkdownCodeBlockNode] stream-markdown not available:', e)
+        }
       }
       finally {
         streamMarkdownLoadPromiseRef.current = null
@@ -460,21 +486,35 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
 
     const lang = normalizeRendererLanguage(rawLang)
 
-    try {
-      await renderer.updateCode(code, lang)
-      return isCurrentRenderSeq(seq) ? lang : undefined
-    }
-    catch {
-      if (!isCurrentRenderSeq(seq) || lang === 'plaintext')
+    const renderPlaintext = async (originalError?: unknown) => {
+      const currentRenderer = rendererRef.current
+      if (!currentRenderer || !isCurrentRenderSeq(seq))
         return undefined
 
+      if (originalError && lang !== 'plaintext')
+        failedRendererLanguagesRef.current.add(lang)
+
       try {
-        await renderer.updateCode(code, 'plaintext')
+        await currentRenderer.updateCode(code, 'plaintext')
         return isCurrentRenderSeq(seq) ? 'plaintext' : undefined
       }
       catch {
         return undefined
       }
+    }
+
+    if (lang !== 'plaintext' && failedRendererLanguagesRef.current.has(lang))
+      return renderPlaintext()
+
+    try {
+      await renderer.updateCode(code, lang)
+      return isCurrentRenderSeq(seq) ? lang : undefined
+    }
+    catch (err) {
+      if (!isCurrentRenderSeq(seq) || lang === 'plaintext')
+        return undefined
+
+      return renderPlaintext(err)
     }
   }, [isCurrentRenderSeq])
 

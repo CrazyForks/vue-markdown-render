@@ -58,6 +58,7 @@ import {
   registerHeightEstimationRendererController,
 } from '../../internal/heightEstimationExperiment'
 import { getCodeBlockExtraProps } from '../../utils/codeBlockExtraProps'
+import { isDevEnvironment } from '../../utils/devEnv'
 import { clampInfographicPreviewHeight, clampMermaidPreviewHeight, estimateInfographicPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber } from '../../utils/diagramHeight'
 import { getCustomNodeAttrs, getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from '../../utils/htmlRenderer'
 import { normalizeLanguageIdentifier } from '../../utils/languageIcon'
@@ -128,6 +129,8 @@ const emit = defineEmits<{
   (e: 'render-final', payload: MarkstreamVirtualMetrics): void
   (e: 'anchor-change', payload: MarkstreamVirtualAnchor): void
 }>()
+
+const isDevEnv = isDevEnvironment()
 
 const RENDERER_MODE_DEFAULTS: Record<NodeRendererMode, Pick<
   NodeRendererProps,
@@ -3027,7 +3030,7 @@ function warnStandaloneHeightCacheIgnored(reason: string) {
   if (
     warnedStandaloneHeightCacheWithoutSignature
     || typeof console === 'undefined'
-    || !import.meta.env.DEV
+    || !isDevEnv
   ) {
     return
   }
@@ -4337,7 +4340,7 @@ function autoDisableViewportPriority(reason: 'too-many-targets') {
   if (viewportPriorityAutoDisabled.value)
     return
   viewportPriorityAutoDisabled.value = true
-  if (import.meta.env.DEV && typeof console !== 'undefined')
+  if (isDevEnv && typeof console !== 'undefined')
     console.warn('[markstream-vue] viewportPriority auto-disabled:', reason)
 
   destroyNodeVisibilityState()

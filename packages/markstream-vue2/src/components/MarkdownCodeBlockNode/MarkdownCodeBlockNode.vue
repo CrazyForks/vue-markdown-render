@@ -370,9 +370,11 @@ let highlightRegistrationSeq = 0
 let renderEpoch = 0
 let disposed = false
 const warnedRendererErrors = new Set<string>()
+const failedRendererLanguages = new Set<string>()
 const isDevEnv = isDevEnvironment()
 let warnedMissingRegisterHighlightForLangs = false
 let streamMarkdownLoadPromise: Promise<void> | null = null
+let streamMarkdownLoadFailed = false
 let warnedStreamMarkdownUnavailable = false
 
 function nextRenderEpoch() {
@@ -389,6 +391,7 @@ function disposeCurrentRenderer(options: { resetStableRender?: boolean } = {}) {
   renderer = undefined
   rendererConfigKey = null
   lastCommittedRenderSignature = ''
+  failedRendererLanguages.clear()
   clearRendererTarget()
   rendererReady.value = false
   if (options.resetStableRender)
@@ -418,7 +421,39 @@ function normalizeRendererLanguage(rawLang?: string | null) {
 async function updateRendererWithFallback(code: string, rawLang?: string | null, epoch = renderEpoch) {
   if (!renderer || !isCurrentRenderEpoch(epoch))
     return undefined
+
   const normalized = normalizeRendererLanguage(rawLang)
+
+  const renderPlaintext = async (originalError?: unknown) => {
+    if (!renderer || !isCurrentRenderEpoch(epoch))
+      return undefined
+
+    if (normalized !== 'plaintext') {
+      if (originalError)
+        failedRendererLanguages.add(normalized)
+
+      if (originalError && isDevEnv && !warnedRendererErrors.has(normalized)) {
+        warnedRendererErrors.add(normalized)
+        console.warn(`[MarkdownCodeBlockNode] Failed to render language "${normalized}", retrying as plaintext.`, originalError)
+      }
+    }
+
+    try {
+      await renderer.updateCode(code, 'plaintext')
+      return isCurrentRenderEpoch(epoch) ? 'plaintext' : undefined
+    }
+    catch (plainErr) {
+      if (!isCurrentRenderEpoch(epoch))
+        return undefined
+      if (isDevEnv)
+        console.warn('[MarkdownCodeBlockNode] Failed to render code block even as plaintext.', plainErr)
+      return undefined
+    }
+  }
+
+  if (normalized !== 'plaintext' && failedRendererLanguages.has(normalized))
+    return renderPlaintext()
+
   try {
     await renderer.updateCode(code, normalized)
     return isCurrentRenderEpoch(epoch) ? normalized : undefined
@@ -427,26 +462,12 @@ async function updateRendererWithFallback(code: string, rawLang?: string | null,
     if (!isCurrentRenderEpoch(epoch))
       return undefined
 
-    if (normalized !== 'plaintext') {
-      if (isDevEnv && !warnedRendererErrors.has(normalized)) {
-        warnedRendererErrors.add(normalized)
-        console.warn(`[MarkdownCodeBlockNode] Failed to render language "${normalized}", retrying as plaintext.`, err)
-      }
-      try {
-        await renderer.updateCode(code, 'plaintext')
-        return isCurrentRenderEpoch(epoch) ? 'plaintext' : undefined
-      }
-      catch (plainErr) {
-        if (!isCurrentRenderEpoch(epoch))
-          return undefined
-        if (isDevEnv)
-          console.warn('[MarkdownCodeBlockNode] Failed to render code block even as plaintext.', plainErr)
-        return undefined
-      }
-    }
-    else if (isDevEnv) {
+    if (normalized !== 'plaintext')
+      return renderPlaintext(err)
+
+    if (isDevEnv)
       console.warn('[MarkdownCodeBlockNode] Failed to render code block even as plaintext.', err)
-    }
+
     return undefined
   }
 }
@@ -509,7 +530,7 @@ function normalizeRuntimeShikiOptions(options: RegisterHighlightOptions): Regist
 }
 
 async function ensureStreamMarkdownLoaded() {
-  if (createShikiRenderer)
+  if (createShikiRenderer || streamMarkdownLoadFailed)
     return
   if (streamMarkdownLoadPromise)
     return streamMarkdownLoadPromise
@@ -517,11 +538,29 @@ async function ensureStreamMarkdownLoaded() {
   streamMarkdownLoadPromise = (async () => {
     try {
       const mod = await import('stream-markdown')
-      createShikiRenderer = mod.createShikiStreamRenderer
-      registerHighlight = mod.registerHighlight as NonNullable<typeof registerHighlight>
+      const nextCreateRenderer = (mod as {
+        createShikiStreamRenderer?: unknown
+      }).createShikiStreamRenderer
+
+      if (typeof nextCreateRenderer !== 'function')
+        throw new TypeError('stream-markdown.createShikiStreamRenderer is not available')
+
+      createShikiRenderer = nextCreateRenderer as NonNullable<typeof createShikiRenderer>
+
+      const nextRegisterHighlight = (mod as {
+        registerHighlight?: unknown
+      }).registerHighlight
+
+      registerHighlight = typeof nextRegisterHighlight === 'function'
+        ? nextRegisterHighlight as NonNullable<typeof registerHighlight>
+        : undefined
+
+      streamMarkdownLoadFailed = false
       warnedStreamMarkdownUnavailable = false
     }
     catch (e) {
+      streamMarkdownLoadFailed = true
+
       if (isDevEnv && !warnedStreamMarkdownUnavailable) {
         warnedStreamMarkdownUnavailable = true
         console.warn('[MarkdownCodeBlockNode] stream-markdown not available:', e)
