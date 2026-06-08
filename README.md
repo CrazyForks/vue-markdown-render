@@ -199,6 +199,8 @@ Prefer the unified code-block `theme` prop for new integrations. When you render
 />
 ```
 
+`code-block-props` forwards user-facing code block props only. Structural renderer keys such as `node`, `key`, `ref`, `ctx`, `renderNode`, `indexKey`, `__proto__`, `prototype`, and `constructor` are ignored.
+
 Language icons use the built-in `material` theme by default. For new integrations, inspect or switch icon themes with the exported helpers before `app.mount()`. The legacy `app.use(VueRendererMarkdown, { iconTheme })` option still works in 1.x, but prefer helpers because icon configuration is process-global state.
 
 ```ts

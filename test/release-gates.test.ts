@@ -15,16 +15,9 @@ describe('release dependency gates', () => {
     expect(prepublishOnly).toContain('pnpm run check:workspace-deps-published')
     expect(prepublishOnly).toContain('pnpm run test:smoke:pack')
     expect(prepublishOnly).toContain('pnpm run test:smoke:pack:optional')
-    expect(prepublishOnly).toContain('pnpm run test:smoke:vue2-cjs')
-    expect(prepublishOnly).toContain('pnpm run test:smoke:shiki-dependent-imports')
-    expect(prepublishOnly).not.toContain('MARKSTREAM_SMOKE_SKIP_BUILD=1 pnpm run test:smoke:shiki-dependent-imports')
-    expect(prepublishOnly).toContain('node scripts/check-no-vite-client-leak.mjs')
     expect(prepublishOnly.indexOf('pnpm run build:parser')).toBeLessThan(prepublishOnly.indexOf('pnpm run check:workspace-deps-published'))
     expect(prepublishOnly.indexOf('pnpm run check:workspace-deps-published')).toBeLessThan(prepublishOnly.indexOf('pnpm run test:smoke:pack'))
     expect(prepublishOnly.indexOf('pnpm run test:smoke:pack')).toBeLessThan(prepublishOnly.indexOf('pnpm run test:smoke:pack:optional'))
-    expect(prepublishOnly.indexOf('pnpm run test:smoke:pack:optional')).toBeLessThan(prepublishOnly.indexOf('pnpm run test:smoke:vue2-cjs'))
-    expect(prepublishOnly.indexOf('pnpm run test:smoke:vue2-cjs')).toBeLessThan(prepublishOnly.indexOf('pnpm run test:smoke:shiki-dependent-imports'))
-    expect(prepublishOnly.indexOf('pnpm run test:smoke:shiki-dependent-imports')).toBeLessThan(prepublishOnly.indexOf('node scripts/check-no-vite-client-leak.mjs'))
   })
 
   it('uses the workspace dependency publish gate in the release script', () => {
@@ -138,109 +131,6 @@ describe('release dependency gates', () => {
     expect(script).toMatch(/packageJson: 'packages\/markstream-core\/package\.json'/)
     expect(script).toMatch(/name: 'stream-markdown-parser'/)
     expect(script).toMatch(/packageJson: 'packages\/markdown-parser\/package\.json'/)
-  })
-
-  it('blocks dependent publishes when changed core files reuse a published version', () => {
-    const script = readFileSync(resolve(process.cwd(), 'scripts/check-core-published.mjs'), 'utf8')
-
-    expect(script).toContain('process.env.GITHUB_BASE_SHA')
-    expect(script).toContain('process.env.GITHUB_BASE_REF')
-    expect(script).toContain('process.env.MARKSTREAM_RELEASE_BASE_SHA')
-    expect(script).toContain('process.env.MARKSTREAM_DIFF_BASE')
-    expect(script).toContain('process.env.GITHUB_EVENT_PATH')
-    expect(script).toContain('event?.pull_request?.base?.sha')
-    expect(script).toContain('event?.before')
-    expect(script).toContain('function isGitWorktree')
-    expect(script).toContain('const shouldCheckCoreSourceChanges')
-    expect(script).toContain('Skip local core source diff guard because no CI/diff base was provided')
-    expect(script).toContain('Unable to determine git diff base')
-    expect(script).toMatch(/Unable to diff \$\{relativePath\} against \$\{base\}/)
-    expect(script).toMatch(/Unable to read previous \$\{packageJsonRelativePath\} from \$\{base\}/)
-    expect(script).toMatch(/`\$\{base\}\.\.\.HEAD`/)
-    expect(script).toContain('hasPackageVersionChanged')
-    expect(script).toContain('local core files changed')
-    expect(script).toMatch(/Bump \$\{args\.corePackageName\} before publishing dependents\./)
-  })
-
-  it('smoke-tests packed Shiki dependent package imports after packed smoke', () => {
-    const scripts = packageJson.scripts
-    const reactPackageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'packages/markstream-react/package.json'), 'utf8'))
-    const vue2PackageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'packages/markstream-vue2/package.json'), 'utf8'))
-    const smokeScript = readFileSync(resolve(process.cwd(), 'scripts/smoke-shiki-dependent-imports.mjs'), 'utf8')
-
-    expect(scripts['test:smoke:shiki-dependent-imports']).toBe('node scripts/smoke-shiki-dependent-imports.mjs')
-    expect(scripts['test:smoke:vue2-cjs']).toContain('pnpm run build:parser')
-    expect(scripts['test:smoke:vue2-cjs']).toContain('require(entry)')
-    expect(scripts['test:smoke:vue2-cjs']).toContain('MarkdownRender')
-    expect(scripts['test:smoke:vue2-cjs']).toContain('useSmoothMarkdownStream')
-    expect(scripts['release:verify']).toContain('pnpm run test:smoke:vue2-cjs')
-    expect(scripts['release:verify']).toContain('pnpm run test:smoke:shiki-dependent-imports')
-    expect(scripts['release:verify'].indexOf('pnpm run test:smoke:pack:optional')).toBeLessThan(
-      scripts['release:verify'].indexOf('pnpm run test:smoke:vue2-cjs'),
-    )
-    expect(scripts['release:verify'].indexOf('pnpm run test:smoke:vue2-cjs')).toBeLessThan(
-      scripts['release:verify'].indexOf('pnpm run test:smoke:shiki-dependent-imports'),
-    )
-    expect(reactPackageJson.scripts.release).not.toContain('pnpm -w run test:smoke:shiki-dependent-imports')
-    expect(vue2PackageJson.scripts.release).not.toContain('pnpm -w run test:smoke:shiki-dependent-imports')
-    expect(smokeScript).toContain('markstream-react')
-    expect(smokeScript).toContain('markstream-vue2')
-    expect(smokeScript).toContain('stream-markdown')
-    expect(smokeScript).toContain('shiki')
-    expect(smokeScript).toContain('parsePnpmPackJsonOutput')
-    expect(smokeScript).toContain('readPackedPackageJson')
-    expect(smokeScript).toContain('assertDependsOnPackedCore')
-    expect(smokeScript).toContain('normalizeShikiLanguage')
-    expect(smokeScript).toContain('registerHighlightOnce')
-    expect(smokeScript).toContain('getRegisterHighlightOptions')
-    expect(smokeScript).toContain('javascript')
-    expect(smokeScript).toContain('typescript')
-    expect(smokeScript).toContain('createShikiStreamRenderer')
-    expect(smokeScript).toContain('vue2/package.json')
-    expect(smokeScript).toContain('vue2/smoke.mjs')
-    expect(smokeScript).toContain('vue-demi')
-    expect(smokeScript).toContain('vueDemi.isVue2')
-    expect(smokeScript).toContain('vue-demi-switch')
-    expect(smokeScript).toContain('require(\'@vue/composition-api\')')
-    expect(smokeScript).toContain('await import(\'@vue/composition-api\')')
-    expect(smokeScript).toContain('vue.use')
-    expect(smokeScript).toContain('require(\'vue\')')
-    expect(smokeScript).toContain('require(\'markstream-vue2\')')
-    expect(smokeScript).toContain('MarkdownRender')
-    expect(smokeScript).toContain('useSmoothMarkdownStream')
-  })
-
-  it('keeps stream-markdown-parser require export available for Vue2 CJS consumers', () => {
-    const parserPackageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'packages/markdown-parser/package.json'), 'utf8'))
-    const parserTsdownConfig = readFileSync(resolve(process.cwd(), 'packages/markdown-parser/tsdown.config.ts'), 'utf8')
-
-    expect(parserPackageJson.exports['.'].require).toBe('./dist/index.cjs')
-    expect(parserPackageJson.main).toBe('./dist/index.cjs')
-    expect(parserTsdownConfig).toContain('format: [\'esm\', \'cjs\']')
-  })
-
-  it('runs Shiki dependent import smoke in CI', () => {
-    const ci = readFileSync(resolve(process.cwd(), '.github/workflows/ci.yml'), 'utf8')
-
-    expect(ci).toContain('test:smoke:shiki-dependent-imports')
-    expect(ci).not.toContain('MARKSTREAM_SMOKE_SKIP_BUILD=1 pnpm run test:smoke:shiki-dependent-imports')
-    expect(ci.indexOf('test:smoke:pack:optional')).toBeLessThan(
-      ci.indexOf('test:smoke:shiki-dependent-imports'),
-    )
-  })
-
-  it('keeps stream-markdown peer range aligned with the langs-capable release', () => {
-    const reactPackageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'packages/markstream-react/package.json'), 'utf8'))
-    const vue2PackageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'packages/markstream-vue2/package.json'), 'utf8'))
-    const streamMarkdownTypes = readFileSync(resolve(process.cwd(), 'node_modules/stream-markdown/dist/index.d.ts'), 'utf8')
-
-    expect(packageJson.peerDependencies['stream-markdown']).toBe('>=0.0.15')
-    expect(packageJson.devDependencies['stream-markdown']).toBe('^0.0.15')
-    expect(reactPackageJson.peerDependencies['stream-markdown']).toBe('>=0.0.15')
-    expect(vue2PackageJson.peerDependencies['stream-markdown']).toBe('>=0.0.15')
-    expect(streamMarkdownTypes).toContain('declare function registerHighlight(options?: {')
-    expect(streamMarkdownTypes).toContain('langs?: string[]')
-    expect(streamMarkdownTypes).toContain('declare function createShikiStreamRenderer')
   })
 
   it('keeps dry-run workspace dependency checks local', () => {

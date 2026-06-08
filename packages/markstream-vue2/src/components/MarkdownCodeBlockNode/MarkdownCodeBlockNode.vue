@@ -4,7 +4,7 @@ import type { PropType } from 'vue-demi'
 import type { MarkdownCodeBlockPreviewPayload } from '../../types/component-props'
 import {
   getHighlightRegistrationKey,
-  getRegisterHighlightOptions,
+  getRuntimeShikiRegistrationConfig,
   normalizeShikiLanguage,
   registerHighlightOnce,
 } from 'markstream-core'
@@ -492,14 +492,12 @@ const highlightRegistrationKey = computed(() =>
 )
 
 function rendererNeedsReconfigure() {
-  const rendererOptions = normalizeRuntimeShikiOptions(
-    getRegisterHighlightOptions(getResolvedThemes(), props.langs),
-  )
+  const runtimeConfig = getRuntimeShikiRegistrationConfig(getResolvedThemes(), props.langs, {
+    hasRegisterHighlight: Boolean(registerHighlight),
+    hasCreateRenderer: Boolean(createShikiRenderer),
+  })
 
-  return Boolean(renderer && rendererConfigKey !== getHighlightRegistrationKey(
-    rendererOptions.themes,
-    rendererOptions.langs,
-  ))
+  return Boolean(renderer && rendererConfigKey !== runtimeConfig.key)
 }
 
 function normalizeRendererLanguage(rawLang?: string | null) {
@@ -561,11 +559,12 @@ async function updateRendererWithFallback(code: string, rawLang?: string | null,
   }
 }
 
-async function ensureHighlightRegistered(themes?: readonly unknown[], langs?: readonly unknown[]): Promise<HighlightRegistrationStatus> {
+async function ensureHighlightRegistered(
+  registerOptions: RegisterHighlightOptions,
+  key: string,
+): Promise<HighlightRegistrationStatus> {
   if (!registerHighlight)
     return 'ready'
-  const opts = getRegisterHighlightOptions(themes, langs)
-  const key = getHighlightRegistrationKey(opts.themes, opts.langs)
   if (latestHighlightRegistrationKey !== key)
     return 'stale'
 
@@ -575,7 +574,7 @@ async function ensureHighlightRegistered(themes?: readonly unknown[], langs?: re
   const seq = ++highlightRegistrationSeq
 
   try {
-    await registerHighlightOnce(registerHighlight, opts, key)
+    await registerHighlightOnce(registerHighlight, registerOptions, key)
   }
   catch {
     if (seq !== highlightRegistrationSeq || latestHighlightRegistrationKey !== key)
@@ -590,32 +589,18 @@ async function ensureHighlightRegistered(themes?: readonly unknown[], langs?: re
   return 'ready'
 }
 
-async function waitForCurrentHighlightRegistration(themes: readonly unknown[] | undefined, langs: readonly unknown[] | undefined, key: string) {
-  const status = await ensureHighlightRegistered(themes, langs)
+async function waitForCurrentHighlightRegistration(
+  registerOptions: RegisterHighlightOptions,
+  key: string,
+) {
+  const status = await ensureHighlightRegistered(registerOptions, key)
   if (status !== 'failed')
     return status
 
   if (latestHighlightRegistrationKey !== key)
     return 'stale'
 
-  return ensureHighlightRegistered(themes, langs)
-}
-
-function normalizeRuntimeShikiOptions(options: RegisterHighlightOptions): RegisterHighlightOptions {
-  if (!options.langs?.length || registerHighlight || !createShikiRenderer)
-    return options
-
-  if (isDevEnv && !warnedMissingRegisterHighlightForLangs) {
-    warnedMissingRegisterHighlightForLangs = true
-    console.warn(
-      '[MarkdownCodeBlockNode] `langs` requires stream-markdown >=0.0.15 with registerHighlight(); '
-      + 'ignoring `langs` and using stream-markdown default language preload.',
-    )
-  }
-
-  const fallbackOptions: RegisterHighlightOptions = { ...options }
-  delete fallbackOptions.langs
-  return fallbackOptions
+  return ensureHighlightRegistered(registerOptions, key)
 }
 
 async function ensureStreamMarkdownLoaded() {
@@ -676,26 +661,27 @@ async function initRenderer(epoch: number) {
     return
   }
 
-  const requestedRendererOptions = getRegisterHighlightOptions(
-    getResolvedThemes(),
-    props.langs,
-  )
-  let rendererOptions = normalizeRuntimeShikiOptions(requestedRendererOptions)
-  let nextRendererConfigKey = getHighlightRegistrationKey(
-    rendererOptions.themes,
-    rendererOptions.langs,
-  )
+  let runtimeConfig = getRuntimeShikiRegistrationConfig(getResolvedThemes(), props.langs, {
+    hasRegisterHighlight: Boolean(registerHighlight),
+    hasCreateRenderer: Boolean(createShikiRenderer),
+  })
+  if (runtimeConfig.ignoredLangs && isDevEnv && !warnedMissingRegisterHighlightForLangs) {
+    warnedMissingRegisterHighlightForLangs = true
+    console.warn(
+      '[MarkdownCodeBlockNode] `langs` requires stream-markdown >=0.0.15 with registerHighlight(); '
+      + 'ignoring `langs` and using stream-markdown default language preload.',
+    )
+  }
+
+  let rendererOptions = runtimeConfig.rendererOptions
+  let nextRendererConfigKey = runtimeConfig.key
   latestHighlightRegistrationKey = nextRendererConfigKey
 
   let needsRendererReconfigure = Boolean(renderer && rendererConfigKey !== nextRendererConfigKey)
   if (needsRendererReconfigure)
     renderFallback(props.node.code, !hasStableRender.value)
 
-  let highlightStatus = await waitForCurrentHighlightRegistration(
-    rendererOptions.themes,
-    rendererOptions.langs,
-    nextRendererConfigKey,
-  )
+  let highlightStatus = await waitForCurrentHighlightRegistration(runtimeConfig.registerOptions, nextRendererConfigKey)
 
   if (highlightStatus === 'failed' && rendererOptions.langs?.length) {
     if (isDevEnv) {
@@ -705,20 +691,15 @@ async function initRenderer(epoch: number) {
       )
     }
 
-    rendererOptions = normalizeRuntimeShikiOptions(
-      getRegisterHighlightOptions(getResolvedThemes(), undefined),
-    )
-    nextRendererConfigKey = getHighlightRegistrationKey(
-      rendererOptions.themes,
-      rendererOptions.langs,
-    )
+    runtimeConfig = getRuntimeShikiRegistrationConfig(getResolvedThemes(), undefined, {
+      hasRegisterHighlight: Boolean(registerHighlight),
+      hasCreateRenderer: Boolean(createShikiRenderer),
+    })
+    rendererOptions = runtimeConfig.rendererOptions
+    nextRendererConfigKey = runtimeConfig.key
     latestHighlightRegistrationKey = nextRendererConfigKey
 
-    highlightStatus = await waitForCurrentHighlightRegistration(
-      rendererOptions.themes,
-      rendererOptions.langs,
-      nextRendererConfigKey,
-    )
+    highlightStatus = await waitForCurrentHighlightRegistration(runtimeConfig.registerOptions, nextRendererConfigKey)
   }
 
   if (!isCurrentRenderEpoch(epoch) || highlightStatus === 'stale')

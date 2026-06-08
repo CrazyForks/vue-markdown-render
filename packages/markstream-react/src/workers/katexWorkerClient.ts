@@ -29,35 +29,15 @@ function notifyDrainIfBelowCap() {
   }
 }
 
-let recordRenderPerformance: ((metric: any) => void) | null = null
+let perfMonitor: any = null
 try {
-  // Keep this as a literal Vite guard so production builds can drop the dev-only import.
   if (typeof window !== 'undefined' && import.meta.env.DEV) {
-    import('../utils/performanceMonitor')
-      .then(({ perfMonitor }) => {
-        recordRenderPerformance = metric => perfMonitor.recordRender(metric)
-      })
-      .catch(() => {})
+    import('../utils/performanceMonitor').then((a) => {
+      perfMonitor = a.perfMonitor
+    })
   }
 }
 catch {}
-
-function recordKaTeXRender(type: 'cache-hit' | 'worker', startTime: number, formulaLength: number, success: boolean, error?: string) {
-  if (!recordRenderPerformance)
-    return
-
-  const metric: any = {
-    type,
-    duration: performance.now() - startTime,
-    formulaLength,
-    timestamp: Date.now(),
-    success,
-  }
-  if (error)
-    metric.error = error
-
-  recordRenderPerformance(metric)
-}
 
 export function setKaTeXWorker(w: Worker) {
   worker = w
@@ -130,7 +110,15 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
   const cacheKey = `${displayMode ? 'd' : 'i'}:${normalizedContent}`
   const cached = cache.get(cacheKey)
   if (cached) {
-    recordKaTeXRender('cache-hit', startTime, normalizedContent.length, true)
+    if (perfMonitor) {
+      perfMonitor.recordRender({
+        type: 'cache-hit',
+        duration: performance.now() - startTime,
+        formulaLength: normalizedContent.length,
+        timestamp: Date.now(),
+        success: true,
+      })
+    }
     return Promise.resolve(cached)
   }
   const wk = ensureWorker()
@@ -143,7 +131,16 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
     ;(err as any).busy = true
     ;(err as any).inFlight = pending.size
     ;(err as any).max = MAX_CONCURRENCY
-    recordKaTeXRender('worker', startTime, normalizedContent.length, false, 'busy')
+    if (perfMonitor) {
+      perfMonitor.recordRender({
+        type: 'worker',
+        duration: performance.now() - startTime,
+        formulaLength: normalizedContent.length,
+        timestamp: Date.now(),
+        success: false,
+        error: 'busy',
+      })
+    }
     return Promise.reject(err)
   }
 
@@ -160,7 +157,16 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
       const err = new Error('Worker render timed out')
       ;(err as any).name = 'WorkerTimeout'
       ;(err as any).code = 'WORKER_TIMEOUT'
-      recordKaTeXRender('worker', startTime, normalizedContent.length, false, 'timeout')
+      if (perfMonitor) {
+        perfMonitor.recordRender({
+          type: 'worker',
+          duration: performance.now() - startTime,
+          formulaLength: normalizedContent.length,
+          timestamp: Date.now(),
+          success: false,
+          error: 'timeout',
+        })
+      }
       reject(err)
       notifyDrainIfBelowCap()
     }, timeout)
@@ -183,13 +189,30 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
       resolve: (html: string) => {
         if (signal)
           signal.removeEventListener('abort', abortListener)
-        recordKaTeXRender('worker', startTime, normalizedContent.length, true)
+        if (perfMonitor) {
+          perfMonitor.recordRender({
+            type: 'worker',
+            duration: performance.now() - startTime,
+            formulaLength: normalizedContent.length,
+            timestamp: Date.now(),
+            success: true,
+          })
+        }
         resolve(html)
       },
       reject: (err: any) => {
         if (signal)
           signal.removeEventListener('abort', abortListener)
-        recordKaTeXRender('worker', startTime, normalizedContent.length, false, err?.code || err?.message)
+        if (perfMonitor) {
+          perfMonitor.recordRender({
+            type: 'worker',
+            duration: performance.now() - startTime,
+            formulaLength: normalizedContent.length,
+            timestamp: Date.now(),
+            success: false,
+            error: err?.code || err?.message,
+          })
+        }
         reject(err)
       },
       timeoutId,

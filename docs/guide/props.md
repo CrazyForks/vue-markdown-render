@@ -183,7 +183,7 @@ These props are forwarded to `CodeBlockNode` / `MarkdownCodeBlockNode` (but **no
 - `code-block-dark-theme`, `code-block-light-theme`
 - `code-block-monaco-options`
 - `code-block-min-width`, `code-block-max-width`
-- `code-block-props` (extra code-block props such as `showHeader`, `showFontSizeButtons`, `showTooltips`, `htmlPreviewAllowScripts`, and `htmlPreviewSandbox`, plus any custom forwarded keys)
+- `code-block-props` (extra code-block props such as `showHeader`, `showFontSizeButtons`, `showTooltips`, `htmlPreviewAllowScripts`, and `htmlPreviewSandbox`, plus custom forwarded keys that are not structural renderer keys like `node`, `key`, `ref`, `ctx`, `renderNode`, `indexKey`, `__proto__`, `prototype`, or `constructor`)
 - `themes` (theme list forwarded to `stream-monaco` when present; in Shiki mode only string theme names are forwarded and theme objects are ignored)
 - `langs` (Shiki language list forwarded to `MarkdownCodeBlockNode`; omit it or pass `[]` to use the `stream-markdown` defaults. In Vue 3 this is consumed by `code-renderer="shiki"`; in React/Vue2 it applies when your custom code-block renderer is `MarkdownCodeBlockNode`.)
 

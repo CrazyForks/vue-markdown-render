@@ -5,7 +5,13 @@ import { createRoot } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, ref } from 'vue'
-import { getHighlightRegistrationKey, getRegisterHighlightOptions, getShikiRendererOptions, registerHighlightOnce } from '../packages/markstream-core/src'
+import {
+  getHighlightRegistrationKey,
+  getRegisterHighlightOptions,
+  getRuntimeShikiRegistrationConfig,
+  getShikiRendererOptions,
+  registerHighlightOnce,
+} from '../packages/markstream-core/src'
 import {
   removeCustomComponents as removeReactCustomComponents,
   setCustomComponents as setReactCustomComponents,
@@ -330,6 +336,57 @@ describe('markdown code block Shiki langs', () => {
     )
   })
 
+  it('builds runtime Shiki config for registerHighlight and renderer capabilities', () => {
+    expect(
+      getRuntimeShikiRegistrationConfig(['vitesse-light'], ['ts'], {
+        hasRegisterHighlight: true,
+        hasCreateRenderer: true,
+      }),
+    ).toEqual({
+      key: getHighlightRegistrationKey(['vitesse-light'], ['typescript']),
+      registerOptions: {
+        themes: ['vitesse-light'],
+        langs: ['typescript'],
+      },
+      rendererOptions: {
+        themes: ['vitesse-light'],
+        langs: ['typescript'],
+      },
+      ignoredLangs: false,
+    })
+
+    expect(
+      getRuntimeShikiRegistrationConfig(['vitesse-light'], ['ts'], {
+        hasRegisterHighlight: false,
+        hasCreateRenderer: true,
+      }),
+    ).toEqual({
+      key: getHighlightRegistrationKey(['vitesse-light'], undefined),
+      registerOptions: {
+        themes: ['vitesse-light'],
+      },
+      rendererOptions: {
+        themes: ['vitesse-light'],
+      },
+      ignoredLangs: true,
+    })
+
+    expect(
+      getRuntimeShikiRegistrationConfig(undefined, ['ts'], {
+        hasRegisterHighlight: false,
+        hasCreateRenderer: false,
+      }),
+    ).toMatchObject({
+      registerOptions: {
+        langs: ['typescript'],
+      },
+      rendererOptions: {
+        langs: ['typescript'],
+      },
+      ignoredLangs: false,
+    })
+  })
+
   it('keeps Shiki theme order in the registration key', () => {
     expect(
       getHighlightRegistrationKey(['vitesse-light', 'vitesse-dark'], ['ts', 'js']),
@@ -453,6 +510,47 @@ describe('markdown code block Shiki langs', () => {
       'end:typescript',
       'start:typescript,python',
       'end:typescript,python',
+    ])
+  })
+
+  it('serializes scoped and default highlight registrations without losing default coverage', async () => {
+    const first = createDeferred()
+    const calls: RegisterHighlightOptions[] = []
+
+    const registerHighlight = vi.fn((opts?: RegisterHighlightOptions) => {
+      calls.push(opts ?? {})
+
+      if (opts?.langs?.includes('typescript'))
+        return first.promise
+
+      return Promise.resolve()
+    })
+
+    const scoped = registerHighlightOnce(registerHighlight, {
+      langs: ['typescript'],
+    })
+    const defaults = registerHighlightOnce(registerHighlight, {})
+
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(calls).toEqual([
+      { langs: ['typescript'] },
+    ])
+
+    first.resolve()
+    await Promise.all([scoped, defaults])
+
+    expect(calls).toEqual([
+      { langs: ['typescript'] },
+      {},
+    ])
+
+    await registerHighlightOnce(registerHighlight, { langs: ['python'] })
+
+    expect(calls).toEqual([
+      { langs: ['typescript'] },
+      {},
     ])
   })
 

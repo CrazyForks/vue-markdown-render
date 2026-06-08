@@ -191,6 +191,8 @@ createApp({
 />
 ```
 
+`code-block-props` 只会透传面向用户的代码块 props；`node`、`key`、`ref`、`ctx`、`renderNode`、`indexKey`、`__proto__`、`prototype`、`constructor` 等渲染器结构字段会被忽略。
+
 语言图标默认使用内置的 `material` theme。新接入建议在 `app.mount()` 之前通过导出的 helper 查看或切换 icon theme。旧的 `app.use(VueRendererMarkdown, { iconTheme })` 选项在 1.x 仍可用，但它会修改进程级全局状态，因此优先使用 helper。
 
 ```ts

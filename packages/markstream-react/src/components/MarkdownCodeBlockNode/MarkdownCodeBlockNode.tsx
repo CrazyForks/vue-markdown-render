@@ -3,7 +3,7 @@ import type { VisibilityHandle } from '../../context/viewportPriority'
 import type { ShikiCodeBlockProps } from '../../types/component-props'
 import {
   getHighlightRegistrationKey,
-  getRegisterHighlightOptions,
+  getRuntimeShikiRegistrationConfig,
   normalizeShikiLanguage,
   registerHighlightOnce,
 } from 'markstream-core'
@@ -61,20 +61,6 @@ interface HighlightRegistrationInput {
   key: string
   themes?: readonly unknown[]
   langs?: readonly unknown[]
-}
-
-function createHighlightRegistrationConfig(
-  themes?: readonly unknown[],
-  langs?: readonly unknown[],
-): HighlightRegistrationConfig {
-  const registerOptions = getRegisterHighlightOptions(themes, langs)
-  const rendererOptions = registerOptions
-
-  return {
-    key: getHighlightRegistrationKey(rendererOptions.themes, rendererOptions.langs),
-    registerOptions,
-    rendererOptions,
-  }
 }
 
 function escapeHtml(str: string) {
@@ -476,12 +462,12 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
   const createRuntimeHighlightRegistrationConfig = useCallback((
     input: HighlightRegistrationInput | null | undefined,
   ): HighlightRegistrationConfig => {
-    const config = createHighlightRegistrationConfig(input?.themes, input?.langs)
+    const runtimeConfig = getRuntimeShikiRegistrationConfig(input?.themes, input?.langs, {
+      hasRegisterHighlight: Boolean(registerHighlightRef.current),
+      hasCreateRenderer: Boolean(createRendererRef.current),
+    })
 
-    if (!config.rendererOptions.langs?.length || registerHighlightRef.current || !createRendererRef.current)
-      return config
-
-    if (isDevEnv && !warnedMissingRegisterHighlightForLangsRef.current && typeof console !== 'undefined') {
+    if (runtimeConfig.ignoredLangs && isDevEnv && !warnedMissingRegisterHighlightForLangsRef.current && typeof console !== 'undefined') {
       warnedMissingRegisterHighlightForLangsRef.current = true
       console.warn(
         '[MarkdownCodeBlockNode] `langs` requires stream-markdown >=0.0.15 with registerHighlight(); '
@@ -489,15 +475,10 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       )
     }
 
-    const registerOptions: RegisterHighlightOptions = { ...config.registerOptions }
-    delete registerOptions.langs
-    const rendererOptions: Pick<ShikiRendererOptions, 'themes' | 'langs'> = { ...config.rendererOptions }
-    delete rendererOptions.langs
-
     return {
-      key: getHighlightRegistrationKey(rendererOptions.themes, rendererOptions.langs),
-      registerOptions,
-      rendererOptions,
+      key: runtimeConfig.key,
+      registerOptions: runtimeConfig.registerOptions,
+      rendererOptions: runtimeConfig.rendererOptions,
     }
   }, [])
 

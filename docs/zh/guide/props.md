@@ -175,7 +175,7 @@ flowchart TD
 - `code-block-dark-theme`, `code-block-light-theme`
 - `code-block-monaco-options`
 - `code-block-min-width`, `code-block-max-width`
-- `code-block-props`（额外代码块 props，例如 `showHeader`、`showFontSizeButtons`、`showTooltips`、`htmlPreviewAllowScripts`、`htmlPreviewSandbox`，同时保留自定义透传字段）
+- `code-block-props`（额外代码块 props，例如 `showHeader`、`showFontSizeButtons`、`showTooltips`、`htmlPreviewAllowScripts`、`htmlPreviewSandbox`，同时保留不是渲染器结构字段的自定义透传字段；`node`、`key`、`ref`、`ctx`、`renderNode`、`indexKey`、`__proto__`、`prototype`、`constructor` 不会透传）
 - `themes`（在安装 `stream-monaco` 时，会转发给其主题系统；Shiki 模式只会转发字符串主题名，主题对象会被忽略）
 - `langs`（转发给 `MarkdownCodeBlockNode` 的 Shiki 语言列表；不传或传 `[]` 时使用 `stream-markdown` 默认行为。Vue 3 会在 `code-renderer="shiki"` 时消费它；React/Vue2 需要你的自定义代码块渲染器使用 `MarkdownCodeBlockNode`。）
 

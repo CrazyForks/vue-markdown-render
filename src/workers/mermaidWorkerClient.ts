@@ -123,7 +123,7 @@ export function clearMermaidWorker() {
 
 function ensureWorker() {
   if (!worker) {
-    workerInitError = new Error('[mermaidWorkerClient] Worker not set.')
+    workerInitError = new Error('[mermaidWorkerClient] No worker instance set. Please inject a Worker via setMermaidWorker().')
     ; (workerInitError as any).name = 'WorkerInitError'
     ; (workerInitError as any).code = 'WORKER_INIT_ERROR'
     return null

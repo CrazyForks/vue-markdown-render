@@ -9,6 +9,13 @@ export interface ShikiRendererOptions {
   langs?: readonly string[]
 }
 
+export interface RuntimeShikiRegistrationConfig {
+  key: string
+  registerOptions: RegisterHighlightOptions
+  rendererOptions: Pick<ShikiRendererOptions, 'themes' | 'langs'>
+  ignoredLangs: boolean
+}
+
 export type RegisterHighlightFn
   = (opts?: RegisterHighlightOptions) => Promise<unknown> | unknown
 
@@ -242,6 +249,41 @@ export function getHighlightRegistrationKey(themes?: readonly unknown[], langs?:
   const langsKey = getShikiLangs(langs)?.join('\u0000') ?? ''
 
   return `${themesKey}\u0000\u0000${langsKey}`
+}
+
+export function getRuntimeShikiRegistrationConfig(
+  themes?: readonly unknown[],
+  langs?: readonly unknown[],
+  options: {
+    hasRegisterHighlight: boolean
+    hasCreateRenderer: boolean
+  } = {
+    hasRegisterHighlight: true,
+    hasCreateRenderer: true,
+  },
+): RuntimeShikiRegistrationConfig {
+  const registerOptions = getRegisterHighlightOptions(themes, langs)
+  const rendererOptions: Pick<ShikiRendererOptions, 'themes' | 'langs'> = {
+    ...registerOptions,
+  }
+
+  const ignoredLangs = Boolean(
+    rendererOptions.langs?.length
+    && options.hasCreateRenderer
+    && !options.hasRegisterHighlight,
+  )
+
+  if (ignoredLangs) {
+    delete registerOptions.langs
+    delete rendererOptions.langs
+  }
+
+  return {
+    key: getHighlightRegistrationKey(rendererOptions.themes, rendererOptions.langs),
+    registerOptions,
+    rendererOptions,
+    ignoredLangs,
+  }
 }
 
 export async function registerHighlightOnce(
