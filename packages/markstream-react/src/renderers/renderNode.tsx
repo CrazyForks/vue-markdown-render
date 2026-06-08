@@ -243,7 +243,7 @@ function renderCodeBlock(
       maxWidth={ctx.codeBlockThemes?.maxWidth}
       isDark={ctx.isDark}
       onCopy={ctx.events.onCopy}
-      {...getCodeBlockExtraProps(ctx.codeBlockProps)}
+      {...getCodeBlockExtraProps(ctx.codeBlockProps, { omit: ['langs'] })}
     />
   )
 }

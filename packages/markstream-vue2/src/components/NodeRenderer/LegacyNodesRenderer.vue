@@ -152,6 +152,9 @@ const customComponentsMap = computed(() => {
 })
 const indexPrefix = computed(() => (props.indexKey != null ? String(props.indexKey) : 'legacy-renderer'))
 const codeBlockExtraProps = computed(() => getCodeBlockExtraProps(props.codeBlockProps))
+const builtinCodeBlockExtraProps = computed(() =>
+  getCodeBlockExtraProps(props.codeBlockProps, { omit: ['langs'] }),
+)
 const codeBlockBindings = computed(() => ({
   stream: props.codeBlockStream,
   darkTheme: props.codeBlockDarkTheme,
@@ -160,7 +163,7 @@ const codeBlockBindings = computed(() => ({
   themes: props.themes,
   minWidth: props.codeBlockMinWidth,
   maxWidth: props.codeBlockMaxWidth,
-  ...codeBlockExtraProps.value,
+  ...builtinCodeBlockExtraProps.value,
 }))
 const customCodeBlockBindings = computed(() => ({
   ...codeBlockBindings.value,

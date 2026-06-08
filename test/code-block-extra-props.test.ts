@@ -26,4 +26,13 @@ describe('getCodeBlockExtraProps', () => {
     })
     expect(getterCalled).toBe(false)
   })
+
+  it.each(implementations)('%s omits caller-specified props', (_, getCodeBlockExtraProps) => {
+    expect(getCodeBlockExtraProps({
+      langs: ['typescript'],
+      showHeader: false,
+    }, { omit: ['langs'] })).toEqual({
+      showHeader: false,
+    })
+  })
 })

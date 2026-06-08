@@ -1861,6 +1861,9 @@ const nodeComponents = {
 }
 const indexPrefix = computed(() => (props.indexKey != null ? String(props.indexKey) : 'markdown-renderer'))
 const codeBlockExtraProps = computed(() => getCodeBlockExtraProps(props.codeBlockProps))
+const builtinCodeBlockExtraProps = computed(() =>
+  getCodeBlockExtraProps(props.codeBlockProps, { omit: ['langs'] }),
+)
 const codeBlockBindings = computed(() => ({
   // streaming behavior control for CodeBlockNode
   stream: props.codeBlockStream,
@@ -1871,7 +1874,7 @@ const codeBlockBindings = computed(() => ({
   minWidth: props.codeBlockMinWidth,
   maxWidth: props.codeBlockMaxWidth,
   ...(typeof props.showTooltips === 'boolean' ? { showTooltips: props.showTooltips } : {}),
-  ...codeBlockExtraProps.value,
+  ...builtinCodeBlockExtraProps.value,
 }))
 const customCodeBlockBindings = computed(() => ({
   ...codeBlockBindings.value,

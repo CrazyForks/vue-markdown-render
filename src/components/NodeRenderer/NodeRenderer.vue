@@ -5124,6 +5124,9 @@ const nodeComponents: Partial<CustomComponents> = {
 }
 const indexPrefix = computed(() => getCurrentIndexPrefix())
 const codeBlockExtraProps = computed(() => getCodeBlockExtraProps(props.codeBlockProps))
+const builtinCodeBlockExtraProps = computed(() =>
+  getCodeBlockExtraProps(props.codeBlockProps, { omit: ['langs'] }),
+)
 const codeBlockBindings = computed(() => ({
   // streaming behavior control for CodeBlockNode / MarkdownCodeBlockNode
   stream: rendererProps.codeBlockStream,
@@ -5135,7 +5138,7 @@ const codeBlockBindings = computed(() => ({
   minWidth: props.codeBlockMinWidth,
   maxWidth: props.codeBlockMaxWidth,
   ...(typeof resolvedShowTooltips.value === 'boolean' ? { showTooltips: resolvedShowTooltips.value } : {}),
-  ...codeBlockExtraProps.value,
+  ...builtinCodeBlockExtraProps.value,
 }))
 
 const customCodeBlockBindings = computed(() => ({

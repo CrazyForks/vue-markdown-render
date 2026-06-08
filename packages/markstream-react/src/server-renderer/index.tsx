@@ -331,7 +331,7 @@ function renderCodeBlock(
       minWidth={ctx.codeBlockThemes?.minWidth}
       maxWidth={ctx.codeBlockThemes?.maxWidth}
       isDark={ctx.isDark}
-      {...getCodeBlockExtraProps(ctx.codeBlockProps)}
+      {...getCodeBlockExtraProps(ctx.codeBlockProps, { omit: ['langs'] })}
     />
   )
 }

@@ -10,8 +10,16 @@ const RESERVED_CODE_BLOCK_EXTRA_PROPS = new Set([
   'constructor',
 ])
 
-export function getCodeBlockExtraProps(source: unknown) {
+export interface CodeBlockExtraPropsOptions {
+  omit?: readonly string[]
+}
+
+export function getCodeBlockExtraProps(
+  source: unknown,
+  options: CodeBlockExtraPropsOptions = {},
+) {
   const extraProps: Record<string, unknown> = {}
+  const omittedProps = new Set(options.omit ?? [])
 
   if (!source || typeof source !== 'object')
     return extraProps
@@ -19,7 +27,7 @@ export function getCodeBlockExtraProps(source: unknown) {
   const descriptors = Object.getOwnPropertyDescriptors(source)
 
   for (const [key, descriptor] of Object.entries(descriptors)) {
-    if (RESERVED_CODE_BLOCK_EXTRA_PROPS.has(key))
+    if (RESERVED_CODE_BLOCK_EXTRA_PROPS.has(key) || omittedProps.has(key))
       continue
 
     if (!('value' in descriptor))
