@@ -1457,6 +1457,41 @@ describe('markdown code block Shiki langs', () => {
     }
   })
 
+  it('clears Vue2 Shiki fallback when MutationObserver is unavailable but renderer wrote content', async () => {
+    const OriginalMutationObserver = globalThis.MutationObserver
+    ;(globalThis as any).MutationObserver = undefined
+
+    const { default: Vue2MarkdownCodeBlockNode } = await import('../packages/markstream-vue2/src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(Vue2MarkdownCodeBlockNode as any, {
+      props: {
+        loading: false,
+        node: makeNode('typescript', 'const value = 1'),
+        langs: ['typescript'],
+      },
+    })
+
+    try {
+      await flushAll()
+
+      await waitUntil(
+        () => {
+          const state = (wrapper.findComponent(Vue2MarkdownCodeBlockNode as any).vm as any).$.setupState
+          return state.rendererReady === true && state.fallbackHtml === '' && state.hasStableRender === true
+        },
+        () => {
+          const state = (wrapper.findComponent(Vue2MarkdownCodeBlockNode as any).vm as any).$.setupState
+          return `Vue2 fallback should be cleared after synchronous renderer content is written: ready=${state.rendererReady} fallback=${JSON.stringify(state.fallbackHtml)} stable=${state.hasStableRender} committed=${state.lastCommittedRenderSignature} render=${wrapper.find('.code-block-render').text()}`
+        },
+      )
+
+      expect(wrapper.text()).toContain('typescript:const value = 1')
+    }
+    finally {
+      wrapper.unmount()
+      ;(globalThis as any).MutationObserver = OriginalMutationObserver
+    }
+  })
+
   it('keeps Vue renderer reconfiguration when code updates during pending langs registration', async () => {
     const second = createDeferred()
     streamMarkdownMock.registerHighlight

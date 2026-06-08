@@ -309,7 +309,12 @@ function startRendererReadyObserver(epoch: number, previousVersion: number) {
   })
 }
 
-async function clearFallbackWhenRendererReady(epoch: number, previousVersion: number, renderSignature: string) {
+async function clearFallbackWhenRendererReady(
+  epoch: number,
+  previousVersion: number,
+  renderSignature: string,
+  previousRendererHtml?: string,
+) {
   pendingRenderSignature = renderSignature
 
   await nextTick()
@@ -317,11 +322,15 @@ async function clearFallbackWhenRendererReady(epoch: number, previousVersion: nu
     return
 
   const rendererHasContent = hasRendererContent()
+  const hasObservedMutation = rendererMutationVersion !== previousVersion
+  const hasDomSnapshotChange = previousRendererHtml !== undefined
+    && rendererTarget.value?.innerHTML !== previousRendererHtml
   if (
     rendererHasContent
     && (
       !lastCommittedRenderSignature
-      || rendererMutationVersion !== previousVersion
+      || hasObservedMutation
+      || hasDomSnapshotChange
       || lastCommittedRenderSignature === renderSignature
     )
   ) {
@@ -661,6 +670,7 @@ async function initRenderer(epoch: number) {
 
   renderFallback(props.node.code)
   const previousMutationVersion = rendererMutationVersion
+  const previousRendererHtml = rendererTarget.value?.innerHTML
   startRendererReadyObserver(epoch, previousMutationVersion)
   const renderedLang = await updateRendererWithFallback(props.node.code, props.node.language, epoch)
   if (!isCurrentRenderEpoch(epoch))
@@ -670,6 +680,7 @@ async function initRenderer(epoch: number) {
       epoch,
       previousMutationVersion,
       getRenderSignature(nextRendererConfigKey, renderedLang, props.node.code),
+      previousRendererHtml,
     )
   }
   else {
@@ -777,6 +788,7 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
 
   renderFallback(code)
   const previousMutationVersion = rendererMutationVersion
+  const previousRendererHtml = rendererTarget.value?.innerHTML
   startRendererReadyObserver(epoch, previousMutationVersion)
   const renderedLang = await updateRendererWithFallback(code, lang, epoch)
   if (!isCurrentRenderEpoch(epoch))
@@ -786,6 +798,7 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
       epoch,
       previousMutationVersion,
       getRenderSignature(rendererConfigKey ?? highlightRegistrationKey.value, renderedLang, code),
+      previousRendererHtml,
     )
   }
   else {

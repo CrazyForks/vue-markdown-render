@@ -344,6 +344,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
     seq: number,
     previousVersion: number,
     renderSignature: string,
+    previousRendererHtml?: string,
   ) => {
     pendingRenderSignatureRef.current = renderSignature
 
@@ -352,11 +353,15 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
       return
 
     const rendererHasContent = hasRendererContent()
+    const hasObservedMutation = rendererMutationVersionRef.current !== previousVersion
+    const hasDomSnapshotChange = previousRendererHtml !== undefined
+      && rendererTargetRef.current?.innerHTML !== previousRendererHtml
     if (
       rendererHasContent
       && (
         !lastCommittedRenderSignatureRef.current
-        || rendererMutationVersionRef.current !== previousVersion
+        || hasObservedMutation
+        || hasDomSnapshotChange
         || lastCommittedRenderSignatureRef.current === renderSignature
       )
     ) {
@@ -622,6 +627,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
 
     renderFallback(code)
     const previousMutationVersion = rendererMutationVersionRef.current
+    const previousRendererHtml = rendererTargetRef.current?.innerHTML
     startRendererReadyObserver(seq, previousMutationVersion)
     const renderedLang = await updateRendererWithFallback(code, rawLang, seq)
     if (!isCurrentRenderSeq(seq))
@@ -631,6 +637,7 @@ export function MarkdownCodeBlockNode(rawProps: MarkdownCodeBlockNodeProps) {
         seq,
         previousMutationVersion,
         getRenderSignature(key, renderedLang, code),
+        previousRendererHtml,
       )
     }
     else {
