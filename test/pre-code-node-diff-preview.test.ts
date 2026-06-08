@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
@@ -30,6 +32,22 @@ describe('pre code node diff preview', () => {
     }
 
     wrapper.unmount()
+  })
+
+  it('uses content width for inline diff fallback when wrap is disabled', () => {
+    const source = readFileSync(
+      'src/components/PreCodeNode/PreCodeNode.vue',
+      'utf8',
+    )
+
+    expect(source).toContain('pre.markstream-pre--diff-preview.markstream-pre--diff-inline:not(.is-wrap) > .markstream-pre__diff-code')
+    expect(source).toContain('grid-template-columns: max-content;')
+    expect(source).toContain('width: max-content;')
+    expect(source).toContain('white-space: inherit;')
+    expect(source).toContain('overflow-wrap: normal;')
+    expect(source).toContain('pre.markstream-pre--diff-preview.is-wrap')
+    expect(source).toContain('white-space: pre-wrap;')
+    expect(source).toContain('overflow-wrap: anywhere;')
   })
 
   it('renders diff lines with index in v-for (row-height sync template wiring)', () => {
@@ -196,6 +214,74 @@ describe('pre code node diff preview', () => {
     ])
     expect(wrapper.findAll('.markstream-pre__diff-line--removed')).toHaveLength(1)
     expect(wrapper.findAll('.markstream-pre__diff-line--added')).toHaveLength(1)
+
+    wrapper.unmount()
+  })
+
+  it('keeps unchanged source rows neutral in inline source diff fallback', () => {
+    const originalCode = [
+      'export const name = "@archships/dim-agent-sdk"',
+      'export {',
+      '  createAgent,',
+      '} from "./agent"',
+      'export {',
+      '  createSessionForAgent,',
+      '  loadSessionForAgent,',
+      '} from "./session"',
+      'export {',
+      '  createRunEngine,',
+      '} from "./run-engine"',
+    ].join('\n')
+    const updatedCode = [
+      'export const name = "@archships/dim-agent-sdk"',
+      '// Core SDK entry points.',
+      'export {',
+      '  createAgent,',
+      '} from "./agent"',
+      '// Session lifecycle.',
+      'export {',
+      '  createSessionForAgent,',
+      '  loadSessionForAgent,',
+      '} from "./session"',
+      '// Run engine.',
+      'export {',
+      '  createRunEngine,',
+      '} from "./run-engine"',
+    ].join('\n')
+    const wrapper = mount(PreCodeNode, {
+      props: {
+        showLineNumbers: true,
+        diffInline: true,
+        node: {
+          type: 'code_block',
+          language: 'ts',
+          diff: true,
+          originalCode,
+          updatedCode,
+          code: updatedCode,
+          raw: '',
+        },
+      },
+    })
+
+    expect(wrapper.findAll('.markstream-pre__diff-line--removed')).toHaveLength(0)
+    expect(wrapper.findAll('.markstream-pre__diff-line--added')).toHaveLength(3)
+    expect(wrapper.findAll('.markstream-pre__diff-content-inner').map(node => node.element.textContent)).toEqual([
+      'export const name = "@archships/dim-agent-sdk"',
+      '// Core SDK entry points.',
+      'export {',
+      '  createAgent,',
+      '} from "./agent"',
+      '// Session lifecycle.',
+      'export {',
+      '  createSessionForAgent,',
+      '  loadSessionForAgent,',
+      '} from "./session"',
+      '// Run engine.',
+      'export {',
+      '  createRunEngine,',
+      '} from "./run-engine"',
+    ])
 
     wrapper.unmount()
   })

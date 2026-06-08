@@ -48,6 +48,11 @@ interface DiffPreviewLine {
   number: number | string
 }
 
+interface SourceLineMatch {
+  originalIndex: number
+  modifiedIndex: number
+}
+
 function isBlankDiffPreviewLine(code: string) {
   return String(code ?? '').trim().length === 0
 }
@@ -79,6 +84,51 @@ function isAddedDiffLine(line: string) {
 
 function hasPatchLines(lines: string[]) {
   return lines.some(line => isRemovedDiffLine(line) || isAddedDiffLine(line))
+}
+
+function computeSourceLineMatches(original: string[], modified: string[]): SourceLineMatch[] | null {
+  const n = original.length
+  const m = modified.length
+  const maxCells = 1_500_000
+  if ((n + 1) * (m + 1) > maxCells)
+    return null
+
+  const cols = m + 1
+  const dp = new Uint32Array((n + 1) * (m + 1))
+  for (let i = 1; i <= n; i++) {
+    for (let j = 1; j <= m; j++) {
+      const index = i * cols + j
+      if (original[i - 1] === modified[j - 1]) {
+        dp[index] = dp[(i - 1) * cols + (j - 1)] + 1
+      }
+      else {
+        const top = dp[(i - 1) * cols + j]
+        const left = dp[i * cols + (j - 1)]
+        dp[index] = top >= left ? top : left
+      }
+    }
+  }
+
+  const matches: SourceLineMatch[] = []
+  let i = n
+  let j = m
+  while (i > 0 && j > 0) {
+    if (original[i - 1] === modified[j - 1]) {
+      matches.push({ originalIndex: i - 1, modifiedIndex: j - 1 })
+      i--
+      j--
+    }
+    else {
+      const top = dp[(i - 1) * cols + j]
+      const left = dp[i * cols + (j - 1)]
+      if (top >= left)
+        i--
+      else
+        j--
+    }
+  }
+  matches.reverse()
+  return matches
 }
 
 function buildInlinePatchPreviewLines(lines: string[]): DiffPreviewLine[] {
@@ -126,6 +176,58 @@ function buildInlinePatchPreviewLines(lines: string[]): DiffPreviewLine[] {
 function buildInlineSourcePreviewLines(originalSource: unknown, modifiedSource: unknown): DiffPreviewLine[] {
   const original = splitDiffSource(originalSource)
   const modified = splitDiffSource(modifiedSource)
+  const matches = computeSourceLineMatches(original, modified)
+  if (matches) {
+    const result: DiffPreviewLine[] = []
+    let originalIndex = 0
+    let modifiedIndex = 0
+
+    for (const match of matches) {
+      while (originalIndex < match.originalIndex) {
+        result.push({
+          ...toDiffPreviewLine(original[originalIndex], 'removed'),
+          key: `inline-removed-source-${originalIndex}`,
+          number: originalIndex + 1,
+        })
+        originalIndex++
+      }
+      while (modifiedIndex < match.modifiedIndex) {
+        result.push({
+          ...toDiffPreviewLine(modified[modifiedIndex], 'added'),
+          key: `inline-added-source-${modifiedIndex}`,
+          number: modifiedIndex + 1,
+        })
+        modifiedIndex++
+      }
+      result.push({
+        ...toDiffPreviewLine(modified[match.modifiedIndex]),
+        key: `inline-context-source-${match.originalIndex}-${match.modifiedIndex}`,
+        number: match.modifiedIndex + 1,
+      })
+      originalIndex = match.originalIndex + 1
+      modifiedIndex = match.modifiedIndex + 1
+    }
+
+    while (originalIndex < original.length) {
+      result.push({
+        ...toDiffPreviewLine(original[originalIndex], 'removed'),
+        key: `inline-removed-source-${originalIndex}`,
+        number: originalIndex + 1,
+      })
+      originalIndex++
+    }
+    while (modifiedIndex < modified.length) {
+      result.push({
+        ...toDiffPreviewLine(modified[modifiedIndex], 'added'),
+        key: `inline-added-source-${modifiedIndex}`,
+        number: modifiedIndex + 1,
+      })
+      modifiedIndex++
+    }
+
+    return result
+  }
+
   const result: DiffPreviewLine[] = []
   let start = 0
   let originalEnd = original.length - 1
@@ -508,6 +610,11 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
   --markstream-pre-diff-line-number-align: var(--markstream-diff-line-number-align, right);
 }
 
+.markstream-vue pre.markstream-pre--diff-preview.is-wrap {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .markstream-vue pre.markstream-pre--diff-preview > .markstream-pre__diff-code {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -521,9 +628,19 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.markstream-vue pre.markstream-pre--diff-preview.markstream-pre--diff-inline:not(.is-wrap) > .markstream-pre__diff-code {
+  grid-template-columns: max-content;
+  width: max-content;
+}
+
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-pane {
   min-width: 0;
   overflow: hidden;
+}
+
+.markstream-vue pre.markstream-pre--diff-preview.markstream-pre--diff-inline:not(.is-wrap) .markstream-pre__diff-pane {
+  min-width: max-content;
+  overflow: visible;
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-pane--modified {
@@ -603,12 +720,17 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
   position: relative;
   z-index: 1;
   display: block;
-  min-width: 0;
+  min-width: max-content;
   line-height: var(--markstream-pre-diff-line-height, 18px);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  white-space: inherit;
+  overflow-wrap: normal;
   word-break: normal;
   line-break: auto;
+}
+
+.markstream-vue pre.markstream-pre--diff-preview.is-wrap .markstream-pre__diff-content {
+  min-width: 0;
+  overflow-wrap: inherit;
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-content-inner {
