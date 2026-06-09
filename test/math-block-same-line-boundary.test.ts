@@ -2093,4 +2093,136 @@ E=mc^2`, { __markstreamFinal: false }) as any[]
     expect(stableSerialized).toContain('x + y = z')
     expect(stableSerialized).toContain('appears later as ordinary text')
   })
+
+  it('does not let tolerant $ close on a heading boundary that contains $', () => {
+    const md = getMarkdown('math-boundary-dollar-no-close-on-heading-boundary')
+
+    const content = [
+      'Text before malformed candidate $',
+      'x + y = z',
+      '## Section $ should not close previous display math',
+      'after $z$ remains inline.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('Text before malformed candidate')
+    expect(serialized).toContain('x + y = z')
+    expect(serialized).toContain('Section')
+    expect(serialized).toContain('should not close previous display math')
+    expect(serialized).toContain('after')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('z')
+  })
+
+  it('keeps streaming stable when tolerant $ candidate reaches a heading boundary containing $', () => {
+    const md = getMarkdown('stream-math-boundary-dollar-no-close-on-heading-boundary')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      'Text before malformed candidate $',
+      'x + y = z',
+      '## Section $ should not close previous display math',
+      'after $z$ remains inline.',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+
+    for (let index = 0; index < 8; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(stableSerialized).toContain('Text before malformed candidate')
+    expect(stableSerialized).toContain('x + y = z')
+    expect(stableSerialized).toContain('Section')
+    expect(stableSerialized).toContain('should not close previous display math')
+    expect(stableSerialized).toContain('after')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('z')
+  })
+
+  it('does not let tolerant explicit \\[ close on a list boundary that contains \\]', () => {
+    const md = getMarkdown('math-boundary-bracket-no-close-on-list-boundary')
+
+    const content = [
+      'Text before malformed candidate \\[',
+      'x + y = z',
+      '- list item \\] should not close previous display math',
+      'after $z$ remains inline.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('Text before malformed candidate')
+    expect(serialized).toContain('x + y = z')
+    expect(serialized).toContain('list item')
+    expect(serialized).toContain('should not close previous display math')
+    expect(serialized).toContain('after')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('z')
+  })
+
+  it('keeps streaming stable when tolerant explicit \\[ candidate reaches a list boundary containing \\]', () => {
+    const md = getMarkdown('stream-math-boundary-bracket-no-close-on-list-boundary')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      'Text before malformed candidate \\[',
+      'x + y = z',
+      '- list item \\] should not close previous display math',
+      'after $z$ remains inline.',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+
+    for (let index = 0; index < 8; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(stableSerialized).toContain('Text before malformed candidate')
+    expect(stableSerialized).toContain('x + y = z')
+    expect(stableSerialized).toContain('list item')
+    expect(stableSerialized).toContain('should not close previous display math')
+    expect(stableSerialized).toContain('after')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('z')
+  })
 })

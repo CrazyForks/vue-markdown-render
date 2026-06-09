@@ -1452,6 +1452,13 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         : lineText === openDelim ? '' : lineText.slice(openDelim.length)
     const fallbackPlainBracketClose = !strict && openDelim === '\\[' ? ']' : ''
 
+    const firstLineNumber = skipFirstLine ? startLine + 1 : startLine
+    if (
+      tolerantBoundary
+      && shouldAbortTolerantBoundaryScan(firstLineContent, startLine, firstLineNumber, '')
+    )
+      return false
+
     const firstLineCloseIndex = findUnescapedDelimiter(firstLineContent, closeDelim)
 
     if (firstLineCloseIndex !== -1) {
@@ -1471,6 +1478,14 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         const lineEnd = s.eMarks[nextLine]
         const currentLine = s.src.slice(lineStart, lineEnd)
         const currentLineTrimmed = currentLine.trim()
+
+        if (
+          tolerantBoundary
+          && shouldAbortTolerantBoundaryScan(currentLine, startLine, nextLine, content)
+        ) {
+          return false
+        }
+
         const escapedPlainBracketCloseInLine = !strict && openDelim === '[' ? findUnescapedDelimiter(currentLine, '\\]') : -1
         const closeIndexInLine = findUnescapedDelimiter(currentLine, closeDelim)
         const fallbackPlainBracketCloseInLine = fallbackPlainBracketClose
@@ -1520,13 +1535,6 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           trailingAfterClose = currentLine.slice(endIndex + closeDelim.length)
           trailingAfterCloseLine = nextLine
           break
-        }
-
-        if (
-          tolerantBoundary
-          && shouldAbortTolerantBoundaryScan(currentLine, startLine, nextLine, content)
-        ) {
-          return false
         }
 
         content += (content ? '\n' : '') + currentLine
