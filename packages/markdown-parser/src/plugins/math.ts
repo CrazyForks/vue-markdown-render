@@ -1360,12 +1360,12 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     if ((!allowLoading || strict) && !found)
       return false
     // 追加检测内容是否是 math
-    // For explicit $ delimiters, skip the isMathLike check since $ is already
+    // For explicit $$ delimiters, skip the isMathLike check since $$ is already
     // a clear math marker. This allows spaced subscript formats like "f _ { x }"
     // to be correctly recognized as math.
     // However, if the content starts with markdown special syntax like ![, skip.
     const hasMarkdownPrefix = /^\s*!\[/.test(content)
-    const looksMath = openDelim === '$' ? !hasMarkdownPrefix : (openDelim === '[' ? isPlainBracketMathLike(content) : isMathLike(content))
+    const looksMath = openDelim === '$$' ? !hasMarkdownPrefix : (openDelim === '[' ? isPlainBracketMathLike(content) : isMathLike(content))
     if (!looksMath)
       return false
 
@@ -1375,7 +1375,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     const token = s.push('math_block', 'math', 0)
     token.content = normalizeStandaloneBackslashT(content)
     token.markup
-      = openDelim === '$' ? '$' : openDelim === '[' ? '[]' : '\\[\\]'
+      = openDelim === '$$' ? '$$' : openDelim === '[' ? '[]' : '\\[\\]'
     token.raw = `${openDelim}${content}${content.startsWith('\n') ? '\n' : ''}${closeDelim}`
     token.map = [startLine, nextLine + 1]
     token.block = true

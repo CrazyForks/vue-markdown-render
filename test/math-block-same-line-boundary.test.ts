@@ -2,22 +2,28 @@ import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 import { describe, expect, it } from 'vitest'
 
 describe('math block same-line boundary regression', () => {
-  function collectByType(nodes: any, type: string, out: any[] = []) {
+  function collectByType(nodes: any, type: string, out: any[] = [], seen = new WeakSet<object>()) {
     if (!nodes)
       return out
 
     if (Array.isArray(nodes)) {
       for (const node of nodes)
-        collectByType(node, type, out)
+        collectByType(node, type, out, seen)
       return out
     }
 
     if (typeof nodes === 'object') {
+      if (seen.has(nodes))
+        return out
+      seen.add(nodes)
+
       if (nodes.type === type)
         out.push(nodes)
 
-      if (nodes.children)
-        collectByType(nodes.children, type, out)
+      // Walk all object fields, not only `children`.
+      // List nodes store descendants under `items`, tables under rows/cells, etc.
+      for (const value of Object.values(nodes))
+        collectByType(value, type, out, seen)
     }
 
     return out
@@ -35,6 +41,7 @@ $$ where $\\epsilon$ denotes the target accuracy, $n$ is the number of nodes, an
     const mathBlocks = collectByType(nodes, 'math_block')
     expect(mathBlocks).toHaveLength(1)
     expect(mathBlocks[0].content).toContain('widetilde')
+    expect(mathBlocks[0].markup).toBe('$$')
     expect(mathBlocks[0].content).toContain('frac')
 
     const serialized = JSON.stringify(nodes)
@@ -462,5 +469,131 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     expect(inlineContent).toContain('$a$')
     expect(inlineContent).toContain('where')
     expect(inlineContent).toContain('$x$')
+  })
+
+  it('keeps $$ math_block markup and accepts explicit display content with weak heuristic signals', () => {
+    const md = getMarkdown('math-block-dollar-markup-weak-heuristic')
+
+    const content = `Before.
+$$
+f _ { x }
+$$ after $x$ follows.`
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true })
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].markup).toBe('$$')
+    expect(mathBlocks[0].content).toContain('f _ { x }')
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('Before')
+    expect(serialized).toContain('after')
+    expect(serialized).toContain('follows')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('x')
+  })
+
+  it('keeps $$ markup when callers use markdown-it parse directly with weak heuristic display content', () => {
+    const md = getMarkdown('direct-md-parse-dollar-markup-weak-heuristic')
+
+    const tokens = md.parse(`$$
+f _ { x }
+$$`, { __markstreamFinal: true }) as any[]
+
+    const mathBlocks = tokens.filter(token => token.type === 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].markup).toBe('$$')
+    expect(mathBlocks[0].content).toContain('f _ { x }')
+  })
+
+  it('does not hoist tolerant math blocks out of list items', () => {
+    const md = getMarkdown('math-block-boundary-list-item')
+
+    const content = `- Before $a$ $$
+  E=mc^2
+  $$ where $x$ follows.`
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0]?.type).toBe('list')
+    expect(nodes[0]?.items).toHaveLength(1)
+
+    const itemChildren = nodes[0].items[0].children.map((node: any) => node.type)
+    expect(itemChildren).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].markup).toBe('$$')
+    expect(mathBlocks[0].content).toContain('E=mc^2')
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('Before')
+    expect(serialized).toContain('where')
+    expect(serialized).toContain('follows')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    const inlineContent = inlineMath.map((node: any) => node.content).join('\n')
+    expect(inlineContent).toContain('a')
+    expect(inlineContent).toContain('x')
+  })
+
+  it('does not split table rows that end with $$ into display math blocks', () => {
+    const md = getMarkdown('math-block-boundary-table-row-guard')
+
+    const content = [
+      '| value |',
+      '| --- |',
+      '| literal $$ |',
+      '| next |',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true })
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(collectByType(nodes, 'table')).toHaveLength(1)
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('literal $$')
+    expect(serialized).toContain('next')
+  })
+
+  it('does not carry normalized stream state into later non-normalized parses', () => {
+    const md = getMarkdown('stream-math-boundary-normalized-to-normal-transition')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const normalizedSource = `Before $a$ and display $$
+E=mc^2
+$$ where $x$ follows.`
+
+    const normalizedNodes = parseMarkdownToStructure(normalizedSource, md, {
+      final: false,
+      streamParse: true,
+    })
+
+    expect(collectByType(normalizedNodes, 'math_block')).toHaveLength(1)
+
+    const plainNodes = parseMarkdownToStructure('Plain $y$ text.', md, {
+      final: false,
+      streamParse: true,
+    })
+
+    expect(collectByType(plainNodes, 'math_block')).toHaveLength(0)
+
+    const serialized = JSON.stringify(plainNodes)
+    expect(serialized).toContain('Plain')
+    expect(serialized).toContain('text')
+    expect(serialized).not.toContain('E=mc^2')
+    expect(serialized).not.toContain('where')
+
+    const inlineMath = collectByType(plainNodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('y')
   })
 })

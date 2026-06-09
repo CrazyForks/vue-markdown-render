@@ -2341,6 +2341,24 @@ function normalizeMathBlockSameLineBoundaries(markdown: string) {
     return spaces >= 4
   }
 
+  const isUnsafeTolerantOpenContextLine = (line: string) => {
+    const trimmed = line.replace(/^[\t ]+/, '')
+    if (!trimmed)
+      return false
+
+    // Do not pre-normalize lines where the prefix is a structural Markdown
+    // marker. Splitting these lines before markdown-it sees them can hoist the
+    // following math block out of its original container, or split a table row.
+    //
+    // Examples that must be left to markdown-it + the math block rule:
+    //   - list item $$
+    //   1. list item $$
+    //   # heading $$
+    //   | table cell $$ |
+    //   ::: container $$
+    return /^(?:#{1,6}[\t ]+|(?:[*+-]|\d{1,9}[.)])[\t ]+|\||:{3,})/.test(trimmed)
+  }
+
   const parseFenceMarker = (line: string) => {
     let i = 0
     while (i < line.length && isIndentWs(line[i]))
@@ -2485,7 +2503,9 @@ function normalizeMathBlockSameLineBoundaries(markdown: string) {
       continue
     }
 
-    const tolerantOpen = findTolerantOpenAtLineEnd(contentLine)
+    const tolerantOpen = isUnsafeTolerantOpenContextLine(contentLine)
+      ? null
+      : findTolerantOpenAtLineEnd(contentLine)
     if (tolerantOpen) {
       activeMathClose = tolerantOpen.close
       out = appendLines(out, [tolerantOpen.before, tolerantOpen.open], newline, prefix)
