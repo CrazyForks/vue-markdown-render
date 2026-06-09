@@ -1500,4 +1500,55 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     expect(mathBlocks).toHaveLength(1)
     expect(mathBlocks[0].content).toContain('E=mc^2')
   })
+
+  it('does not dedupe a real suffix paragraph that equals the next tolerant prefix during streaming', () => {
+    const md = getMarkdown('stream-math-boundary-suffix-prefix-same-content')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      'First display $$',
+      'a = 1',
+      '$$ repeat',
+      'repeat $$',
+      'b = 2',
+      '$$ done $x$.',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+    for (let index = 0; index < 8; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const repeatParagraphs = nodes.filter((node: any) => node.type === 'paragraph' && node.raw === 'repeat')
+    expect(repeatParagraphs).toHaveLength(2)
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(2)
+    expect(mathBlocks[0].content).toContain('a = 1')
+    expect(mathBlocks[1].content).toContain('b = 2')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('x')
+  })
 })

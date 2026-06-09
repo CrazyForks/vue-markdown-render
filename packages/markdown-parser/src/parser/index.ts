@@ -638,10 +638,16 @@ function findLastClosingTagStart(raw: string, tag: string) {
 }
 
 const SYNTHETIC_MATH_BOUNDARY_PARAGRAPH_META = '__markstreamSyntheticMathBoundaryParagraph'
+const SYNTHETIC_MATH_BOUNDARY_PARAGRAPH_ROLE_META = '__markstreamSyntheticMathBoundaryRole'
 
 function hasTokenMetaFlag(token: MarkdownToken | undefined, key: string) {
   const meta = token?.meta
   return !!(meta && typeof meta === 'object' && (meta as Record<string, unknown>)[key] === true)
+}
+
+function hasTokenMetaValue(token: MarkdownToken | undefined, key: string, value: string) {
+  const meta = token?.meta
+  return !!(meta && typeof meta === 'object' && (meta as Record<string, unknown>)[key] === value)
 }
 
 function isParagraphTokenTriplet(tokens: MarkdownToken[], index: number) {
@@ -650,12 +656,22 @@ function isParagraphTokenTriplet(tokens: MarkdownToken[], index: number) {
     && tokens[index + 2]?.type === 'paragraph_close'
 }
 
-function isSyntheticMathBoundaryParagraphTriplet(tokens: MarkdownToken[], index: number) {
+function isSyntheticMathBoundaryParagraphTriplet(
+  tokens: MarkdownToken[],
+  index: number,
+  role?: 'prefix' | 'suffix',
+) {
+  const hasSyntheticMeta = (token: MarkdownToken | undefined) => {
+    if (!hasTokenMetaFlag(token, SYNTHETIC_MATH_BOUNDARY_PARAGRAPH_META))
+      return false
+    return role ? hasTokenMetaValue(token, SYNTHETIC_MATH_BOUNDARY_PARAGRAPH_ROLE_META, role) : true
+  }
+
   return isParagraphTokenTriplet(tokens, index)
     && (
-      hasTokenMetaFlag(tokens[index], SYNTHETIC_MATH_BOUNDARY_PARAGRAPH_META)
-      || hasTokenMetaFlag(tokens[index + 1], SYNTHETIC_MATH_BOUNDARY_PARAGRAPH_META)
-      || hasTokenMetaFlag(tokens[index + 2], SYNTHETIC_MATH_BOUNDARY_PARAGRAPH_META)
+      hasSyntheticMeta(tokens[index])
+      || hasSyntheticMeta(tokens[index + 1])
+      || hasSyntheticMeta(tokens[index + 2])
     )
 }
 
@@ -679,8 +695,8 @@ function removeStaleStreamingSyntheticMathBoundaryPrefixParagraphs(tokens: Markd
     // math boundary paragraphs with identical content, followed by a math_block.
     // The first one is a stale duplicate from the stream cache.
     if (
-      isSyntheticMathBoundaryParagraphTriplet(tokens, index)
-      && isSyntheticMathBoundaryParagraphTriplet(tokens, index + 3)
+      isSyntheticMathBoundaryParagraphTriplet(tokens, index, 'prefix')
+      && isSyntheticMathBoundaryParagraphTriplet(tokens, index + 3, 'prefix')
       && mathBlock?.type === 'math_block'
     ) {
       const staleContent = normalizeBoundaryParagraphContent(staleInline?.content)
