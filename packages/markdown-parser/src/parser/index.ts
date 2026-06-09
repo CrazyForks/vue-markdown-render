@@ -2156,6 +2156,67 @@ function normalizeMathBlockSameLineBoundaries(markdown: string) {
 
   const isIndentWs = (ch: string) => ch === ' ' || ch === '\t'
 
+  type Range = [number, number]
+
+  const buildCodeSpanRanges = (src: string): Range[] => {
+    const ranges: Range[] = []
+    let index = 0
+
+    while (index < src.length) {
+      if (src[index] !== '`') {
+        index++
+        continue
+      }
+
+      const openStart = index
+      let openLen = 1
+      while (openStart + openLen < src.length && src[openStart + openLen] === '`')
+        openLen++
+
+      let cursor = openStart + openLen
+      let closeStart = -1
+
+      while (cursor < src.length) {
+        if (src[cursor] !== '`') {
+          cursor++
+          continue
+        }
+
+        const runStart = cursor
+        let runLen = 1
+        while (runStart + runLen < src.length && src[runStart + runLen] === '`')
+          runLen++
+
+        if (runLen === openLen) {
+          closeStart = runStart
+          break
+        }
+
+        cursor = runStart + runLen
+      }
+
+      if (closeStart === -1) {
+        // Streaming mid-state: an unfinished code span should protect the rest
+        // of the line from display-math boundary normalization.
+        ranges.push([openStart, src.length])
+        break
+      }
+
+      ranges.push([openStart, closeStart + openLen])
+      index = closeStart + openLen
+    }
+
+    return ranges
+  }
+
+  const findRangeAt = (ranges: Range[], index: number): Range | null => {
+    for (const range of ranges) {
+      if (index >= range[0] && index < range[1])
+        return range
+    }
+    return null
+  }
+
   const isEscapedAtIndex = (src: string, index: number) => {
     let cursor = index - 1
     let slashCount = 0
@@ -2168,7 +2229,12 @@ function normalizeMathBlockSameLineBoundaries(markdown: string) {
     return slashCount % 2 === 1
   }
 
-  const findUnescapedDelimiter = (src: string, delimiter: string, startIndex = 0) => {
+  const findUnescapedDelimiter = (
+    src: string,
+    delimiter: string,
+    startIndex = 0,
+    excludedRanges: Range[] = [],
+  ) => {
     let searchIndex = Math.max(0, startIndex)
 
     while (searchIndex < src.length) {
@@ -2176,13 +2242,56 @@ function normalizeMathBlockSameLineBoundaries(markdown: string) {
       if (index === -1)
         return -1
 
+      const excludedRange = findRangeAt(excludedRanges, index)
+      if (excludedRange) {
+        searchIndex = Math.max(index + delimiter.length, excludedRange[1])
+        continue
+      }
+
       if (!isEscapedAtIndex(src, index))
         return index
 
-      searchIndex = index + Math.max(1, delimiter.length)
+      searchIndex = index + delimiter.length
     }
 
     return -1
+  }
+
+  const countUnescapedDelimiter = (
+    src: string,
+    delimiter: string,
+    startIndex: number,
+    endIndex: number,
+    excludedRanges: Range[] = [],
+  ) => {
+    let count = 0
+    let cursor = Math.max(0, startIndex)
+    const end = Math.min(src.length, Math.max(0, endIndex))
+
+    while (cursor < end) {
+      const index = findUnescapedDelimiter(src, delimiter, cursor, excludedRanges)
+      if (index === -1 || index >= end)
+        break
+
+      count++
+      cursor = index + delimiter.length
+    }
+
+    return count
+  }
+
+  const hasUnmatchedDisplayOpenBefore = (
+    src: string,
+    delimiter: DisplayDelimiter,
+    endIndex: number,
+    excludedRanges: Range[],
+  ) => {
+    if (delimiter.open === '$$')
+      return countUnescapedDelimiter(src, '$$', 0, endIndex, excludedRanges) % 2 === 1
+
+    const openCount = countUnescapedDelimiter(src, delimiter.open, 0, endIndex, excludedRanges)
+    const closeCount = countUnescapedDelimiter(src, delimiter.close, 0, endIndex, excludedRanges)
+    return openCount > closeCount
   }
 
   const parseBlockquotePrefix = (line: string) => {
@@ -2283,12 +2392,15 @@ function normalizeMathBlockSameLineBoundaries(markdown: string) {
 
   const findTolerantOpenAtLineEnd = (line: string) => {
     const trimmedRight = line.replace(/[\t ]+$/, '')
+    const codeSpanRanges = buildCodeSpanRanges(trimmedRight)
 
     for (const delimiter of displayDelimiters) {
       const openIndex = trimmedRight.length - delimiter.open.length
       if (openIndex < 0 || !trimmedRight.startsWith(delimiter.open, openIndex))
         continue
       if (isEscapedAtIndex(trimmedRight, openIndex))
+        continue
+      if (findRangeAt(codeSpanRanges, openIndex))
         continue
 
       const before = trimmedRight.slice(0, openIndex)
@@ -2298,7 +2410,7 @@ function normalizeMathBlockSameLineBoundaries(markdown: string) {
       // Avoid rewriting normal same-line inline/display pairs such as
       // "text $x$"; this normalization is only for malformed block openers
       // emitted at the end of a paragraph line.
-      if (findUnescapedDelimiter(before, delimiter.open) !== -1)
+      if (hasUnmatchedDisplayOpenBefore(trimmedRight, delimiter, openIndex, codeSpanRanges))
         continue
 
       return {

@@ -311,4 +311,156 @@ x + y = z
 
     expect(collectByType(nodes, 'math_block')).toHaveLength(0)
   })
+
+  it('normalizes a final tolerant $$ opener after an earlier balanced same-line $$ pair', () => {
+    const md = getMarkdown('math-block-boundary-balanced-prior-display-pair')
+
+    const content = `Intro $$a+b$$ then display $$
+E=mc^2
+$$ after $x$ follows.`
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true })
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].content).toContain('E=mc^2')
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('Intro')
+    expect(serialized).toContain('then display')
+    expect(serialized).toContain('after')
+    expect(serialized).toContain('follows')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    const inlineContent = inlineMath.map((node: any) => node.content).join('\n')
+    expect(inlineContent).toContain('a+b')
+    expect(inlineContent).toContain('x')
+  })
+
+  it('does not normalize a same-line $$ pair close as a tolerant block opener', () => {
+    const md = getMarkdown('math-block-boundary-same-line-display-pair-close')
+
+    const content = 'Inline display-like math $$a+b$$ stays in one paragraph.'
+    const nodes = parseMarkdownToStructure(content, md, { final: true })
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('a+b')
+    expect(JSON.stringify(nodes)).toContain('stays in one paragraph')
+  })
+
+  it('does not rewrite unfinished inline code spans ending with $$ during streaming', () => {
+    const md = getMarkdown('stream-math-boundary-unclosed-inline-code-dollar')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = Array.from({ length: 80 }, (_, index) => `line ${index} \`unfinished code $$`).join('\n')
+
+    let stableSerialized = ''
+    let nodes: any[] = []
+
+    for (let index = 0; index < 8; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(stableSerialized).toContain('unfinished code')
+  })
+
+  it('does not rewrite unfinished inline code spans ending with \\[ during streaming', () => {
+    const md = getMarkdown('stream-math-boundary-unclosed-inline-code-bracket')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = Array.from({ length: 80 }, (_, index) => `line ${index} \`unfinished code \\\\[`).join('\n')
+
+    let stableSerialized = ''
+    let nodes: any[] = []
+
+    for (let index = 0; index < 8; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(stableSerialized).toContain('unfinished code')
+  })
+
+  it('keeps streaming and final node order equivalent for tolerant $$ boundaries', () => {
+    const streamingMd = getMarkdown('stream-final-equivalence-math-boundary-stream')
+    const finalMd = getMarkdown('stream-final-equivalence-math-boundary-final')
+    ;(streamingMd as any).stream.reset()
+    ;(streamingMd as any).stream.resetStats()
+
+    const chunks = [
+      'Before $a$ and display $',
+      '$\nE=mc^2',
+      '\n$$ where $x$ follows.',
+    ]
+
+    let source = ''
+    let streamingNodes: any[] = []
+
+    for (const chunk of chunks) {
+      source += chunk
+      streamingNodes = parseMarkdownToStructure(source, streamingMd, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+    }
+
+    const finalNodes = parseMarkdownToStructure(source, finalMd, {
+      final: true,
+      streamParse: true,
+    }) as any[]
+
+    expect(streamingNodes.map(node => node.type)).toEqual(finalNodes.map(node => node.type))
+    expect(streamingNodes.map(node => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
+    expect(collectByType(streamingNodes, 'math_block')).toHaveLength(1)
+    expect(collectByType(finalNodes, 'math_block')).toHaveLength(1)
+  })
+
+  it('preserves math boundary text when callers use markdown-it parse directly', () => {
+    const md = getMarkdown('direct-md-parse-math-boundary')
+
+    const tokens = md.parse(`Before $a$ and display $$
+E=mc^2
+$$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
+
+    const mathBlocks = tokens.filter(token => token.type === 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].content).toContain('E=mc^2')
+
+    const inlineContent = tokens
+      .filter(token => token.type === 'inline')
+      .map(token => token.content)
+      .join('\n')
+
+    expect(inlineContent).toContain('Before')
+    expect(inlineContent).toContain('$a$')
+    expect(inlineContent).toContain('where')
+    expect(inlineContent).toContain('$x$')
+  })
 })

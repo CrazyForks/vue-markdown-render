@@ -453,6 +453,71 @@ function findUnescapedDelimiter(src: string, delimiter: string, startIdx = 0) {
   return -1
 }
 
+function countUnescapedDelimiter(src: string, delimiter: string, startIdx = 0, endIdx = src.length) {
+  let count = 0
+  let searchPos = Math.max(0, startIdx)
+  const end = Math.min(src.length, Math.max(0, endIdx))
+
+  while (searchPos < end) {
+    const index = findUnescapedDelimiter(src, delimiter, searchPos)
+    if (index === -1 || index >= end)
+      break
+
+    count++
+    searchPos = index + delimiter.length
+  }
+
+  return count
+}
+
+function isInsideCodeSpanOrUnclosedTail(src: string, index: number) {
+  let cursor = 0
+
+  while (cursor < src.length) {
+    if (src[cursor] !== '`') {
+      cursor++
+      continue
+    }
+
+    const openStart = cursor
+    let openLen = 1
+    while (openStart + openLen < src.length && src[openStart + openLen] === '`')
+      openLen++
+
+    let search = openStart + openLen
+    let closeStart = -1
+
+    while (search < src.length) {
+      if (src[search] !== '`') {
+        search++
+        continue
+      }
+
+      const runStart = search
+      let runLen = 1
+      while (runStart + runLen < src.length && src[runStart + runLen] === '`')
+        runLen++
+
+      if (runLen === openLen) {
+        closeStart = runStart
+        break
+      }
+
+      search = runStart + runLen
+    }
+
+    if (closeStart === -1)
+      return index >= openStart
+
+    if (index >= openStart && index < closeStart + openLen)
+      return true
+
+    cursor = closeStart + openLen
+  }
+
+  return false
+}
+
 function isLikelyCurrencyRangeDollar(content: string, nextChar?: string) {
   const stripped = String(content ?? '').trim()
   if (!stripped)
@@ -1054,6 +1119,22 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     const allowLoading = !s?.env?.__markstreamFinal
     const strict = mathOpts?.strictDelimiters
 
+    const pushInlineParagraph = (content: string, line: number) => {
+      const paragraphContent = String(content ?? '').replace(/^[\t ]+/, '').replace(/[\t ]+$/, '')
+      if (!paragraphContent)
+        return
+
+      const paragraphOpen = s.push('paragraph_open', 'p', 1)
+      paragraphOpen.map = [line, line + 1]
+
+      const inlineToken = s.push('inline', '', 0)
+      inlineToken.content = paragraphContent
+      inlineToken.map = [line, line + 1]
+      inlineToken.children = []
+
+      s.push('paragraph_close', 'p', -1)
+    }
+
     const delimiters: [string, string][] = strict
       ? [
           ['\\[', '\\]'],
@@ -1065,10 +1146,12 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           ['$$', '$$'],
         ]
     const startPos = s.bMarks[startLine] + s.tShift[startLine]
-    const lineText = s.src.slice(startPos, s.eMarks[startLine]).trim()
+    let lineText = s.src.slice(startPos, s.eMarks[startLine]).trim()
     let matched = false
     let openDelim = ''
     let closeDelim = ''
+    let skipFirstLine = false
+    let prefixBeforeOpen = ''
     for (const [open, close] of delimiters) {
       // 这里其实不应该只匹配 startWith的情况因为很可能前面还有 text
       if (lineText.startsWith(open)) {
@@ -1126,6 +1209,42 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           break
         }
       }
+      // AI/LLM 输出中常见的异常格式：
+      //
+      //   prefix text $
+      //   E = mc^2
+      //   $ suffix
+      //
+      // 这里在 markdown-it block rule 层做兜底，保证直接 md.parse/render
+      // 也不会丢 prefix/suffix；parseMarkdownToStructure 前置 normalizer
+      // 命中时通常不会走到这个分支。
+      else if ((open === '$$' || open === '\\[') && lineText.endsWith(open) && startLine + 1 < endLine) {
+        const openIndex = lineText.length - open.length
+        if (isEscapedAt(lineText, openIndex) || isInsideCodeSpanOrUnclosedTail(lineText, openIndex))
+          continue
+
+        const before = lineText.slice(0, openIndex).replace(/[\t ]+$/, '')
+        if (!before.trim())
+          continue
+
+        const previousOpenCount = countUnescapedDelimiter(lineText, open, 0, openIndex)
+        const previousCloseCount = open === '$$'
+          ? 0
+          : countUnescapedDelimiter(lineText, close, 0, openIndex)
+
+        if (open === '$$' ? previousOpenCount % 2 === 1 : previousOpenCount > previousCloseCount)
+          continue
+
+        prefixBeforeOpen = before
+
+        const nextLineStartPos = s.bMarks[startLine + 1] + s.tShift[startLine + 1]
+        lineText = s.src.slice(nextLineStartPos, s.eMarks[startLine + 1]).trim()
+        skipFirstLine = true
+        matched = true
+        openDelim = open
+        closeDelim = close
+        break
+      }
     }
 
     if (!matched)
@@ -1143,7 +1262,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       ? escapedPlainBracketCloseIndex
       : findUnescapedDelimiter(lineText, closeDelim, closeSearchStart)
 
-    if (sameLineCloseIndex > openDelim.length) {
+    if (!skipFirstLine && sameLineCloseIndex > openDelim.length) {
       const content = lineText.slice(
         startDelimIndex + openDelim.length,
         sameLineCloseIndex,
@@ -1157,15 +1276,24 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       token.block = true
       token.loading = false
       s.line = startLine + 1
+
+      const trailingAfterClose = lineText.slice(sameLineCloseIndex + sameLineCloseDelim.length)
+      if (trailingAfterClose.trim())
+        pushInlineParagraph(trailingAfterClose, startLine)
+
       return true
     }
 
     let nextLine = startLine
     let content = ''
     let found = false
+    let trailingAfterClose = ''
+    let trailingAfterCloseLine = startLine
 
     const firstLineContent
-      = lineText === openDelim ? '' : lineText.slice(openDelim.length)
+      = skipFirstLine
+        ? lineText
+        : lineText === openDelim ? '' : lineText.slice(openDelim.length)
     const fallbackPlainBracketClose = !strict && openDelim === '\\[' ? ']' : ''
 
     const firstLineCloseIndex = findUnescapedDelimiter(firstLineContent, closeDelim)
@@ -1173,11 +1301,13 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     if (firstLineCloseIndex !== -1) {
       const endIndex = firstLineCloseIndex
       content = firstLineContent.slice(0, endIndex)
+      trailingAfterClose = firstLineContent.slice(endIndex + closeDelim.length)
+      trailingAfterCloseLine = skipFirstLine ? startLine + 1 : startLine
       found = true
-      nextLine = startLine
+      nextLine = trailingAfterCloseLine
     }
     else {
-      if (firstLineContent)
+      if (firstLineContent && !skipFirstLine)
         content = firstLineContent
 
       for (nextLine = startLine + 1; nextLine < endLine; nextLine++) {
@@ -1204,14 +1334,22 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         else if (escapedPlainBracketCloseInLine !== -1) {
           found = true
           const endIndex = escapedPlainBracketCloseInLine
+          const beforeClose = currentLine.slice(0, endIndex)
           closeDelim = '\\]'
-          content += (content ? '\n' : '') + currentLine.slice(0, endIndex)
+          if (beforeClose)
+            content += (content ? '\n' : '') + beforeClose
+          trailingAfterClose = currentLine.slice(endIndex + closeDelim.length)
+          trailingAfterCloseLine = nextLine
           break
         }
         else if (closeIndexInLine !== -1) {
           found = true
           const endIndex = closeIndexInLine
-          content += (content ? '\n' : '') + currentLine.slice(0, endIndex)
+          const beforeClose = currentLine.slice(0, endIndex)
+          if (beforeClose)
+            content += (content ? '\n' : '') + beforeClose
+          trailingAfterClose = currentLine.slice(endIndex + closeDelim.length)
+          trailingAfterCloseLine = nextLine
           break
         }
         content += (content ? '\n' : '') + currentLine
@@ -1227,19 +1365,26 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     // to be correctly recognized as math.
     // However, if the content starts with markdown special syntax like ![, skip.
     const hasMarkdownPrefix = /^\s*!\[/.test(content)
-    const looksMath = openDelim === '$$' ? !hasMarkdownPrefix : (openDelim === '[' ? isPlainBracketMathLike(content) : isMathLike(content))
+    const looksMath = openDelim === '$' ? !hasMarkdownPrefix : (openDelim === '[' ? isPlainBracketMathLike(content) : isMathLike(content))
     if (!looksMath)
       return false
+
+    if (prefixBeforeOpen)
+      pushInlineParagraph(prefixBeforeOpen, startLine)
 
     const token = s.push('math_block', 'math', 0)
     token.content = normalizeStandaloneBackslashT(content)
     token.markup
-      = openDelim === '$$' ? '$$' : openDelim === '[' ? '[]' : '\\[\\]'
+      = openDelim === '$' ? '$' : openDelim === '[' ? '[]' : '\\[\\]'
     token.raw = `${openDelim}${content}${content.startsWith('\n') ? '\n' : ''}${closeDelim}`
     token.map = [startLine, nextLine + 1]
     token.block = true
     token.loading = !found
     s.line = nextLine + 1
+
+    if (trailingAfterClose.trim())
+      pushInlineParagraph(trailingAfterClose, trailingAfterCloseLine)
+
     return true
   }
 
