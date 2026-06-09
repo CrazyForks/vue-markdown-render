@@ -3,6 +3,7 @@ import type { HtmlBlockNode, InternalParseOptions, MarkdownToken, ParsedNode, Pa
 import { normalizeCustomHtmlTags } from '../customHtmlTags'
 import { NON_STRUCTURING_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
 import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes, parseTagAttrs } from '../htmlTagUtils'
+import { isMathLike } from '../plugins/isMathLike'
 import { parseInlineTokens } from './inline-parsers'
 import { createLinkifyDemotionContextTracker } from './linkifyHeuristics'
 import { parseCommonBlockToken } from './node-parsers/block-token-parser'
@@ -2305,6 +2306,8 @@ function hasMathBlockSameLineBoundary(markdown: string) {
   let fenceChar: '`' | '~' | '' = ''
   let fenceLen = 0
   let activeMathClose: CloseDelimiter | '' = ''
+  let activeMathTolerant = false
+  let activeMathContent = ''
 
   while (index < markdown.length) {
     const nl = markdown.indexOf('\n', index)
@@ -2342,11 +2345,28 @@ function hasMathBlockSameLineBoundary(markdown: string) {
     if (activeMathClose) {
       const closeIndex = findUnescapedDelimiter(line, activeMathClose)
       if (closeIndex !== -1) {
+        const beforeClose = line.slice(0, closeIndex)
+        if (beforeClose)
+          activeMathContent += (activeMathContent ? '\n' : '') + beforeClose
+
+        const activeLooksMath = !activeMathTolerant || isMathLike(activeMathContent)
         const afterClose = line.slice(closeIndex + activeMathClose.length)
-        if (afterClose.trim())
+        if (activeLooksMath && afterClose.trim())
+          return true
+
+        // Tolerant opener itself is a same-line boundary even when the close
+        // delimiter is alone on its line, but only if the captured content is
+        // actually math-like. Otherwise ordinary text ending with "$$" can be
+        // misdetected and force repeated full reparses during streaming.
+        if (activeMathTolerant && activeLooksMath)
           return true
 
         activeMathClose = ''
+        activeMathTolerant = false
+        activeMathContent = ''
+      }
+      else {
+        activeMathContent += (activeMathContent ? '\n' : '') + line
       }
 
       index = hasNl ? nl + 1 : markdown.length
@@ -2354,8 +2374,13 @@ function hasMathBlockSameLineBoundary(markdown: string) {
     }
 
     const tolerantOpen = findTolerantOpenAtLineEnd(line)
-    if (tolerantOpen)
-      return true
+    if (tolerantOpen) {
+      activeMathClose = tolerantOpen.close
+      activeMathTolerant = true
+      activeMathContent = ''
+      index = hasNl ? nl + 1 : markdown.length
+      continue
+    }
 
     const lineStartOpen = findLineStartOpen(line)
     if (lineStartOpen) {
@@ -2367,6 +2392,8 @@ function hasMathBlockSameLineBoundary(markdown: string) {
 
       if (closeIndex === -1) {
         activeMathClose = lineStartOpen.close
+        activeMathTolerant = false
+        activeMathContent = line.slice(lineStartOpen.start + lineStartOpen.open.length)
       }
       else {
         const afterClose = line.slice(closeIndex + lineStartOpen.close.length)
@@ -2378,7 +2405,7 @@ function hasMathBlockSameLineBoundary(markdown: string) {
     index = hasNl ? nl + 1 : markdown.length
   }
 
-  return false
+  return activeMathTolerant && isMathLike(activeMathContent)
 }
 
 export function parseMarkdownToStructure(

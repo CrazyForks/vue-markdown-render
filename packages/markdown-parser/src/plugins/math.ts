@@ -1169,6 +1169,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     let closeDelim = ''
     let skipFirstLine = false
     let prefixBeforeOpen = ''
+    let tolerantBoundary = false
     for (const [open, close] of delimiters) {
       // 这里其实不应该只匹配 startWith的情况因为很可能前面还有 text
       if (lineText.startsWith(open)) {
@@ -1254,6 +1255,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           continue
 
         prefixBeforeOpen = before
+        tolerantBoundary = true
 
         const nextLineStartPos = s.bMarks[startLine + 1] + s.tShift[startLine + 1]
         lineText = s.src.slice(nextLineStartPos, s.eMarks[startLine + 1]).trim()
@@ -1383,7 +1385,9 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     // to be correctly recognized as math.
     // However, if the content starts with markdown special syntax like ![, skip.
     const hasMarkdownPrefix = /^\s*!\[/.test(content)
-    const looksMath = openDelim === '$$' ? !hasMarkdownPrefix : (openDelim === '[' ? isPlainBracketMathLike(content) : isMathLike(content))
+    const looksMath = openDelim === '$$'
+      ? !hasMarkdownPrefix && (!tolerantBoundary || isMathLike(content))
+      : (openDelim === '[' ? isPlainBracketMathLike(content) : isMathLike(content))
     if (!looksMath)
       return false
 
