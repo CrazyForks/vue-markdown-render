@@ -593,8 +593,15 @@ function isLikelySpacedSuperSubscriptMath(content: string) {
   return /(?:^|[^\p{L}\p{N}\\])(?:[A-Z]|\\[A-Z]+)\s*[_^]\s*(?:\{[^{}\n]{1,120}\}|[A-Z0-9\\]+)(?:$|[^\p{L}\p{N}])/iu.test(stripped)
 }
 
-function isLikelyTolerantDollarMathBlockContent(content: string) {
-  return isMathLike(content) || isLikelySpacedSuperSubscriptMath(content)
+function isLikelyTolerantDollarMathBlockContent(content: string, closed: boolean) {
+  if (isMathLike(content))
+    return true
+
+  // `f _ { x }` 这类 spaced sub/superscript 信号很弱，只能在 closing `$`
+  // 已经到达后用于 final/tolerant block 识别。
+  // streaming 中如果未闭合就提前把 prefix 拆成 paragraph + loading math_block，
+  // markdown-it-ts 的增量 token cache 容易保留上一轮 paragraph，最终形成重复段落。
+  return closed && isLikelySpacedSuperSubscriptMath(content)
 }
 
 export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
@@ -1426,7 +1433,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     // However, if the content starts with markdown special syntax like ![, skip.
     const hasMarkdownPrefix = /^\s*!\[/.test(content)
     const looksMath = openDelim === '$$'
-      ? !hasMarkdownPrefix && (!tolerantBoundary || isLikelyTolerantDollarMathBlockContent(content))
+      ? !hasMarkdownPrefix && (!tolerantBoundary || isLikelyTolerantDollarMathBlockContent(content, found))
       : (openDelim === '[' ? isPlainBracketMathLike(content) : isMathLike(content))
     if (!looksMath)
       return false

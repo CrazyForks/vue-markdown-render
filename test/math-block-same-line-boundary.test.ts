@@ -674,7 +674,9 @@ $$ where $x$ follows.`
 
     let source = ''
     let streamingNodes: any[] = []
-    for (const chunk of chunks) {
+
+    for (let index = 0; index < chunks.length; index++) {
+      const chunk = chunks[index]
       source += chunk
       expect(() => {
         streamingNodes = parseMarkdownToStructure(source, streamingMd, {
@@ -682,25 +684,35 @@ $$ where $x$ follows.`
           streamParse: true,
         }) as any[]
       }).not.toThrow()
+
+      // Weak spaced subscript content alone is not enough to emit a tolerant
+      // loading math_block. Wait for the closing `$` so streaming does not
+      // split the prefix paragraph and then duplicate it when the close arrives.
+      if (index < chunks.length - 1)
+        expect(collectByType(streamingNodes, 'math_block')).toHaveLength(0)
     }
 
-    // Note: streaming produces an extra paragraph before math_block.
-    // This is a known streaming-side issue (same as the two pre-existing
-    // failures in this file) and is not introduced by the tolerant
-    // math-block changes.
     expect(streamingNodes.map(node => node.type)).toEqual([
-      'paragraph',
       'paragraph',
       'math_block',
       'paragraph',
     ])
+
+    const stableSerialized = JSON.stringify(streamingNodes)
+    for (let index = 0; index < 10; index++) {
+      streamingNodes = parseMarkdownToStructure(source, streamingMd, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+      expect(JSON.stringify(streamingNodes)).toBe(stableSerialized)
+    }
 
     const streamingMathBlocks = collectByType(streamingNodes, 'math_block')
     expect(streamingMathBlocks).toHaveLength(1)
     expect(streamingMathBlocks[0].markup).toBe('$$')
     expect(streamingMathBlocks[0].content).toContain('f _ { x }')
 
-    const serialized = JSON.stringify(streamingNodes)
+    const serialized = stableSerialized
     expect(serialized).toContain('Before display')
     expect(serialized).toContain('where')
     expect(serialized).toContain('follows')
