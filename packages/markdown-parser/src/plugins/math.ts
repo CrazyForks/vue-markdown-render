@@ -487,17 +487,6 @@ function countUnescapedDelimiter(
   return count
 }
 
-function findLineStartUnescapedDelimiter(src: string, delimiter: string) {
-  let index = 0
-  while (index < src.length && (src[index] === ' ' || src[index] === '\t'))
-    index++
-
-  if (src.slice(index, index + delimiter.length) !== delimiter)
-    return -1
-
-  return isEscapedAt(src, index) ? -1 : index
-}
-
 function findPlainBracketFallbackClose(src: string) {
   let index = 0
   while (index < src.length && (src[index] === ' ' || src[index] === '\t'))
@@ -556,7 +545,7 @@ function isInsideCodeSpanOrUnclosedTail(src: string, index: number) {
   let cursor = 0
 
   while (cursor < src.length) {
-    if (src[cursor] !== '`') {
+    if (src[cursor] !== '`' || isEscapedAt(src, cursor)) {
       cursor++
       continue
     }
@@ -647,6 +636,27 @@ function isLikelySpacedSuperSubscriptMath(content: string) {
   return /(?:^|[^\p{L}\p{N}\\])(?:[A-Z]|\\[A-Z]+)\s*[_^]\s*(?:\{[^{}\n]{1,120}\}|[A-Z0-9\\]+)(?:$|[^\p{L}\p{N}])/iu.test(stripped)
 }
 
+function pushSyntheticInlineParagraph(s: MathBlockState, content: string) {
+  const paragraphContent = String(content ?? '').replace(/^[\t ]+/, '').replace(/[\t ]+$/, '')
+  if (!paragraphContent)
+    return
+
+  // Intentionally leave `map` unset for these synthetic prefix/suffix paragraphs.
+  // A tolerant math boundary can split one physical source line into:
+  //   prefix paragraph + math opener
+  // or:
+  //   math closer + suffix paragraph
+  // Line-level maps cannot represent that split without overlapping the
+  // math_block range. Wrong overlapping maps are worse than no map for
+  // streaming cache / incremental parsing.
+  s.push('paragraph_open', 'p', 1)
+
+  const inlineToken = s.push('inline', '', 0)
+  inlineToken.content = paragraphContent
+  inlineToken.children = []
+
+  s.push('paragraph_close', 'p', -1)
+}
 
 export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
   // Inline rule for `\\(...\\)` and `$$...$$` and `$...$`
@@ -1218,22 +1228,6 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     const allowLoading = !s?.env?.__markstreamFinal
     const strict = mathOpts?.strictDelimiters
 
-    const pushInlineParagraph = (content: string, line: number) => {
-      const paragraphContent = String(content ?? '').replace(/^[\t ]+/, '').replace(/[\t ]+$/, '')
-      if (!paragraphContent)
-        return
-
-      const paragraphOpen = s.push('paragraph_open', 'p', 1)
-      paragraphOpen.map = [line, line + 1]
-
-      const inlineToken = s.push('inline', '', 0)
-      inlineToken.content = paragraphContent
-      inlineToken.map = [line, line + 1]
-      inlineToken.children = []
-
-      s.push('paragraph_close', 'p', -1)
-    }
-
     const delimiters: [string, string][] = strict
       ? [
           ['\\[', '\\]'],
@@ -1386,7 +1380,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
 
       const trailingAfterClose = lineText.slice(sameLineCloseIndex + sameLineCloseDelim.length)
       if (trailingAfterClose.trim())
-        pushInlineParagraph(trailingAfterClose, startLine)
+        pushSyntheticInlineParagraph(s, trailingAfterClose)
 
       return true
     }
@@ -1499,7 +1493,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       return true
 
     if (prefixBeforeOpen)
-      pushInlineParagraph(prefixBeforeOpen, startLine)
+      pushSyntheticInlineParagraph(s, prefixBeforeOpen)
 
     const token = s.push('math_block', 'math', 0)
     token.content = normalizeStandaloneBackslashT(content)
@@ -1512,7 +1506,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     s.line = nextLine + 1
 
     if (trailingAfterClose.trim())
-      pushInlineParagraph(trailingAfterClose, trailingAfterCloseLine)
+      pushSyntheticInlineParagraph(s, trailingAfterClose)
 
     return true
   }

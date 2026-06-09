@@ -1291,4 +1291,110 @@ line 1 ordinary text ending with $$`, { __markstreamFinal: true }) as any[]
     const inlineMath = collectByType(nodes, 'math_inline')
     expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('x')
   })
+
+  it('does not attach overlapping line maps to synthetic boundary paragraphs', () => {
+    const md = getMarkdown('direct-md-parse-boundary-synthetic-paragraph-map')
+
+    const tokens = md.parse(`Before $a$ and display $$
+E=mc^2
+$$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
+
+    const inlineTokens = tokens.filter(token => token.type === 'inline')
+    expect(inlineTokens.map(token => token.content)).toEqual([
+      'Before $a$ and display',
+      'where $x$ follows.',
+    ])
+
+    // Synthetic prefix/suffix inline tokens intentionally have no map.
+    // Otherwise they overlap the math_block line range:
+    // - prefix shares the opener line
+    // - suffix shares the closer line
+    expect(inlineTokens.every(token => !Array.isArray(token.map))).toBe(true)
+
+    const mathBlocks = tokens.filter(token => token.type === 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].map).toEqual([0, 3])
+    expect(mathBlocks[0].content).toContain('E=mc^2')
+  })
+
+  it('parses tolerant display math after an escaped backtick in final mode', () => {
+    const md = getMarkdown('math-boundary-escaped-backtick-before-opener-final')
+
+    const content = [
+      'Prefix escaped \\` marker before display $$',
+      'E=mc^2',
+      '$$ where $x$ follows.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].content).toContain('E=mc^2')
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('Prefix escaped')
+    expect(serialized).toContain('marker before display')
+    expect(serialized).toContain('where')
+    expect(serialized).toContain('follows')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('x')
+  })
+
+  it('keeps streaming stable for tolerant display math after an escaped backtick', () => {
+    const md = getMarkdown('math-boundary-escaped-backtick-before-opener-streaming')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const chunks = [
+      'Prefix escaped \\` marker before display $',
+      '$\nE=mc^2',
+      '\n$$ where $x$ follows.',
+    ]
+
+    let source = ''
+    let nodes: any[] = []
+
+    for (const chunk of chunks) {
+      source += chunk
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+    }
+
+    // TODO: the streaming normalizer currently emits an extra leading paragraph
+    // for tolerant display math boundaries – the same pre-existing issue as the
+    // "tolerant $$ block boundaries" streaming test above.
+    // Once the streaming normalizer is fixed, tighten this to:
+    //   ['paragraph', 'math_block', 'paragraph']
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 10; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+    }
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].content).toContain('E=mc^2')
+  })
 })
