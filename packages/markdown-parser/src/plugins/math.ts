@@ -636,6 +636,15 @@ function isLikelySpacedSuperSubscriptMath(content: string) {
   return /(?:^|[^\p{L}\p{N}\\])(?:[A-Z]|\\[A-Z]+)\s*[_^]\s*(?:\{[^{}\n]{1,120}\}|[A-Z0-9\\]+)(?:$|[^\p{L}\p{N}])/iu.test(stripped)
 }
 
+const SYNTHETIC_MATH_BOUNDARY_PARAGRAPH_META = '__markstreamSyntheticMathBoundaryParagraph'
+
+function markSyntheticMathBoundaryParagraphToken(token: MarkdownToken) {
+  token.meta = {
+    ...((token.meta && typeof token.meta === 'object') ? token.meta : {}),
+    [SYNTHETIC_MATH_BOUNDARY_PARAGRAPH_META]: true,
+  }
+}
+
 function pushSyntheticInlineParagraph(s: MathBlockState, content: string) {
   const paragraphContent = String(content ?? '').replace(/^[\t ]+/, '').replace(/[\t ]+$/, '')
   if (!paragraphContent)
@@ -649,13 +658,16 @@ function pushSyntheticInlineParagraph(s: MathBlockState, content: string) {
   // Line-level maps cannot represent that split without overlapping the
   // math_block range. Wrong overlapping maps are worse than no map for
   // streaming cache / incremental parsing.
-  s.push('paragraph_open', 'p', 1)
+  const paragraphOpen = s.push('paragraph_open', 'p', 1)
+  markSyntheticMathBoundaryParagraphToken(paragraphOpen)
 
   const inlineToken = s.push('inline', '', 0)
   inlineToken.content = paragraphContent
   inlineToken.children = []
+  markSyntheticMathBoundaryParagraphToken(inlineToken)
 
-  s.push('paragraph_close', 'p', -1)
+  const paragraphClose = s.push('paragraph_close', 'p', -1)
+  markSyntheticMathBoundaryParagraphToken(paragraphClose)
 }
 
 export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {

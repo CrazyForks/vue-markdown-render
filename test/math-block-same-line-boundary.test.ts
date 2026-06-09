@@ -1372,13 +1372,7 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
       }).not.toThrow()
     }
 
-    // TODO: the streaming normalizer currently emits an extra leading paragraph
-    // for tolerant display math boundaries – the same pre-existing issue as the
-    // "tolerant $$ block boundaries" streaming test above.
-    // Once the streaming normalizer is fixed, tighten this to:
-    //   ['paragraph', 'math_block', 'paragraph']
     expect(nodes.map(node => node.type)).toEqual([
-      'paragraph',
       'paragraph',
       'math_block',
       'paragraph',
@@ -1392,6 +1386,115 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
       }) as any[]
       expect(JSON.stringify(nodes)).toBe(stableSerialized)
     }
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].content).toContain('E=mc^2')
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('Prefix escaped')
+    expect(serialized).toContain('marker before display')
+    expect(serialized).toContain('where')
+    expect(serialized).toContain('follows')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('x')
+  })
+
+  it('keeps streaming stable for tolerant explicit \\[ display math after an escaped backtick', () => {
+    const md = getMarkdown('math-boundary-escaped-backtick-before-bracket-opener-streaming')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const chunks = [
+      'Prefix escaped \\` marker before display \\',
+      '[\nE=mc^2',
+      '\n\\] where $x$ follows.',
+    ]
+
+    let source = ''
+    let nodes: any[] = []
+
+    for (const chunk of chunks) {
+      source += chunk
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+    }
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 10; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+    }
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].markup).toBe('\\[\\]')
+    expect(mathBlocks[0].content).toContain('E=mc^2')
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('Prefix escaped')
+    expect(serialized).toContain('marker before display')
+    expect(serialized).toContain('where')
+    expect(serialized).toContain('follows')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('x')
+  })
+
+  it('does not drop a real previous paragraph that only resembles a stale boundary prefix', () => {
+    const md = getMarkdown('stream-math-boundary-does-not-drop-real-previous-paragraph')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      'Prefix escaped \\` marker before display $',
+      '',
+      'Prefix escaped \\` marker before display $$',
+      'E=mc^2',
+      '$$ where $x$ follows.',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+
+    for (let index = 0; index < 8; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    expect(nodes[0]?.raw).toContain('display $')
+    expect(nodes[1]?.raw).toContain('marker before display')
 
     const mathBlocks = collectByType(nodes, 'math_block')
     expect(mathBlocks).toHaveLength(1)
