@@ -1033,7 +1033,7 @@ x + y = z
     expect(inlineContent).toContain('x')
   })
 
-  it('does not split table rows that end with $$$ into display math blocks', () => {
+  it('does not split table rows that end with $$$$ into display math blocks', () => {
     const md = getMarkdown('math-block-boundary-table-row-guard')
 
     const content = [
@@ -1282,7 +1282,7 @@ line 1 ordinary text ending with $$`, { __markstreamFinal: true }) as any[]
 
     const content = [
       'The first line belongs to the same paragraph.',
-      'This ordinary prose line happens to end with $',
+      'This ordinary prose line happens to end with $$',
       'and this following line is still ordinary prose.',
     ].join('\n')
 
@@ -1292,7 +1292,7 @@ line 1 ordinary text ending with $$`, { __markstreamFinal: true }) as any[]
     expect(nodes).toHaveLength(1)
     expect(nodes[0]?.type).toBe('paragraph')
     expect(nodes[0]?.raw).toContain('The first line belongs')
-    expect(nodes[0]?.raw).toContain('happens to end with $')
+    expect(nodes[0]?.raw).toContain('happens to end with $$')
     expect(nodes[0]?.raw).toContain('following line is still ordinary prose')
   })
 
@@ -1322,7 +1322,7 @@ line 1 ordinary text ending with $$`, { __markstreamFinal: true }) as any[]
 
     const source = [
       'The first line belongs to the same paragraph.',
-      'This ordinary prose line happens to end with $',
+      'This ordinary prose line happens to end with $$',
       'and this following line is still ordinary prose.',
     ].join('\n')
 
@@ -1348,7 +1348,7 @@ line 1 ordinary text ending with $$`, { __markstreamFinal: true }) as any[]
     expect(nodes).toHaveLength(1)
     expect(nodes[0]?.type).toBe('paragraph')
     expect(nodes[0]?.raw).toContain('The first line belongs')
-    expect(nodes[0]?.raw).toContain('happens to end with $')
+    expect(nodes[0]?.raw).toContain('happens to end with $$')
     expect(nodes[0]?.raw).toContain('following line is still ordinary prose')
   })
 
@@ -1356,7 +1356,7 @@ line 1 ordinary text ending with $$`, { __markstreamFinal: true }) as any[]
     const md = getMarkdown('math-boundary-tolerant-dollar-prose-hyphen-no-block')
 
     const content = [
-      'The first line belongs to the same paragraph and happens to end with $',
+      'The first line belongs to the same paragraph and happens to end with $$',
       'foo - bar',
       '$ after text should not become a display block.',
     ].join('\n')
@@ -1366,7 +1366,7 @@ line 1 ordinary text ending with $$`, { __markstreamFinal: true }) as any[]
     expect(collectByType(nodes, 'math_block')).toHaveLength(0)
     expect(nodes).toHaveLength(1)
     expect(nodes[0]?.type).toBe('paragraph')
-    expect(nodes[0]?.raw).toContain('happens to end with $')
+    expect(nodes[0]?.raw).toContain('happens to end with $$')
     expect(nodes[0]?.raw).toContain('foo - bar')
     expect(nodes[0]?.raw).toContain('after text should not become a display block')
   })
@@ -1377,7 +1377,7 @@ line 1 ordinary text ending with $$`, { __markstreamFinal: true }) as any[]
     ;(md as any).stream.resetStats()
 
     const source = [
-      'The first line belongs to the same paragraph and happens to end with $',
+      'The first line belongs to the same paragraph and happens to end with $$',
       'foo - bar',
       '$ after text should not become a display block.',
     ].join('\n')
@@ -1926,5 +1926,171 @@ E=mc^2`, { __markstreamFinal: false }) as any[]
     expect(stableSerialized).toContain('where')
     expect(stableSerialized).toContain('follows in prose')
     expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+  })
+
+  it('does not let tolerant $$ scan cross a blank line before a later unrelated close', () => {
+    const md = getMarkdown('math-boundary-tolerant-dollar-no-cross-blank-line')
+
+    const content = [
+      'This paragraph happens to end with $$',
+      'x + y = z',
+      '',
+      'Later text with $z$ inline math.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('This paragraph happens to end with')
+    expect(serialized).toContain('x + y = z')
+    expect(serialized).toContain('Later text with')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('z')
+  })
+
+  it('keeps streaming stable when tolerant $$ candidate is separated from later $$ by a blank line', () => {
+    const md = getMarkdown('stream-math-boundary-dollar-no-cross-blank-line')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      'This paragraph happens to end with $$',
+      'x + y = z',
+      '',
+      'Later text with $z$ inline math.',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+
+    for (let index = 0; index < 8; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(stableSerialized).toContain('This paragraph happens to end with')
+    expect(stableSerialized).toContain('x + y = z')
+    expect(stableSerialized).toContain('Later text with')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('z')
+  })
+
+  it('does not let tolerant $$ scan cross a heading/list/fence boundary', () => {
+    const md = getMarkdown('math-boundary-tolerant-dollar-no-cross-block-markers')
+
+    const cases = [
+      [
+        'heading',
+        [
+          'Text before malformed candidate $$',
+          'x + y = z',
+          '## Next section',
+          'Some $$ later $z$ text.',
+        ].join('\n'),
+      ],
+      [
+        'list',
+        [
+          'Text before malformed candidate $$',
+          'x + y = z',
+          '- next item',
+          'Some $$ later $z$ text.',
+        ].join('\n'),
+      ],
+      [
+        'fence',
+        [
+          'Text before malformed candidate $$',
+          'x + y = z',
+          '```ts',
+          'Some $$ later $z$ text.',
+          '```',
+        ].join('\n'),
+      ],
+    ] as const
+
+    for (const [name, content] of cases) {
+      const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+      const serialized = JSON.stringify(nodes)
+
+      expect(collectByType(nodes, 'math_block'), name).toHaveLength(0)
+      expect(serialized, name).toContain('Text before malformed candidate')
+      expect(serialized, name).toContain('x + y = z')
+      expect(serialized, name).toContain('later')
+    }
+  })
+
+  it('does not let tolerant explicit \\[ scan cross a blank line before a later unrelated close', () => {
+    const md = getMarkdown('math-boundary-tolerant-bracket-no-cross-blank-line')
+
+    const content = [
+      'This paragraph happens to end with \\[',
+      'x + y = z',
+      '',
+      '\\] appears later as ordinary text, with $z$ inline.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('This paragraph happens to end with')
+    expect(serialized).toContain('x + y = z')
+    expect(serialized).toContain('appears later as ordinary text')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('z')
+  })
+
+  it('keeps streaming stable when tolerant explicit \\[ candidate is separated from later \\] by a blank line', () => {
+    const md = getMarkdown('stream-math-boundary-bracket-no-cross-blank-line')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      'This paragraph happens to end with \\[',
+      'x + y = z',
+      '',
+      '\\] appears later as ordinary text, with $z$ inline.',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+
+    for (let index = 0; index < 8; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(stableSerialized).toContain('This paragraph happens to end with')
+    expect(stableSerialized).toContain('x + y = z')
+    expect(stableSerialized).toContain('appears later as ordinary text')
   })
 })

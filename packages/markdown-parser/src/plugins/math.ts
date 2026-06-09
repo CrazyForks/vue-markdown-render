@@ -612,6 +612,44 @@ function isInsideCodeSpanOrUnclosedTail(src: string, index: number) {
   return false
 }
 
+const MAX_TOLERANT_BOUNDARY_LINES = 80
+const MAX_TOLERANT_BOUNDARY_CHARS = 20000
+
+function isTolerantBoundaryScanStopLine(line: string) {
+  const trimmed = String(line ?? '').trimStart()
+
+  if (!trimmed)
+    return true
+
+  // Tolerant same-line math boundaries are an LLM-output repair path, not a
+  // general block parser. Do not scan across obvious markdown block boundaries;
+  // otherwise ordinary paragraphs ending with "$" can accidentally consume a
+  // later unrelated "$".
+  if (/^(?:#{1,6}[\t ]+\S|>{1,}[\t ]*\S|(?:[*+-]|\d+[.)])[\t ]+\S|`{3,}|~{3,}|\|[^|\n]*\||:{3,}[\t ]*\S|<\s*[A-Za-z][\w:-]*(?:\s|>|\/))/.test(trimmed))
+    return true
+
+  // Reference/definition-style boundaries are not formula content.
+  if (/^\[[^\]\n]+]:[\t ]+\S/.test(trimmed))
+    return true
+
+  return false
+}
+
+function shouldAbortTolerantBoundaryScan(
+  currentLine: string,
+  startLine: number,
+  currentLineNumber: number,
+  accumulatedContent: string,
+) {
+  if (currentLineNumber - startLine > MAX_TOLERANT_BOUNDARY_LINES)
+    return true
+
+  if (accumulatedContent.length + currentLine.length > MAX_TOLERANT_BOUNDARY_CHARS)
+    return true
+
+  return isTolerantBoundaryScanStopLine(currentLine)
+}
+
 function isLikelyCurrencyRangeDollar(content: string, nextChar?: string) {
   const stripped = String(content ?? '').trim()
   if (!stripped)
@@ -1483,6 +1521,14 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           trailingAfterCloseLine = nextLine
           break
         }
+
+        if (
+          tolerantBoundary
+          && shouldAbortTolerantBoundaryScan(currentLine, startLine, nextLine, content)
+        ) {
+          return false
+        }
+
         content += (content ? '\n' : '') + currentLine
       }
     }
