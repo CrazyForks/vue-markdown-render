@@ -104,15 +104,15 @@ x + y = z
     expect(inlineContent).toContain('z')
   })
 
-  it('does not loop in stream parser when tolerant $ boundaries produce prefix/suffix inline tokens', () => {
+  it('keeps streaming output stable for tolerant $$ block boundaries', () => {
     const md = getMarkdown('stream-math-block-boundary-no-loop')
     ;(md as any).stream.reset()
     ;(md as any).stream.resetStats()
 
     const chunks = [
       'Before $a$ and display math $',
-      '\nE=mc^2',
-      '\n$ where $x$ follows.',
+      '$\nE=mc^2',
+      '\n$$ where $x$ follows.',
     ]
 
     let source = ''
@@ -128,9 +128,17 @@ x + y = z
       }).not.toThrow()
     }
 
-    // Re-parse the same completed source a few times to exercise stream cache
-    // hits. A synthetic paragraph_open/close emitted from mathBlock can make
-    // the streaming token state unstable here.
+    const stableSerialized = JSON.stringify(nodes)
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    // Re-parse the same completed source a few times. The result must stay
+    // byte-for-byte stable; duplicated prefix/suffix paragraphs around the
+    // math_block show up here immediately.
     for (let index = 0; index < 10; index++) {
       expect(() => {
         nodes = parseMarkdownToStructure(source, md, {
@@ -138,6 +146,7 @@ x + y = z
           streamParse: true,
         }) as any[]
       }).not.toThrow()
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
     }
 
     const serialized = JSON.stringify(nodes)
@@ -149,5 +158,8 @@ x + y = z
     const inlineContent = inlineMath.map((node: any) => node.content).join('\n')
     expect(inlineContent).toContain('a')
     expect(inlineContent).toContain('x')
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
   })
 })

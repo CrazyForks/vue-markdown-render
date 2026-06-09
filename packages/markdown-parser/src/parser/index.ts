@@ -2142,6 +2142,185 @@ function ensureBlankLineBeforeCustomHtmlBlocks(markdown: string, tags: string[])
   return out
 }
 
+function normalizeMathBlockSameLineBoundaries(markdown: string) {
+  if (!markdown || (!markdown.includes('$$') && !markdown.includes('\\[') && !markdown.includes('\\]')))
+    return markdown
+
+  type CloseDelimiter = '$$' | '\\]'
+
+  const displayDelimiters: Array<{ open: string, close: CloseDelimiter }> = [
+    { open: '$$', close: '$$' },
+    { open: '\\[', close: '\\]' },
+  ]
+
+  const isIndentWs = (ch: string) => ch === ' ' || ch === '\t'
+
+  const parseFenceMarker = (line: string) => {
+    let i = 0
+    while (i < line.length && isIndentWs(line[i])) i++
+
+    const ch = line[i]
+    if (ch !== '`' && ch !== '~')
+      return null
+
+    let j = i
+    while (j < line.length && line[j] === ch) j++
+
+    const len = j - i
+    if (len < 3)
+      return null
+
+    return {
+      markerChar: ch as '`' | '~',
+      markerLen: len,
+      rest: line.slice(j),
+    }
+  }
+
+  const appendLines = (out: string, lines: string[], newline: string) => {
+    const separator = newline || '\n'
+    return `${out}${lines.join(separator)}${newline}`
+  }
+
+  const findLineStartOpen = (line: string) => {
+    let start = 0
+    while (start < line.length && isIndentWs(line[start])) start++
+
+    for (const delimiter of displayDelimiters) {
+      if (line.startsWith(delimiter.open, start)) {
+        return {
+          ...delimiter,
+          start,
+        }
+      }
+    }
+
+    return null
+  }
+
+  const findTolerantOpenAtLineEnd = (line: string) => {
+    const trimmedRight = line.replace(/[\t ]+$/, '')
+
+    for (const delimiter of displayDelimiters) {
+      if (!trimmedRight.endsWith(delimiter.open))
+        continue
+
+      const before = trimmedRight.slice(0, trimmedRight.length - delimiter.open.length)
+      if (!before.trim())
+        continue
+
+      // Avoid rewriting normal same-line inline/display pairs such as
+      // "text $x$"; this normalization is only for malformed block openers
+      // emitted at the end of a paragraph line.
+      if (before.includes(delimiter.open))
+        continue
+
+      return {
+        before: before.replace(/[\t ]+$/, ''),
+        open: delimiter.open,
+        close: delimiter.close,
+      }
+    }
+
+    return null
+  }
+
+  let out = ''
+  let idx = 0
+  let inFence = false
+  let fenceChar: '`' | '~' | '' = ''
+  let fenceLen = 0
+  let activeMathClose: CloseDelimiter | '' = ''
+
+  while (idx < markdown.length) {
+    const nl = markdown.indexOf('\n', idx)
+    const hasNl = nl !== -1
+    const isCrlf = hasNl && nl > idx && markdown[nl - 1] === '\r'
+    const lineEnd = hasNl ? (isCrlf ? nl - 1 : nl) : markdown.length
+    const line = markdown.slice(idx, lineEnd)
+    const newline = hasNl ? (isCrlf ? '\r\n' : '\n') : ''
+
+    const fenceMatch = parseFenceMarker(line)
+    if (fenceMatch) {
+      out = appendLines(out, [line], newline)
+
+      if (inFence) {
+        if (fenceMatch.markerChar === fenceChar && fenceMatch.markerLen >= fenceLen && /^\s*$/.test(fenceMatch.rest)) {
+          inFence = false
+          fenceChar = ''
+          fenceLen = 0
+        }
+      }
+      else {
+        inFence = true
+        fenceChar = fenceMatch.markerChar
+        fenceLen = fenceMatch.markerLen
+      }
+
+      idx = hasNl ? nl + 1 : markdown.length
+      continue
+    }
+
+    if (inFence) {
+      out = appendLines(out, [line], newline)
+      idx = hasNl ? nl + 1 : markdown.length
+      continue
+    }
+
+    if (activeMathClose) {
+      const closeIndex = line.indexOf(activeMathClose)
+      if (closeIndex === -1) {
+        out = appendLines(out, [line], newline)
+        idx = hasNl ? nl + 1 : markdown.length
+        continue
+      }
+
+      const beforeAndClose = line.slice(0, closeIndex + activeMathClose.length).replace(/[\t ]+$/, '')
+      const afterClose = line.slice(closeIndex + activeMathClose.length).replace(/^[\t ]+/, '')
+      activeMathClose = ''
+      out = appendLines(out, afterClose.trim() ? [beforeAndClose, afterClose] : [line], newline)
+      idx = hasNl ? nl + 1 : markdown.length
+      continue
+    }
+
+    const tolerantOpen = findTolerantOpenAtLineEnd(line)
+    if (tolerantOpen) {
+      activeMathClose = tolerantOpen.close
+      out = appendLines(out, [tolerantOpen.before, tolerantOpen.open], newline)
+      idx = hasNl ? nl + 1 : markdown.length
+      continue
+    }
+
+    const lineStartOpen = findLineStartOpen(line)
+    if (lineStartOpen) {
+      const closeIndex = line.indexOf(lineStartOpen.close, lineStartOpen.start + lineStartOpen.open.length)
+      if (closeIndex === -1) {
+        activeMathClose = lineStartOpen.close
+        out = appendLines(out, [line], newline)
+        idx = hasNl ? nl + 1 : markdown.length
+        continue
+      }
+
+      const afterClose = line.slice(closeIndex + lineStartOpen.close.length).replace(/^[\t ]+/, '')
+      if (afterClose.trim()) {
+        const beforeAndClose = line.slice(0, closeIndex + lineStartOpen.close.length).replace(/[\t ]+$/, '')
+        out = appendLines(out, [beforeAndClose, afterClose], newline)
+      }
+      else {
+        out = appendLines(out, [line], newline)
+      }
+
+      idx = hasNl ? nl + 1 : markdown.length
+      continue
+    }
+
+    out = appendLines(out, [line], newline)
+    idx = hasNl ? nl + 1 : markdown.length
+  }
+
+  return out
+}
+
 export function parseMarkdownToStructure(
   markdown: string,
   md: MarkdownIt,
@@ -2154,7 +2333,22 @@ export function parseMarkdownToStructure(
   // todo: 下面的特殊 math 其实应该更精确匹配到() 或者 $$ $$ 或者 \[ \] 内部的内容
   let safeMarkdown = (markdown ?? '').toString().replace(/([^\\])\r(ight|ho)/g, '$1\\r$2').replace(/([^\\])\n(abla|eq|ot|exists)/g, '$1\\n$2')
 
-  if (shouldResetTopLevelStreamCacheForFinalAutoParse(md, options))
+  const normalizedMathBoundaryMarkdown = normalizeMathBlockSameLineBoundaries(safeMarkdown)
+  const mathBoundaryNormalized = normalizedMathBoundaryMarkdown !== safeMarkdown
+  safeMarkdown = normalizedMathBoundaryMarkdown
+
+  // The normalization above can rewrite the latest source into a non-append-only
+  // view, e.g. "text $" -> "text\n$" once the second "$" arrives. Do not feed
+  // that transformed source into the incremental top-level stream cache; parse
+  // this edge case fully to keep token order stable and avoid duplicated prefix
+  // paragraphs around math_block.
+  const parseOptions: ParseOptions = mathBoundaryNormalized
+    ? ({ ...(options as InternalParseOptions), __disableStreamParse: true } as InternalParseOptions)
+    : options
+
+  if (mathBoundaryNormalized && md.stream?.enabled === true && typeof md.stream.reset === 'function')
+    md.stream.reset()
+  else if (shouldResetTopLevelStreamCacheForFinalAutoParse(md, parseOptions))
     md.stream!.reset!()
 
   if (!isFinal) {
@@ -2226,8 +2420,8 @@ export function parseMarkdownToStructure(
   // (like a list/table/blockquote/fence) is parsed as Markdown blocks, insert
   // a single empty line after the closing tag when the next line begins with a
   // block-level marker.
-  if (options.customHtmlTags?.length && safeMarkdown.includes('<')) {
-    const tags = normalizeCustomHtmlTags(options.customHtmlTags)
+  if (parseOptions.customHtmlTags?.length && safeMarkdown.includes('<')) {
+    const tags = normalizeCustomHtmlTags(parseOptions.customHtmlTags)
 
     if (tags.length) {
       safeMarkdown = ensureBlankLineBeforeInlineMultilineCustomHtmlBlocks(safeMarkdown, tags)
@@ -2277,10 +2471,10 @@ export function parseMarkdownToStructure(
   if (standaloneHtmlDocument) {
     // Keep pre/post hooks observable for callers that rely on them for
     // instrumentation, but preserve the full-document html_block shape.
-    const preHook = options.preTransformTokens
-    const postHook = options.postTransformTokens
-    if (shouldUseTopLevelStreamParse(md, options) || typeof preHook === 'function' || typeof postHook === 'function') {
-      const rawTokens = parseTopLevelTokens(md, safeMarkdown, { __markstreamFinal: isFinal }, options) as unknown as MarkdownToken[]
+    const preHook = parseOptions.preTransformTokens
+    const postHook = parseOptions.postTransformTokens
+    if (shouldUseTopLevelStreamParse(md, parseOptions) || typeof preHook === 'function' || typeof postHook === 'function') {
+      const rawTokens = parseTopLevelTokens(md, safeMarkdown, { __markstreamFinal: isFinal }, parseOptions) as unknown as MarkdownToken[]
       const hookedTokens = typeof preHook === 'function' ? (preHook(rawTokens) || rawTokens) : rawTokens
       if (typeof postHook === 'function')
         postHook(hookedTokens)
@@ -2289,13 +2483,13 @@ export function parseMarkdownToStructure(
   }
 
   // Get tokens from markdown-it
-  const tokens = parseTopLevelTokens(md, safeMarkdown, { __markstreamFinal: isFinal }, options)
+  const tokens = parseTopLevelTokens(md, safeMarkdown, { __markstreamFinal: isFinal }, parseOptions)
   // Defensive: ensure tokens is an array
   if (!tokens || !Array.isArray(tokens))
     return finishTimedParse([], timing, parseStartedAt)
   // Allow consumers to transform tokens before processing
-  const pre = options.preTransformTokens
-  const post = options.postTransformTokens
+  const pre = parseOptions.preTransformTokens
+  const post = parseOptions.postTransformTokens
   let transformedTokens = tokens as unknown as MarkdownToken[]
   if (pre && typeof pre === 'function') {
     transformedTokens = pre(transformedTokens) || transformedTokens
@@ -2309,9 +2503,9 @@ export function parseMarkdownToStructure(
   // md.set({ validateLink }) is applied when we emit link nodes (tokens may
   // bypass the tokenizer's link rule, e.g. synthetic links from fixLinkTokens).
   const mdAny = md as { options?: { validateLink?: (url: string) => boolean }, validateLink?: (url: string) => boolean }
-  const validateLink = options.validateLink ?? mdAny.options?.validateLink ?? (typeof mdAny.validateLink === 'function' ? mdAny.validateLink : undefined)
+  const validateLink = parseOptions.validateLink ?? mdAny.options?.validateLink ?? (typeof mdAny.validateLink === 'function' ? mdAny.validateLink : undefined)
   const internalOptions: InternalParseOptions = {
-    ...options,
+    ...parseOptions,
     validateLink,
     __markdownIt: md,
     __sourceMarkdown: safeMarkdown,
@@ -2339,8 +2533,8 @@ export function parseMarkdownToStructure(
   }
 
   result = mergeSplitTopLevelHtmlBlocks(result, isFinal, safeMarkdown)
-  result = combineStructuredDetailsHtmlBlocks(result, safeMarkdown, md, options, isFinal)[0]
-  result = structureGenericHtmlBlockChildren(result, md, options, isFinal)
+  result = combineStructuredDetailsHtmlBlocks(result, safeMarkdown, md, parseOptions, isFinal)[0]
+  result = structureGenericHtmlBlockChildren(result, md, parseOptions, isFinal)
 
   if (isFinal) {
     const seen = new WeakSet<object>()
@@ -2368,7 +2562,7 @@ export function parseMarkdownToStructure(
     finalizeHtmlBlockLoading(result)
   }
 
-  if (options.debug) {
+  if (parseOptions.debug) {
     console.log('Parsed Markdown Tree Structure:', result)
   }
   return finishTimedParse(result, timing, parseStartedAt)

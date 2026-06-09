@@ -1037,24 +1037,6 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     const allowLoading = !s?.env?.__markstreamFinal
     const strict = mathOpts?.strictDelimiters
 
-    const pushBoundaryInline = (content: string, line: number) => {
-      const inlineContent = String(content ?? '')
-        .replace(/^[\t ]+/, '')
-        .replace(/[\t ]+$/, '')
-
-      if (!inlineContent)
-        return
-
-      // Do not synthesize paragraph_open/paragraph_close here.
-      // The stream parser is sensitive to block-token nesting generated from
-      // a single block rule. A root-level `inline` token is already supported
-      // by processTokens(), which wraps it as a paragraph after inline parsing.
-      const inlineToken = s.push('inline', '', 0)
-      inlineToken.content = inlineContent
-      inlineToken.map = [line, line + 1]
-      inlineToken.children = []
-    }
-
     const delimiters: [string, string][] = strict
       ? [
           ['\\[', '\\]'],
@@ -1066,12 +1048,10 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           ['$$', '$$'],
         ]
     const startPos = s.bMarks[startLine] + s.tShift[startLine]
-    let lineText = s.src.slice(startPos, s.eMarks[startLine]).trim()
+    const lineText = s.src.slice(startPos, s.eMarks[startLine]).trim()
     let matched = false
     let openDelim = ''
     let closeDelim = ''
-    let skipFirstLine = false
-    let prefixBeforeOpen = ''
     for (const [open, close] of delimiters) {
       // 这里其实不应该只匹配 startWith的情况因为很可能前面还有 text
       if (lineText.startsWith(open)) {
@@ -1129,29 +1109,6 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           break
         }
       }
-      // 这里可能 AI 返回的格式有问题：display math opener 跟在文本最后，而不是单独一行。
-      // 只对明确的 block math delimiter 启用该容错：
-      // - `$$`
-      // - `\[`，即显式 TeX display math
-      //
-      // 不要对非严格模式下的 plain `[` 启用，否则容易误伤 JSON/数组/普通 bracket 文本。
-      else if (
-        (open === '$$' || open === '\\[')
-        && lineText.endsWith(open)
-        && !lineText.slice(0, lineText.length - open.length).trim().includes(open)
-        && startLine + 1 < endLine
-      ) {
-        prefixBeforeOpen = lineText.slice(0, lineText.length - open.length)
-        const nextLineStartPos = s.bMarks[startLine + 1] + s.tShift[startLine + 1]
-        const nextLineText = s.src.slice(nextLineStartPos, s.eMarks[startLine + 1]).trim()
-        lineText = nextLineText
-        // 更新 endLine
-        skipFirstLine = true
-        matched = true
-        openDelim = open
-        closeDelim = close
-        break
-      }
     }
 
     if (!matched)
@@ -1169,7 +1126,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       ? escapedPlainBracketCloseIndex
       : lineText.indexOf(closeDelim, closeSearchStart)
 
-    if (!skipFirstLine && sameLineCloseIndex > openDelim.length) {
+    if (sameLineCloseIndex > openDelim.length) {
       const content = lineText.slice(
         startDelimIndex + openDelim.length,
         sameLineCloseIndex,
@@ -1183,36 +1140,25 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       token.block = true
       token.loading = false
       s.line = startLine + 1
-
-      const trailingAfterClose = lineText.slice(sameLineCloseIndex + sameLineCloseDelim.length)
-      if (trailingAfterClose.trim())
-        pushBoundaryInline(trailingAfterClose, startLine)
-
       return true
     }
 
     let nextLine = startLine
     let content = ''
     let found = false
-    let trailingAfterClose = ''
-    let trailingAfterCloseLine = startLine
 
     const firstLineContent
-      = skipFirstLine
-        ? lineText
-        : lineText === openDelim ? '' : lineText.slice(openDelim.length)
+      = lineText === openDelim ? '' : lineText.slice(openDelim.length)
     const fallbackPlainBracketClose = !strict && openDelim === '\\[' ? ']' : ''
 
     if (firstLineContent.includes(closeDelim)) {
       const endIndex = firstLineContent.indexOf(closeDelim)
       content = firstLineContent.slice(0, endIndex)
-      trailingAfterClose = firstLineContent.slice(endIndex + closeDelim.length)
-      trailingAfterCloseLine = skipFirstLine ? startLine + 1 : startLine
       found = true
-      nextLine = trailingAfterCloseLine
+      nextLine = startLine
     }
     else {
-      if (firstLineContent && !skipFirstLine)
+      if (firstLineContent)
         content = firstLineContent
 
       for (nextLine = startLine + 1; nextLine < endLine; nextLine++) {
@@ -1238,21 +1184,13 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           found = true
           const endIndex = currentLine.indexOf('\\]')
           closeDelim = '\\]'
-          const beforeClose = currentLine.slice(0, endIndex)
-          if (beforeClose)
-            content += (content ? '\n' : '') + beforeClose
-          trailingAfterClose = currentLine.slice(endIndex + closeDelim.length)
-          trailingAfterCloseLine = nextLine
+          content += (content ? '\n' : '') + currentLine.slice(0, endIndex)
           break
         }
         else if (currentLine.includes(closeDelim)) {
           found = true
           const endIndex = currentLine.indexOf(closeDelim)
-          const beforeClose = currentLine.slice(0, endIndex)
-          if (beforeClose)
-            content += (content ? '\n' : '') + beforeClose
-          trailingAfterClose = currentLine.slice(endIndex + closeDelim.length)
-          trailingAfterCloseLine = nextLine
+          content += (content ? '\n' : '') + currentLine.slice(0, endIndex)
           break
         }
         content += (content ? '\n' : '') + currentLine
@@ -1263,7 +1201,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     if ((!allowLoading || strict) && !found)
       return false
     // 追加检测内容是否是 math
-    // For explicit $$ delimiters, skip the isMathLike check since $$ is already
+    // For explicit $ delimiters, skip the isMathLike check since $ is already
     // a clear math marker. This allows spaced subscript formats like "f _ { x }"
     // to be correctly recognized as math.
     // However, if the content starts with markdown special syntax like ![, skip.
@@ -1271,9 +1209,6 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     const looksMath = openDelim === '$$' ? !hasMarkdownPrefix : (openDelim === '[' ? isPlainBracketMathLike(content) : isMathLike(content))
     if (!looksMath)
       return false
-
-    if (prefixBeforeOpen)
-      pushBoundaryInline(prefixBeforeOpen, startLine)
 
     const token = s.push('math_block', 'math', 0)
     token.content = normalizeStandaloneBackslashT(content)
@@ -1284,10 +1219,6 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     token.block = true
     token.loading = !found
     s.line = nextLine + 1
-
-    if (trailingAfterClose.trim())
-      pushBoundaryInline(trailingAfterClose, trailingAfterCloseLine)
-
     return true
   }
 
