@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { BaseNode, HtmlPolicy, ParsedNode } from 'stream-markdown-parser'
-import type { CodeBlockMonacoOptions, CodeBlockMonacoTheme, CodeBlockNodeProps, CodeBlockPreviewPayload } from '../../types/component-props'
+import type { CodeBlockMonacoOptions, CodeBlockMonacoTheme, CodeBlockNodeProps, CodeBlockPreviewPayload, ShikiCodeBlockProps } from '../../types/component-props'
+import { normalizeShikiLanguage } from 'markstream-core'
 import { normalizeCustomHtmlTags } from 'stream-markdown-parser'
-import { computed } from 'vue-demi'
+import { computed, provide } from 'vue-demi'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
 import CheckboxNode from '../../components/CheckboxNode'
@@ -32,12 +33,26 @@ import TableNode from '../../components/TableNode'
 import TextNode from '../../components/TextNode'
 import ThematicBreakNode from '../../components/ThematicBreakNode'
 import VmrContainerNode from '../../components/VmrContainerNode'
+import { normalizeLanguageIdentifier } from '../../utils'
+import { getCodeBlockExtraProps } from '../../utils/codeBlockExtraProps'
 import { getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from '../../utils/htmlRenderer'
 import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
 import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode/HtmlInlineNode.vue'
 import { MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
 import FallbackComponent from './FallbackComponent.vue'
+
+type NodeRendererCodeBlockThemes
+  = CodeBlockNodeProps['themes']
+    | ShikiCodeBlockProps['themes']
+
+type NodeRendererCodeBlockProps
+  = Partial<Omit<CodeBlockNodeProps, 'node' | 'themes'>>
+    & Partial<Omit<ShikiCodeBlockProps, 'themes'>>
+    & {
+      themes?: NodeRendererCodeBlockThemes
+    }
+    & Record<string, unknown>
 
 const props = withDefaults(defineProps<{
   nodes?: BaseNode[]
@@ -52,9 +67,21 @@ const props = withDefaults(defineProps<{
   codeBlockMonacoOptions?: CodeBlockMonacoOptions
   codeBlockMinWidth?: string | number
   codeBlockMaxWidth?: string | number
-  codeBlockProps?: Partial<Omit<CodeBlockNodeProps, 'node'>>
+  codeBlockProps?: NodeRendererCodeBlockProps
   renderCodeBlocksAsPre?: boolean
+  /**
+   * Theme names or theme objects preloaded for Monaco-backed code blocks.
+   * When Shiki code blocks are used, only string theme names are forwarded to
+   * MarkdownCodeBlockNode / stream-markdown; theme objects are ignored.
+   */
   themes?: CodeBlockMonacoTheme[]
+  /**
+   * Shiki language preload list forwarded to MarkdownCodeBlockNode.
+   *
+   * Vue2's default code block renderer is Monaco-backed. This prop is used
+   * when a custom `code_block` or language renderer uses MarkdownCodeBlockNode.
+   */
+  langs?: readonly string[]
   isDark?: boolean
   customHtmlTags?: readonly string[]
   htmlPolicy?: HtmlPolicy
@@ -70,6 +97,17 @@ const emit = defineEmits<{
   (e: 'handleArtifactClick', payload: CodeBlockPreviewPayload): void
   (e: 'click', event: MouseEvent): void
 }>()
+
+provide('markstreamTypewriter', computed(() => props.typewriter === true))
+provide('markstreamFade', computed(() => props.fade !== false))
+
+function handleCopy(code: string) {
+  emit('copy', code)
+}
+
+function handleArtifactClick(payload: CodeBlockPreviewPayload) {
+  emit('handleArtifactClick', payload)
+}
 
 const nodeComponents = {
   text: TextNode,
@@ -113,6 +151,10 @@ const customComponentsMap = computed(() => {
   return getCustomNodeComponents(props.customId)
 })
 const indexPrefix = computed(() => (props.indexKey != null ? String(props.indexKey) : 'legacy-renderer'))
+const codeBlockExtraProps = computed(() => getCodeBlockExtraProps(props.codeBlockProps))
+const builtinCodeBlockExtraProps = computed(() =>
+  getCodeBlockExtraProps(props.codeBlockProps, { omit: ['langs'] }),
+)
 const codeBlockBindings = computed(() => ({
   stream: props.codeBlockStream,
   darkTheme: props.codeBlockDarkTheme,
@@ -121,7 +163,12 @@ const codeBlockBindings = computed(() => ({
   themes: props.themes,
   minWidth: props.codeBlockMinWidth,
   maxWidth: props.codeBlockMaxWidth,
-  ...(props.codeBlockProps || {}),
+  ...builtinCodeBlockExtraProps.value,
+}))
+const customCodeBlockBindings = computed(() => ({
+  ...codeBlockBindings.value,
+  langs: props.langs,
+  ...codeBlockExtraProps.value,
 }))
 const nonCodeBindings = computed(() => ({ typewriter: props.typewriter, fade: props.fade, htmlPolicy: props.htmlPolicy ?? 'safe' }))
 const linkBindings = computed(() => ({
@@ -141,8 +188,8 @@ const renderedItems = computed(() => {
   const nodes = Array.isArray(props.nodes) ? props.nodes : []
   return nodes.map((rawNode, index) => {
     let node = rawNode as ParsedNode
+    const type = String((rawNode as any)?.type || 'unknown')
     const language = getCodeBlockLanguage(node)
-    const type = String((node as any)?.type || 'unknown')
     let component = getNodeComponent(node, language)
 
     // Coerce html_block/html_inline nodes whose tag matches a registered
@@ -201,7 +248,7 @@ const renderedItems = computed(() => {
       node,
       isCodeBlock: node?.type === 'code_block',
       component,
-      bindings: getBindingsFor(node, language),
+      bindings: getBindingsFor(node, language, component),
     }
   })
 })
@@ -212,6 +259,23 @@ function getCodeBlockLanguage(node: ParsedNode) {
     : ''
 }
 
+function getCustomCodeLanguageComponent(
+  customComponents: Record<string, unknown>,
+  language: string,
+) {
+  const raw = language.trim().toLowerCase()
+  if (!raw)
+    return undefined
+
+  for (const key of [raw, normalizeLanguageIdentifier(raw), normalizeShikiLanguage(raw)]) {
+    const component = key && customComponents[key]
+    if (component)
+      return component
+  }
+
+  return undefined
+}
+
 function getNodeComponent(node: ParsedNode, language?: string) {
   if (!node)
     return FallbackComponent
@@ -219,7 +283,9 @@ function getNodeComponent(node: ParsedNode, language?: string) {
   const customForType = (customComponents as any)[String((node as any).type)]
   if (node.type === 'code_block') {
     const lang = language ?? getCodeBlockLanguage(node)
-    const customForLanguage = lang ? (customComponents as any)[lang] : undefined
+    const customForLanguage = lang
+      ? getCustomCodeLanguageComponent(customComponents as any, lang)
+      : undefined
     if (customForLanguage)
       return customForLanguage
 
@@ -245,8 +311,30 @@ function getNodeComponent(node: ParsedNode, language?: string) {
   return (nodeComponents as any)[String((node as any).type)] || FallbackComponent
 }
 
-function getBindingsFor(node: ParsedNode, language?: string) {
+function isCustomCodeBlockComponent(component: unknown) {
+  return Boolean(component && component === customComponentsMap.value.code_block)
+}
+
+function isCustomLanguageCodeBlockComponent(component: unknown, language?: string) {
+  return Boolean(component && language && component === getCustomCodeLanguageComponent(customComponentsMap.value as any, language))
+}
+
+function getBindingsFor(node: ParsedNode, language?: string, component?: unknown) {
   const lang = language ?? getCodeBlockLanguage(node)
+  if (node.type === 'code_block' && isCustomLanguageCodeBlockComponent(component, lang)) {
+    if (lang === 'mermaid' || lang === 'infographic' || lang === 'd2' || lang === 'd2lang')
+      return {}
+
+    return customCodeBlockBindings.value
+  }
+
+  if (
+    node.type === 'code_block'
+    && isCustomCodeBlockComponent(component)
+  ) {
+    return customCodeBlockBindings.value
+  }
+
   if (lang === 'mermaid' || lang === 'infographic' || lang === 'd2' || lang === 'd2lang')
     return {}
   if (node.type === 'link')
@@ -275,14 +363,15 @@ function handleClick(event: MouseEvent) {
       <div class="node-content">
         <component
           :is="item.component"
+          :key="`${item.renderKey}-component`"
           :node="item.node"
           :loading="item.node.loading"
           :index-key="item.indexKey"
           v-bind="item.bindings"
           :custom-id="props.customId"
           :is-dark="props.isDark"
-          @copy="emit('copy', $event)"
-          @handle-artifact-click="emit('handleArtifactClick', $event)"
+          @copy="handleCopy"
+          @handle-artifact-click="handleArtifactClick"
         />
       </div>
     </div>

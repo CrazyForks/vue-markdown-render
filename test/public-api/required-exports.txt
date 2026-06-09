@@ -98,6 +98,7 @@ safeCancelRaf
 CodeBlockNodeProps
 CodeBlockPreviewPayload
 CodeBlockThemeProp
+ShikiCodeBlockProps
 CodeBlockMonacoLanguage
 CodeBlockMonacoOptions
 CodeBlockMonacoTheme

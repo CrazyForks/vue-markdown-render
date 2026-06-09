@@ -16,6 +16,7 @@ import type {
   NodeRendererMode,
   NodeRendererProps,
 } from '../../types/node-renderer-props'
+import { getHighlightRegistrationKey, normalizeShikiLanguage } from 'markstream-core'
 import { computed, defineAsyncComponent, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
@@ -56,8 +57,11 @@ import {
   heightEstimationExperimentRevision,
   registerHeightEstimationRendererController,
 } from '../../internal/heightEstimationExperiment'
+import { getCodeBlockExtraProps } from '../../utils/codeBlockExtraProps'
+import { isDevEnvironment } from '../../utils/devEnv'
 import { clampInfographicPreviewHeight, clampMermaidPreviewHeight, estimateInfographicPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber } from '../../utils/diagramHeight'
 import { getCustomNodeAttrs, getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from '../../utils/htmlRenderer'
+import { normalizeLanguageIdentifier } from '../../utils/languageIcon'
 import { isReservedNodeComponentKey, useCustomNodeComponents } from '../../utils/nodeComponents'
 import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import { setNormalizedElementScrollTop } from '../../utils/normalizedScroll'
@@ -125,6 +129,8 @@ const emit = defineEmits<{
   (e: 'render-final', payload: MarkstreamVirtualMetrics): void
   (e: 'anchor-change', payload: MarkstreamVirtualAnchor): void
 }>()
+
+const isDevEnv = isDevEnvironment()
 
 const RENDERER_MODE_DEFAULTS: Record<NodeRendererMode, Pick<
   NodeRendererProps,
@@ -248,6 +254,7 @@ const rendererProps = {
   get infographicProps() { return props.infographicProps },
   get showTooltips() { return resolvedShowTooltipsProp.value },
   get themes() { return props.themes },
+  get langs() { return props.langs },
   get isDark() { return props.isDark },
   get customId() { return props.customId },
   get indexKey() { return props.indexKey },
@@ -584,6 +591,7 @@ const nestedRendererProps = computed<Partial<NodeRendererProps>>(() => ({
   infographicProps: props.infographicProps,
   showTooltips: resolvedShowTooltips.value,
   themes: props.themes,
+  langs: props.langs,
   isDark: props.isDark,
   typewriter: props.typewriter,
   smoothStreamingOptions: props.smoothStreamingOptions,
@@ -1761,7 +1769,8 @@ function getHostVirtualMeasurementKey() {
 function getVirtualRendererLayoutKey() {
   const renderer = resolvedCodeRenderer.value
   const monaco = renderer === 'monaco' ? props.codeBlockMonacoOptions : undefined
-  const codeProps = props.codeBlockProps
+  const codeProps = props.codeBlockProps as Record<string, unknown> | undefined
+  const includeShikiCodeOptions = renderer === 'shiki'
 
   return [
     props.isDark ? 'dark' : 'light',
@@ -1773,6 +1782,12 @@ function getVirtualRendererLayoutKey() {
     rendererProps.codeBlockStream === false ? 'code-static' : 'code-stream',
     stringifyVirtualToken(props.codeBlockMinWidth),
     stringifyVirtualToken(props.codeBlockMaxWidth),
+    ...(includeShikiCodeOptions
+      ? [getHighlightRegistrationKey(
+          (codeProps?.themes ?? props.themes) as readonly unknown[] | undefined,
+          (codeProps?.langs ?? props.langs) as readonly unknown[] | undefined,
+        )]
+      : []),
     stringifyVirtualToken(monaco?.fontSize),
     stringifyVirtualToken(monaco?.lineHeight),
     stringifyVirtualToken(monaco?.fontFamily),
@@ -3015,7 +3030,7 @@ function warnStandaloneHeightCacheIgnored(reason: string) {
   if (
     warnedStandaloneHeightCacheWithoutSignature
     || typeof console === 'undefined'
-    || !(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV)
+    || !isDevEnv
   ) {
     return
   }
@@ -4325,7 +4340,7 @@ function autoDisableViewportPriority(reason: 'too-many-targets') {
   if (viewportPriorityAutoDisabled.value)
     return
   viewportPriorityAutoDisabled.value = true
-  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV && typeof console !== 'undefined')
+  if (isDevEnv && typeof console !== 'undefined')
     console.warn('[markstream-vue] viewportPriority auto-disabled:', reason)
 
   destroyNodeVisibilityState()
@@ -5108,6 +5123,10 @@ const nodeComponents: Partial<CustomComponents> = {
   // 例如:custom_node: CustomNode,
 }
 const indexPrefix = computed(() => getCurrentIndexPrefix())
+const codeBlockExtraProps = computed(() => getCodeBlockExtraProps(props.codeBlockProps))
+const builtinCodeBlockExtraProps = computed(() =>
+  getCodeBlockExtraProps(props.codeBlockProps, { omit: ['langs'] }),
+)
 const codeBlockBindings = computed(() => ({
   // streaming behavior control for CodeBlockNode / MarkdownCodeBlockNode
   stream: rendererProps.codeBlockStream,
@@ -5115,10 +5134,17 @@ const codeBlockBindings = computed(() => ({
   lightTheme: props.codeBlockLightTheme,
   monacoOptions: props.codeBlockMonacoOptions,
   themes: props.themes,
+  langs: resolvedCodeRenderer.value === 'shiki' ? props.langs : undefined,
   minWidth: props.codeBlockMinWidth,
   maxWidth: props.codeBlockMaxWidth,
   ...(typeof resolvedShowTooltips.value === 'boolean' ? { showTooltips: resolvedShowTooltips.value } : {}),
-  ...(props.codeBlockProps || {}),
+  ...builtinCodeBlockExtraProps.value,
+}))
+
+const customCodeBlockBindings = computed(() => ({
+  ...codeBlockBindings.value,
+  langs: props.langs,
+  ...codeBlockExtraProps.value,
 }))
 
 function pickBoolean(value: unknown) {
@@ -5150,18 +5176,18 @@ const preCodeBlockBindings = computed(() => {
 })
 
 const shikiCodeBlockBindings = computed(() => {
-  const source = (props.codeBlockProps || {}) as Record<string, unknown>
   return {
     stream: rendererProps.codeBlockStream,
     darkTheme: props.codeBlockDarkTheme,
     lightTheme: props.codeBlockLightTheme,
     themes: props.themes,
+    langs: props.langs,
     minWidth: props.codeBlockMinWidth,
     maxWidth: props.codeBlockMaxWidth,
     ...(typeof resolvedShowTooltips.value === 'boolean'
       ? { showTooltips: resolvedShowTooltips.value }
       : {}),
-    ...source,
+    ...codeBlockExtraProps.value,
   }
 })
 
@@ -5288,7 +5314,10 @@ const renderedItems = computed(() => {
       }
     }
 
-    const usesPreCodeBindings = shouldUsePreCodeBindings(node, language, component)
+    const usesPreCodeBindings = node.type === 'code_block'
+      && resolvedCodeRenderer.value === 'pre'
+      && component === PreCodeNode
+      && !getCustomCodeLanguageComponent(customComponentsMap.value, language)
     let bindings = { ...getBindingsFor(node, language, component) } as Record<string, unknown>
     const estimatedHeight = estimatedNodeHeights.value[item.index]
     if (node.type === 'code_block' && estimatedHeight?.kind === 'code-block') {
@@ -5368,23 +5397,46 @@ function getCodeBlockLanguage(node: ParsedNode) {
     : ''
 }
 
-function hasExactCodeLanguageOverride(language: string) {
-  return Boolean(language && customComponentsMap.value[language])
-}
-
-function isCustomCodeBlockComponent(component: unknown) {
-  return Boolean(component && component === customComponentsMap.value.code_block)
-}
-
-function shouldUsePreCodeBindings(
-  node: ParsedNode,
+function getCustomCodeLanguageComponent(
+  customComponents: Record<string, unknown>,
   language: string,
-  component: unknown,
 ) {
-  return node.type === 'code_block'
-    && resolvedCodeRenderer.value === 'pre'
-    && !hasExactCodeLanguageOverride(language)
-    && component === PreCodeNode
+  const raw = language.trim().toLowerCase()
+  if (!raw)
+    return undefined
+
+  for (const key of [raw, normalizeLanguageIdentifier(raw), normalizeShikiLanguage(raw)]) {
+    const component = key && customComponents[key]
+    if (component)
+      return component
+  }
+
+  return undefined
+}
+
+function getPreviewBindingsFor(
+  source: { value: Record<string, any> },
+  node: ParsedNode,
+  estimate: (code: string) => number,
+  clamp: (height: number, minHeight?: number, maxHeight?: number | null) => number,
+) {
+  const bindings = { ...source.value } as Record<string, any>
+  if (parsePositiveNumber(bindings.estimatedPreviewHeightPx) == null) {
+    bindings.estimatedPreviewHeightPx = clamp(
+      estimate(String((node as RuntimeCodeBlockNode)?.code ?? '')),
+      undefined,
+      bindings.maxHeight === 'none' ? null : (parsePositiveNumber(bindings.maxHeight) ?? undefined),
+    )
+  }
+  return bindings
+}
+
+function getMermaidBindingsFor(node: ParsedNode) {
+  return getPreviewBindingsFor(mermaidBindings, node, estimateMermaidPreviewHeight, clampMermaidPreviewHeight)
+}
+
+function getInfographicBindingsFor(node: ParsedNode) {
+  return getPreviewBindingsFor(infographicBindings, node, estimateInfographicPreviewHeight, clampInfographicPreviewHeight)
 }
 
 // Decide which component to use for a given node. Ensure that code blocks
@@ -5397,7 +5449,9 @@ function getNodeComponent(node: ParsedNode, language?: string) {
   const customForType = customComponents[String(node.type)]
   if (node.type === 'code_block') {
     const lang = language ?? getCodeBlockLanguage(node)
-    const customForLanguage = lang ? customComponents[lang] : undefined
+    const customForLanguage = lang
+      ? getCustomCodeLanguageComponent(customComponents, lang)
+      : undefined
     if (customForLanguage)
       return customForLanguage
 
@@ -5445,20 +5499,45 @@ function getNodeComponent(node: ParsedNode, language?: string) {
 
 function getBindingsFor(node: ParsedNode, language?: string, component?: unknown) {
   const lang = language ?? getCodeBlockLanguage(node)
-  if (component && shouldUsePreCodeBindings(node, lang, component))
-    return preCodeBlockBindings.value
+  if (node.type === 'code_block') {
+    const customLanguageComponent = lang
+      ? getCustomCodeLanguageComponent(customComponentsMap.value, lang)
+      : undefined
 
-  if (node.type === 'code_block' && isCustomCodeBlockComponent(component))
-    return codeBlockBindings.value
+    if (
+      component
+      && resolvedCodeRenderer.value === 'pre'
+      && !customLanguageComponent
+      && component === PreCodeNode
+    ) {
+      return preCodeBlockBindings.value
+    }
 
-  if (node.type === 'code_block' && isMarkdownCodeBlockComponent(component))
-    return shikiCodeBlockBindings.value
+    if (component && lang && component === customLanguageComponent) {
+      if (lang === 'mermaid')
+        return getMermaidBindingsFor(node)
+
+      if (lang === 'infographic')
+        return getInfographicBindingsFor(node)
+
+      if (lang === 'd2' || lang === 'd2lang')
+        return d2Bindings.value
+
+      return customCodeBlockBindings.value
+    }
+
+    if (component && component === customComponentsMap.value.code_block)
+      return customCodeBlockBindings.value
+
+    if (isMarkdownCodeBlockComponent(component))
+      return shikiCodeBlockBindings.value
+  }
 
   if (lang === 'mermaid')
-    return mermaidBindings.value
+    return getMermaidBindingsFor(node)
 
   if (lang === 'infographic')
-    return infographicBindings.value
+    return getInfographicBindingsFor(node)
 
   if (lang === 'd2' || lang === 'd2lang')
     return d2Bindings.value

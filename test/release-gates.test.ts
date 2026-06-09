@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 describe('release dependency gates', () => {
   const packageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'))
+  const readPackageJson = (path: string) => JSON.parse(readFileSync(resolve(process.cwd(), path), 'utf8'))
 
   it('runs the workspace dependency publish gate before packed smoke on prepublish', () => {
     const scripts = packageJson.scripts
@@ -131,6 +132,30 @@ describe('release dependency gates', () => {
     expect(script).toMatch(/packageJson: 'packages\/markstream-core\/package\.json'/)
     expect(script).toMatch(/name: 'stream-markdown-parser'/)
     expect(script).toMatch(/packageJson: 'packages\/markdown-parser\/package\.json'/)
+    expect(script).toContain('token === \'--package-json\'')
+    expect(script).toContain('const dependencyVersion = packageJson.dependencies?.[dep.name]')
+    expect(script).toContain('continue')
+  })
+
+  it('uses workspace dependency publish gates for framework package releases', () => {
+    for (const path of [
+      'packages/markstream-angular/package.json',
+      'packages/markstream-react/package.json',
+      'packages/markstream-svelte/package.json',
+      'packages/markstream-vue2/package.json',
+    ]) {
+      const frameworkPackageJson = readPackageJson(path)
+      const scripts = frameworkPackageJson.scripts
+
+      expect(frameworkPackageJson.dependencies['stream-markdown-parser']).toBe('workspace:*')
+      expect(scripts['check:workspace-deps-published']).toBe('node ../../scripts/check-workspace-deps-published.mjs --package-json package.json')
+      expect(scripts.release).toContain('pnpm run check:workspace-deps-published')
+      expect(scripts.release).not.toContain('pnpm run check:core-published')
+      if (scripts.prepublishOnly) {
+        expect(scripts.prepublishOnly).toContain('pnpm run check:workspace-deps-published')
+        expect(scripts.prepublishOnly).not.toContain('pnpm run check:core-published')
+      }
+    }
   })
 
   it('keeps dry-run workspace dependency checks local', () => {

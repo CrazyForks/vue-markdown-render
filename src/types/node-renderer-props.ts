@@ -8,9 +8,20 @@ import type {
   D2BlockNodeProps,
   InfographicBlockNodeProps,
   MermaidBlockNodeProps,
+  ShikiCodeBlockProps,
 } from './component-props'
 
-export type NodeRendererCodeBlockProps = Partial<Omit<CodeBlockNodeProps, 'node'>> & Record<string, unknown>
+type NodeRendererCodeBlockThemes
+  = CodeBlockNodeProps['themes']
+    | ShikiCodeBlockProps['themes']
+
+export type NodeRendererCodeBlockProps
+  = Partial<Omit<CodeBlockNodeProps, 'node' | 'themes'>>
+    & Partial<Omit<ShikiCodeBlockProps, 'themes'>>
+    & {
+      themes?: NodeRendererCodeBlockThemes
+    }
+    & Record<string, unknown>
 export type NodeRendererMode = 'docs' | 'chat' | 'minimal'
 export type NodeRendererCodeRenderer = 'pre' | 'shiki' | 'monaco'
 
@@ -316,8 +327,20 @@ export interface NodeRendererProps {
   infographicProps?: Partial<Omit<InfographicBlockNodeProps, 'node' | 'loading' | 'isDark'>>
   /** Global tooltip toggle for link/code-block renderers (default: true) */
   showTooltips?: boolean
-  /** Theme names or theme objects preloaded for Monaco-backed code blocks. */
+  /**
+   * Theme names or theme objects preloaded for Monaco-backed code blocks.
+   * When `codeRenderer="shiki"`, only string theme names are forwarded to
+   * MarkdownCodeBlockNode / stream-markdown; theme objects are ignored.
+   */
   themes?: CodeBlockMonacoTheme[]
+  /**
+   * Shiki language preload list forwarded to MarkdownCodeBlockNode.
+   *
+   * Vue 3 built-in Shiki mode consumes this when `codeRenderer="shiki"`.
+   * React/Vue2 consume it when a custom `code_block` or language renderer
+   * uses MarkdownCodeBlockNode.
+   */
+  langs?: readonly string[]
   /** Forces dark mode for built-in renderers such as Mermaid, D2, KaTeX, and code blocks. */
   isDark?: boolean
   /** Scope key used by `setCustomComponents()` and `data-custom-id` style overrides. */

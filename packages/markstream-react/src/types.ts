@@ -10,9 +10,20 @@ import type {
   D2BlockNodeProps,
   InfographicBlockNodeProps,
   MermaidBlockNodeProps,
+  ShikiCodeBlockProps,
 } from './types/component-props'
 
-export type NodeRendererCodeBlockProps = Partial<Omit<CodeBlockNodeProps, 'node'>> & Record<string, unknown>
+type NodeRendererCodeBlockThemes
+  = CodeBlockNodeProps['themes']
+    | ShikiCodeBlockProps['themes']
+
+export type NodeRendererCodeBlockProps
+  = Partial<Omit<CodeBlockNodeProps, 'node' | 'themes'>>
+    & Partial<Omit<ShikiCodeBlockProps, 'themes'>>
+    & {
+      themes?: NodeRendererCodeBlockThemes
+    }
+    & Record<string, unknown>
 
 export interface NodeRendererProps {
   content?: string
@@ -45,7 +56,19 @@ export interface NodeRendererProps {
   d2Props?: Partial<Omit<D2BlockNodeProps, 'node' | 'loading' | 'isDark'>>
   infographicProps?: Partial<Omit<InfographicBlockNodeProps, 'node' | 'loading' | 'isDark'>>
   showTooltips?: boolean
+  /**
+   * Theme names or theme objects preloaded for Monaco-backed code blocks.
+   * When Shiki code blocks are used, only string theme names are forwarded to
+   * MarkdownCodeBlockNode / stream-markdown; theme objects are ignored.
+   */
   themes?: CodeBlockMonacoTheme[]
+  /**
+   * Shiki language preload list forwarded to MarkdownCodeBlockNode.
+   *
+   * The default React code block renderer is Monaco-backed. This prop is used
+   * when a custom `code_block` or language renderer uses MarkdownCodeBlockNode.
+   */
+  langs?: readonly string[]
   isDark?: boolean
   customId?: string
   indexKey?: number | string
@@ -105,6 +128,7 @@ export interface RenderContext {
     monacoOptions?: CodeBlockMonacoOptions
     minWidth?: string | number
     maxWidth?: string | number
+    langs?: readonly string[]
   }
   events: {
     onCopy?: (code: string) => void

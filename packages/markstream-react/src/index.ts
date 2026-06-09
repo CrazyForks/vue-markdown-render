@@ -99,6 +99,7 @@ export type {
   MermaidBlockEvent,
   MermaidBlockNodeProps,
   PreCodeNodeProps,
+  ShikiCodeBlockProps,
 } from './types/component-props'
 export type { NodeComponentProps } from './types/node-component'
 export * from './utils/languageIcon'

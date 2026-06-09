@@ -255,6 +255,7 @@ module.exports = {
     '@shikijs/core',
     '@shikijs/engine-javascript',
     '@shikijs/engine-oniguruma',
+    '@shikijs/primitive',
     '@shikijs/types',
     '@shikijs/vscode-textmate',
     '@shikijs/monaco',

@@ -1,5 +1,6 @@
 import type { ParsedNode } from 'stream-markdown-parser'
 import type { RenderContext } from '../types'
+import { normalizeShikiLanguage } from 'markstream-core'
 import React from 'react'
 import { getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from 'stream-markdown-parser'
 import { AdmonitionNode } from '../components/AdmonitionNode/AdmonitionNode'
@@ -45,6 +46,7 @@ import { VmrContainerNode } from '../components/VmrContainerNode/VmrContainerNod
 import { getCustomNodeComponents } from '../customComponents'
 import { resolveCustomHtmlTag } from '../utils/customHtmlTag'
 import { normalizeLanguageIdentifier } from '../utils/languageIcon'
+import { getCodeBlockExtraProps } from './codeBlockExtraProps'
 import { renderNodeChildren } from './renderChildren'
 
 function getRawCodeBlockLanguage(node: any) {
@@ -56,22 +58,90 @@ function getRawCodeBlockLanguage(node: any) {
   return base.toLowerCase()
 }
 
+function getCustomCodeLanguageComponent(
+  customComponents: Record<string, any>,
+  rawLanguage: string,
+) {
+  const raw = rawLanguage.trim().toLowerCase()
+  if (!raw)
+    return null
+
+  for (const key of [raw, normalizeLanguageIdentifier(raw), normalizeShikiLanguage(raw)]) {
+    const component = key && customComponents[key]
+    if (component)
+      return component
+  }
+
+  return null
+}
+
 function renderCustomCodeBlockComponent(
   component: any,
   node: any,
   key: React.Key,
   ctx: RenderContext,
+  specialProps: Record<string, unknown> = {},
 ) {
+  const extraProps = getCodeBlockExtraProps(ctx.codeBlockProps)
+  const onPreviewCode = ctx.events.onHandleArtifactClick
+    ? (payload: { type?: string, content?: string, title?: string }) => {
+        const artifactType = payload.type === 'image/svg+xml'
+          ? 'image/svg+xml'
+          : 'text/html'
+
+        ctx.events.onHandleArtifactClick?.({
+          node: payload.content == null
+            ? node
+            : {
+                ...node,
+                code: payload.content,
+              },
+          artifactType,
+          artifactTitle: payload.title || (
+            artifactType === 'image/svg+xml' ? 'SVG Preview' : 'HTML Preview'
+          ),
+          id: String(key),
+        })
+      }
+    : undefined
+
   return React.createElement(component, {
     key,
     node,
+    loading: Boolean(node.loading),
+    stream: ctx.codeBlockStream,
     customId: ctx.customId,
     isDark: ctx.isDark,
+    darkTheme: ctx.codeBlockThemes?.darkTheme,
+    lightTheme: ctx.codeBlockThemes?.lightTheme,
+    themes: ctx.codeBlockThemes?.themes,
+    langs: ctx.codeBlockThemes?.langs,
+    minWidth: ctx.codeBlockThemes?.minWidth,
+    maxWidth: ctx.codeBlockThemes?.maxWidth,
+    onCopy: ctx.events.onCopy,
+    onPreviewCode,
+    ...extraProps,
+    ...specialProps,
     ctx,
     renderNode,
     indexKey: key,
     typewriter: ctx.typewriter,
     fade: ctx.fade,
+  })
+}
+
+function renderSpecialCodeBlockComponent(
+  component: any,
+  node: any,
+  key: React.Key,
+  ctx: RenderContext,
+  specialProps: Record<string, unknown> = {},
+) {
+  return React.createElement(component, {
+    key,
+    node,
+    isDark: ctx.isDark,
+    ...specialProps,
   })
 }
 
@@ -107,12 +177,12 @@ function renderCodeBlock(
 ) {
   const rawLanguage = getRawCodeBlockLanguage(node)
   const language = normalizeLanguageIdentifier(rawLanguage)
-  const customForLanguage = rawLanguage ? customComponents[rawLanguage] : null
+  const customForLanguage = getCustomCodeLanguageComponent(customComponents, rawLanguage)
   if (language === 'mermaid') {
     const mermaidProps = getMermaidRenderProps(node, ctx)
     const customMermaid = customForLanguage || customComponents.mermaid
     if (customMermaid)
-      return React.createElement(customMermaid as any, { key, node, isDark: ctx.isDark, ...mermaidProps })
+      return renderSpecialCodeBlockComponent(customMermaid, node, key, ctx, mermaidProps)
     if (!ctx.renderCodeBlocksAsPre) {
       return (
         <MermaidBlockNode
@@ -130,7 +200,7 @@ function renderCodeBlock(
     const infographicProps = getInfographicRenderProps(node, ctx)
     const customInfographic = customForLanguage || customComponents.infographic
     if (customInfographic)
-      return React.createElement(customInfographic as any, { key, node, isDark: ctx.isDark, ...infographicProps })
+      return renderSpecialCodeBlockComponent(customInfographic, node, key, ctx, infographicProps)
 
     return (
       <InfographicBlockNode
@@ -146,7 +216,7 @@ function renderCodeBlock(
   if (language === 'd2' || language === 'd2lang') {
     const customD2 = customForLanguage || customComponents.d2
     if (customD2)
-      return React.createElement(customD2 as any, { key, node, isDark: ctx.isDark, ...(ctx.d2Props || {}) })
+      return renderSpecialCodeBlockComponent(customD2, node, key, ctx, ctx.d2Props || {})
 
     return (
       <D2BlockNode
@@ -182,7 +252,7 @@ function renderCodeBlock(
       maxWidth={ctx.codeBlockThemes?.maxWidth}
       isDark={ctx.isDark}
       onCopy={ctx.events.onCopy}
-      {...(ctx.codeBlockProps || {})}
+      {...getCodeBlockExtraProps(ctx.codeBlockProps, { omit: ['langs'] })}
     />
   )
 }

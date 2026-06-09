@@ -1,7 +1,7 @@
 {
   "name": "markstream-vue2",
   "type": "module",
-  "version": "0.0.45",
+  "version": "0.0.46-beta.0",
   "description": "Vue 2 Markdown renderer optimized for large documents with progressive Mermaid rendering, streaming diff code blocks, and fast real-time preview. Perfect for documentation sites, AI chat interfaces, and content management systems.",
   "author": "Simon He",
   "license": "MIT",
@@ -85,7 +85,8 @@
     "validate:dist": "node ./scripts/validate-dist-entries.mjs",
     "size:check": "MAX_PACK_UNPACKED_BYTES=800000 node ../../scripts/check-package-size.mjs",
     "check:core-published": "node ../../scripts/check-core-published.mjs --package-json package.json --core-package-json ../markstream-core/package.json",
-    "release": "pnpm run check:core-published && bumpp --commit --no-tag --no-push && pnpm publish --access public && node ../../scripts/tag-package.mjs --package-json package.json --push"
+    "check:workspace-deps-published": "node ../../scripts/check-workspace-deps-published.mjs --package-json package.json",
+    "release": "pnpm run check:workspace-deps-published && bumpp --commit --no-tag --no-push && pnpm publish --access public && node ../../scripts/tag-package.mjs --package-json package.json --push"
   },
   "peerDependencies": {
     "@antv/infographic": "^0.2.3",

@@ -199,6 +199,8 @@ Prefer the unified code-block `theme` prop for new integrations. When you render
 />
 ```
 
+`code-block-props` forwards user-facing code block props only. Structural renderer keys such as `node`, `key`, `ref`, `ctx`, `renderNode`, `indexKey`, `__proto__`, `prototype`, and `constructor` are ignored.
+
 Language icons use the built-in `material` theme by default. For new integrations, inspect or switch icon themes with the exported helpers before `app.mount()`. The legacy `app.use(VueRendererMarkdown, { iconTheme })` option still works in 1.x, but prefer helpers because icon configuration is process-global state.
 
 ```ts
@@ -449,7 +451,7 @@ Parse hooks example (match server + client):
 
 - Mermaid/KaTeX not rendering? Install the peer (`mermaid` / `katex`) and pass `:enable-mermaid="true"` / `:enable-katex="true"` or call the loader setters. If you load them via CDN script tags, the library will also pick up `window.mermaid` / `window.katex`.
 - CDN + KaTeX worker: if you don't bundle `katex` but still want off-main-thread rendering, create and inject a worker that loads KaTeX via CDN (UMD) using `createKaTeXWorkerFromCDN()` + `setKaTeXWorker()`.
-- Bundle size: peers are optional and not bundled; import only `markstream-vue/index.css` once; use Shiki (`MarkdownCodeBlockNode`) when Monaco is too heavy. Infrequent language icons are split into an async chunk and load on demand; call `preloadExtendedLanguageIcons()` during app idle if you want to avoid first-hit icon fallback.
+- Bundle size: peers are optional and not bundled; import only `markstream-vue/index.css` once; use Shiki (`MarkdownCodeBlockNode`) when Monaco is too heavy. Pass `langs` to request a smaller Shiki language preload set; it is not a rendering allow-list, and languages already available in the shared Shiki registry may still highlight. Infrequent language icons are split into an async chunk and load on demand; call `preloadExtendedLanguageIcons()` during app idle if you want to avoid first-hit icon fallback.
 - Custom UI: register components via `setCustomComponents` (global or scoped), then emit markers/placeholders in Markdown and map them to Vue components.
 
 ## 🆚 Why markstream-vue over a typical Markdown renderer?

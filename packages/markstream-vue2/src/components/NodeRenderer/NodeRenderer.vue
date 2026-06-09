@@ -2,7 +2,8 @@
 import type { BaseNode, HtmlPolicy, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
 import type { SmoothMarkdownStreamOptions } from '../../composables/useSmoothMarkdownStream'
 import type { VisibilityHandle } from '../../composables/viewportPriority'
-import type { CodeBlockMonacoOptions, CodeBlockMonacoTheme, CodeBlockNodeProps, CodeBlockPreviewPayload, D2BlockNodeProps, InfographicBlockNodeProps, MermaidBlockNodeProps } from '../../types/component-props'
+import type { CodeBlockMonacoOptions, CodeBlockMonacoTheme, CodeBlockNodeProps, CodeBlockPreviewPayload, D2BlockNodeProps, InfographicBlockNodeProps, MermaidBlockNodeProps, ShikiCodeBlockProps } from '../../types/component-props'
+import { normalizeShikiLanguage } from 'markstream-core'
 import { getMarkdown, mergeCustomHtmlTags, parseMarkdownToStructure, resolveCustomHtmlTags } from 'stream-markdown-parser'
 import { h as createVNode } from 'vue'
 import { computed, getCurrentInstance, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue-demi'
@@ -37,6 +38,8 @@ import ThematicBreakNode from '../../components/ThematicBreakNode'
 import VmrContainerNode from '../../components/VmrContainerNode'
 import { useSmoothMarkdownStream } from '../../composables/useSmoothMarkdownStream'
 import { provideViewportPriority } from '../../composables/viewportPriority'
+import { normalizeLanguageIdentifier } from '../../utils'
+import { getCodeBlockExtraProps } from '../../utils/codeBlockExtraProps'
 import { clampInfographicPreviewHeight, clampMermaidPreviewHeight, estimateInfographicPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber } from '../../utils/diagramHeight'
 import { getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from '../../utils/htmlRenderer'
 import { customComponentsRevision, getCustomNodeComponents } from '../../utils/nodeComponents'
@@ -52,6 +55,18 @@ import LegacyNodesRenderer from './LegacyNodesRenderer.vue'
 interface IdleDeadlineLike {
   timeRemaining?: () => number
 }
+
+type NodeRendererCodeBlockThemes
+  = CodeBlockNodeProps['themes']
+    | ShikiCodeBlockProps['themes']
+
+type NodeRendererCodeBlockProps
+  = Partial<Omit<CodeBlockNodeProps, 'node' | 'themes'>>
+    & Partial<Omit<ShikiCodeBlockProps, 'themes'>>
+    & {
+      themes?: NodeRendererCodeBlockThemes
+    }
+    & Record<string, unknown>
 
 // Exported props interface so declaration generators can include prop types
 export interface NodeRendererProps {
@@ -93,7 +108,7 @@ export interface NodeRendererProps {
   /** Maximum width forwarded to CodeBlockNode (px or CSS unit) */
   codeBlockMaxWidth?: string | number
   /** Arbitrary props to forward to every CodeBlockNode */
-  codeBlockProps?: Partial<Omit<CodeBlockNodeProps, 'node'>>
+  codeBlockProps?: NodeRendererCodeBlockProps
   /** Props forwarded to MermaidBlockNode for mermaid fences */
   mermaidProps?: Partial<Omit<MermaidBlockNodeProps, 'node' | 'loading' | 'isDark'>>
   /** Props forwarded to D2BlockNode for d2/d2lang fences */
@@ -102,7 +117,19 @@ export interface NodeRendererProps {
   infographicProps?: Partial<Omit<InfographicBlockNodeProps, 'node' | 'loading' | 'isDark'>>
   /** Global tooltip toggle for link/code-block renderers (default: true) */
   showTooltips?: boolean
+  /**
+   * Theme names or theme objects preloaded for Monaco-backed code blocks.
+   * When Shiki code blocks are used, only string theme names are forwarded to
+   * MarkdownCodeBlockNode / stream-markdown; theme objects are ignored.
+   */
   themes?: CodeBlockMonacoTheme[]
+  /**
+   * Shiki language preload list forwarded to MarkdownCodeBlockNode.
+   *
+   * Vue2's default code block renderer is Monaco-backed. This prop is used
+   * when a custom `code_block` or language renderer uses MarkdownCodeBlockNode.
+   */
+  langs?: readonly string[]
   isDark?: boolean
   customId?: string
   indexKey?: number | string
@@ -1833,6 +1860,10 @@ const nodeComponents = {
   // 例如:custom_node: CustomNode,
 }
 const indexPrefix = computed(() => (props.indexKey != null ? String(props.indexKey) : 'markdown-renderer'))
+const codeBlockExtraProps = computed(() => getCodeBlockExtraProps(props.codeBlockProps))
+const builtinCodeBlockExtraProps = computed(() =>
+  getCodeBlockExtraProps(props.codeBlockProps, { omit: ['langs'] }),
+)
 const codeBlockBindings = computed(() => ({
   // streaming behavior control for CodeBlockNode
   stream: props.codeBlockStream,
@@ -1843,7 +1874,12 @@ const codeBlockBindings = computed(() => ({
   minWidth: props.codeBlockMinWidth,
   maxWidth: props.codeBlockMaxWidth,
   ...(typeof props.showTooltips === 'boolean' ? { showTooltips: props.showTooltips } : {}),
-  ...(props.codeBlockProps || {}),
+  ...builtinCodeBlockExtraProps.value,
+}))
+const customCodeBlockBindings = computed(() => ({
+  ...codeBlockBindings.value,
+  langs: props.langs,
+  ...codeBlockExtraProps.value,
 }))
 const mermaidBindings = computed(() => ({
   ...(props.mermaidProps || {}),
@@ -1926,7 +1962,7 @@ const legacyRenderedItems = computed(() => {
     return {
       node: resolvedNode,
       component,
-      bindings: getBindingsFor(resolvedNode, language),
+      bindings: getBindingsFor(resolvedNode, language, component),
       isCodeBlock: resolvedNode.type === 'code_block',
       index,
       indexKey: `${indexPrefix.value}-${index}`,
@@ -1994,7 +2030,7 @@ const renderedItems = computed(() => {
       ...item,
       node,
       component,
-      bindings: getBindingsFor(node, language),
+      bindings: getBindingsFor(node, language, component),
       isCodeBlock: node.type === 'code_block',
       indexKey: `${indexPrefix.value}-${item.index}`,
       renderKey: getRenderKey(node, item.index),
@@ -2030,6 +2066,23 @@ function getCodeBlockLanguage(node: ParsedNode) {
   return node?.type === 'code_block'
     ? String((node as any).language ?? '').trim().toLowerCase()
     : ''
+}
+
+function getCustomCodeLanguageComponent(
+  customComponents: Record<string, unknown>,
+  language: string,
+) {
+  const raw = language.trim().toLowerCase()
+  if (!raw)
+    return undefined
+
+  for (const key of [raw, normalizeLanguageIdentifier(raw), normalizeShikiLanguage(raw)]) {
+    const component = key && customComponents[key]
+    if (component)
+      return component
+  }
+
+  return undefined
 }
 
 function isLegacyStructuredNode(node: ParsedNode | null | undefined) {
@@ -2114,7 +2167,9 @@ function getNodeComponent(node: ParsedNode, language?: string) {
   const customForType = (customComponents as any)[String((node as any).type)]
   if (node.type === 'code_block') {
     const lang = language ?? getCodeBlockLanguage(node)
-    const customForLanguage = lang ? (customComponents as any)[lang] : undefined
+    const customForLanguage = lang
+      ? getCustomCodeLanguageComponent(customComponents as any, lang)
+      : undefined
     if (customForLanguage)
       return customForLanguage
 
@@ -2153,8 +2208,32 @@ function getNodeComponent(node: ParsedNode, language?: string) {
   return (nodeComponents as any)[String((node as any).type)] || FallbackComponent
 }
 
-function getBindingsFor(node: ParsedNode, language?: string) {
+function isCustomCodeBlockComponent(component: unknown) {
+  return Boolean(component && component === (customComponentsMap.value as any).code_block)
+}
+
+function isCustomLanguageCodeBlockComponent(component: unknown, language?: string) {
+  return Boolean(component && language && component === getCustomCodeLanguageComponent(customComponentsMap.value as any, language))
+}
+
+function getBindingsFor(node: ParsedNode, language?: string, component?: unknown) {
   const lang = language ?? getCodeBlockLanguage(node)
+  if (node.type === 'code_block' && isCustomLanguageCodeBlockComponent(component, lang)) {
+    if (lang === 'mermaid')
+      return getMermaidBindingsFor(node)
+
+    if (lang === 'infographic')
+      return getInfographicBindingsFor(node)
+
+    if (lang === 'd2' || lang === 'd2lang')
+      return d2Bindings.value
+
+    return customCodeBlockBindings.value
+  }
+
+  if (node.type === 'code_block' && isCustomCodeBlockComponent(component))
+    return customCodeBlockBindings.value
+
   if (lang === 'mermaid')
     return getMermaidBindingsFor(node)
 
@@ -2418,6 +2497,7 @@ watch(
       :code-block-max-width="props.codeBlockMaxWidth"
       :code-block-props="props.codeBlockProps"
       :themes="props.themes"
+      :langs="props.langs"
       :is-dark="props.isDark"
       :custom-html-tags="mergedParseOptions.customHtmlTags"
       :html-policy="resolvedHtmlPolicy"

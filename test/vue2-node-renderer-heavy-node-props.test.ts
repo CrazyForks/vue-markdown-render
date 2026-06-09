@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it } from 'vitest'
 import { defineComponent, h } from 'vue'
+import LegacyNodesRenderer from '../packages/markstream-vue2/src/components/NodeRenderer/LegacyNodesRenderer.vue'
 import NodeRenderer from '../packages/markstream-vue2/src/components/NodeRenderer/NodeRenderer.vue'
 import { removeCustomComponents, setCustomComponents } from '../packages/markstream-vue2/src/utils/nodeComponents'
 import { flushAll } from './setup/flush-all'
@@ -70,6 +71,52 @@ const GenericCodeBlockProbe = defineComponent({
     return h('div', {
       'class': 'generic-code-block-probe',
       'data-language': String((this as any).node?.language ?? ''),
+      'data-show-header': String((this as any).showHeader),
+    })
+  },
+})
+
+const GenericCodeBlockAttrsProbe = defineComponent({
+  name: 'GenericCodeBlockAttrsProbe',
+  inheritAttrs: false,
+  props: {
+    node: { type: Object, required: true },
+  },
+  render() {
+    return h('div', {
+      'class': 'generic-code-block-attrs-probe',
+      'data-language': String((this as any).node?.language ?? ''),
+      'data-langs': JSON.stringify((this as any).$attrs.langs ?? null),
+    })
+  },
+})
+
+const CopyEmitterProbe = defineComponent({
+  name: 'CopyEmitterProbe',
+  props: {
+    node: { type: Object, required: true },
+  },
+  emits: ['copy'],
+  setup(props, { emit }) {
+    return () => h('button', {
+      class: 'copy-emitter-probe',
+      onClick: () => emit('copy', (props.node as any).code),
+    }, 'copy')
+  },
+})
+
+const ReservedCodeBlockPropsProbe = defineComponent({
+  name: 'ReservedCodeBlockPropsProbe',
+  props: {
+    node: { type: Object, required: true },
+    indexKey: { type: [String, Number], required: true },
+    showHeader: { type: Boolean, default: true },
+  },
+  render() {
+    return h('div', {
+      'class': 'reserved-code-block-props-probe',
+      'data-language': String((this as any).node?.language ?? ''),
+      'data-index-key': String((this as any).indexKey),
       'data-show-header': String((this as any).showHeader),
     })
   },
@@ -233,6 +280,181 @@ describe('markstream-vue2 heavy-node prop forwarding', () => {
     expect(generic.attributes('data-show-header')).toBe('false')
   })
 
+  it('does not forward top-level langs to built-in pre code blocks', async () => {
+    const wrapper = mount(NodeRenderer as any, {
+      props: {
+        langs: ['typescript'],
+        renderCodeBlocksAsPre: true,
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'export const value = 1',
+            raw: '```ts\nexport const value = 1\n```',
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+
+    expect(wrapper.get('pre[data-language="ts"]').attributes('langs')).toBeUndefined()
+  })
+
+  it('forwards top-level langs to custom code block renderers', async () => {
+    setCustomComponents(customId, {
+      code_block: GenericCodeBlockAttrsProbe as any,
+    })
+
+    const wrapper = mount(NodeRenderer as any, {
+      props: {
+        customId,
+        langs: ['typescript'],
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'export const value = 1',
+            raw: '```ts\nexport const value = 1\n```',
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+
+    const probe = wrapper.get('.generic-code-block-attrs-probe')
+    expect(probe.attributes('data-language')).toBe('ts')
+    expect(probe.attributes('data-langs')).toBe('["typescript"]')
+  })
+
+  it('does not let codeBlockProps override reserved code block props', async () => {
+    setCustomComponents(customId, {
+      code_block: ReservedCodeBlockPropsProbe as any,
+    })
+
+    const wrapper = mount(NodeRenderer as any, {
+      props: {
+        customId,
+        codeBlockProps: {
+          node: {
+            type: 'code_block',
+            language: 'spoofed',
+          },
+          indexKey: 'spoofed-index',
+          key: 'spoofed-key',
+          ctx: {},
+          renderNode: () => null,
+          showHeader: false,
+        },
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'export const value = 1',
+            raw: '```ts\nexport const value = 1\n```',
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+
+    const probe = wrapper.get('.reserved-code-block-props-probe')
+    expect(probe.attributes('data-language')).toBe('ts')
+    expect(probe.attributes('data-index-key')).toBe('markdown-renderer-0')
+    expect(probe.attributes('data-show-header')).toBe('false')
+  })
+
+  it('does not let codeBlockProps override reserved legacy code block props', async () => {
+    setCustomComponents(customId, {
+      code_block: ReservedCodeBlockPropsProbe as any,
+    })
+
+    const wrapper = mount(LegacyNodesRenderer as any, {
+      props: {
+        customId,
+        codeBlockProps: {
+          node: {
+            type: 'code_block',
+            language: 'spoofed',
+          },
+          indexKey: 'spoofed-index',
+          key: 'spoofed-key',
+          ctx: {},
+          renderNode: () => null,
+          showHeader: false,
+        },
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'export const value = 1',
+            raw: '```ts\nexport const value = 1\n```',
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+
+    const probe = wrapper.get('.reserved-code-block-props-probe')
+    expect(probe.attributes('data-language')).toBe('ts')
+    expect(probe.attributes('data-index-key')).toBe('legacy-renderer-0')
+    expect(probe.attributes('data-show-header')).toBe('false')
+  })
+
+  it('keeps top-level langs off legacy exact custom mermaid renderers', async () => {
+    setCustomComponents(customId, {
+      mermaid: GenericCodeBlockAttrsProbe as any,
+    })
+
+    const wrapper = mount(LegacyNodesRenderer as any, {
+      props: {
+        customId,
+        langs: ['mermaid'],
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'mermaid',
+            code: 'flowchart TD\nA-->B',
+            raw: '```mermaid\nflowchart TD\nA-->B\n```',
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+
+    const probe = wrapper.get('.generic-code-block-attrs-probe')
+    expect(probe.attributes('data-language')).toBe('mermaid')
+    expect(probe.attributes('data-langs')).toBe('null')
+  })
+
+  it('re-emits copy from legacy custom code block renderers', async () => {
+    setCustomComponents(customId, {
+      code_block: CopyEmitterProbe as any,
+    })
+
+    const wrapper = mount(LegacyNodesRenderer as any, {
+      props: {
+        customId,
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'export const value = 1',
+            raw: '```ts\nexport const value = 1\n```',
+          },
+        ],
+      },
+    })
+
+    await wrapper.get('.copy-emitter-probe').trigger('click')
+
+    expect(wrapper.emitted('copy')?.[0]).toEqual(['export const value = 1'])
+  })
+
   it('lets d2lang exact overrides beat d2 fallback while keeping d2 props', async () => {
     setCustomComponents(customId, {
       d2: CustomD2Probe as any,
@@ -278,6 +500,9 @@ describe('markstream-vue2 heavy-node prop forwarding', () => {
             raw: '```mermaid\ngraph LR\nA-->B\n```',
           },
         ],
+        codeBlockProps: {
+          showHeader: true,
+        },
         mermaidProps: {
           showHeader: false,
           showZoomControls: false,

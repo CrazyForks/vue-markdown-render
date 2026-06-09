@@ -2647,6 +2647,200 @@ describe('node renderer virtual-scroll coordination', () => {
     wrapper.unmount()
   })
 
+  it('ignores shiki language options in the virtual layout key for unrelated custom components', async () => {
+    const ParagraphProbe = defineComponent({
+      props: {
+        node: { type: Object, required: true },
+      },
+      setup(props) {
+        return () => h('p', { class: 'virtual-paragraph-probe' }, String((props.node as any)?.raw ?? ''))
+      },
+    })
+
+    setCustomComponents('virtual-prefix-test', {
+      paragraph: ParagraphProbe as any,
+    })
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId: 'virtual-prefix-test',
+        nodes: [
+          createParagraph(1),
+          createCodeBlock(3),
+        ],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        langs: ['typescript'],
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'unrelated-custom-layout-key',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    expect(wrapper.get('.virtual-paragraph-probe').exists()).toBe(true)
+    const initialKey = (wrapper.vm as any).captureVirtualState()?.measurementKey
+    expect(initialKey).not.toContain('["typescript"]')
+
+    await wrapper.setProps({
+      langs: ['typescript', 'python'],
+    })
+    await flushAll()
+
+    expect((wrapper.vm as any).captureVirtualState()?.measurementKey).toBe(initialKey)
+
+    wrapper.unmount()
+  })
+
+  it('does not include langs in the virtual layout key for language custom code blocks', async () => {
+    const LanguageCodeBlockProbe = defineComponent({
+      inheritAttrs: false,
+      props: {
+        node: { type: Object, required: true },
+      },
+      setup(_, { attrs }) {
+        return () => h('div', {
+          'class': 'virtual-language-code-block-probe',
+          'data-langs': JSON.stringify(attrs.langs ?? null),
+        })
+      },
+    })
+
+    setCustomComponents('virtual-prefix-test', {
+      ts: LanguageCodeBlockProbe as any,
+    })
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId: 'virtual-prefix-test',
+        nodes: [createCodeBlock(3)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        langs: ['typescript'],
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'language-code-block-layout-key',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    expect(wrapper.get('.virtual-language-code-block-probe').attributes('data-langs')).toBe('["typescript"]')
+    const initialKey = (wrapper.vm as any).captureVirtualState()?.measurementKey
+    expect(initialKey).not.toContain('typescript')
+    expect(initialKey).not.toContain('["typescript"]')
+
+    await wrapper.setProps({
+      langs: ['typescript', 'python'],
+    })
+    await flushAll()
+
+    expect(wrapper.get('.virtual-language-code-block-probe').attributes('data-langs')).toBe('["typescript","python"]')
+    expect((wrapper.vm as any).captureVirtualState()?.measurementKey).toBe(initialKey)
+
+    wrapper.unmount()
+  })
+
+  it('normalizes shiki langs in the virtual layout key for built-in shiki code blocks', async () => {
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        codeRenderer: 'shiki',
+        nodes: [createCodeBlock(3)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        langs: ['ts', 'js'],
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'normalized-language-code-block-layout-key',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const initialKey = (wrapper.vm as any).captureVirtualState()?.measurementKey
+    expect(initialKey).toContain('javascript')
+    expect(initialKey).toContain('typescript')
+    expect(initialKey).not.toContain('["ts","js"]')
+
+    await wrapper.setProps({
+      langs: ['javascript', 'typescript'],
+    })
+    await flushAll()
+
+    expect((wrapper.vm as any).captureVirtualState()?.measurementKey).toBe(initialKey)
+
+    await wrapper.setProps({
+      langs: ['typescript', 'javascript'],
+    })
+    await flushAll()
+
+    expect((wrapper.vm as any).captureVirtualState()?.measurementKey).toBe(initialKey)
+
+    wrapper.unmount()
+  })
+
+  it('normalizes shiki themes in the virtual layout key for built-in shiki code blocks', async () => {
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        codeRenderer: 'shiki',
+        nodes: [createCodeBlock(3)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        themes: [' vitesse-light ', 'vitesse-dark', 'vitesse-light'] as any,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'normalized-shiki-theme-layout-key',
+          settleMode: 'manual',
+          emitIntervalMs: 0,
+        },
+      },
+    })
+
+    await flushAll()
+
+    const initialKey = (wrapper.vm as any).captureVirtualState()?.measurementKey
+    expect(initialKey).toContain('vitesse-light')
+    expect(initialKey).toContain('vitesse-dark')
+
+    await wrapper.setProps({
+      themes: ['vitesse-light', 'vitesse-dark'],
+    })
+    await flushAll()
+
+    expect((wrapper.vm as any).captureVirtualState()?.measurementKey).toBe(initialKey)
+
+    await wrapper.setProps({
+      codeBlockProps: {
+        themes: ['github-light'],
+      },
+    })
+    await flushAll()
+
+    const overrideKey = (wrapper.vm as any).captureVirtualState()?.measurementKey
+    expect(overrideKey).toContain('github-light')
+    expect(overrideKey).not.toBe(initialKey)
+
+    wrapper.unmount()
+  })
+
   it('treats prop restoreState as cache-only unless restoreAnchor is provided', async () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
 

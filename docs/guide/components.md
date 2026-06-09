@@ -66,7 +66,7 @@ Notes:
 
 - `InstanceType<typeof MarkdownRender>['$props']` is the most direct way to inspect the exported component props.
 - `NodeRendererProps` is the named export for the same public prop surface.
-- `codeBlockProps` now follows the public `CodeBlockNode` prop surface except for `node`, so hover/completion works for flags like `showHeader`, `showFontSizeButtons`, and `showTooltips`.
+- `codeBlockProps` now follows the public `CodeBlockNode` prop surface except for structural renderer keys (`node`, `key`, `ref`, `ctx`, `renderNode`, `indexKey`, `__proto__`, `prototype`, and `constructor`), so hover/completion works for flags like `showHeader`, `showFontSizeButtons`, and `showTooltips`.
 - Prefer `codeBlockProps.theme` for new code. `darkTheme` / `lightTheme` still exist for backward compatibility.
 - Hover the property names after each dot in the snippet above, not the imported type names.
 - If you specifically want the best component-prop hover targets, use the `MarkdownRender` snippet below first.
@@ -231,10 +231,20 @@ Deep dive: [CodeBlockNode](/guide/code-block-node), [Monaco](/guide/monaco)
 > Lightweight syntax-highlighted code block renderer powered by Shiki via `stream-markdown`.
 
 - **Best for**: SSR-friendly docs, blog-style pages, smaller bundles
-- **Key props**: `node`, `stream`, `loading`
+- **Key props**: `node`, `stream`, `loading`, `themes`, `langs`
 - **Slots**: `header-left`, `header-right`
 - **Peers**: `stream-markdown`
 - **Common gotcha**: if highlighting never appears, confirm `stream-markdown` is installed and loaded in the environment where rendering happens
+
+Pass `langs` to limit the Shiki languages preloaded by `stream-markdown`; omit it or pass an empty array to keep the default language preload behavior.
+
+```vue
+<MarkdownCodeBlockNode
+  :node="node"
+  :themes="['vitesse-light', 'vitesse-dark']"
+  :langs="['javascript', 'typescript', 'vue']"
+/>
+```
 
 Choose this when you do not need Monaco's editing surface or diff interactions.
 

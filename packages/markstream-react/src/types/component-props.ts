@@ -13,6 +13,21 @@ export type CodeBlockMonacoTheme = string | CodeBlockMonacoThemeObject
 
 export type CodeBlockMonacoLanguage = string | ((...args: unknown[]) => unknown)
 
+export interface CommonCodeBlockProps {
+  showHeader?: boolean
+  showCopyButton?: boolean
+  showExpandButton?: boolean
+}
+
+export interface ShikiCodeBlockProps extends CommonCodeBlockProps {
+  themes?: readonly string[]
+  /**
+   * Shiki language preload request forwarded to stream-markdown's registerHighlight().
+   * This is not a rendering allow-list; already available Shiki languages may still highlight.
+   */
+  langs?: readonly string[]
+}
+
 export interface CodeBlockDiffHideUnchangedRegionsOptions {
   enabled?: boolean
   contextLineCount?: number
@@ -79,7 +94,7 @@ export interface CodeBlockMonacoOptions {
   [key: string]: unknown
 }
 
-export interface CodeBlockNodeProps {
+export interface CodeBlockNodeProps extends CommonCodeBlockProps {
   node: CodeBlockNode
   isDark?: boolean
   loading?: boolean
@@ -92,9 +107,6 @@ export interface CodeBlockNodeProps {
   minWidth?: string | number
   maxWidth?: string | number
   themes?: CodeBlockMonacoTheme[]
-  showHeader?: boolean
-  showCopyButton?: boolean
-  showExpandButton?: boolean
   showPreviewButton?: boolean
   showCollapseButton?: boolean
   showFontSizeButtons?: boolean

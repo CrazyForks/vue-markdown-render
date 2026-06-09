@@ -66,7 +66,7 @@ codeBlockProps.theme
 
 - `InstanceType<typeof MarkdownRender>['$props']` 是最直接的组件 props 查看入口。
 - `NodeRendererProps` 是同一套公开 props 结构的命名类型导出。
-- `codeBlockProps` 现在会跟随公开的 `CodeBlockNode` props 结构（去掉 `node`），因此像 `showHeader`、`showFontSizeButtons`、`showTooltips` 这类字段也能直接获得 hover 与补全。
+- `codeBlockProps` 现在会跟随公开的 `CodeBlockNode` props 结构（不透传 `node`、`key`、`ref`、`ctx`、`renderNode`、`indexKey`、`__proto__`、`prototype`、`constructor` 等渲染器结构字段），因此像 `showHeader`、`showFontSizeButtons`、`showTooltips` 这类字段也能直接获得 hover 与补全。
 - 新接入更推荐使用 `codeBlockProps.theme`；`darkTheme` / `lightTheme` 仍保留作兼容字段。
 - 更推荐 hover 上面每一行点号后面的字段名，而不是只 hover 导入的类型名。
 - 如果你主要想看组件 props 的 hover，优先看下面这段 `MarkdownRender` 示例。
@@ -231,10 +231,20 @@ setCustomComponents('docs', {
 > 基于 Shiki 和 `stream-markdown` 的轻量代码块渲染器。
 
 - **适合**：SSR 友好的文档站、博客页、更小的打包体积
-- **关键 props**：`node`、`stream`、`loading`
+- **关键 props**：`node`、`stream`、`loading`、`themes`、`langs`
 - **插槽**：`header-left`、`header-right`
 - **同伴依赖**：`stream-markdown`
 - **常见问题**：一直没有高亮时，先确认 `stream-markdown` 已安装，并在实际渲染环境里可用
+
+传入 `langs` 可以限制 `stream-markdown` 为 Shiki 预加载的语言；不传或传空数组时，会保留默认语言预加载行为。
+
+```vue
+<MarkdownCodeBlockNode
+  :node="node"
+  :themes="['vitesse-light', 'vitesse-dark']"
+  :langs="['javascript', 'typescript', 'vue']"
+/>
+```
 
 如果你不需要 Monaco 的编辑面板和 diff 交互，这个通常是更轻的选择。
 

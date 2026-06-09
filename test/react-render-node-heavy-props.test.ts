@@ -6,6 +6,8 @@ import type { RenderContext } from '../packages/markstream-react/src/types'
 import { createRequire } from 'node:module'
 import { describe, expect, it } from 'vitest'
 import { HtmlBlockNode as ReactHtmlBlockNode } from '../packages/markstream-react/src/components/HtmlBlockNode/HtmlBlockNode'
+import { NodeRenderer } from '../packages/markstream-react/src/components/NodeRenderer'
+import { removeCustomComponents, setCustomComponents } from '../packages/markstream-react/src/customComponents'
 import { renderNode as clientRenderNode } from '../packages/markstream-react/src/renderers/renderNode'
 import {
   HtmlBlockNode as ReactServerHtmlBlockNode,
@@ -38,6 +40,16 @@ function CustomD2Probe() {
 
 function CustomD2LangProbe() {
   return null
+}
+
+function CodeBlockForwardingProbe(props: any) {
+  return React.createElement('div', {
+    'className': 'code-block-forwarding-probe',
+    'data-dark-theme': String(props.darkTheme ?? ''),
+    'data-light-theme': String(props.lightTheme ?? ''),
+    'data-themes': Array.isArray(props.themes) ? props.themes.join(',') : '',
+    'data-langs': Array.isArray(props.langs) ? props.langs.join(',') : '',
+  })
 }
 
 describe('markstream-react heavy-node prop forwarding', () => {
@@ -77,6 +89,61 @@ describe('markstream-react heavy-node prop forwarding', () => {
     expect(element?.props?.showHeader).toBe(false)
     expect(element?.props?.renderDebounceMs).toBe(180)
     expect(element?.props?.estimatedPreviewHeightPx).toBe(360)
+  })
+
+  it('does not let codeBlockProps override default code block structural props', () => {
+    const realNode = {
+      type: 'code_block',
+      language: 'ts',
+      code: 'export const real = 1',
+      raw: '```ts\nexport const real = 1\n```',
+    }
+    const fakeNode = {
+      type: 'code_block',
+      language: 'python',
+      code: 'wrong = True',
+      raw: '```python\nwrong = True\n```',
+    }
+    const ctx: RenderContext = {
+      ...baseCtx,
+      codeBlockProps: {
+        key: 'wrong-key',
+        node: fakeNode,
+        ref: 'wrong-ref',
+        ctx: { unsafe: true },
+        renderNode: null,
+        indexKey: 'wrong-index',
+        ['__proto__']: { unsafe: true },
+        prototype: { unsafe: true },
+        constructor: { unsafe: true },
+        showHeader: false,
+      },
+    }
+
+    const clientElement = clientRenderNode(realNode as any, 'client-default-code', ctx) as any
+    const serverElement = serverRenderNode(realNode as any, 'server-default-code', ctx) as any
+
+    expect(clientElement?.key).toBe('client-default-code')
+    expect(clientElement?.props?.node).toBe(realNode)
+    expect(clientElement?.props?.showHeader).toBe(false)
+    expect(clientElement?.props?.ctx).toBeUndefined()
+    expect(clientElement?.props?.renderNode).toBeUndefined()
+    expect(clientElement?.props?.indexKey).toBeUndefined()
+    expect(clientElement?.ref).toBeNull()
+    expect(Object.prototype.hasOwnProperty.call(clientElement?.props ?? {}, '__proto__')).toBe(false)
+    expect(Object.prototype.hasOwnProperty.call(clientElement?.props ?? {}, 'prototype')).toBe(false)
+    expect(Object.prototype.hasOwnProperty.call(clientElement?.props ?? {}, 'constructor')).toBe(false)
+
+    expect(serverElement?.key).toBe('server-default-code')
+    expect(serverElement?.props?.node).toBe(realNode)
+    expect(serverElement?.props?.showHeader).toBe(false)
+    expect(serverElement?.props?.ctx).toBeUndefined()
+    expect(serverElement?.props?.renderNode).toBeUndefined()
+    expect(serverElement?.props?.indexKey).toBeUndefined()
+    expect(serverElement?.ref).toBeNull()
+    expect(Object.prototype.hasOwnProperty.call(serverElement?.props ?? {}, '__proto__')).toBe(false)
+    expect(Object.prototype.hasOwnProperty.call(serverElement?.props ?? {}, 'prototype')).toBe(false)
+    expect(Object.prototype.hasOwnProperty.call(serverElement?.props ?? {}, 'constructor')).toBe(false)
   })
 
   it('injects stable preview height estimates for client Mermaid and Infographic custom renderers', () => {
@@ -144,6 +211,37 @@ describe('markstream-react heavy-node prop forwarding', () => {
     expect(genericElement?.props?.ctx?.codeBlockProps).toEqual({ showHeader: false })
   })
 
+  it('forwards top-level Shiki themes and langs through React NodeRenderer custom code_block renderers', () => {
+    const customId = 'react-node-renderer-shiki-forwarding'
+
+    try {
+      setCustomComponents(customId, {
+        code_block: CodeBlockForwardingProbe as any,
+      })
+
+      const html = renderToStaticMarkup(
+        React.createElement(NodeRenderer, {
+          customId,
+          content: '```ts\nconst value = 1\n```',
+          final: true,
+          renderCodeBlocksAsPre: false,
+          codeBlockDarkTheme: 'github-dark',
+          codeBlockLightTheme: 'github-light',
+          themes: ['github-dark', 'github-light'],
+          langs: ['ts', 'js'],
+        }),
+      )
+
+      expect(html).toContain('data-dark-theme="github-dark"')
+      expect(html).toContain('data-light-theme="github-light"')
+      expect(html).toContain('data-themes="github-dark,github-light"')
+      expect(html).toContain('data-langs="ts,js"')
+    }
+    finally {
+      removeCustomComponents(customId)
+    }
+  })
+
   it('keeps specialized mermaid routing ahead of code_block fallback on the client renderer', () => {
     const ctx: RenderContext = {
       ...baseCtx,
@@ -168,6 +266,9 @@ describe('markstream-react heavy-node prop forwarding', () => {
     expect(element?.props?.showHeader).toBe(false)
     expect(element?.props?.renderDebounceMs).toBe(180)
     expect(element?.props?.estimatedPreviewHeightPx).toBe(360)
+    expect(element?.props?.stream).toBeUndefined()
+    expect(element?.props?.langs).toBeUndefined()
+    expect(element?.props?.ctx).toBeUndefined()
   })
 
   it('lets d2lang exact overrides beat d2 fallback on the client renderer', () => {
@@ -251,6 +352,9 @@ describe('markstream-react heavy-node prop forwarding', () => {
     expect(element?.props?.showHeader).toBe(false)
     expect(element?.props?.renderDebounceMs).toBe(180)
     expect(element?.props?.estimatedPreviewHeightPx).toBe(360)
+    expect(element?.props?.stream).toBeUndefined()
+    expect(element?.props?.langs).toBeUndefined()
+    expect(element?.props?.ctx).toBeUndefined()
   })
 
   it('injects stable preview height estimates for server Mermaid and Infographic custom renderers', () => {

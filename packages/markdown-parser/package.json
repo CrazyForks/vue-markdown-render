@@ -1,7 +1,7 @@
 {
   "name": "stream-markdown-parser",
   "type": "module",
-  "version": "1.0.3",
+  "version": "1.0.4-beta.0",
   "packageManager": "pnpm@10.33.4",
   "description": "Pure markdown parser and renderer utilities with streaming support - framework agnostic",
   "author": "Simon He",
@@ -31,10 +31,11 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     }
   },
-  "main": "./dist/index.js",
+  "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [

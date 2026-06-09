@@ -83,6 +83,30 @@ const result = resolveStreamingTextUpdate({
 })
 ```
 
+### Shiki Highlighting Helpers
+
+`markstream-core` exports shared helpers used by Markstream adapters to normalize Shiki language and theme options before calling `stream-markdown`.
+
+```ts
+import {
+  getHighlightRegistrationKey,
+  getRegisterHighlightOptions,
+  getRuntimeShikiRegistrationConfig,
+  getShikiLangs,
+  getShikiRendererOptions,
+  getShikiThemes,
+  normalizeShikiLanguage,
+  registerHighlightOnce,
+} from 'markstream-core'
+```
+
+- `getShikiLangs(langs)` normalizes common Shiki language aliases, removes duplicates, and sorts the result because language preload order has no priority semantics.
+- `getShikiThemes(themes)` keeps valid string themes, removes duplicates, and preserves caller order so theme priority is not changed.
+- `getRegisterHighlightOptions(themes, langs)` and `getShikiRendererOptions(themes, langs)` return normalized options for `registerHighlight()` and `createShikiStreamRenderer()`.
+- `getHighlightRegistrationKey(themes, langs)` returns a normalized key. Language order is stable for equivalent preload sets, while theme order is preserved because renderer theme priority is order-sensitive.
+- `getRuntimeShikiRegistrationConfig(themes, langs, options)` returns framework-neutral runtime config for adapters that may have a renderer without `registerHighlight()`.
+- `registerHighlightOnce(registerHighlight, opts, key)` coalesces in-flight registrations for the same `registerHighlight` function and key.
+
 ## Framework Adapters
 
 - **Vue 3**: `useSmoothMarkdownStream` in `markstream-vue` wraps the core controller with Vue reactivity.

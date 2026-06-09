@@ -177,7 +177,7 @@ const THREAD_RESTORE_SETTLE_DELAYS = [0, 80, 180, 360, 640]
 const THREAD_RESTORE_READY_POLL_FRAMES = 40
 const THREAD_RESTORE_MIN_READY_MS = 96
 const THREAD_RESTORE_STABLE_FRAMES = 2
-const THREAD_RESTORE_COLD_STABLE_FRAMES = 8
+const THREAD_RESTORE_COLD_STABLE_FRAMES = 24
 const THREAD_RESTORE_READY_RETRY_DELAY_MS = 120
 const THREAD_STATE_REMEMBER_DELAY_MS = 80
 const ITEM_SIZE_RECONCILE_DEADBAND_PX = 1
@@ -1945,15 +1945,29 @@ function hasReadyMarkdownRestoreMetrics(record: TimelineRecord, el: HTMLElement)
   const metrics = state?.metrics
   const totalHeight = Number(metrics?.totalHeight ?? 0)
 
-  return Number.isFinite(totalHeight)
-    && totalHeight > 0
-    && (
-      metrics?.stable === true
-      || metrics?.final === true
-      || metrics?.confidence === 'measured'
-      || metrics?.confidence === 'final'
-      || metrics?.confidence === 'mixed'
-    )
+  if (!Number.isFinite(totalHeight) || totalHeight <= 0)
+    return false
+
+  const measuredCount = Number(metrics?.measuredCount ?? 0)
+  const estimatedCount = Number(metrics?.estimatedCount ?? 0)
+  const nodeCount = Number(metrics?.nodeCount ?? 0)
+
+  const hasCompleteMeasurement = nodeCount <= 0
+    || (measuredCount >= nodeCount && estimatedCount <= 0)
+
+  const hasMeasuredOrFinalConfidence = metrics?.confidence === 'measured'
+    || metrics?.confidence === 'final'
+
+  const hasStableHeight = metrics?.stable === true
+    || hasMeasuredOrFinalConfidence
+
+  if (activeThreadRestoreRequiresColdMarkdownMetrics) {
+    return hasCompleteMeasurement
+      && metrics?.final === true
+      && hasMeasuredOrFinalConfidence
+  }
+
+  return hasStableHeight || metrics?.final === true
 }
 
 function isRestoreViewportReady() {

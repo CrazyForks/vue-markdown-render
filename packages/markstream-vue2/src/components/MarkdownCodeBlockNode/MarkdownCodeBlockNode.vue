@@ -1,12 +1,54 @@
 <script setup lang="ts">
+import type { RegisterHighlightOptions, ShikiRendererOptions } from 'markstream-core'
+import type { PropType } from 'vue-demi'
 import type { MarkdownCodeBlockPreviewPayload } from '../../types/component-props'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue-demi'
+import {
+  getHighlightRegistrationKey,
+  getRuntimeShikiRegistrationConfig,
+  normalizeShikiLanguage,
+  registerHighlightOnce,
+} from 'markstream-core'
+import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue-demi'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { getLanguageIcon, languageIconsRevision, languageMap, normalizeLanguageIdentifier } from '../../utils'
+import { isDevEnvironment } from '../../utils/devEnv'
+
+interface MarkdownCodeBlockNodeProps {
+  node: {
+    type: 'code_block'
+    language: string
+    code: string
+    raw: string
+    diff?: boolean
+    originalCode?: string
+    updatedCode?: string
+  }
+  loading?: boolean
+  stream?: boolean
+  darkTheme?: string
+  lightTheme?: string
+  isDark?: boolean
+  isShowPreview?: boolean
+  enableFontSizeControl?: boolean
+  minWidth?: string | number
+  maxWidth?: string | number
+  themes?: readonly string[]
+  langs?: readonly string[]
+  showHeader?: boolean
+  showCopyButton?: boolean
+  showExpandButton?: boolean
+  showPreviewButton?: boolean
+  showCollapseButton?: boolean
+  showFontSizeButtons?: boolean
+  showTooltips?: boolean
+}
 
 const props = defineProps({
-  node: { type: Object, required: true },
+  node: {
+    type: Object as PropType<MarkdownCodeBlockNodeProps['node']>,
+    required: true,
+  },
   loading: { type: Boolean, default: true },
   stream: { type: Boolean, default: true },
   darkTheme: { type: String, default: 'vitesse-dark' },
@@ -16,7 +58,8 @@ const props = defineProps({
   enableFontSizeControl: { type: Boolean, default: true },
   minWidth: { type: [String, Number], default: undefined },
   maxWidth: { type: [String, Number], default: undefined },
-  themes: { type: Array, default: undefined },
+  themes: { type: Array as PropType<readonly string[]>, default: undefined },
+  langs: { type: Array as PropType<readonly string[]>, default: undefined },
   showHeader: { type: Boolean, default: true },
   showCopyButton: { type: Boolean, default: true },
   showExpandButton: { type: Boolean, default: true },
@@ -32,7 +75,7 @@ const emits = defineEmits<{
 }>()
 const { t } = useSafeI18n()
 
-const codeLanguage = ref<string>(normalizeLanguageIdentifier(String(props.node.language ?? '')))
+const codeLanguage = ref<string>(normalizeLanguageIdentifier(props.node.language))
 const copyText = ref(false)
 const isExpanded = ref(false)
 const isCollapsed = ref(false)
@@ -43,6 +86,9 @@ const fallbackHtml = ref('')
 const rendererReady = ref(false)
 const hasStableRender = ref(false)
 let renderObserver: MutationObserver | undefined
+let lastCommittedRenderSignature = ''
+let rendererMutationVersion = 0
+let pendingRenderSignature: string | null = null
 
 // Auto-scroll state management
 const autoScrollEnabled = ref(true) // Start with auto-scroll enabled
@@ -112,7 +158,7 @@ function getPreferredColorScheme() {
 }
 
 function getResolvedThemes() {
-  return props.themes as string[] | undefined
+  return props.themes as readonly unknown[] | undefined
 }
 
 function getColorChannels(color: string) {
@@ -193,17 +239,21 @@ function escapeHtml(str: string) {
 }
 
 function renderFallback(code: string, force = false) {
-  renderObserver?.disconnect()
-  renderObserver = undefined
-  if (!force && hasStableRender.value) {
-    fallbackHtml.value = ''
-    rendererReady.value = true
-    return
-  }
+  pendingRenderSignature = null
+  disconnectReadyObserver()
+  const fallbackEl = codeBlockContent.value?.querySelector('.code-fallback-plain') as HTMLElement | null
+  fallbackEl?.style.removeProperty('display')
   if (!code) {
+    clearRendererTarget()
     fallbackHtml.value = ''
     rendererReady.value = false
     hasStableRender.value = false
+    lastCommittedRenderSignature = ''
+    return
+  }
+  if (!force && hasStableRender.value) {
+    fallbackHtml.value = ''
+    rendererReady.value = true
     return
   }
   fallbackHtml.value = `<pre class="shiki shiki-fallback"><code>${escapeHtml(code)}</code></pre>`
@@ -214,18 +264,31 @@ function clearFallback() {
   fallbackHtml.value = ''
   rendererReady.value = true
   hasStableRender.value = true
-  void nextTick().then(() => {
+  const fallbackEl = codeBlockContent.value?.querySelector('.code-fallback-plain') as HTMLElement | null
+  if (fallbackEl)
+    fallbackEl.style.display = 'none'
+  void nextTick().then(async () => {
+    await nextTick()
+    if (!fallbackHtml.value && rendererReady.value) {
+      rendererReady.value = false
+      rendererReady.value = true
+    }
     syncRenderedCssVars()
   })
 }
 
 function keepLastSuccessfulRender() {
-  renderObserver?.disconnect()
-  renderObserver = undefined
+  pendingRenderSignature = null
+  disconnectReadyObserver()
   if (!hasStableRender.value)
     return
   fallbackHtml.value = ''
   rendererReady.value = true
+}
+
+function clearRendererTarget() {
+  if (rendererTarget.value)
+    rendererTarget.value.innerHTML = ''
 }
 
 function hasRendererContent() {
@@ -237,24 +300,89 @@ function hasRendererContent() {
   return Boolean(target.textContent?.trim().length)
 }
 
-async function clearFallbackWhenRendererReady() {
-  await nextTick()
-  if (hasRendererContent()) {
-    clearFallback()
-    return
-  }
-  const target = rendererTarget.value
-  if (!target)
-    return
-  renderObserver?.disconnect()
-  renderObserver = new MutationObserver(() => {
-    if (!hasRendererContent())
-      return
-    clearFallback()
-    renderObserver?.disconnect()
+function getRenderSignature(configKey: string | null | undefined, lang: string, code: string) {
+  return `${configKey ?? ''}\u0000${lang}\u0000${code}`
+}
+
+function markRendererCommitted(renderSignature: string) {
+  lastCommittedRenderSignature = renderSignature
+  clearFallback()
+}
+
+function disconnectReadyObserver(observer?: MutationObserver) {
+  observer?.disconnect()
+  if (!observer || renderObserver === observer)
     renderObserver = undefined
+}
+
+function startRendererReadyObserver(epoch: number, previousVersion: number) {
+  disconnectReadyObserver()
+
+  const target = rendererTarget.value
+  if (!target || typeof MutationObserver === 'undefined')
+    return
+
+  pendingRenderSignature = null
+
+  const observer = new MutationObserver(() => {
+    rendererMutationVersion += 1
+
+    const signature = pendingRenderSignature
+    if (!signature)
+      return
+
+    if (!isCurrentRenderEpoch(epoch)) {
+      pendingRenderSignature = null
+      disconnectReadyObserver(observer)
+      return
+    }
+
+    if (rendererMutationVersion === previousVersion || !hasRendererContent())
+      return
+
+    pendingRenderSignature = null
+    disconnectReadyObserver(observer)
+    markRendererCommitted(signature)
   })
-  renderObserver.observe(target, { childList: true, subtree: true })
+
+  renderObserver = observer
+  observer.observe(target, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+    attributes: true,
+  })
+}
+
+async function clearFallbackWhenRendererReady(
+  epoch: number,
+  previousVersion: number,
+  renderSignature: string,
+  previousRendererHtml?: string,
+) {
+  pendingRenderSignature = renderSignature
+
+  await nextTick()
+  if (!isCurrentRenderEpoch(epoch))
+    return
+
+  const rendererHasContent = hasRendererContent()
+  const hasObservedMutation = rendererMutationVersion !== previousVersion
+  const hasDomSnapshotChange = previousRendererHtml !== undefined
+    && rendererTarget.value?.innerHTML !== previousRendererHtml
+  if (
+    rendererHasContent
+    && (
+      !lastCommittedRenderSignature
+      || hasObservedMutation
+      || hasDomSnapshotChange
+      || lastCommittedRenderSignature === renderSignature
+    )
+  ) {
+    pendingRenderSignature = null
+    disconnectReadyObserver()
+    markRendererCommitted(renderSignature)
+  }
 }
 // Lazy-load stream-markdown (and thus shiki) only when needed
 interface ShikiRenderer {
@@ -262,92 +390,371 @@ interface ShikiRenderer {
   setTheme: (theme?: string) => void | Promise<void>
   dispose: () => void
 }
+type HighlightRegistrationStatus = 'ready' | 'failed' | 'stale'
+
 let renderer: ShikiRenderer | undefined
+let rendererConfigKey: string | null = null
+let rendererTheme: string | undefined
+let rendererThemeSyncQueued = false
+let rendererThemeObserver: MutationObserver | undefined
 let createShikiRenderer:
-  | ((el: HTMLElement, opts: { theme?: string | undefined, themes?: string[] | undefined }) => ShikiRenderer)
+  | ((el: HTMLElement, opts: ShikiRendererOptions) => ShikiRenderer)
   | undefined
 
-let registerHighlight
-let registeredHighlightLanguages: Set<string> | undefined
-const warnedMissingLanguages = new Set<string>()
+let registerHighlight:
+  | ((opts?: RegisterHighlightOptions) => Promise<unknown> | unknown)
+  | undefined
+let registeredHighlightKey: string | null = null
+let latestHighlightRegistrationKey = ''
+let highlightRegistrationSeq = 0
+let renderEpoch = 0
+let disposed = false
 const warnedRendererErrors = new Set<string>()
-const isDevEnv = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.DEV)
+const failedRendererLanguages = new Set<string>()
+const failedHighlightRegistrationKeys = new Set<string>()
+const isDevEnv = isDevEnvironment()
+let warnedMissingRegisterHighlightForLangs = false
+let streamMarkdownLoadPromise: Promise<void> | null = null
+let streamMarkdownLoadFailed = false
+let warnedStreamMarkdownUnavailable = false
 
-function normalizeRendererLanguage(rawLang?: string | null, hasContent = false) {
-  const normalized = normalizeLanguageIdentifier(String(rawLang ?? ''))
-  if (!normalized)
-    return 'plaintext'
-  if (!registeredHighlightLanguages || registeredHighlightLanguages.has(normalized))
-    return normalized
-  if (hasContent && isDevEnv && !warnedMissingLanguages.has(normalized)) {
-    warnedMissingLanguages.add(normalized)
-    console.warn(`[MarkdownCodeBlockNode] Language "${normalized}" not preloaded in stream-markdown; falling back to plaintext.`)
-  }
-  return 'plaintext'
+function nextRenderEpoch() {
+  renderEpoch += 1
+  return renderEpoch
 }
 
-async function updateRendererWithFallback(code: string, rawLang?: string | null) {
-  if (!renderer)
-    return false
-  const normalized = normalizeRendererLanguage(rawLang, Boolean(code && code.length))
+function isCurrentRenderEpoch(epoch = renderEpoch) {
+  return !disposed && epoch === renderEpoch
+}
+
+function disposeCurrentRenderer(options: { resetStableRender?: boolean } = {}) {
+  const current = renderer
+  renderer = undefined
+  rendererConfigKey = null
+  rendererTheme = undefined
+  lastCommittedRenderSignature = ''
+  pendingRenderSignature = null
+  failedRendererLanguages.clear()
+
   try {
-    await renderer.updateCode(code, normalized)
-    return true
+    current?.dispose()
   }
   catch (err) {
-    if (normalized !== 'plaintext') {
-      if (isDevEnv && !warnedRendererErrors.has(normalized)) {
-        warnedRendererErrors.add(normalized)
-        console.warn(`[MarkdownCodeBlockNode] Failed to render language "${normalized}", retrying as plaintext.`, err)
-      }
-      try {
-        await renderer.updateCode(code, 'plaintext')
-        return true
-      }
-      catch (plainErr) {
-        if (isDevEnv)
-          console.warn('[MarkdownCodeBlockNode] Failed to render code block even as plaintext.', plainErr)
-        return false
-      }
-    }
-    else if (isDevEnv) {
-      console.warn('[MarkdownCodeBlockNode] Failed to render code block even as plaintext.', err)
-    }
-    return false
+    if (isDevEnv)
+      console.warn('[MarkdownCodeBlockNode] Failed to dispose Shiki renderer.', err)
   }
-}
-async function ensureStreamMarkdownLoaded() {
-  if (createShikiRenderer)
-    return
-  try {
-    const mod = await import('stream-markdown')
-    createShikiRenderer = mod.createShikiStreamRenderer
-    registerHighlight = mod.registerHighlight
-    const defaultLangs = Array.isArray((mod as any).defaultLanguages) ? (mod as any).defaultLanguages : undefined
-    registeredHighlightLanguages = defaultLangs ? new Set(defaultLangs.map((l: string) => l.toLowerCase())) : undefined
-    registerHighlight?.({ themes: getResolvedThemes() })
-  }
-  catch (e) {
-    // stream-markdown is an optional peer; if missing, silently skip highlighting
-    console.warn('[MarkdownCodeBlockNode] stream-markdown not available:', e)
+  finally {
+    clearRendererTarget()
+    rendererReady.value = false
+    if (options.resetStableRender)
+      hasStableRender.value = false
   }
 }
 
-async function initRenderer() {
+async function syncRendererTheme() {
+  if (!renderer)
+    return
+
+  const theme = getRenderedColorScheme()
+  if (rendererTheme === theme)
+    return
+
+  await renderer.setTheme(theme)
+  rendererTheme = theme
+}
+
+function queueRendererThemeChange() {
+  const theme = getRenderedColorScheme()
+  if (!renderer || theme === rendererTheme || rendererThemeSyncQueued)
+    return
+
+  rendererThemeSyncQueued = true
+  void nextTick(() => {
+    rendererThemeSyncQueued = false
+    void handleRendererThemeChange()
+  })
+}
+
+function startRendererThemeObserver() {
+  if (rendererThemeObserver || typeof MutationObserver === 'undefined')
+    return
+
+  const rootEl = container.value
+  if (!rootEl)
+    return
+
+  rendererThemeObserver = new MutationObserver(() => {
+    queueRendererThemeChange()
+  })
+  rendererThemeObserver.observe(rootEl, {
+    attributes: true,
+    attributeFilter: ['data-markstream-code-theme'],
+  })
+}
+
+function disconnectRendererThemeObserver() {
+  rendererThemeObserver?.disconnect()
+  rendererThemeObserver = undefined
+}
+
+function getRenderedColorScheme() {
+  return container.value?.getAttribute('data-markstream-code-theme') || getPreferredColorScheme()
+}
+
+const highlightRegistrationKey = computed(() =>
+  getHighlightRegistrationKey(getResolvedThemes(), props.langs),
+)
+
+function getShikiRuntimeCapabilities() {
+  return {
+    hasRegisterHighlight: Boolean(registerHighlight),
+    hasCreateRenderer: Boolean(createShikiRenderer),
+  }
+}
+
+function getRuntimeConfigWithFailedLangsFallback(
+  themes?: readonly unknown[],
+  langs?: readonly unknown[],
+) {
+  const capabilities = getShikiRuntimeCapabilities()
+  const runtimeConfig = getRuntimeShikiRegistrationConfig(themes, langs, capabilities)
+
+  if (
+    runtimeConfig.rendererOptions.langs?.length
+    && failedHighlightRegistrationKeys.has(runtimeConfig.key)
+  ) {
+    return getRuntimeShikiRegistrationConfig(themes, undefined, capabilities)
+  }
+
+  return runtimeConfig
+}
+
+function rendererNeedsReconfigure() {
+  const runtimeConfig = getRuntimeConfigWithFailedLangsFallback(getResolvedThemes(), props.langs)
+  return Boolean(renderer && rendererConfigKey !== runtimeConfig.key)
+}
+
+function normalizeRendererLanguage(rawLang?: string | null) {
+  const normalized = normalizeShikiLanguage(rawLang)
+  return normalized || 'plaintext'
+}
+
+async function updateRendererWithFallback(code: string, rawLang?: string | null, epoch = renderEpoch) {
+  if (!renderer || !isCurrentRenderEpoch(epoch))
+    return undefined
+
+  const normalized = normalizeRendererLanguage(rawLang)
+
+  const renderPlaintext = async (originalError?: unknown) => {
+    if (!renderer || !isCurrentRenderEpoch(epoch))
+      return undefined
+
+    if (normalized !== 'plaintext') {
+      if (originalError)
+        failedRendererLanguages.add(normalized)
+
+      if (originalError && isDevEnv && !warnedRendererErrors.has(normalized)) {
+        warnedRendererErrors.add(normalized)
+        console.warn(`[MarkdownCodeBlockNode] Failed to render language "${normalized}", retrying as plaintext.`, originalError)
+      }
+    }
+
+    try {
+      await renderer.updateCode(code, 'plaintext')
+      return isCurrentRenderEpoch(epoch) ? 'plaintext' : undefined
+    }
+    catch (plainErr) {
+      if (!isCurrentRenderEpoch(epoch))
+        return undefined
+      if (isDevEnv)
+        console.warn('[MarkdownCodeBlockNode] Failed to render code block even as plaintext.', plainErr)
+      return undefined
+    }
+  }
+
+  if (normalized !== 'plaintext' && failedRendererLanguages.has(normalized))
+    return renderPlaintext()
+
+  try {
+    await renderer.updateCode(code, normalized)
+    return isCurrentRenderEpoch(epoch) ? normalized : undefined
+  }
+  catch (err) {
+    if (!isCurrentRenderEpoch(epoch))
+      return undefined
+
+    if (normalized !== 'plaintext')
+      return renderPlaintext(err)
+
+    if (isDevEnv)
+      console.warn('[MarkdownCodeBlockNode] Failed to render code block even as plaintext.', err)
+
+    return undefined
+  }
+}
+
+async function ensureHighlightRegistered(
+  registerOptions: RegisterHighlightOptions,
+  key: string,
+): Promise<HighlightRegistrationStatus> {
+  if (!registerHighlight)
+    return 'ready'
+  if (latestHighlightRegistrationKey !== key)
+    return 'stale'
+
+  if (registeredHighlightKey === key)
+    return 'ready'
+
+  const seq = ++highlightRegistrationSeq
+
+  try {
+    await registerHighlightOnce(registerHighlight, registerOptions, key)
+  }
+  catch {
+    if (seq !== highlightRegistrationSeq || latestHighlightRegistrationKey !== key)
+      return 'stale'
+    return 'failed'
+  }
+
+  if (seq !== highlightRegistrationSeq || latestHighlightRegistrationKey !== key)
+    return 'stale'
+
+  registeredHighlightKey = key
+  return 'ready'
+}
+
+async function waitForCurrentHighlightRegistration(
+  registerOptions: RegisterHighlightOptions,
+  key: string,
+) {
+  const status = await ensureHighlightRegistered(registerOptions, key)
+  if (status !== 'failed')
+    return status
+
+  if (latestHighlightRegistrationKey !== key)
+    return 'stale'
+
+  return ensureHighlightRegistered(registerOptions, key)
+}
+
+async function ensureStreamMarkdownLoaded() {
+  if (createShikiRenderer || streamMarkdownLoadFailed)
+    return
+  if (streamMarkdownLoadPromise)
+    return streamMarkdownLoadPromise
+
+  streamMarkdownLoadPromise = (async () => {
+    try {
+      const mod = await import('stream-markdown')
+      const nextCreateRenderer = (mod as {
+        createShikiStreamRenderer?: unknown
+      }).createShikiStreamRenderer
+
+      if (typeof nextCreateRenderer !== 'function')
+        throw new TypeError('stream-markdown.createShikiStreamRenderer is not available')
+
+      createShikiRenderer = nextCreateRenderer as NonNullable<typeof createShikiRenderer>
+
+      const nextRegisterHighlight = (mod as {
+        registerHighlight?: unknown
+      }).registerHighlight
+
+      registerHighlight = typeof nextRegisterHighlight === 'function'
+        ? nextRegisterHighlight as NonNullable<typeof registerHighlight>
+        : undefined
+
+      streamMarkdownLoadFailed = false
+      warnedStreamMarkdownUnavailable = false
+    }
+    catch (e) {
+      streamMarkdownLoadFailed = true
+
+      if (isDevEnv && !warnedStreamMarkdownUnavailable) {
+        warnedStreamMarkdownUnavailable = true
+        console.warn('[MarkdownCodeBlockNode] stream-markdown not available:', e)
+      }
+    }
+    finally {
+      streamMarkdownLoadPromise = null
+    }
+  })()
+
+  return streamMarkdownLoadPromise
+}
+
+async function initRenderer(epoch: number) {
+  if (!isCurrentRenderEpoch(epoch))
+    return
+
   await ensureStreamMarkdownLoaded()
+  if (!isCurrentRenderEpoch(epoch))
+    return
 
   if (!codeBlockContent.value || !rendererTarget.value) {
     renderFallback(props.node.code, true)
     return
   }
 
-  registerHighlight?.({ themes: getResolvedThemes() })
+  let runtimeConfig = getRuntimeConfigWithFailedLangsFallback(getResolvedThemes(), props.langs)
+  if (runtimeConfig.ignoredLangs && isDevEnv && !warnedMissingRegisterHighlightForLangs) {
+    warnedMissingRegisterHighlightForLangs = true
+    console.warn(
+      '[MarkdownCodeBlockNode] `langs` requires stream-markdown >=0.0.15 with registerHighlight(); '
+      + 'ignoring `langs` and using stream-markdown default language preload.',
+    )
+  }
+
+  let rendererOptions = runtimeConfig.rendererOptions
+  let nextRendererConfigKey = runtimeConfig.key
+  latestHighlightRegistrationKey = nextRendererConfigKey
+
+  let needsRendererReconfigure = Boolean(renderer && rendererConfigKey !== nextRendererConfigKey)
+  if (needsRendererReconfigure)
+    renderFallback(props.node.code, !hasStableRender.value)
+
+  let highlightStatus = await waitForCurrentHighlightRegistration(runtimeConfig.registerOptions, nextRendererConfigKey)
+
+  if (highlightStatus === 'failed' && rendererOptions.langs?.length) {
+    failedHighlightRegistrationKeys.add(nextRendererConfigKey)
+
+    if (isDevEnv) {
+      console.warn(
+        '[MarkdownCodeBlockNode] Failed to register configured Shiki languages; retrying without `langs`.',
+        { langs: rendererOptions.langs },
+      )
+    }
+
+    runtimeConfig = getRuntimeShikiRegistrationConfig(getResolvedThemes(), undefined, getShikiRuntimeCapabilities())
+    rendererOptions = runtimeConfig.rendererOptions
+    nextRendererConfigKey = runtimeConfig.key
+    latestHighlightRegistrationKey = nextRendererConfigKey
+
+    highlightStatus = await waitForCurrentHighlightRegistration(runtimeConfig.registerOptions, nextRendererConfigKey)
+  }
+
+  if (!isCurrentRenderEpoch(epoch) || highlightStatus === 'stale')
+    return
+
+  needsRendererReconfigure = Boolean(renderer && rendererConfigKey !== nextRendererConfigKey)
+  if (highlightStatus === 'failed') {
+    if (needsRendererReconfigure && renderer && hasRendererContent())
+      clearFallback()
+    else
+      renderFallback(props.node.code, true)
+    return
+  }
+
+  if (needsRendererReconfigure)
+    disposeCurrentRenderer({ resetStableRender: true })
 
   if (!renderer && createShikiRenderer) {
+    const theme = getRenderedColorScheme()
     renderer = createShikiRenderer(rendererTarget.value, {
-      theme: getPreferredColorScheme(),
-      themes: getResolvedThemes(),
+      theme,
+      ...rendererOptions,
     })
+    rendererTheme = theme
+    rendererConfigKey = nextRendererConfigKey
     rendererReady.value = true
   }
 
@@ -362,34 +769,88 @@ async function initRenderer() {
   }
 
   renderFallback(props.node.code, !hasStableRender.value)
-  const updated = await updateRendererWithFallback(props.node.code, codeLanguage.value)
-  if (!updated) {
+  const previousMutationVersion = rendererMutationVersion
+  const previousRendererHtml = rendererTarget.value?.innerHTML
+  startRendererReadyObserver(epoch, previousMutationVersion)
+  const renderedLang = await updateRendererWithFallback(props.node.code, props.node.language, epoch)
+  if (!isCurrentRenderEpoch(epoch))
+    return
+  if (!renderedLang) {
+    pendingRenderSignature = null
+    disconnectReadyObserver()
     keepLastSuccessfulRender()
     return
   }
-  if (hasStableRender.value)
+  if (hasStableRender.value) {
     keepLastSuccessfulRender()
-  else
-    await clearFallbackWhenRendererReady()
+  }
+  else {
+    await clearFallbackWhenRendererReady(
+      epoch,
+      previousMutationVersion,
+      getRenderSignature(nextRendererConfigKey, renderedLang, props.node.code),
+      previousRendererHtml,
+    )
+  }
 }
-initRenderer()
-onMounted(() => {
-  initRenderer()
-})
-onBeforeUnmount(() => {
+
+async function safeInitRenderer(epoch = nextRenderEpoch()) {
+  try {
+    await initRenderer(epoch)
+  }
+  catch (err) {
+    if (!isCurrentRenderEpoch(epoch))
+      return
+    if (isDevEnv)
+      console.warn('[MarkdownCodeBlockNode] Failed to initialize Shiki renderer.', err)
+    renderFallback(props.node.code, !hasStableRender.value)
+  }
+}
+
+function cleanupRenderer() {
+  disposed = true
+  renderEpoch += 1
   renderObserver?.disconnect()
   renderObserver = undefined
-})
+  disconnectRendererThemeObserver()
+  pendingRenderSignature = null
+  disposeCurrentRenderer({ resetStableRender: true })
+}
 
-watch(() => props.themes, async () => {
-  if (registerHighlight)
-    registerHighlight({ themes: getResolvedThemes() })
+renderFallback(props.node.code, true)
+
+if (getCurrentInstance()) {
+  onMounted(() => {
+    startRendererThemeObserver()
+    void safeInitRenderer()
+  })
+  onBeforeUnmount(cleanupRenderer)
+}
+else {
+  void nextTick(async () => {
+    await nextTick()
+    startRendererThemeObserver()
+    await safeInitRenderer()
+    if (!lastCommittedRenderSignature && hasRendererContent()) {
+      markRendererCommitted(
+        getRenderSignature(
+          rendererConfigKey ?? highlightRegistrationKey.value,
+          normalizeRendererLanguage(props.node.language),
+          props.node.code,
+        ),
+      )
+    }
+  })
+}
+
+watch(highlightRegistrationKey, async () => {
+  await safeInitRenderer()
 })
 
 watch(() => props.loading, (loading) => {
   if (loading)
     return
-  initRenderer()
+  void safeInitRenderer()
 })
 
 watch(tooltipsEnabled, (enabled) => {
@@ -398,7 +859,8 @@ watch(tooltipsEnabled, (enabled) => {
 })
 
 watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
-  const normalizedLang = normalizeLanguageIdentifier(String(lang ?? ''))
+  const epoch = nextRenderEpoch()
+  const normalizedLang = normalizeLanguageIdentifier(lang)
   if (normalizedLang !== codeLanguage.value)
     codeLanguage.value = normalizedLang
   if (!codeBlockContent.value || !rendererTarget.value) {
@@ -407,48 +869,57 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
   }
 
   if (!code) {
-    renderObserver?.disconnect()
-    renderObserver = undefined
-    rendererTarget.value.innerHTML = ''
-    fallbackHtml.value = ''
-    rendererReady.value = false
-    hasStableRender.value = false
+    renderFallback('')
     return
   }
 
-  if (!renderer) {
+  if (!renderer || rendererNeedsReconfigure()) {
     renderFallback(code, !hasStableRender.value)
-    await initRenderer()
+    await safeInitRenderer(epoch)
+    return
   }
-  if (!renderer || !code)
+  if (!isCurrentRenderEpoch(epoch))
+    return
+  if (!renderer)
     return
 
   if (props.stream === false && props.loading)
     return
 
   renderFallback(code, !hasStableRender.value)
-  const updated = await updateRendererWithFallback(code, normalizedLang)
-  if (!updated) {
+  const previousMutationVersion = rendererMutationVersion
+  const previousRendererHtml = rendererTarget.value?.innerHTML
+  startRendererReadyObserver(epoch, previousMutationVersion)
+  const renderedLang = await updateRendererWithFallback(code, lang, epoch)
+  if (!isCurrentRenderEpoch(epoch))
+    return
+  if (!renderedLang) {
+    pendingRenderSignature = null
+    disconnectReadyObserver()
     keepLastSuccessfulRender()
     return
   }
-  if (hasStableRender.value)
+  if (hasStableRender.value) {
     keepLastSuccessfulRender()
-  else
-    await clearFallbackWhenRendererReady()
+  }
+  else {
+    await clearFallbackWhenRendererReady(
+      epoch,
+      previousMutationVersion,
+      getRenderSignature(rendererConfigKey ?? highlightRegistrationKey.value, renderedLang, code),
+      previousRendererHtml,
+    )
+  }
 })
 
-watch(
-  () => [props.darkTheme, props.lightTheme],
-  async () => {
-    if (!codeBlockContent.value || !rendererTarget.value)
-      return
-    if (!renderer)
-      await initRenderer()
-    await renderer?.setTheme(getPreferredColorScheme())
-    syncRenderedCssVars()
-  },
-)
+async function handleRendererThemeChange() {
+  if (!codeBlockContent.value || !rendererTarget.value)
+    return
+  if (!renderer)
+    await safeInitRenderer()
+  await syncRendererTheme()
+  syncRenderedCssVars()
+}
 
 // Auto-scroll to bottom when content changes (if not expanded and auto-scroll is enabled)
 watch(() => props.node.code, async () => {
@@ -609,7 +1080,7 @@ function previewCode() {
   if (!isPreviewable.value)
     return
 
-  const lowerLang = normalizeLanguageIdentifier(String(codeLanguage.value || props.node.language)).toLowerCase()
+  const lowerLang = normalizeLanguageIdentifier(codeLanguage.value || props.node.language).toLowerCase()
   const artifactType = lowerLang === 'html' ? 'text/html' : 'image/svg+xml'
   const artifactTitle
     = lowerLang === 'html'
@@ -634,6 +1105,7 @@ function previewCode() {
     }"
     class="code-block-container my-4 rounded-lg border overflow-hidden shadow-sm"
     :class="[props.isDark ? 'border-gray-700/30 bg-gray-900' : 'border-gray-200 bg-white', props.isDark ? 'is-dark' : '']"
+    :data-markstream-code-theme="props.isDark ? props.darkTheme : props.lightTheme"
   >
     <div
       v-if="props.showHeader"
@@ -757,7 +1229,7 @@ function previewCode() {
       @scroll="handleScroll"
     >
       <div ref="rendererTarget" class="code-block-render" />
-      <div v-if="!rendererReady" class="code-fallback-plain" v-html="fallbackHtml" />
+      <div v-if="!rendererReady && fallbackHtml" class="code-fallback-plain" v-html="fallbackHtml" />
     </div>
     <!-- Loading placeholder can be overridden via slot -->
     <div v-show="!stream && loading" class="code-loading-placeholder">
@@ -791,6 +1263,8 @@ function previewCode() {
 }
 
 .code-block-content {
+  position: relative;
+  display: grid;
   max-height: min(70vh, 500px);
   overflow: auto;
   transition: max-height 0.3s ease;
@@ -799,7 +1273,14 @@ function previewCode() {
 }
 
 .code-block-render {
+  grid-area: 1 / 1;
+  min-width: 0;
   min-height: 1px;
+}
+
+.code-fallback-plain {
+  grid-area: 1 / 1;
+  min-width: 0;
 }
 
 .code-block-container ::v-deep .code-block-render pre,
@@ -814,8 +1295,8 @@ function previewCode() {
 .code-block-container ::v-deep .code-block-content .shiki-fallback {
   padding: 1rem;
   margin: 0;
-  background: transparent;
-  color: inherit;
+  background: var(--vscode-editor-background, var(--markstream-code-fallback-bg));
+  color: var(--vscode-editor-foreground, var(--markstream-code-fallback-fg));
   white-space: pre;
   font-family: inherit;
   font-size: inherit;
@@ -823,10 +1304,12 @@ function previewCode() {
 }
 
 .code-fallback-plain {
+  position: relative;
+  z-index: 1;
   white-space: pre;
   overflow: auto;
-  background: transparent;
-  color: inherit;
+  background: var(--vscode-editor-background, var(--markstream-code-fallback-bg));
+  color: var(--vscode-editor-foreground, var(--markstream-code-fallback-fg));
   font-size: inherit;
   line-height: inherit;
   font-family: inherit;

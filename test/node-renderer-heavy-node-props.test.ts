@@ -16,6 +16,7 @@ vi.mock('../src/components/MarkdownCodeBlockNode', async () => {
         return () => h('div', {
           'class': 'code-block-container',
           'data-has-monaco-options': String(Object.prototype.hasOwnProperty.call(attrs, 'monacoOptions')),
+          'data-langs': JSON.stringify(attrs.langs ?? null),
         })
       },
     }),
@@ -72,6 +73,24 @@ const GenericCodeBlockAttrsProbe = defineComponent({
       'data-has-stream': String(Object.prototype.hasOwnProperty.call(attrs, 'stream')),
       'data-has-monaco-options': String(Object.prototype.hasOwnProperty.call(attrs, 'monacoOptions')),
       'data-has-themes': String(Object.prototype.hasOwnProperty.call(attrs, 'themes')),
+      'data-langs': JSON.stringify(attrs.langs ?? null),
+    })
+  },
+})
+
+const ReservedCodeBlockPropsProbe = defineComponent({
+  name: 'ReservedCodeBlockPropsProbe',
+  props: {
+    node: { type: Object, required: true },
+    indexKey: { type: [String, Number], required: true },
+    showHeader: { type: Boolean, default: true },
+  },
+  setup(props) {
+    return () => h('div', {
+      'class': 'reserved-code-block-props-probe',
+      'data-language': String((props.node as any)?.language ?? ''),
+      'data-index-key': String(props.indexKey),
+      'data-show-header': String(props.showHeader),
     })
   },
 })
@@ -323,6 +342,183 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
     const shiki = wrapper.get('.code-block-container')
     expect(wrapper.find('[data-markstream-code-block="1"]').exists()).toBe(false)
     expect(shiki.attributes('data-has-monaco-options')).toBe('false')
+  })
+
+  it('forwards top-level langs to the shiki renderer and lets codeBlockProps override them', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        codeRenderer: 'shiki',
+        langs: ['typescript'],
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'const value = 1',
+            raw: '```ts\nconst value = 1\n```',
+          },
+        ],
+      },
+    })
+
+    for (let attempt = 0; attempt < 10 && !wrapper.find('.code-block-container').exists(); attempt++)
+      await flushAll()
+
+    expect(wrapper.get('.code-block-container').attributes('data-langs')).toBe('["typescript"]')
+
+    await wrapper.setProps({
+      codeBlockProps: {
+        langs: ['python'],
+      },
+    })
+    await flushAll()
+
+    expect(wrapper.get('.code-block-container').attributes('data-langs')).toBe('["python"]')
+  })
+
+  it('forwards top-level langs to nested shiki renderers', async () => {
+    setCustomComponents(customId, {
+      'answer-box': AnswerBox,
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId,
+        codeRenderer: 'shiki',
+        langs: ['typescript'],
+        content: [
+          '<answer-box>',
+          '```ts',
+          'console.log(1)',
+          '```',
+          '</answer-box>',
+        ].join('\n'),
+        customHtmlTags: ['answer-box'],
+        final: true,
+        batchRendering: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    for (let attempt = 0; attempt < 10 && !wrapper.find('.code-block-container').exists(); attempt++)
+      await flushAll()
+
+    expect(wrapper.get('.answer-box .code-block-container').attributes('data-langs')).toBe('["typescript"]')
+  })
+
+  it('forwards top-level langs to custom code_block renderers without forcing codeRenderer="shiki"', async () => {
+    setCustomComponents(customId, {
+      code_block: GenericCodeBlockAttrsProbe as any,
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId,
+        langs: ['typescript'],
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'const value = 1',
+            raw: '```ts\nconst value = 1\n```',
+          },
+        ],
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+        batchRendering: false,
+        maxLiveNodes: 0,
+      },
+    })
+
+    for (let attempt = 0; attempt < 10 && !wrapper.find('.generic-code-block-attrs-probe').exists(); attempt++)
+      await flushAll()
+
+    expect(wrapper.get('.generic-code-block-attrs-probe').attributes('data-langs')).toBe('["typescript"]')
+  })
+
+  it('keeps generic code block props off exact custom mermaid renderers', async () => {
+    setCustomComponents(customId, {
+      mermaid: GenericCodeBlockAttrsProbe as any,
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId,
+        langs: ['mermaid'],
+        codeBlockStream: false,
+        codeBlockProps: {
+          showHeader: true,
+        },
+        mermaidProps: {
+          showHeader: false,
+        },
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'mermaid',
+            code: 'flowchart TD\nA-->B',
+            raw: '```mermaid\nflowchart TD\nA-->B\n```',
+          },
+        ],
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+        batchRendering: false,
+        maxLiveNodes: 0,
+      },
+    })
+
+    for (let attempt = 0; attempt < 10 && !wrapper.find('.generic-code-block-attrs-probe').exists(); attempt++)
+      await flushAll()
+
+    const probe = wrapper.get('.generic-code-block-attrs-probe')
+    expect(probe.attributes('data-show-header')).toBe('false')
+    expect(probe.attributes('data-has-stream')).toBe('false')
+    expect(probe.attributes('data-langs')).toBe('null')
+  })
+
+  it('does not let codeBlockProps override reserved code block props', async () => {
+    setCustomComponents(customId, {
+      code_block: ReservedCodeBlockPropsProbe,
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId,
+        codeBlockProps: {
+          node: {
+            type: 'code_block',
+            language: 'spoofed',
+          },
+          indexKey: 'spoofed-index',
+          key: 'spoofed-key',
+          ref: 'spoofed-ref',
+          ctx: {},
+          renderNode: () => null,
+          ['__proto__']: { polluted: true },
+          prototype: { polluted: true },
+          constructor: { polluted: true },
+          showHeader: false,
+        },
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'const value = 1',
+            raw: '```ts\nconst value = 1\n```',
+          },
+        ],
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+        batchRendering: false,
+        maxLiveNodes: 0,
+      },
+    })
+
+    await flushAll()
+
+    const probe = wrapper.get('.reserved-code-block-props-probe')
+    expect(probe.attributes('data-language')).toBe('ts')
+    expect(probe.attributes('data-index-key')).toBe('markdown-renderer-0')
+    expect(probe.attributes('data-show-header')).toBe('false')
   })
 
   it('ignores invalid runtime codeRenderer values', async () => {

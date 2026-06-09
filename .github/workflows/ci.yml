@@ -66,8 +66,16 @@ jobs:
       - name: Run tests
         run: pnpm run build:parser && pnpm run build:core && nr test -- --run
 
+      - name: Core package ESM/CJS smoke (Ubuntu only)
+        if: matrix.os == 'ubuntu-latest'
+        run: pnpm run test:smoke:core
+
       - name: Run SSR check
         run: nr check:ssr
+
+      - name: Vue2 CJS smoke (Ubuntu only)
+        if: matrix.os == 'ubuntu-latest'
+        run: pnpm run test:smoke:vue2-cjs
 
       - name: Build (Ubuntu only)
         if: matrix.os == 'ubuntu-latest'
