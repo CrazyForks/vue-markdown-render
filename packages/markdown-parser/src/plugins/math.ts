@@ -487,6 +487,29 @@ function countUnescapedDelimiter(
   return count
 }
 
+function isPlainBracketFallbackCloseMathContinuation(tail: string) {
+  const stripped = String(tail ?? '').trimStart()
+  if (!stripped)
+    return false
+
+  // Lines like `] + x = 0`, `] \cdot x`, or `]}` are likely still math
+  // content, so the leading `]` should not be treated as the malformed close
+  // for a non-strict `\[` block.
+  if (/^[\])}]/.test(stripped))
+    return true
+
+  if (/^\\[a-z]+/i.test(stripped))
+    return true
+
+  if (/^[+*/^_=<>]\s*(?:[A-Za-z0-9\\({]|$)/.test(stripped))
+    return true
+
+  // `] - x` can be math continuation, but `] - where ...` is normal suffix.
+  // Keep hyphen conservative: treat it as math only when the right side is a
+  // short variable/number/TeX command, not a prose word.
+  return /^-\s*(?:[A-Za-z](?:\b|[_^])|\d|\\[a-z]+|[({]|$)/i.test(stripped)
+}
+
 function findPlainBracketFallbackClose(src: string) {
   let index = 0
   while (index < src.length && (src[index] === ' ' || src[index] === '\t'))
@@ -516,7 +539,7 @@ function findPlainBracketFallbackClose(src: string) {
   //
   // Treat the plain `]` as a fallback close only when the tail does not look
   // like a math continuation.
-  if (/^(?:[+\-*/^_=<>]|\\[a-z]+|[\])}])/.test(tail))
+  if (isPlainBracketFallbackCloseMathContinuation(tail))
     return -1
 
   return index
@@ -1484,15 +1507,19 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     // For explicit $$ delimiters, skip the isMathLike check since $$ is already
     // a clear math marker. This allows spaced subscript formats like "f _ { x }"
     // to be correctly recognized as math.
+    // The same applies to explicit `\[` / `\]`: unlike non-strict plain `[`,
+    // this is an intentional TeX display delimiter and should not be rejected
+    // merely because the content has weak heuristic signals.
     // However, if the content starts with markdown special syntax like ![, skip.
     const hasMarkdownPrefix = /^\s*!\[/.test(content)
-    const looksMath = openDelim === '$$'
-      ? !hasMarkdownPrefix && (!tolerantBoundary || isLikelyTolerantExplicitMathBlockContent(content, found))
+    const looksMath = openDelim === '$$' || openDelim === '\\['
+      ? !hasMarkdownPrefix && (
+          !tolerantBoundary
+          || isLikelyTolerantExplicitMathBlockContent(content, found)
+        )
       : (openDelim === '['
           ? isPlainBracketMathLike(content)
-          : (tolerantBoundary && openDelim === '\\[')
-              ? !hasMarkdownPrefix && isLikelyTolerantExplicitMathBlockContent(content, found)
-              : isMathLike(content))
+          : isMathLike(content))
     if (!looksMath)
       return false
 

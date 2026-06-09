@@ -1749,4 +1749,182 @@ E=mc^2`, { __markstreamFinal: false }) as any[]
     const inlineMath = collectByType(nodes, 'math_inline')
     expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('x')
   })
+
+  it('keeps explicit standalone \\[ display math with weak spaced subscript content', () => {
+    const md = getMarkdown('math-block-explicit-bracket-weak-spaced-subscript')
+
+    const content = [
+      '\\[',
+      'f _ { x }',
+      '\\] after $x$ follows.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].markup).toBe('\\[\\]')
+    expect(mathBlocks[0].content).toContain('f _ { x }')
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('after')
+    expect(serialized).toContain('follows')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('x')
+  })
+
+  it('keeps explicit standalone \\[ weak content stable during streaming', () => {
+    const md = getMarkdown('stream-math-block-explicit-bracket-weak-spaced-subscript')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const chunks = [
+      '\\[\nf _ { x }',
+      '\n\\] after $x$ follows.',
+    ]
+
+    let source = ''
+    let nodes: any[] = []
+
+    for (const chunk of chunks) {
+      source += chunk
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+    }
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].markup).toBe('\\[\\]')
+    expect(mathBlocks[0].content).toContain('f _ { x }')
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 10; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+    }
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('x')
+  })
+
+  it('treats plain ] followed by prose hyphen as non-strict \\[ fallback close suffix', () => {
+    const md = getMarkdown('math-block-bracket-plain-close-prose-hyphen-suffix')
+
+    const content = [
+      'Prefix before display \\[',
+      'x + y = z',
+      '] - where $z$ follows in prose.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].markup).toBe('\\[\\]')
+    expect(mathBlocks[0].content).toContain('x + y = z')
+    expect(mathBlocks[0].content).not.toContain('where')
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('Prefix before display')
+    expect(serialized).toContain('where')
+    expect(serialized).toContain('follows in prose')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('z')
+  })
+
+  it('keeps plain ] followed by math hyphen as \\[ content instead of fallback close', () => {
+    const md = getMarkdown('math-block-bracket-plain-close-math-hyphen-continuation')
+
+    const content = [
+      '\\[',
+      '] - x = 0',
+      '\\] after $x$ follows.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].content).toContain('] - x = 0')
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('after')
+    expect(serialized).toContain('follows')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('x')
+  })
+
+  it('keeps streaming stable for plain ] prose-hyphen fallback close suffix', () => {
+    const md = getMarkdown('stream-math-block-bracket-plain-close-prose-hyphen-suffix')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const chunks = [
+      'Prefix before display \\[\nx + y = z',
+      '\n] - where $z$ follows in prose.',
+    ]
+
+    let source = ''
+    let nodes: any[] = []
+
+    for (const chunk of chunks) {
+      source += chunk
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+    }
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 10; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+    }
+
+    expect(stableSerialized).toContain('where')
+    expect(stableSerialized).toContain('follows in prose')
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+  })
 })
