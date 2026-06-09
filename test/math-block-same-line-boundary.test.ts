@@ -226,6 +226,115 @@ x + y = z
     expect(code).toContain('$$ where it should stay indented code')
   })
 
+  it('does not rewrite raw HTML blocks that contain math-looking boundaries', () => {
+    const md = getMarkdown('math-block-boundary-raw-html-guard')
+
+    const content = [
+      '<pre>',
+      'literal $$',
+      'E=mc^2',
+      '$$ where it must stay raw html content',
+      '</pre>',
+      '',
+      'after $x$ remains inline math',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true })
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('literal $$')
+    expect(serialized).toContain('$$ where it must stay raw html content')
+    expect(serialized).toContain('after')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('x')
+  })
+
+  it('does not rewrite configured custom HTML blocks that contain math-looking boundaries', () => {
+    const md = getMarkdown('math-block-boundary-custom-html-guard')
+
+    const content = [
+      '<artifact>',
+      'literal $$',
+      'E=mc^2',
+      '$$ where it must stay inside the custom node',
+      '</artifact>',
+      '',
+      'outside display $$',
+      'y = x + 1',
+      '$$ after $x$ follows.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, {
+      final: true,
+      customHtmlTags: ['artifact'],
+    })
+
+    const customNodes = collectByType(nodes, 'artifact')
+    expect(customNodes).toHaveLength(1)
+    expect(String(customNodes[0].content)).toContain('literal $$')
+    expect(String(customNodes[0].content)).toContain('$$ where it must stay inside the custom node')
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].content).toContain('y = x + 1')
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('outside display')
+    expect(serialized).toContain('after')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('x')
+  })
+
+  it('keeps streaming stable when protected custom HTML contains repeated math-looking boundaries', () => {
+    const md = getMarkdown('stream-math-boundary-custom-html-no-loop')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const noisyCustomContent = Array.from(
+      { length: 80 },
+      (_, index) => `line ${index} literal $$`,
+    ).join('\n')
+
+    const source = [
+      '<artifact>',
+      noisyCustomContent,
+      '$$ this must not become math',
+      '</artifact>',
+      '',
+      'Plain $x$ text.',
+    ].join('\n')
+
+    let stableSerialized = ''
+    let nodes: any[] = []
+
+    for (let index = 0; index < 8; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+          customHtmlTags: ['artifact'],
+        }) as any[]
+      }).not.toThrow()
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(collectByType(nodes, 'artifact')).toHaveLength(1)
+    expect(stableSerialized).toContain('$$ this must not become math')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('x')
+  })
+
   it('does not split escaped $$ delimiters or close math blocks on escaped $$', () => {
     const md = getMarkdown('math-block-boundary-escaped-dollar')
 

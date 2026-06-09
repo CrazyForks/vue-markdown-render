@@ -2142,7 +2142,7 @@ function ensureBlankLineBeforeCustomHtmlBlocks(markdown: string, tags: string[])
   return out
 }
 
-function normalizeMathBlockSameLineBoundaries(markdown: string) {
+function normalizeMathBlockSameLineBoundaries(markdown: string, customHtmlTags?: readonly string[]) {
   if (!markdown || (!markdown.includes('$$') && !markdown.includes('\\[') && !markdown.includes('\\]')))
     return markdown
 
@@ -2155,6 +2155,105 @@ function normalizeMathBlockSameLineBoundaries(markdown: string) {
   ]
 
   const isIndentWs = (ch: string) => ch === ' ' || ch === '\t'
+
+  const trackedHtmlBlockTags = new Set<string>([
+    // Raw-text / sensitive HTML blocks. Normalizing display-math markers inside
+    // these blocks mutates user content before markdown-it can preserve it as
+    // html_block/custom content.
+    'pre',
+    'script',
+    'style',
+    'textarea',
+    ...normalizeCustomHtmlTags(customHtmlTags),
+  ])
+
+  const isHtmlNameStart = (ch?: string) => {
+    if (!ch)
+      return false
+    const code = ch.charCodeAt(0)
+    return (code >= 65 && code <= 90) || (code >= 97 && code <= 122)
+  }
+
+  const isHtmlNameChar = (ch?: string) => {
+    if (!ch)
+      return false
+    const code = ch.charCodeAt(0)
+    return isHtmlNameStart(ch)
+      || (code >= 48 && code <= 57)
+      || ch === '_'
+      || ch === '-'
+      || ch === ':'
+  }
+
+  const findTrackedCloseTag = (line: string, tag: string) => {
+    if (!tag)
+      return -1
+
+    const closeRe = new RegExp(String.raw`<\s*\/\s*${escapeTagForRegExp(tag)}(?=\s|>)`, 'i')
+    const match = closeRe.exec(line)
+    return match?.index ?? -1
+  }
+
+  const parseTrackedHtmlBlockBoundary = (line: string) => {
+    const trimmed = line.replace(/^[\t ]+/, '')
+    if (!trimmed || trimmed[0] !== '<')
+      return null
+
+    let cursor = 1
+    while (cursor < trimmed.length && isIndentWs(trimmed[cursor]))
+      cursor++
+
+    let closing = false
+    if (trimmed[cursor] === '/') {
+      closing = true
+      cursor++
+      while (cursor < trimmed.length && isIndentWs(trimmed[cursor]))
+        cursor++
+    }
+
+    if (!isHtmlNameStart(trimmed[cursor]))
+      return null
+
+    const nameStart = cursor
+    while (cursor < trimmed.length && isHtmlNameChar(trimmed[cursor]))
+      cursor++
+
+    const name = trimmed.slice(nameStart, cursor).toLowerCase()
+    if (!trackedHtmlBlockTags.has(name))
+      return null
+
+    // Require a real tag-name boundary so we don't match prefixes like
+    // "<prelude>" when guarding "<pre>".
+    const boundary = trimmed[cursor]
+    if (
+      boundary
+      && boundary !== ' '
+      && boundary !== '\t'
+      && boundary !== '\r'
+      && boundary !== '\n'
+      && boundary !== '>'
+      && boundary !== '/'
+    ) {
+      return null
+    }
+
+    if (closing)
+      return { type: 'close' as const, name, complete: true }
+
+    const tagCloseIndex = findTagCloseIndexOutsideQuotes(trimmed)
+    if (tagCloseIndex === -1)
+      return { type: 'open' as const, name, complete: false }
+
+    const openTag = trimmed.slice(0, tagCloseIndex + 1)
+    const selfClosing = /\/[\t ]*>$/.test(openTag)
+    const sameLineClose = findTrackedCloseTag(trimmed.slice(tagCloseIndex + 1), name) !== -1
+
+    return {
+      type: 'open' as const,
+      name,
+      complete: selfClosing || sameLineClose,
+    }
+  }
 
   type Range = [number, number]
 
@@ -2447,6 +2546,7 @@ function normalizeMathBlockSameLineBoundaries(markdown: string) {
   let fenceChar: '`' | '~' | '' = ''
   let fenceLen = 0
   let activeMathClose: CloseDelimiter | '' = ''
+  let activeHtmlBlockTag = ''
 
   while (idx < markdown.length) {
     const nl = markdown.indexOf('\n', idx)
@@ -2476,6 +2576,16 @@ function normalizeMathBlockSameLineBoundaries(markdown: string) {
       continue
     }
 
+    if (activeHtmlBlockTag) {
+      out = appendLines(out, [contentLine], newline, prefix)
+
+      if (findTrackedCloseTag(contentLine, activeHtmlBlockTag) !== -1)
+        activeHtmlBlockTag = ''
+
+      idx = hasNl ? nl + 1 : markdown.length
+      continue
+    }
+
     const fenceMatch = parseFenceMarker(contentLine)
     if (fenceMatch) {
       out = appendLines(out, [contentLine], newline, prefix)
@@ -2499,6 +2609,17 @@ function normalizeMathBlockSameLineBoundaries(markdown: string) {
 
     if (inFence || isIndentedCodeLine(contentLine)) {
       out = appendLines(out, [contentLine], newline, prefix)
+      idx = hasNl ? nl + 1 : markdown.length
+      continue
+    }
+
+    const htmlBoundary = parseTrackedHtmlBlockBoundary(contentLine)
+    if (htmlBoundary) {
+      out = appendLines(out, [contentLine], newline, prefix)
+
+      if (htmlBoundary.type === 'open' && !htmlBoundary.complete)
+        activeHtmlBlockTag = htmlBoundary.name
+
       idx = hasNl ? nl + 1 : markdown.length
       continue
     }
@@ -2559,7 +2680,7 @@ export function parseMarkdownToStructure(
   // todo: 下面的特殊 math 其实应该更精确匹配到() 或者 $$ $$ 或者 \[ \] 内部的内容
   let safeMarkdown = (markdown ?? '').toString().replace(/([^\\])\r(ight|ho)/g, '$1\\r$2').replace(/([^\\])\n(abla|eq|ot|exists)/g, '$1\\n$2')
 
-  const normalizedMathBoundaryMarkdown = normalizeMathBlockSameLineBoundaries(safeMarkdown)
+  const normalizedMathBoundaryMarkdown = normalizeMathBlockSameLineBoundaries(safeMarkdown, options.customHtmlTags)
   const mathBoundaryNormalized = normalizedMathBoundaryMarkdown !== safeMarkdown
   safeMarkdown = normalizedMathBoundaryMarkdown
 
