@@ -436,6 +436,23 @@ function findSingleDollarClose(src: string, startIdx: number) {
   return -1
 }
 
+function findUnescapedDelimiter(src: string, delimiter: string, startIdx = 0) {
+  let searchPos = Math.max(0, startIdx)
+
+  while (searchPos < src.length) {
+    const index = src.indexOf(delimiter, searchPos)
+    if (index === -1)
+      return -1
+
+    if (!isEscapedAt(src, index))
+      return index
+
+    searchPos = index + Math.max(1, delimiter.length)
+  }
+
+  return -1
+}
+
 function isLikelyCurrencyRangeDollar(content: string, nextChar?: string) {
   const stripped = String(content ?? '').trim()
   if (!stripped)
@@ -1119,12 +1136,12 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     const startDelimIndex = lineText.indexOf(openDelim)
     const closeSearchStart = startDelimIndex + openDelim.length
     const escapedPlainBracketCloseIndex = !strict && openDelim === '['
-      ? lineText.indexOf('\\]', closeSearchStart)
+      ? findUnescapedDelimiter(lineText, '\\]', closeSearchStart)
       : -1
     const sameLineCloseDelim = escapedPlainBracketCloseIndex >= 0 ? '\\]' : closeDelim
     const sameLineCloseIndex = escapedPlainBracketCloseIndex >= 0
       ? escapedPlainBracketCloseIndex
-      : lineText.indexOf(closeDelim, closeSearchStart)
+      : findUnescapedDelimiter(lineText, closeDelim, closeSearchStart)
 
     if (sameLineCloseIndex > openDelim.length) {
       const content = lineText.slice(
@@ -1151,8 +1168,10 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       = lineText === openDelim ? '' : lineText.slice(openDelim.length)
     const fallbackPlainBracketClose = !strict && openDelim === '\\[' ? ']' : ''
 
-    if (firstLineContent.includes(closeDelim)) {
-      const endIndex = firstLineContent.indexOf(closeDelim)
+    const firstLineCloseIndex = findUnescapedDelimiter(firstLineContent, closeDelim)
+
+    if (firstLineCloseIndex !== -1) {
+      const endIndex = firstLineCloseIndex
       content = firstLineContent.slice(0, endIndex)
       found = true
       nextLine = startLine
@@ -1166,6 +1185,8 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         const lineEnd = s.eMarks[nextLine]
         const currentLine = s.src.slice(lineStart, lineEnd)
         const currentLineTrimmed = currentLine.trim()
+        const escapedPlainBracketCloseInLine = !strict && openDelim === '[' ? findUnescapedDelimiter(currentLine, '\\]') : -1
+        const closeIndexInLine = findUnescapedDelimiter(currentLine, closeDelim)
         if (!strict && openDelim === '[' && currentLineTrimmed === '\\]') {
           closeDelim = '\\]'
           found = true
@@ -1180,16 +1201,16 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           found = true
           break
         }
-        else if (!strict && openDelim === '[' && currentLine.includes('\\]')) {
+        else if (escapedPlainBracketCloseInLine !== -1) {
           found = true
-          const endIndex = currentLine.indexOf('\\]')
+          const endIndex = escapedPlainBracketCloseInLine
           closeDelim = '\\]'
           content += (content ? '\n' : '') + currentLine.slice(0, endIndex)
           break
         }
-        else if (currentLine.includes(closeDelim)) {
+        else if (closeIndexInLine !== -1) {
           found = true
-          const endIndex = currentLine.indexOf(closeDelim)
+          const endIndex = closeIndexInLine
           content += (content ? '\n' : '') + currentLine.slice(0, endIndex)
           break
         }

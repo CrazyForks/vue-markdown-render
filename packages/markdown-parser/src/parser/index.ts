@@ -2147,24 +2147,103 @@ function normalizeMathBlockSameLineBoundaries(markdown: string) {
     return markdown
 
   type CloseDelimiter = '$$' | '\\]'
+  type DisplayDelimiter = { open: string, close: CloseDelimiter }
 
-  const displayDelimiters: Array<{ open: string, close: CloseDelimiter }> = [
+  const displayDelimiters: DisplayDelimiter[] = [
     { open: '$$', close: '$$' },
     { open: '\\[', close: '\\]' },
   ]
 
   const isIndentWs = (ch: string) => ch === ' ' || ch === '\t'
 
+  const isEscapedAtIndex = (src: string, index: number) => {
+    let cursor = index - 1
+    let slashCount = 0
+
+    while (cursor >= 0 && src[cursor] === '\\') {
+      slashCount++
+      cursor--
+    }
+
+    return slashCount % 2 === 1
+  }
+
+  const findUnescapedDelimiter = (src: string, delimiter: string, startIndex = 0) => {
+    let searchIndex = Math.max(0, startIndex)
+
+    while (searchIndex < src.length) {
+      const index = src.indexOf(delimiter, searchIndex)
+      if (index === -1)
+        return -1
+
+      if (!isEscapedAtIndex(src, index))
+        return index
+
+      searchIndex = index + Math.max(1, delimiter.length)
+    }
+
+    return -1
+  }
+
+  const parseBlockquotePrefix = (line: string) => {
+    let index = 0
+    let prefixEnd = 0
+    let sawBlockquote = false
+
+    while (index < line.length) {
+      while (index < line.length && isIndentWs(line[index]))
+        index++
+
+      if (line[index] !== '>')
+        break
+
+      sawBlockquote = true
+      index++
+
+      while (index < line.length && isIndentWs(line[index]))
+        index++
+
+      prefixEnd = index
+    }
+
+    if (!sawBlockquote) {
+      return {
+        prefix: '',
+        content: line,
+      }
+    }
+
+    return {
+      prefix: line.slice(0, prefixEnd),
+      content: line.slice(prefixEnd),
+    }
+  }
+
+  const isIndentedCodeLine = (line: string) => {
+    if (!line)
+      return false
+    if (line[0] === '\t')
+      return true
+
+    let spaces = 0
+    while (spaces < line.length && line[spaces] === ' ')
+      spaces++
+
+    return spaces >= 4
+  }
+
   const parseFenceMarker = (line: string) => {
     let i = 0
-    while (i < line.length && isIndentWs(line[i])) i++
+    while (i < line.length && isIndentWs(line[i]))
+      i++
 
     const ch = line[i]
     if (ch !== '`' && ch !== '~')
       return null
 
     let j = i
-    while (j < line.length && line[j] === ch) j++
+    while (j < line.length && line[j] === ch)
+      j++
 
     const len = j - i
     if (len < 3)
@@ -2177,21 +2256,25 @@ function normalizeMathBlockSameLineBoundaries(markdown: string) {
     }
   }
 
-  const appendLines = (out: string, lines: string[], newline: string) => {
+  const appendLines = (out: string, lines: string[], newline: string, prefix = '') => {
     const separator = newline || '\n'
-    return `${out}${lines.join(separator)}${newline}`
+    return `${out}${lines.map(line => `${prefix}${line}`).join(separator)}${newline}`
   }
 
   const findLineStartOpen = (line: string) => {
     let start = 0
-    while (start < line.length && isIndentWs(line[start])) start++
+    while (start < line.length && isIndentWs(line[start]))
+      start++
 
     for (const delimiter of displayDelimiters) {
-      if (line.startsWith(delimiter.open, start)) {
-        return {
-          ...delimiter,
-          start,
-        }
+      if (!line.startsWith(delimiter.open, start))
+        continue
+      if (isEscapedAtIndex(line, start))
+        continue
+
+      return {
+        ...delimiter,
+        start,
       }
     }
 
@@ -2202,17 +2285,20 @@ function normalizeMathBlockSameLineBoundaries(markdown: string) {
     const trimmedRight = line.replace(/[\t ]+$/, '')
 
     for (const delimiter of displayDelimiters) {
-      if (!trimmedRight.endsWith(delimiter.open))
+      const openIndex = trimmedRight.length - delimiter.open.length
+      if (openIndex < 0 || !trimmedRight.startsWith(delimiter.open, openIndex))
+        continue
+      if (isEscapedAtIndex(trimmedRight, openIndex))
         continue
 
-      const before = trimmedRight.slice(0, trimmedRight.length - delimiter.open.length)
+      const before = trimmedRight.slice(0, openIndex)
       if (!before.trim())
         continue
 
       // Avoid rewriting normal same-line inline/display pairs such as
       // "text $x$"; this normalization is only for malformed block openers
       // emitted at the end of a paragraph line.
-      if (before.includes(delimiter.open))
+      if (findUnescapedDelimiter(before, delimiter.open) !== -1)
         continue
 
       return {
@@ -2240,9 +2326,29 @@ function normalizeMathBlockSameLineBoundaries(markdown: string) {
     const line = markdown.slice(idx, lineEnd)
     const newline = hasNl ? (isCrlf ? '\r\n' : '\n') : ''
 
-    const fenceMatch = parseFenceMarker(line)
+    const blockquote = parseBlockquotePrefix(line)
+    const prefix = blockquote.prefix
+    const contentLine = blockquote.content
+
+    if (activeMathClose) {
+      const closeIndex = findUnescapedDelimiter(contentLine, activeMathClose)
+      if (closeIndex === -1) {
+        out = appendLines(out, [contentLine], newline, prefix)
+        idx = hasNl ? nl + 1 : markdown.length
+        continue
+      }
+
+      const beforeAndClose = contentLine.slice(0, closeIndex + activeMathClose.length).replace(/[\t ]+$/, '')
+      const afterClose = contentLine.slice(closeIndex + activeMathClose.length).replace(/^[\t ]+/, '')
+      activeMathClose = ''
+      out = appendLines(out, afterClose.trim() ? [beforeAndClose, afterClose] : [contentLine], newline, prefix)
+      idx = hasNl ? nl + 1 : markdown.length
+      continue
+    }
+
+    const fenceMatch = parseFenceMarker(contentLine)
     if (fenceMatch) {
-      out = appendLines(out, [line], newline)
+      out = appendLines(out, [contentLine], newline, prefix)
 
       if (inFence) {
         if (fenceMatch.markerChar === fenceChar && fenceMatch.markerLen >= fenceLen && /^\s*$/.test(fenceMatch.rest)) {
@@ -2261,60 +2367,48 @@ function normalizeMathBlockSameLineBoundaries(markdown: string) {
       continue
     }
 
-    if (inFence) {
-      out = appendLines(out, [line], newline)
+    if (inFence || isIndentedCodeLine(contentLine)) {
+      out = appendLines(out, [contentLine], newline, prefix)
       idx = hasNl ? nl + 1 : markdown.length
       continue
     }
 
-    if (activeMathClose) {
-      const closeIndex = line.indexOf(activeMathClose)
-      if (closeIndex === -1) {
-        out = appendLines(out, [line], newline)
-        idx = hasNl ? nl + 1 : markdown.length
-        continue
-      }
-
-      const beforeAndClose = line.slice(0, closeIndex + activeMathClose.length).replace(/[\t ]+$/, '')
-      const afterClose = line.slice(closeIndex + activeMathClose.length).replace(/^[\t ]+/, '')
-      activeMathClose = ''
-      out = appendLines(out, afterClose.trim() ? [beforeAndClose, afterClose] : [line], newline)
-      idx = hasNl ? nl + 1 : markdown.length
-      continue
-    }
-
-    const tolerantOpen = findTolerantOpenAtLineEnd(line)
+    const tolerantOpen = findTolerantOpenAtLineEnd(contentLine)
     if (tolerantOpen) {
       activeMathClose = tolerantOpen.close
-      out = appendLines(out, [tolerantOpen.before, tolerantOpen.open], newline)
+      out = appendLines(out, [tolerantOpen.before, tolerantOpen.open], newline, prefix)
       idx = hasNl ? nl + 1 : markdown.length
       continue
     }
 
-    const lineStartOpen = findLineStartOpen(line)
+    const lineStartOpen = findLineStartOpen(contentLine)
     if (lineStartOpen) {
-      const closeIndex = line.indexOf(lineStartOpen.close, lineStartOpen.start + lineStartOpen.open.length)
+      const closeIndex = findUnescapedDelimiter(
+        contentLine,
+        lineStartOpen.close,
+        lineStartOpen.start + lineStartOpen.open.length,
+      )
       if (closeIndex === -1) {
         activeMathClose = lineStartOpen.close
-        out = appendLines(out, [line], newline)
+        out = appendLines(out, [contentLine], newline, prefix)
         idx = hasNl ? nl + 1 : markdown.length
         continue
       }
 
-      const afterClose = line.slice(closeIndex + lineStartOpen.close.length).replace(/^[\t ]+/, '')
+      const afterClose = contentLine.slice(closeIndex + lineStartOpen.close.length).replace(/^[\t ]+/, '')
       if (afterClose.trim()) {
-        const beforeAndClose = line.slice(0, closeIndex + lineStartOpen.close.length).replace(/[\t ]+$/, '')
-        out = appendLines(out, [beforeAndClose, afterClose], newline)
+        const beforeAndClose = contentLine.slice(0, closeIndex + lineStartOpen.close.length).replace(/[\t ]+$/, '')
+        out = appendLines(out, [beforeAndClose, afterClose], newline, prefix)
       }
       else {
-        out = appendLines(out, [line], newline)
+        out = appendLines(out, [contentLine], newline, prefix)
       }
 
       idx = hasNl ? nl + 1 : markdown.length
       continue
     }
 
-    out = appendLines(out, [line], newline)
+    out = appendLines(out, [contentLine], newline, prefix)
     idx = hasNl ? nl + 1 : markdown.length
   }
 
