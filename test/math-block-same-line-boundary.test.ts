@@ -786,7 +786,7 @@ x + y = z
     expect(inlineContent).toContain('x')
   })
 
-  it('does not split table rows that end with $$ into display math blocks', () => {
+  it('does not split table rows that end with $$$ into display math blocks', () => {
     const md = getMarkdown('math-block-boundary-table-row-guard')
 
     const content = [
@@ -1027,5 +1027,80 @@ $$ where $x$ follows.`
 line 1 ordinary text ending with $$`, { __markstreamFinal: true }) as any[]
 
     expect(tokens.filter(token => token.type === 'math_block')).toHaveLength(0)
+  })
+
+  it('does not let silent tolerant $ detection split ordinary final paragraphs', () => {
+    const md = getMarkdown('math-boundary-silent-final-dollar-no-paragraph-split')
+
+    const content = [
+      'The first line belongs to the same paragraph.',
+      'This ordinary prose line happens to end with $$',
+      'and this following line is still ordinary prose.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0]?.type).toBe('paragraph')
+    expect(nodes[0]?.raw).toContain('The first line belongs')
+    expect(nodes[0]?.raw).toContain('happens to end with $$')
+    expect(nodes[0]?.raw).toContain('following line is still ordinary prose')
+  })
+
+  it('does not let silent tolerant \\[ detection split ordinary final paragraphs', () => {
+    const md = getMarkdown('math-boundary-silent-final-bracket-no-paragraph-split')
+
+    const content = [
+      'The first line belongs to the same paragraph.',
+      'This ordinary prose line happens to end with \\[',
+      'and this following line is still ordinary prose.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0]?.type).toBe('paragraph')
+    expect(nodes[0]?.raw).toContain('The first line belongs')
+    expect(nodes[0]?.raw).toContain('happens to end with \\[')
+    expect(nodes[0]?.raw).toContain('following line is still ordinary prose')
+  })
+
+  it('keeps streaming ordinary paragraphs stable when a middle line ends with $', () => {
+    const md = getMarkdown('stream-math-boundary-silent-dollar-no-paragraph-split')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      'The first line belongs to the same paragraph.',
+      'This ordinary prose line happens to end with $$',
+      'and this following line is still ordinary prose.',
+    ].join('\n')
+
+    let stableSerialized = ''
+    let nodes: any[] = []
+
+    for (let index = 0; index < 8; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0]?.type).toBe('paragraph')
+    expect(nodes[0]?.raw).toContain('The first line belongs')
+    expect(nodes[0]?.raw).toContain('happens to end with $$')
+    expect(nodes[0]?.raw).toContain('following line is still ordinary prose')
   })
 })

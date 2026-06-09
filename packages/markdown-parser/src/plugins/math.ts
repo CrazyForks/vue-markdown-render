@@ -1303,7 +1303,16 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
 
     if (!matched)
       return false
-    if (silent)
+
+    // Keep the old fast path for real line-start math blocks.
+    //
+    // For tolerant same-line boundaries (`prefix $$` / `prefix \[`), do not
+    // return true in silent mode until the candidate has passed the same checks
+    // as non-silent parsing. Otherwise markdown-it's paragraph rule can treat
+    // ordinary prose lines ending in `$$` or `\[` as block terminators, split the
+    // paragraph, and then the non-silent parse of that same line can still return
+    // false after `looksMath`.
+    if (silent && !tolerantBoundary)
       return true
 
     const startDelimIndex = lineText.indexOf(openDelim)
@@ -1437,6 +1446,9 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       : (openDelim === '[' ? isPlainBracketMathLike(content) : isMathLike(content))
     if (!looksMath)
       return false
+
+    if (silent)
+      return true
 
     if (prefixBeforeOpen)
       pushInlineParagraph(prefixBeforeOpen, startLine)
