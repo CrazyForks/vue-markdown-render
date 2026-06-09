@@ -487,6 +487,17 @@ function countUnescapedDelimiter(
   return count
 }
 
+function findLineStartUnescapedDelimiter(src: string, delimiter: string) {
+  let index = 0
+  while (index < src.length && (src[index] === ' ' || src[index] === '\t'))
+    index++
+
+  if (src.slice(index, index + delimiter.length) !== delimiter)
+    return -1
+
+  return isEscapedAt(src, index) ? -1 : index
+}
+
 function isInsideCodeSpanOrUnclosedTail(src: string, index: number) {
   let cursor = 0
 
@@ -564,6 +575,26 @@ function isLikelyPlaceholderDollar(content: string) {
     return false
   // Placeholder text like "$...$" / "$…$" is not math.
   return /^(?:\.{3,}|…+)$/.test(stripped)
+}
+
+function isLikelySpacedSuperSubscriptMath(content: string) {
+  const stripped = String(content ?? '').trim()
+  if (!stripped || stripped.length > 400)
+    return false
+
+  // Keep this deliberately narrow:
+  // - only a single variable / TeX command before _ or ^
+  // - optional spaces around _/^
+  // - braced or simple alnum command suffix
+  //
+  // This covers real display math that is already supported for normal
+  // standalone $ blocks, for example `f _ { x }`, without turning ordinary
+  // prose like "foo _ bar" into a tolerant math block.
+  return /(?:^|[^\p{L}\p{N}\\])(?:[A-Z]|\\[A-Z]+)\s*[_^]\s*(?:\{[^{}\n]{1,120}\}|[A-Z0-9\\]+)(?:$|[^\p{L}\p{N}])/iu.test(stripped)
+}
+
+function isLikelyTolerantDollarMathBlockContent(content: string) {
+  return isMathLike(content) || isLikelySpacedSuperSubscriptMath(content)
 }
 
 export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
@@ -1333,6 +1364,9 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         const currentLineTrimmed = currentLine.trim()
         const escapedPlainBracketCloseInLine = !strict && openDelim === '[' ? findUnescapedDelimiter(currentLine, '\\]') : -1
         const closeIndexInLine = findUnescapedDelimiter(currentLine, closeDelim)
+        const fallbackPlainBracketCloseInLine = fallbackPlainBracketClose
+          ? findLineStartUnescapedDelimiter(currentLine, fallbackPlainBracketClose)
+          : -1
         if (!strict && openDelim === '[' && currentLineTrimmed === '\\]') {
           closeDelim = '\\]'
           found = true
@@ -1341,6 +1375,16 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         if (fallbackPlainBracketClose && currentLine.trim() === fallbackPlainBracketClose) {
           closeDelim = fallbackPlainBracketClose
           found = true
+          break
+        }
+        if (fallbackPlainBracketCloseInLine !== -1) {
+          closeDelim = fallbackPlainBracketClose
+          found = true
+          const beforeClose = currentLine.slice(0, fallbackPlainBracketCloseInLine)
+          if (beforeClose.trim())
+            content += (content ? '\n' : '') + beforeClose
+          trailingAfterClose = currentLine.slice(fallbackPlainBracketCloseInLine + closeDelim.length)
+          trailingAfterCloseLine = nextLine
           break
         }
         if (currentLineTrimmed === closeDelim) {
@@ -1382,7 +1426,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     // However, if the content starts with markdown special syntax like ![, skip.
     const hasMarkdownPrefix = /^\s*!\[/.test(content)
     const looksMath = openDelim === '$$'
-      ? !hasMarkdownPrefix && (!tolerantBoundary || isMathLike(content))
+      ? !hasMarkdownPrefix && (!tolerantBoundary || isLikelyTolerantDollarMathBlockContent(content))
       : (openDelim === '[' ? isPlainBracketMathLike(content) : isMathLike(content))
     if (!looksMath)
       return false
