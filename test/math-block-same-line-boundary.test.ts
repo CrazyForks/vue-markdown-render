@@ -103,4 +103,51 @@ x + y = z
     expect(inlineContent).toContain('a')
     expect(inlineContent).toContain('z')
   })
+
+  it('does not loop in stream parser when tolerant $ boundaries produce prefix/suffix inline tokens', () => {
+    const md = getMarkdown('stream-math-block-boundary-no-loop')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const chunks = [
+      'Before $a$ and display math $',
+      '\nE=mc^2',
+      '\n$ where $x$ follows.',
+    ]
+
+    let source = ''
+    let nodes: any[] = []
+
+    for (const chunk of chunks) {
+      source += chunk
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+    }
+
+    // Re-parse the same completed source a few times to exercise stream cache
+    // hits. A synthetic paragraph_open/close emitted from mathBlock can make
+    // the streaming token state unstable here.
+    for (let index = 0; index < 10; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+    }
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('Before')
+    expect(serialized).toContain('where')
+    expect(serialized).toContain('follows')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    const inlineContent = inlineMath.map((node: any) => node.content).join('\n')
+    expect(inlineContent).toContain('a')
+    expect(inlineContent).toContain('x')
+  })
 })

@@ -1037,23 +1037,22 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     const allowLoading = !s?.env?.__markstreamFinal
     const strict = mathOpts?.strictDelimiters
 
-    const pushInlineParagraph = (content: string, line: number) => {
-      const paragraphContent = String(content ?? '')
+    const pushBoundaryInline = (content: string, line: number) => {
+      const inlineContent = String(content ?? '')
         .replace(/^[\t ]+/, '')
         .replace(/[\t ]+$/, '')
 
-      if (!paragraphContent)
+      if (!inlineContent)
         return
 
-      const paragraphOpen = s.push('paragraph_open', 'p', 1)
-      paragraphOpen.map = [line, line + 1]
-
+      // Do not synthesize paragraph_open/paragraph_close here.
+      // The stream parser is sensitive to block-token nesting generated from
+      // a single block rule. A root-level `inline` token is already supported
+      // by processTokens(), which wraps it as a paragraph after inline parsing.
       const inlineToken = s.push('inline', '', 0)
-      inlineToken.content = paragraphContent
+      inlineToken.content = inlineContent
       inlineToken.map = [line, line + 1]
       inlineToken.children = []
-
-      s.push('paragraph_close', 'p', -1)
     }
 
     const delimiters: [string, string][] = strict
@@ -1187,7 +1186,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
 
       const trailingAfterClose = lineText.slice(sameLineCloseIndex + sameLineCloseDelim.length)
       if (trailingAfterClose.trim())
-        pushInlineParagraph(trailingAfterClose, startLine)
+        pushBoundaryInline(trailingAfterClose, startLine)
 
       return true
     }
@@ -1274,7 +1273,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       return false
 
     if (prefixBeforeOpen)
-      pushInlineParagraph(prefixBeforeOpen, startLine)
+      pushBoundaryInline(prefixBeforeOpen, startLine)
 
     const token = s.push('math_block', 'math', 0)
     token.content = normalizeStandaloneBackslashT(content)
@@ -1287,7 +1286,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     s.line = nextLine + 1
 
     if (trailingAfterClose.trim())
-      pushInlineParagraph(trailingAfterClose, trailingAfterCloseLine)
+      pushBoundaryInline(trailingAfterClose, trailingAfterCloseLine)
 
     return true
   }
