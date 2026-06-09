@@ -636,40 +636,20 @@ function isLikelySpacedSuperSubscriptMath(content: string) {
   return /(?:^|[^\p{L}\p{N}\\])(?:[A-Z]|\\[A-Z]+)\s*[_^]\s*(?:\{[^{}\n]{1,120}\}|[A-Z0-9\\]+)(?:$|[^\p{L}\p{N}])/iu.test(stripped)
 }
 
-const SYNTHETIC_MATH_BOUNDARY_PARAGRAPH_META = '__markstreamSyntheticMathBoundaryParagraph'
-const SYNTHETIC_MATH_BOUNDARY_PARAGRAPH_ROLE_META = '__markstreamSyntheticMathBoundaryRole'
-
-type SyntheticMathBoundaryParagraphRole = 'prefix' | 'suffix'
-
-function markSyntheticMathBoundaryParagraphToken(token: MarkdownToken, role: SyntheticMathBoundaryParagraphRole) {
-  token.meta = {
-    ...((token.meta && typeof token.meta === 'object') ? token.meta : {}),
-    [SYNTHETIC_MATH_BOUNDARY_PARAGRAPH_META]: true,
-    [SYNTHETIC_MATH_BOUNDARY_PARAGRAPH_ROLE_META]: role,
-  }
-}
-
-function pushSyntheticInlineParagraph(s: MathBlockState, content: string, role: SyntheticMathBoundaryParagraphRole, line: number) {
+function pushSyntheticInlineParagraph(s: MathBlockState, content: string, line: number) {
   const paragraphContent = String(content ?? '').replace(/^[\t ]+/, '').replace(/[\t ]+$/, '')
   if (!paragraphContent)
     return
 
-  // These paragraphs are synthetic, but they still represent concrete slices of
-  // the opener/closer source lines. Give them maps so the top-level stream parser
-  // can invalidate/reuse them deterministically instead of keeping no-map stale
-  // prefix tokens across incremental parses.
   const paragraphOpen = s.push('paragraph_open', 'p', 1)
   paragraphOpen.map = [line, line + 1]
-  markSyntheticMathBoundaryParagraphToken(paragraphOpen, role)
 
   const inlineToken = s.push('inline', '', 0)
   inlineToken.content = paragraphContent
   inlineToken.map = [line, line + 1]
   inlineToken.children = []
-  markSyntheticMathBoundaryParagraphToken(inlineToken, role)
 
-  const paragraphClose = s.push('paragraph_close', 'p', -1)
-  markSyntheticMathBoundaryParagraphToken(paragraphClose, role)
+  s.push('paragraph_close', 'p', -1)
 }
 
 export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
@@ -1394,7 +1374,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
 
       const trailingAfterClose = lineText.slice(sameLineCloseIndex + sameLineCloseDelim.length)
       if (trailingAfterClose.trim())
-        pushSyntheticInlineParagraph(s, trailingAfterClose, 'suffix', startLine)
+        pushSyntheticInlineParagraph(s, trailingAfterClose, startLine)
 
       return true
     }
@@ -1507,7 +1487,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       return true
 
     if (prefixBeforeOpen)
-      pushSyntheticInlineParagraph(s, prefixBeforeOpen, 'prefix', startLine)
+      pushSyntheticInlineParagraph(s, prefixBeforeOpen, startLine)
 
     const token = s.push('math_block', 'math', 0)
     token.content = normalizeStandaloneBackslashT(content)
@@ -1521,7 +1501,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     s.line = blockEndLine
 
     if (trailingAfterClose.trim())
-      pushSyntheticInlineParagraph(s, trailingAfterClose, 'suffix', trailingAfterCloseLine)
+      pushSyntheticInlineParagraph(s, trailingAfterClose, trailingAfterCloseLine)
 
     return true
   }

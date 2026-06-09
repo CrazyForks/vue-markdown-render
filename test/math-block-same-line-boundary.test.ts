@@ -139,10 +139,14 @@ x + y = z
 
     expect(nodes.map(node => node.type)).toEqual([
       'paragraph',
-      'paragraph',
       'math_block',
       'paragraph',
     ])
+
+    const prefixParagraphs = nodes.filter(
+      (node: any) => node.type === 'paragraph' && String(node.raw ?? '').includes('display math'),
+    )
+    expect(prefixParagraphs).toHaveLength(1)
 
     // Re-parse the same completed source a few times. The result must stay
     // byte-for-byte stable.
@@ -584,19 +588,15 @@ $$ after $x$ follows.`
       streamParse: true,
     }) as any[]
 
-    expect(streamingNodes.map(node => node.type)).toEqual([
-      'paragraph',
-      'paragraph',
-      'math_block',
-      'paragraph',
-    ])
     expect(finalNodes.map(node => node.type)).toEqual([
       'paragraph',
       'math_block',
       'paragraph',
     ])
+    expect(streamingNodes.map(node => node.type)).toEqual(finalNodes.map(node => node.type))
     expect(collectByType(streamingNodes, 'math_block')).toHaveLength(1)
     expect(collectByType(finalNodes, 'math_block')).toHaveLength(1)
+    expect(streamingNodes.filter((node: any) => node.type === 'paragraph' && String(node.raw ?? '').includes('Before'))).toHaveLength(1)
   })
 
   it('preserves math boundary text when callers use markdown-it parse directly', () => {
@@ -1401,10 +1401,14 @@ E=mc^2`, { __markstreamFinal: false }) as any[]
 
     expect(nodes.map(node => node.type)).toEqual([
       'paragraph',
-      'paragraph',
       'math_block',
       'paragraph',
     ])
+
+    const prefixParagraphs = nodes.filter(
+      (node: any) => node.type === 'paragraph' && String(node.raw ?? '').includes('marker before display'),
+    )
+    expect(prefixParagraphs).toHaveLength(1)
 
     const stableSerialized = JSON.stringify(nodes)
     for (let index = 0; index < 10; index++) {
@@ -1455,10 +1459,14 @@ E=mc^2`, { __markstreamFinal: false }) as any[]
 
     expect(nodes.map(node => node.type)).toEqual([
       'paragraph',
-      'paragraph',
       'math_block',
       'paragraph',
     ])
+
+    const prefixParagraphs = nodes.filter(
+      (node: any) => node.type === 'paragraph' && String(node.raw ?? '').includes('marker before display'),
+    )
+    expect(prefixParagraphs).toHaveLength(1)
 
     const stableSerialized = JSON.stringify(nodes)
     for (let index = 0; index < 10; index++) {
