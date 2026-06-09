@@ -436,13 +436,24 @@ function findSingleDollarClose(src: string, startIdx: number) {
   return -1
 }
 
-function findUnescapedDelimiter(src: string, delimiter: string, startIdx = 0) {
+function findUnescapedDelimiter(
+  src: string,
+  delimiter: string,
+  startIdx = 0,
+  excludedRanges: Array<[number, number]> = [],
+) {
   let searchPos = Math.max(0, startIdx)
 
   while (searchPos < src.length) {
     const index = src.indexOf(delimiter, searchPos)
     if (index === -1)
       return -1
+
+    const excludedRange = findRangeAt(excludedRanges, index)
+    if (excludedRange) {
+      searchPos = Math.max(index + Math.max(1, delimiter.length), excludedRange[1])
+      continue
+    }
 
     if (!isEscapedAt(src, index))
       return index
@@ -453,13 +464,19 @@ function findUnescapedDelimiter(src: string, delimiter: string, startIdx = 0) {
   return -1
 }
 
-function countUnescapedDelimiter(src: string, delimiter: string, startIdx = 0, endIdx = src.length) {
+function countUnescapedDelimiter(
+  src: string,
+  delimiter: string,
+  startIdx = 0,
+  endIdx = src.length,
+  excludedRanges: Array<[number, number]> = [],
+) {
   let count = 0
   let searchPos = Math.max(0, startIdx)
   const end = Math.min(src.length, Math.max(0, endIdx))
 
   while (searchPos < end) {
-    const index = findUnescapedDelimiter(src, delimiter, searchPos)
+    const index = findUnescapedDelimiter(src, delimiter, searchPos, excludedRanges)
     if (index === -1 || index >= end)
       break
 
@@ -1227,10 +1244,11 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         if (!before.trim())
           continue
 
-        const previousOpenCount = countUnescapedDelimiter(lineText, open, 0, openIndex)
+        const codeSpanRanges = buildCodeSpanRanges(lineText)
+        const previousOpenCount = countUnescapedDelimiter(lineText, open, 0, openIndex, codeSpanRanges)
         const previousCloseCount = open === '$$'
           ? 0
-          : countUnescapedDelimiter(lineText, close, 0, openIndex)
+          : countUnescapedDelimiter(lineText, close, 0, openIndex, codeSpanRanges)
 
         if (open === '$$' ? previousOpenCount % 2 === 1 : previousOpenCount > previousCloseCount)
           continue

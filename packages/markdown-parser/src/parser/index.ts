@@ -2142,179 +2142,19 @@ function ensureBlankLineBeforeCustomHtmlBlocks(markdown: string, tags: string[])
   return out
 }
 
-function normalizeMathBlockSameLineBoundaries(markdown: string, customHtmlTags?: readonly string[]) {
+function hasMathBlockSameLineBoundary(markdown: string) {
   if (!markdown || (!markdown.includes('$$') && !markdown.includes('\\[') && !markdown.includes('\\]')))
-    return markdown
+    return false
 
   type CloseDelimiter = '$$' | '\\]'
-  type DisplayDelimiter = { open: string, close: CloseDelimiter }
+  type DisplayDelimiter = { open: '$$' | '\\[', close: CloseDelimiter }
 
   const displayDelimiters: DisplayDelimiter[] = [
     { open: '$$', close: '$$' },
     { open: '\\[', close: '\\]' },
   ]
 
-  const isIndentWs = (ch: string) => ch === ' ' || ch === '\t'
-
-  const trackedHtmlBlockTags = new Set<string>([
-    // Raw-text / sensitive HTML blocks. Normalizing display-math markers inside
-    // these blocks mutates user content before markdown-it can preserve it as
-    // html_block/custom content.
-    'pre',
-    'script',
-    'style',
-    'textarea',
-    ...normalizeCustomHtmlTags(customHtmlTags),
-  ])
-
-  const isHtmlNameStart = (ch?: string) => {
-    if (!ch)
-      return false
-    const code = ch.charCodeAt(0)
-    return (code >= 65 && code <= 90) || (code >= 97 && code <= 122)
-  }
-
-  const isHtmlNameChar = (ch?: string) => {
-    if (!ch)
-      return false
-    const code = ch.charCodeAt(0)
-    return isHtmlNameStart(ch)
-      || (code >= 48 && code <= 57)
-      || ch === '_'
-      || ch === '-'
-      || ch === ':'
-  }
-
-  const findTrackedCloseTag = (line: string, tag: string) => {
-    if (!tag)
-      return -1
-
-    const closeRe = new RegExp(String.raw`<\s*\/\s*${escapeTagForRegExp(tag)}(?=\s|>)`, 'i')
-    const match = closeRe.exec(line)
-    return match?.index ?? -1
-  }
-
-  const parseTrackedHtmlBlockBoundary = (line: string) => {
-    const trimmed = line.replace(/^[\t ]+/, '')
-    if (!trimmed || trimmed[0] !== '<')
-      return null
-
-    let cursor = 1
-    while (cursor < trimmed.length && isIndentWs(trimmed[cursor]))
-      cursor++
-
-    let closing = false
-    if (trimmed[cursor] === '/') {
-      closing = true
-      cursor++
-      while (cursor < trimmed.length && isIndentWs(trimmed[cursor]))
-        cursor++
-    }
-
-    if (!isHtmlNameStart(trimmed[cursor]))
-      return null
-
-    const nameStart = cursor
-    while (cursor < trimmed.length && isHtmlNameChar(trimmed[cursor]))
-      cursor++
-
-    const name = trimmed.slice(nameStart, cursor).toLowerCase()
-    if (!trackedHtmlBlockTags.has(name))
-      return null
-
-    // Require a real tag-name boundary so we don't match prefixes like
-    // "<prelude>" when guarding "<pre>".
-    const boundary = trimmed[cursor]
-    if (
-      boundary
-      && boundary !== ' '
-      && boundary !== '\t'
-      && boundary !== '\r'
-      && boundary !== '\n'
-      && boundary !== '>'
-      && boundary !== '/'
-    ) {
-      return null
-    }
-
-    if (closing)
-      return { type: 'close' as const, name, complete: true }
-
-    const tagCloseIndex = findTagCloseIndexOutsideQuotes(trimmed)
-    if (tagCloseIndex === -1)
-      return { type: 'open' as const, name, complete: false }
-
-    const openTag = trimmed.slice(0, tagCloseIndex + 1)
-    const selfClosing = /\/[\t ]*>$/.test(openTag)
-    const sameLineClose = findTrackedCloseTag(trimmed.slice(tagCloseIndex + 1), name) !== -1
-
-    return {
-      type: 'open' as const,
-      name,
-      complete: selfClosing || sameLineClose,
-    }
-  }
-
-  type Range = [number, number]
-
-  const buildCodeSpanRanges = (src: string): Range[] => {
-    const ranges: Range[] = []
-    let index = 0
-
-    while (index < src.length) {
-      if (src[index] !== '`') {
-        index++
-        continue
-      }
-
-      const openStart = index
-      let openLen = 1
-      while (openStart + openLen < src.length && src[openStart + openLen] === '`')
-        openLen++
-
-      let cursor = openStart + openLen
-      let closeStart = -1
-
-      while (cursor < src.length) {
-        if (src[cursor] !== '`') {
-          cursor++
-          continue
-        }
-
-        const runStart = cursor
-        let runLen = 1
-        while (runStart + runLen < src.length && src[runStart + runLen] === '`')
-          runLen++
-
-        if (runLen === openLen) {
-          closeStart = runStart
-          break
-        }
-
-        cursor = runStart + runLen
-      }
-
-      if (closeStart === -1) {
-        // Streaming mid-state: an unfinished code span should protect the rest
-        // of the line from display-math boundary normalization.
-        ranges.push([openStart, src.length])
-        break
-      }
-
-      ranges.push([openStart, closeStart + openLen])
-      index = closeStart + openLen
-    }
-
-    return ranges
-  }
-
-  const findRangeAt = (ranges: Range[], index: number): Range | null => {
-    for (const range of ranges) {
-      if (index >= range[0] && index < range[1])
-        return range
-    }
-    return null
-  }
+  const isIndentWs = (ch?: string) => ch === ' ' || ch === '\t'
 
   const isEscapedAtIndex = (src: string, index: number) => {
     let cursor = index - 1
@@ -2328,12 +2168,7 @@ function normalizeMathBlockSameLineBoundaries(markdown: string, customHtmlTags?:
     return slashCount % 2 === 1
   }
 
-  const findUnescapedDelimiter = (
-    src: string,
-    delimiter: string,
-    startIndex = 0,
-    excludedRanges: Range[] = [],
-  ) => {
+  const findUnescapedDelimiter = (src: string, delimiter: string, startIndex = 0) => {
     let searchIndex = Math.max(0, startIndex)
 
     while (searchIndex < src.length) {
@@ -2341,56 +2176,13 @@ function normalizeMathBlockSameLineBoundaries(markdown: string, customHtmlTags?:
       if (index === -1)
         return -1
 
-      const excludedRange = findRangeAt(excludedRanges, index)
-      if (excludedRange) {
-        searchIndex = Math.max(index + delimiter.length, excludedRange[1])
-        continue
-      }
-
       if (!isEscapedAtIndex(src, index))
         return index
 
-      searchIndex = index + delimiter.length
+      searchIndex = index + Math.max(1, delimiter.length)
     }
 
     return -1
-  }
-
-  const countUnescapedDelimiter = (
-    src: string,
-    delimiter: string,
-    startIndex: number,
-    endIndex: number,
-    excludedRanges: Range[] = [],
-  ) => {
-    let count = 0
-    let cursor = Math.max(0, startIndex)
-    const end = Math.min(src.length, Math.max(0, endIndex))
-
-    while (cursor < end) {
-      const index = findUnescapedDelimiter(src, delimiter, cursor, excludedRanges)
-      if (index === -1 || index >= end)
-        break
-
-      count++
-      cursor = index + delimiter.length
-    }
-
-    return count
-  }
-
-  const hasUnmatchedDisplayOpenBefore = (
-    src: string,
-    delimiter: DisplayDelimiter,
-    endIndex: number,
-    excludedRanges: Range[],
-  ) => {
-    if (delimiter.open === '$$')
-      return countUnescapedDelimiter(src, '$$', 0, endIndex, excludedRanges) % 2 === 1
-
-    const openCount = countUnescapedDelimiter(src, delimiter.open, 0, endIndex, excludedRanges)
-    const closeCount = countUnescapedDelimiter(src, delimiter.close, 0, endIndex, excludedRanges)
-    return openCount > closeCount
   }
 
   const parseBlockquotePrefix = (line: string) => {
@@ -2414,22 +2206,45 @@ function normalizeMathBlockSameLineBoundaries(markdown: string, customHtmlTags?:
       prefixEnd = index
     }
 
-    if (!sawBlockquote) {
-      return {
-        prefix: '',
-        content: line,
-      }
+    return sawBlockquote ? line.slice(prefixEnd) : line
+  }
+
+  const isBlank = (value: string) => {
+    for (let index = 0; index < value.length; index++) {
+      const ch = value[index]
+      if (ch !== ' ' && ch !== '\t' && ch !== '\r' && ch !== '\n')
+        return false
     }
+    return true
+  }
+  const parseFenceMarker = (line: string) => {
+    let index = 0
+    while (index < line.length && isIndentWs(line[index]))
+      index++
+
+    const ch = line[index]
+    if (ch !== '`' && ch !== '~')
+      return null
+
+    let end = index
+    while (end < line.length && line[end] === ch)
+      end++
+
+    const len = end - index
+    if (len < 3)
+      return null
 
     return {
-      prefix: line.slice(0, prefixEnd),
-      content: line.slice(prefixEnd),
+      markerChar: ch as '`' | '~',
+      markerLen: len,
+      rest: line.slice(end),
     }
   }
 
   const isIndentedCodeLine = (line: string) => {
     if (!line)
       return false
+
     if (line[0] === '\t')
       return true
 
@@ -2440,53 +2255,6 @@ function normalizeMathBlockSameLineBoundaries(markdown: string, customHtmlTags?:
     return spaces >= 4
   }
 
-  const isUnsafeTolerantOpenContextLine = (line: string) => {
-    const trimmed = line.replace(/^[\t ]+/, '')
-    if (!trimmed)
-      return false
-
-    // Do not pre-normalize lines where the prefix is a structural Markdown
-    // marker. Splitting these lines before markdown-it sees them can hoist the
-    // following math block out of its original container, or split a table row.
-    //
-    // Examples that must be left to markdown-it + the math block rule:
-    //   - list item $$
-    //   1. list item $$
-    //   # heading $$
-    //   | table cell $$ |
-    //   ::: container $$
-    return /^(?:#{1,6}[\t ]+|(?:[*+-]|\d{1,9}[.)])[\t ]+|\||:{3,})/.test(trimmed)
-  }
-
-  const parseFenceMarker = (line: string) => {
-    let i = 0
-    while (i < line.length && isIndentWs(line[i]))
-      i++
-
-    const ch = line[i]
-    if (ch !== '`' && ch !== '~')
-      return null
-
-    let j = i
-    while (j < line.length && line[j] === ch)
-      j++
-
-    const len = j - i
-    if (len < 3)
-      return null
-
-    return {
-      markerChar: ch as '`' | '~',
-      markerLen: len,
-      rest: line.slice(j),
-    }
-  }
-
-  const appendLines = (out: string, lines: string[], newline: string, prefix = '') => {
-    const separator = newline || '\n'
-    return `${out}${lines.map(line => `${prefix}${line}`).join(separator)}${newline}`
-  }
-
   const findLineStartOpen = (line: string) => {
     let start = 0
     while (start < line.length && isIndentWs(line[start]))
@@ -2495,6 +2263,7 @@ function normalizeMathBlockSameLineBoundaries(markdown: string, customHtmlTags?:
     for (const delimiter of displayDelimiters) {
       if (!line.startsWith(delimiter.open, start))
         continue
+
       if (isEscapedAtIndex(line, start))
         continue
 
@@ -2509,89 +2278,47 @@ function normalizeMathBlockSameLineBoundaries(markdown: string, customHtmlTags?:
 
   const findTolerantOpenAtLineEnd = (line: string) => {
     const trimmedRight = line.replace(/[\t ]+$/, '')
-    const codeSpanRanges = buildCodeSpanRanges(trimmedRight)
 
     for (const delimiter of displayDelimiters) {
       const openIndex = trimmedRight.length - delimiter.open.length
-      if (openIndex < 0 || !trimmedRight.startsWith(delimiter.open, openIndex))
+      if (openIndex < 0)
         continue
+
+      if (!trimmedRight.startsWith(delimiter.open, openIndex))
+        continue
+
       if (isEscapedAtIndex(trimmedRight, openIndex))
-        continue
-      if (findRangeAt(codeSpanRanges, openIndex))
         continue
 
       const before = trimmedRight.slice(0, openIndex)
       if (!before.trim())
         continue
 
-      // Avoid rewriting normal same-line inline/display pairs such as
-      // "text $x$"; this normalization is only for malformed block openers
-      // emitted at the end of a paragraph line.
-      if (hasUnmatchedDisplayOpenBefore(trimmedRight, delimiter, openIndex, codeSpanRanges))
-        continue
-
-      return {
-        before: before.replace(/[\t ]+$/, ''),
-        open: delimiter.open,
-        close: delimiter.close,
-      }
+      return delimiter
     }
 
     return null
   }
 
-  let out = ''
-  let idx = 0
+  let index = 0
   let inFence = false
   let fenceChar: '`' | '~' | '' = ''
   let fenceLen = 0
   let activeMathClose: CloseDelimiter | '' = ''
-  let activeHtmlBlockTag = ''
 
-  while (idx < markdown.length) {
-    const nl = markdown.indexOf('\n', idx)
+  while (index < markdown.length) {
+    const nl = markdown.indexOf('\n', index)
     const hasNl = nl !== -1
-    const isCrlf = hasNl && nl > idx && markdown[nl - 1] === '\r'
-    const lineEnd = hasNl ? (isCrlf ? nl - 1 : nl) : markdown.length
-    const line = markdown.slice(idx, lineEnd)
-    const newline = hasNl ? (isCrlf ? '\r\n' : '\n') : ''
+    const lineEnd = hasNl && nl > index && markdown[nl - 1] === '\r'
+      ? nl - 1
+      : hasNl ? nl : markdown.length
+    const rawLine = markdown.slice(index, lineEnd)
+    const line = parseBlockquotePrefix(rawLine)
 
-    const blockquote = parseBlockquotePrefix(line)
-    const prefix = blockquote.prefix
-    const contentLine = blockquote.content
-
-    if (activeMathClose) {
-      const closeIndex = findUnescapedDelimiter(contentLine, activeMathClose)
-      if (closeIndex === -1) {
-        out = appendLines(out, [contentLine], newline, prefix)
-        idx = hasNl ? nl + 1 : markdown.length
-        continue
-      }
-
-      const beforeAndClose = contentLine.slice(0, closeIndex + activeMathClose.length).replace(/[\t ]+$/, '')
-      const afterClose = contentLine.slice(closeIndex + activeMathClose.length).replace(/^[\t ]+/, '')
-      activeMathClose = ''
-      out = appendLines(out, afterClose.trim() ? [beforeAndClose, afterClose] : [contentLine], newline, prefix)
-      idx = hasNl ? nl + 1 : markdown.length
-      continue
-    }
-
-    if (activeHtmlBlockTag) {
-      out = appendLines(out, [contentLine], newline, prefix)
-
-      if (findTrackedCloseTag(contentLine, activeHtmlBlockTag) !== -1)
-        activeHtmlBlockTag = ''
-
-      idx = hasNl ? nl + 1 : markdown.length
-      continue
-    }
-
-    const fenceMatch = parseFenceMarker(contentLine)
+    const fenceMatch = parseFenceMarker(line)
     if (fenceMatch) {
-      out = appendLines(out, [contentLine], newline, prefix)
-
       if (inFence) {
-        if (fenceMatch.markerChar === fenceChar && fenceMatch.markerLen >= fenceLen && /^\s*$/.test(fenceMatch.rest)) {
+        if (fenceMatch.markerChar === fenceChar && fenceMatch.markerLen >= fenceLen && isBlank(fenceMatch.rest)) {
           inFence = false
           fenceChar = ''
           fenceLen = 0
@@ -2603,69 +2330,55 @@ function normalizeMathBlockSameLineBoundaries(markdown: string, customHtmlTags?:
         fenceLen = fenceMatch.markerLen
       }
 
-      idx = hasNl ? nl + 1 : markdown.length
+      index = hasNl ? nl + 1 : markdown.length
       continue
     }
 
-    if (inFence || isIndentedCodeLine(contentLine)) {
-      out = appendLines(out, [contentLine], newline, prefix)
-      idx = hasNl ? nl + 1 : markdown.length
+    if (inFence || isIndentedCodeLine(line)) {
+      index = hasNl ? nl + 1 : markdown.length
       continue
     }
 
-    const htmlBoundary = parseTrackedHtmlBlockBoundary(contentLine)
-    if (htmlBoundary) {
-      out = appendLines(out, [contentLine], newline, prefix)
+    if (activeMathClose) {
+      const closeIndex = findUnescapedDelimiter(line, activeMathClose)
+      if (closeIndex !== -1) {
+        const afterClose = line.slice(closeIndex + activeMathClose.length)
+        if (afterClose.trim())
+          return true
 
-      if (htmlBoundary.type === 'open' && !htmlBoundary.complete)
-        activeHtmlBlockTag = htmlBoundary.name
+        activeMathClose = ''
+      }
 
-      idx = hasNl ? nl + 1 : markdown.length
+      index = hasNl ? nl + 1 : markdown.length
       continue
     }
 
-    const tolerantOpen = isUnsafeTolerantOpenContextLine(contentLine)
-      ? null
-      : findTolerantOpenAtLineEnd(contentLine)
-    if (tolerantOpen) {
-      activeMathClose = tolerantOpen.close
-      out = appendLines(out, [tolerantOpen.before, tolerantOpen.open], newline, prefix)
-      idx = hasNl ? nl + 1 : markdown.length
-      continue
-    }
+    const tolerantOpen = findTolerantOpenAtLineEnd(line)
+    if (tolerantOpen)
+      return true
 
-    const lineStartOpen = findLineStartOpen(contentLine)
+    const lineStartOpen = findLineStartOpen(line)
     if (lineStartOpen) {
       const closeIndex = findUnescapedDelimiter(
-        contentLine,
+        line,
         lineStartOpen.close,
         lineStartOpen.start + lineStartOpen.open.length,
       )
+
       if (closeIndex === -1) {
         activeMathClose = lineStartOpen.close
-        out = appendLines(out, [contentLine], newline, prefix)
-        idx = hasNl ? nl + 1 : markdown.length
-        continue
-      }
-
-      const afterClose = contentLine.slice(closeIndex + lineStartOpen.close.length).replace(/^[\t ]+/, '')
-      if (afterClose.trim()) {
-        const beforeAndClose = contentLine.slice(0, closeIndex + lineStartOpen.close.length).replace(/[\t ]+$/, '')
-        out = appendLines(out, [beforeAndClose, afterClose], newline, prefix)
       }
       else {
-        out = appendLines(out, [contentLine], newline, prefix)
+        const afterClose = line.slice(closeIndex + lineStartOpen.close.length)
+        if (afterClose.trim())
+          return true
       }
-
-      idx = hasNl ? nl + 1 : markdown.length
-      continue
     }
 
-    out = appendLines(out, [contentLine], newline, prefix)
-    idx = hasNl ? nl + 1 : markdown.length
+    index = hasNl ? nl + 1 : markdown.length
   }
 
-  return out
+  return false
 }
 
 export function parseMarkdownToStructure(
@@ -2680,20 +2393,12 @@ export function parseMarkdownToStructure(
   // todo: 下面的特殊 math 其实应该更精确匹配到() 或者 $$ $$ 或者 \[ \] 内部的内容
   let safeMarkdown = (markdown ?? '').toString().replace(/([^\\])\r(ight|ho)/g, '$1\\r$2').replace(/([^\\])\n(abla|eq|ot|exists)/g, '$1\\n$2')
 
-  const normalizedMathBoundaryMarkdown = normalizeMathBlockSameLineBoundaries(safeMarkdown, options.customHtmlTags)
-  const mathBoundaryNormalized = normalizedMathBoundaryMarkdown !== safeMarkdown
-  safeMarkdown = normalizedMathBoundaryMarkdown
-
-  // The normalization above can rewrite the latest source into a non-append-only
-  // view, e.g. "text $" -> "text\n$" once the second "$" arrives. Do not feed
-  // that transformed source into the incremental top-level stream cache; parse
-  // this edge case fully to keep token order stable and avoid duplicated prefix
-  // paragraphs around math_block.
-  const parseOptions: ParseOptions = mathBoundaryNormalized
+  const shouldBypassStreamParseForMathBoundary = !isFinal && hasMathBlockSameLineBoundary(safeMarkdown)
+  const parseOptions: ParseOptions = shouldBypassStreamParseForMathBoundary
     ? ({ ...(options as InternalParseOptions), __disableStreamParse: true } as InternalParseOptions)
     : options
 
-  if (mathBoundaryNormalized && md.stream?.enabled === true && typeof md.stream.reset === 'function')
+  if (shouldBypassStreamParseForMathBoundary && md.stream?.enabled === true && typeof md.stream.reset === 'function')
     md.stream.reset()
   else if (shouldResetTopLevelStreamCacheForFinalAutoParse(md, parseOptions))
     md.stream!.reset!()

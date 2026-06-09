@@ -705,4 +705,158 @@ $$ where $x$ follows.`
     const inlineMath = collectByType(plainNodes, 'math_inline')
     expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('y')
   })
+
+  it("does not mutate final unmatched tolerant $$ opener into a display block", () => {
+    const md = getMarkdown("math-block-boundary-final-unmatched-dollar")
+
+    const content = [
+      "This is ordinary final text ending with $$",
+      "and this line should remain paragraph text, not loading math.",
+    ].join("\n")
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true })
+
+    expect(collectByType(nodes, "math_block")).toHaveLength(0)
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain("ordinary final text")
+    expect(serialized).toContain("should remain paragraph text")
+    expect(serialized).toContain("$$")
+  })
+
+  it("does not mutate final unmatched tolerant \\[ opener into a display block", () => {
+    const md = getMarkdown("math-block-boundary-final-unmatched-bracket")
+
+    const content = [
+      "This is ordinary final text ending with \\[",
+      "and this line should remain paragraph text, not loading math.",
+    ].join("\n")
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true })
+
+    expect(collectByType(nodes, "math_block")).toHaveLength(0)
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain("ordinary final text")
+    expect(serialized).toContain("should remain paragraph text")
+    expect(serialized).toContain("\\[")
+  })
+
+  it("ignores prior $$ delimiters inside code spans when detecting tolerant opener", () => {
+    const md = getMarkdown("math-block-boundary-code-span-prior-dollar")
+
+    const content = [
+      "Before `literal $$` then display $$",
+      "E=mc^2",
+      "$$ after $x$ follows.",
+    ].join("\n")
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true })
+
+    const mathBlocks = collectByType(nodes, "math_block")
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].content).toContain("E=mc^2")
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain("literal $$")
+    expect(serialized).toContain("then display")
+    expect(serialized).toContain("after")
+    expect(serialized).toContain("follows")
+
+    const inlineMath = collectByType(nodes, "math_inline")
+    expect(inlineMath.map((node: any) => node.content).join("\n")).toContain("x")
+  })
+
+  it("ignores prior \\[ delimiters inside code spans when detecting tolerant opener", () => {
+    const md = getMarkdown("math-block-boundary-code-span-prior-bracket")
+
+    const content = [
+      "Before `literal \\[` then display \\[",
+      "x + y = z",
+      "\\] after $z$ follows.",
+    ].join("\n")
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true })
+
+    const mathBlocks = collectByType(nodes, "math_block")
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].markup).toBe("\\[\\]")
+    expect(mathBlocks[0].content).toContain("x + y = z")
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain("literal \\\\[")
+    expect(serialized).toContain("then display")
+    expect(serialized).toContain("after")
+    expect(serialized).toContain("follows")
+
+    const inlineMath = collectByType(nodes, "math_inline")
+    expect(inlineMath.map((node: any) => node.content).join("\n")).toContain("z")
+  })
+
+  it("keeps streaming unmatched tolerant $$ opener as a single loading block without duplicated prefix", () => {
+    const md = getMarkdown("stream-math-block-boundary-unmatched-loading")
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      "Before $a$ and display $$",
+      "E=mc^2",
+    ].join("\n")
+
+    let stableSerialized = ""
+    let nodes: any[] = []
+
+    for (let index = 0; index < 8; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(nodes.map(node => node.type)).toEqual(["paragraph", "math_block"])
+
+    const mathBlocks = collectByType(nodes, "math_block")
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(true)
+    expect(mathBlocks[0].content).toContain("E=mc^2")
+
+    const paragraphNode = nodes.find((n: any) => n.type === "paragraph")
+    expect(paragraphNode?.raw).toContain("Before")
+    expect(paragraphNode?.raw).toContain("display")
+    expect(JSON.stringify(nodes)).toContain("display")
+  })
+
+  it("does not loop on many final unmatched tolerant opener-looking lines", () => {
+    const md = getMarkdown("math-block-boundary-final-unmatched-no-loop")
+
+    const content = Array.from(
+      { length: 120 },
+      (_, index) => `line ${index} ordinary text ending with $$`,
+    ).join("\n")
+
+    let nodes: any[] = []
+    expect(() => {
+      nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+    }).not.toThrow()
+
+    // Adjacent lines with trailing $$ form tolerant-opener / close pairs.
+    // 120 lines => 60 math_block nodes. The main assertion is that the parser
+    // does not loop or throw on a large number of consecutive opener-looking
+    // lines.
+    const mathBlocks = collectByType(nodes, "math_block")
+    expect(mathBlocks.length).toBeGreaterThanOrEqual(50)
+    expect(mathBlocks.length).toBeLessThanOrEqual(70)
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain("line 0 ordinary text")
+    expect(serialized).toContain("line 119 ordinary text")
+  })
 })
