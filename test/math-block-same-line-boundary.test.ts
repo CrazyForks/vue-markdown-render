@@ -29,7 +29,7 @@ describe('math block same-line boundary regression', () => {
     return out
   }
 
-  it('preserves inline math before tolerant $$ block and text after closing $$', () => {
+  it('preserves inline math before tolerant $$$ block and text after closing $$', () => {
     const md = getMarkdown('issue-492-math-boundary')
 
     const content = `Decentralized stochastic optimization is a fundamental paradigm for large-scale learning over networks, where agents communicate only with their neighbors and no central coordinator is required. For strongly convex problems, communication efficiency is mainly determined by the condition number $\\kappa=L/\\mu$ and the network spectral gap $1-\\beta$. Although deterministic decentralized methods can simultaneously achieve accelerated $\\sqrt{\\kappa}$ and $1/\\sqrt{1-\\beta}$ dependences, no existing stochastic method attains both improvements at once. In this paper, we propose *Multi-Gossip Accelerated DSGD* (MG-ADSGD), a decentralized stochastic algorithm that combines Nesterov-type primal--dual extrapolation with multi-round fast gossip averaging. The key idea is to couple the gossip depth with the mini-batch size so that additional communication rounds simultaneously improve consensus accuracy and reduce gradient variance. We show that MG-ADSGD achieves the communication complexity $$
@@ -111,7 +111,7 @@ x + y = z
     expect(inlineContent).toContain('z')
   })
 
-  it('keeps streaming output stable for tolerant $$ block boundaries', () => {
+  it('keeps streaming output stable for tolerant $$$ block boundaries', () => {
     const md = getMarkdown('stream-math-block-boundary-no-loop')
     ;(md as any).stream.reset()
     ;(md as any).stream.resetStats()
@@ -387,7 +387,7 @@ x + y = z
     expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('x')
   })
 
-  it('keeps streaming output stable for blockquoted tolerant $$ boundaries', () => {
+  it('keeps streaming output stable for blockquoted tolerant $$$ boundaries', () => {
     const md = getMarkdown('stream-math-block-boundary-blockquote')
     ;(md as any).stream.reset()
     ;(md as any).stream.resetStats()
@@ -460,7 +460,7 @@ x + y = z
     expect(collectByType(nodes, 'math_block')).toHaveLength(0)
   })
 
-  it('normalizes a final tolerant $$ opener after an earlier balanced same-line $$ pair', () => {
+  it('normalizes a final tolerant $$$ opener after an earlier balanced same-line $$ pair', () => {
     const md = getMarkdown('math-block-boundary-balanced-prior-display-pair')
 
     const content = `Intro $$a+b$$ then display $$
@@ -556,7 +556,7 @@ $$ after $x$ follows.`
     expect(stableSerialized).toContain('unfinished code')
   })
 
-  it('keeps streaming and final node order equivalent for tolerant $$ boundaries', () => {
+  it('keeps streaming and final node order equivalent for tolerant $$$ boundaries', () => {
     const streamingMd = getMarkdown('stream-final-equivalence-math-boundary-stream')
     const finalMd = getMarkdown('stream-final-equivalence-math-boundary-final')
     ;(streamingMd as any).stream.reset()
@@ -649,7 +649,7 @@ $$`, { __markstreamFinal: true }) as any[]
     expect(mathBlocks[0].content).toContain('f _ { x }')
   })
 
-  it('keeps tolerant $$ display math with spaced subscript content in final and streaming parses', () => {
+  it('keeps tolerant $$$ display math with spaced subscript content in final and streaming parses', () => {
     const finalMd = getMarkdown('math-block-tolerant-dollar-weak-heuristic-final')
     const streamingMd = getMarkdown('math-block-tolerant-dollar-weak-heuristic-stream')
     ;(streamingMd as any).stream.reset()
@@ -915,7 +915,7 @@ $$ where $x$ follows.`
     expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('y')
   })
 
-  it('does not mutate final unmatched tolerant $$ opener into a display block', () => {
+  it('does not mutate final unmatched tolerant $$$ opener into a display block', () => {
     const md = getMarkdown('math-block-boundary-final-unmatched-dollar')
 
     const content = [
@@ -1002,7 +1002,7 @@ $$ where $x$ follows.`
     expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('z')
   })
 
-  it('keeps streaming unmatched tolerant $$ opener as a single loading block without duplicated prefix', () => {
+  it('keeps streaming unmatched tolerant $$$ opener as a single loading block without duplicated prefix', () => {
     const md = getMarkdown('stream-math-block-boundary-unmatched-loading')
     ;(md as any).stream.reset()
     ;(md as any).stream.resetStats()
@@ -1096,7 +1096,7 @@ $$ where $x$ follows.`
     expect(stableSerialized).toContain('line 119 ordinary text')
   })
 
-  it('does not make direct markdown-it parse treat ordinary tolerant $$ pairs as math blocks', () => {
+  it('does not make direct markdown-it parse treat ordinary tolerant $$$ pairs as math blocks', () => {
     const md = getMarkdown('direct-md-parse-ordinary-tolerant-dollar-pairs')
 
     const tokens = md.parse(`line 0 ordinary text ending with $$
@@ -1105,12 +1105,12 @@ line 1 ordinary text ending with $$`, { __markstreamFinal: true }) as any[]
     expect(tokens.filter(token => token.type === 'math_block')).toHaveLength(0)
   })
 
-  it('does not let silent tolerant $ detection split ordinary final paragraphs', () => {
+  it('does not let silent tolerant $$ detection split ordinary final paragraphs', () => {
     const md = getMarkdown('math-boundary-silent-final-dollar-no-paragraph-split')
 
     const content = [
       'The first line belongs to the same paragraph.',
-      'This ordinary prose line happens to end with $$',
+      'This ordinary prose line happens to end with $',
       'and this following line is still ordinary prose.',
     ].join('\n')
 
@@ -1120,7 +1120,7 @@ line 1 ordinary text ending with $$`, { __markstreamFinal: true }) as any[]
     expect(nodes).toHaveLength(1)
     expect(nodes[0]?.type).toBe('paragraph')
     expect(nodes[0]?.raw).toContain('The first line belongs')
-    expect(nodes[0]?.raw).toContain('happens to end with $$')
+    expect(nodes[0]?.raw).toContain('happens to end with $')
     expect(nodes[0]?.raw).toContain('following line is still ordinary prose')
   })
 
@@ -1150,7 +1150,7 @@ line 1 ordinary text ending with $$`, { __markstreamFinal: true }) as any[]
 
     const source = [
       'The first line belongs to the same paragraph.',
-      'This ordinary prose line happens to end with $$',
+      'This ordinary prose line happens to end with $',
       'and this following line is still ordinary prose.',
     ].join('\n')
 
@@ -1176,7 +1176,119 @@ line 1 ordinary text ending with $$`, { __markstreamFinal: true }) as any[]
     expect(nodes).toHaveLength(1)
     expect(nodes[0]?.type).toBe('paragraph')
     expect(nodes[0]?.raw).toContain('The first line belongs')
-    expect(nodes[0]?.raw).toContain('happens to end with $$')
+    expect(nodes[0]?.raw).toContain('happens to end with $')
     expect(nodes[0]?.raw).toContain('following line is still ordinary prose')
+  })
+
+  it('does not split ordinary prose around tolerant $ when the middle line only has prose hyphens', () => {
+    const md = getMarkdown('math-boundary-tolerant-dollar-prose-hyphen-no-block')
+
+    const content = [
+      'The first line belongs to the same paragraph and happens to end with $',
+      'foo - bar',
+      '$ after text should not become a display block.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0]?.type).toBe('paragraph')
+    expect(nodes[0]?.raw).toContain('happens to end with $')
+    expect(nodes[0]?.raw).toContain('foo - bar')
+    expect(nodes[0]?.raw).toContain('after text should not become a display block')
+  })
+
+  it('keeps streaming ordinary prose stable around tolerant $ with prose hyphens', () => {
+    const md = getMarkdown('stream-math-boundary-tolerant-dollar-prose-hyphen-no-block')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      'The first line belongs to the same paragraph and happens to end with $',
+      'foo - bar',
+      '$ after text should not become a display block.',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+
+    for (let index = 0; index < 8; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0]?.type).toBe('paragraph')
+    expect(nodes[0]?.raw).toContain('foo - bar')
+  })
+
+  it('still parses tolerant $$ content with a concrete formula operator signal', () => {
+    const md = getMarkdown('math-boundary-tolerant-dollar-formula-signal')
+
+    const content = [
+      'Prefix text before display math $$',
+      'x + y = z',
+      '$$ where $z$ follows.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].content).toContain('x + y = z')
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('Prefix text before display math')
+    expect(serialized).toContain('where')
+    expect(serialized).toContain('follows')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('z')
+  })
+
+  it('does not treat a plain ] followed by math continuation as a non-strict \\[ fallback close', () => {
+    const md = getMarkdown('math-boundary-bracket-plain-close-math-continuation')
+
+    const content = [
+      '\\[',
+      '] + x = 0',
+      '\\] after $x$ follows.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].content).toContain('] + x = 0')
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('after')
+    expect(serialized).toContain('follows')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('x')
   })
 })

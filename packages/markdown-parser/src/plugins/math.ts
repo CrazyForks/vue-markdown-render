@@ -498,6 +498,60 @@ function findLineStartUnescapedDelimiter(src: string, delimiter: string) {
   return isEscapedAt(src, index) ? -1 : index
 }
 
+function findPlainBracketFallbackClose(src: string) {
+  let index = 0
+  while (index < src.length && (src[index] === ' ' || src[index] === '\t'))
+    index++
+
+  if (src[index] !== ']')
+    return -1
+
+  if (isEscapedAt(src, index))
+    return -1
+
+  const tail = src.slice(index + 1).trimStart()
+  if (!tail)
+    return index
+
+  // Non-strict `\[` accepts a plain `]` close for malformed LLM output:
+  //
+  //   \[
+  //   x + y
+  //   ] where ...
+  //
+  // But a math line may also legitimately start with `]` as content:
+  //
+  //   \[
+  //   ] + x = 0
+  //   \]
+  //
+  // Treat the plain `]` as a fallback close only when the tail does not look
+  // like a math continuation.
+  if (/^(?:[+\-*/^_=<>]|\\[a-z]+|[\])}])/.test(tail))
+    return -1
+
+  return index
+}
+
+function hasTolerantFormulaOperatorSignal(content: string) {
+  return /(?:^|[^\p{L}\p{N}\\])(?:[A-Z]|\d+(?:\.\d+)?|\\[a-z]+)\s*(?:[=+*/<>]|-(?!\s*[\p{L}]{2,}\b))\s*(?:[A-Z]|\d+(?:\.\d+)?|\\[a-z]+)(?:$|[^\p{L}\p{N}])/iu.test(content)
+}
+
+function isLikelyTolerantExplicitMathBlockContent(content: string, closed: boolean) {
+  const stripped = String(content ?? '').trim()
+  if (!stripped)
+    return false
+
+  // Tolerant same-line boundaries are weaker than real line-start `$` / `\[`.
+  // Require a concrete math signal so ordinary prose ending with `$` does not
+  // split into synthetic paragraph + math_block + paragraph.
+  return /\\[a-z]+/i.test(stripped)
+    || /[A-Za-z0-9\\][_^](?:[A-Za-z0-9\\]|\{)/.test(stripped)
+    || /\\(?:times|pm|cdot|le|ge|neq)\b/.test(stripped)
+    || hasTolerantFormulaOperatorSignal(stripped)
+    || (closed && isLikelySpacedSuperSubscriptMath(stripped))
+}
+
 function isInsideCodeSpanOrUnclosedTail(src: string, index: number) {
   let cursor = 0
 
@@ -593,16 +647,6 @@ function isLikelySpacedSuperSubscriptMath(content: string) {
   return /(?:^|[^\p{L}\p{N}\\])(?:[A-Z]|\\[A-Z]+)\s*[_^]\s*(?:\{[^{}\n]{1,120}\}|[A-Z0-9\\]+)(?:$|[^\p{L}\p{N}])/iu.test(stripped)
 }
 
-function isLikelyClosedWeakExplicitMathBlockContent(content: string, closed: boolean) {
-  if (isMathLike(content))
-    return true
-
-  // `f _ { x }` 这类 spaced sub/superscript 信号很弱，只能在 closing `$`
-  // / `\]` 已经到达后用于 final/tolerant block 识别。
-  // streaming 中如果未闭合就提前把 prefix 拆成 paragraph + loading math_block，
-  // markdown-it-ts 的增量 token cache 容易保留上一轮 paragraph，最终形成重复段落。
-  return closed && isLikelySpacedSuperSubscriptMath(content)
-}
 
 export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
   // Inline rule for `\\(...\\)` and `$$...$$` and `$...$`
@@ -1381,7 +1425,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         const escapedPlainBracketCloseInLine = !strict && openDelim === '[' ? findUnescapedDelimiter(currentLine, '\\]') : -1
         const closeIndexInLine = findUnescapedDelimiter(currentLine, closeDelim)
         const fallbackPlainBracketCloseInLine = fallbackPlainBracketClose
-          ? findLineStartUnescapedDelimiter(currentLine, fallbackPlainBracketClose)
+          ? findPlainBracketFallbackClose(currentLine)
           : -1
         if (!strict && openDelim === '[' && currentLineTrimmed === '\\]') {
           closeDelim = '\\]'
@@ -1442,11 +1486,11 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     // However, if the content starts with markdown special syntax like ![, skip.
     const hasMarkdownPrefix = /^\s*!\[/.test(content)
     const looksMath = openDelim === '$$'
-      ? !hasMarkdownPrefix && (!tolerantBoundary || isLikelyClosedWeakExplicitMathBlockContent(content, found))
+      ? !hasMarkdownPrefix && (!tolerantBoundary || isLikelyTolerantExplicitMathBlockContent(content, found))
       : (openDelim === '['
           ? isPlainBracketMathLike(content)
           : (tolerantBoundary && openDelim === '\\[')
-              ? !hasMarkdownPrefix && isLikelyClosedWeakExplicitMathBlockContent(content, found)
+              ? !hasMarkdownPrefix && isLikelyTolerantExplicitMathBlockContent(content, found)
               : isMathLike(content))
     if (!looksMath)
       return false
