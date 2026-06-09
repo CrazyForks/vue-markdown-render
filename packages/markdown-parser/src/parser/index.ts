@@ -2401,33 +2401,6 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
     switch (token.type) {
       case 'paragraph_open':
       {
-        // During streaming, markdown-it-ts's tryTailSegmentReparse may keep a
-        // stale paragraph_open/inline/paragraph_close triple from the previous
-        // parse while also appending the re-parsed triple for the same source
-        // lines.  Detect and skip the stale triple when the next triple has the
-        // same inline content and covers the same source map.
-        if (
-          tokens[i + 1]?.type === 'inline'
-          && tokens[i + 2]?.type === 'paragraph_close'
-          && tokens[i + 3]?.type === 'paragraph_open'
-          && tokens[i + 4]?.type === 'inline'
-          && tokens[i + 5]?.type === 'paragraph_close'
-        ) {
-          const curInline = tokens[i + 1]
-          const nextInline = tokens[i + 4]
-          const curMap = curInline?.map
-          const nextMap = nextInline?.map
-          if (
-            String(curInline?.content ?? '') === String(nextInline?.content ?? '')
-            && Array.isArray(curMap) && Array.isArray(nextMap)
-            && curMap[0] === nextMap[0] && curMap[1] === nextMap[1]
-          ) {
-            // Stale triple — skip it and process the correct one at i+3.
-            i += 3
-            break
-          }
-        }
-
         const paragraphRaw = String(tokens[i + 1]?.content ?? '')
         const paragraphNode = parseParagraph(tokens, i, linkifyContext.options(paragraphRaw)) as ParsedNode
         const promoted = maybePromoteCustomNodeFromParagraph(paragraphNode, options)

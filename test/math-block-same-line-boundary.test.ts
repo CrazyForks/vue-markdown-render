@@ -1,4 +1,4 @@
-import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+import { getMarkdown, parseMarkdownToStructure, processTokens } from 'stream-markdown-parser'
 import { describe, expect, it } from 'vitest'
 
 describe('math block same-line boundary regression', () => {
@@ -29,7 +29,169 @@ describe('math block same-line boundary regression', () => {
     return out
   }
 
-  it('preserves inline math before tolerant $$$ block and text after closing $$', () => {
+  it('does not drop intentional duplicate paragraph triples in processTokens', () => {
+    const makeParagraphTriple = () => [
+      {
+        type: 'paragraph_open',
+        tag: 'p',
+        nesting: 1,
+      },
+      {
+        type: 'inline',
+        tag: '',
+        content: 'repeat',
+        map: [0, 1],
+        children: [
+          {
+            type: 'text',
+            tag: '',
+            content: 'repeat',
+            raw: 'repeat',
+          },
+        ],
+      },
+      {
+        type: 'paragraph_close',
+        tag: 'p',
+        nesting: -1,
+      },
+    ]
+
+    const nodes = processTokens([
+      ...makeParagraphTriple(),
+      ...makeParagraphTriple(),
+    ] as any)
+
+    expect(nodes).toHaveLength(2)
+    expect(nodes.map((node: any) => node.raw)).toEqual(['repeat', 'repeat'])
+
+    const textNodes = collectByType(nodes, 'text')
+    expect(textNodes.map((node: any) => node.content)).toEqual(['repeat', 'repeat'])
+  })
+
+  it('does not emit loading math_block for tolerant same-line $$ opener before close during streaming', () => {
+    const md = getMarkdown('stream-tolerant-dollar-opener-waits-for-close')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const partial = `Before display $$
+E=mc^2`
+
+    const partialNodes = parseMarkdownToStructure(partial, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(collectByType(partialNodes, 'math_block')).toHaveLength(0)
+
+    const partialSerialized = JSON.stringify(partialNodes)
+    expect(partialSerialized).toContain('Before display')
+    expect(partialSerialized).toContain('E=mc^2')
+
+    const complete = `${partial}
+$$ where $x$ follows.`
+
+    let completeNodes = parseMarkdownToStructure(complete, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(completeNodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(completeNodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(false)
+    expect(mathBlocks[0].content).toContain('E=mc^2')
+
+    const inlineMath = collectByType(completeNodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('x')
+
+    const stableSerialized = JSON.stringify(completeNodes)
+    for (let index = 0; index < 10; index++) {
+      completeNodes = parseMarkdownToStructure(complete, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(completeNodes)).toBe(stableSerialized)
+    }
+  })
+
+  it('does not emit loading math_block for tolerant same-line \\[ opener before close during streaming', () => {
+    const md = getMarkdown('stream-tolerant-bracket-opener-waits-for-close')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const partial = `Before display \\[
+x + y = z`
+
+    const partialNodes = parseMarkdownToStructure(partial, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(collectByType(partialNodes, 'math_block')).toHaveLength(0)
+
+    const partialSerialized = JSON.stringify(partialNodes)
+    expect(partialSerialized).toContain('Before display')
+    expect(partialSerialized).toContain('x + y = z')
+
+    const complete = `${partial}
+\\] where $z$ follows.`
+
+    let completeNodes = parseMarkdownToStructure(complete, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(completeNodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(completeNodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(false)
+    expect(mathBlocks[0].markup).toBe('\\[\\]')
+    expect(mathBlocks[0].content).toContain('x + y = z')
+
+    const inlineMath = collectByType(completeNodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('z')
+
+    const stableSerialized = JSON.stringify(completeNodes)
+    for (let index = 0; index < 10; index++) {
+      completeNodes = parseMarkdownToStructure(complete, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(completeNodes)).toBe(stableSerialized)
+    }
+  })
+
+  it('still emits loading math_block for real standalone $$ opener during streaming', () => {
+    const md = getMarkdown('stream-standalone-dollar-loading-still-supported')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const nodes = parseMarkdownToStructure(`$$
+E=mc^2`, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(true)
+    expect(mathBlocks[0].content).toContain('E=mc^2')
+  })
+
+  it('preserves inline math before tolerant $$ block and text after closing $', () => {
     const md = getMarkdown('issue-492-math-boundary')
 
     const content = `Decentralized stochastic optimization is a fundamental paradigm for large-scale learning over networks, where agents communicate only with their neighbors and no central coordinator is required. For strongly convex problems, communication efficiency is mainly determined by the condition number $\\kappa=L/\\mu$ and the network spectral gap $1-\\beta$. Although deterministic decentralized methods can simultaneously achieve accelerated $\\sqrt{\\kappa}$ and $1/\\sqrt{1-\\beta}$ dependences, no existing stochastic method attains both improvements at once. In this paper, we propose *Multi-Gossip Accelerated DSGD* (MG-ADSGD), a decentralized stochastic algorithm that combines Nesterov-type primal--dual extrapolation with multi-round fast gossip averaging. The key idea is to couple the gossip depth with the mini-batch size so that additional communication rounds simultaneously improve consensus accuracy and reduce gradient variance. We show that MG-ADSGD achieves the communication complexity $$
@@ -1011,13 +1173,13 @@ $$ where $x$ follows.`
     expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('z')
   })
 
-  it('keeps streaming unmatched tolerant $$$ opener as a single loading block without duplicated prefix', () => {
+  it('keeps streaming unmatched tolerant $ opener as a single paragraph without emitting loading math_block', () => {
     const md = getMarkdown('stream-math-block-boundary-unmatched-loading')
     ;(md as any).stream.reset()
     ;(md as any).stream.resetStats()
 
     const source = [
-      'Before $a$ and display $$',
+      'Before $a$ and display $',
       'E=mc^2',
     ].join('\n')
 
@@ -1039,17 +1201,18 @@ $$ where $x$ follows.`
         expect(serialized).toBe(stableSerialized)
     }
 
-    expect(nodes.map(node => node.type)).toEqual(['paragraph', 'math_block'])
+    // Tolerant same-line $ opener without close stays as paragraph — no loading math_block.
+    expect(nodes.map(node => node.type)).toEqual(['paragraph'])
 
     const mathBlocks = collectByType(nodes, 'math_block')
-    expect(mathBlocks).toHaveLength(1)
-    expect(mathBlocks[0].loading).toBe(true)
-    expect(mathBlocks[0].content).toContain('E=mc^2')
+    expect(mathBlocks).toHaveLength(0)
 
     const paragraphNode = nodes.find((n: any) => n.type === 'paragraph')
     expect(paragraphNode?.raw).toContain('Before')
     expect(paragraphNode?.raw).toContain('display')
+    expect(paragraphNode?.raw).toContain('E=mc^2')
     expect(JSON.stringify(nodes)).toContain('display')
+    expect(JSON.stringify(nodes)).toContain('E=mc^2')
   })
 
   it('does not misparse many final ordinary trailing $$ lines as math blocks', () => {
@@ -1325,23 +1488,21 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     expect(mathBlocks[0].content).toContain('E=mc^2')
   })
 
-  it('does not advance loading tolerant math blocks past the current streaming line range', () => {
+  it('keeps tolerant same-line $ opener as inline paragraph in streaming mode before close arrives', () => {
     const md = getMarkdown('direct-md-parse-boundary-loading-map')
 
-    const tokens = md.parse(`Before $a$ and display $$
+    const tokens = md.parse(`Before $a$ and display $
 E=mc^2`, { __markstreamFinal: false }) as any[]
 
     const inlineTokens = tokens.filter(token => token.type === 'inline')
+    // Tolerant same-line opener without close stays as inline content — no math_block.
     expect(inlineTokens.map(token => token.content)).toEqual([
-      'Before $a$ and display',
+      'Before $a$ and display $\nE=mc^2',
     ])
-    expect(inlineTokens[0].map).toEqual([0, 1])
+    expect(inlineTokens[0].map).toEqual([0, 2])
 
     const mathBlocks = tokens.filter(token => token.type === 'math_block')
-    expect(mathBlocks).toHaveLength(1)
-    expect(mathBlocks[0].loading).toBe(true)
-    expect(mathBlocks[0].map).toEqual([0, 2])
-    expect(mathBlocks[0].content).toContain('E=mc^2')
+    expect(mathBlocks).toHaveLength(0)
   })
 
   it('parses tolerant display math after an escaped backtick in final mode', () => {

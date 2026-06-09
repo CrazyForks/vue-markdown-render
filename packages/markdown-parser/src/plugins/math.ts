@@ -1467,6 +1467,19 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     // In strict mode or final mode, do not emit mid-state (unclosed) block math
     if ((!allowLoading || strict) && !found)
       return false
+
+    // Tolerant same-line boundaries are an LLM-output repair path, not a real
+    // markdown block opener. Do not emit a loading math_block for:
+    //
+    //   prefix $
+    //   E=mc^2
+    //
+    // before the closing "$" arrives. Emitting synthetic prefix paragraph +
+    // loading math_block here changes the token shape on the next chunk and is
+    // the source of stale/duplicated paragraph triples in streaming mode.
+    if (tolerantBoundary && !found)
+      return false
+
     // 追加检测内容是否是 math
     // For explicit $$ delimiters, skip the isMathLike check since $$ is already
     // a clear math marker. This allows spaced subscript formats like "f _ { x }"
