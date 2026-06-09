@@ -139,13 +139,13 @@ x + y = z
 
     expect(nodes.map(node => node.type)).toEqual([
       'paragraph',
+      'paragraph',
       'math_block',
       'paragraph',
     ])
 
     // Re-parse the same completed source a few times. The result must stay
-    // byte-for-byte stable; duplicated prefix/suffix paragraphs around the
-    // math_block show up here immediately.
+    // byte-for-byte stable.
     for (let index = 0; index < 10; index++) {
       expect(() => {
         nodes = parseMarkdownToStructure(source, md, {
@@ -584,8 +584,17 @@ $$ after $x$ follows.`
       streamParse: true,
     }) as any[]
 
-    expect(streamingNodes.map(node => node.type)).toEqual(finalNodes.map(node => node.type))
-    expect(streamingNodes.map(node => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
+    expect(streamingNodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+    expect(finalNodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
     expect(collectByType(streamingNodes, 'math_block')).toHaveLength(1)
     expect(collectByType(finalNodes, 'math_block')).toHaveLength(1)
   })
@@ -1292,7 +1301,7 @@ line 1 ordinary text ending with $$`, { __markstreamFinal: true }) as any[]
     expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('x')
   })
 
-  it('does not attach overlapping line maps to synthetic boundary paragraphs', () => {
+  it('attaches source line maps to synthetic boundary paragraphs for stream invalidation', () => {
     const md = getMarkdown('direct-md-parse-boundary-synthetic-paragraph-map')
 
     const tokens = md.parse(`Before $a$ and display $$
@@ -1305,15 +1314,33 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
       'where $x$ follows.',
     ])
 
-    // Synthetic prefix/suffix inline tokens intentionally have no map.
-    // Otherwise they overlap the math_block line range:
-    // - prefix shares the opener line
-    // - suffix shares the closer line
-    expect(inlineTokens.every(token => !Array.isArray(token.map))).toBe(true)
+    expect(inlineTokens.map(token => token.map)).toEqual([
+      [0, 1],
+      [2, 3],
+    ])
 
     const mathBlocks = tokens.filter(token => token.type === 'math_block')
     expect(mathBlocks).toHaveLength(1)
     expect(mathBlocks[0].map).toEqual([0, 3])
+    expect(mathBlocks[0].content).toContain('E=mc^2')
+  })
+
+  it('does not advance loading tolerant math blocks past the current streaming line range', () => {
+    const md = getMarkdown('direct-md-parse-boundary-loading-map')
+
+    const tokens = md.parse(`Before $a$ and display $$
+E=mc^2`, { __markstreamFinal: false }) as any[]
+
+    const inlineTokens = tokens.filter(token => token.type === 'inline')
+    expect(inlineTokens.map(token => token.content)).toEqual([
+      'Before $a$ and display',
+    ])
+    expect(inlineTokens[0].map).toEqual([0, 1])
+
+    const mathBlocks = tokens.filter(token => token.type === 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(true)
+    expect(mathBlocks[0].map).toEqual([0, 2])
     expect(mathBlocks[0].content).toContain('E=mc^2')
   })
 
@@ -1374,6 +1401,7 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
 
     expect(nodes.map(node => node.type)).toEqual([
       'paragraph',
+      'paragraph',
       'math_block',
       'paragraph',
     ])
@@ -1426,6 +1454,7 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     }
 
     expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
       'paragraph',
       'math_block',
       'paragraph',
