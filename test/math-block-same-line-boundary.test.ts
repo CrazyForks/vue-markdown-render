@@ -721,6 +721,82 @@ $$ where $x$ follows.`
     expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('x')
   })
 
+  it('keeps tolerant explicit \\[ display math with spaced subscript content in final and streaming parses', () => {
+    const finalMd = getMarkdown('math-block-tolerant-bracket-weak-heuristic-final')
+    const streamingMd = getMarkdown('math-block-tolerant-bracket-weak-heuristic-stream')
+    ;(streamingMd as any).stream.reset()
+    ;(streamingMd as any).stream.resetStats()
+
+    const content = `Before display \\[
+f _ { x }
+\\] where $x$ follows.`
+
+    const finalNodes = parseMarkdownToStructure(content, finalMd, { final: true }) as any[]
+
+    expect(finalNodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const finalMathBlocks = collectByType(finalNodes, 'math_block')
+    expect(finalMathBlocks).toHaveLength(1)
+    expect(finalMathBlocks[0].markup).toBe('\\[\\]')
+    expect(finalMathBlocks[0].content).toContain('f _ { x }')
+
+    const chunks = [
+      'Before display \\[\nf _ { x }',
+      '\n\\] where $x$ follows.',
+    ]
+
+    let source = ''
+    let streamingNodes: any[] = []
+
+    for (let index = 0; index < chunks.length; index++) {
+      source += chunks[index]
+      expect(() => {
+        streamingNodes = parseMarkdownToStructure(source, streamingMd, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      // Weak spaced subscript content alone is not enough to emit a tolerant
+      // loading math_block. Wait for the closing `\]` so streaming does not
+      // split the prefix paragraph and then duplicate it when the close arrives.
+      if (index < chunks.length - 1)
+        expect(collectByType(streamingNodes, 'math_block')).toHaveLength(0)
+    }
+
+    expect(streamingNodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const stableSerialized = JSON.stringify(streamingNodes)
+    for (let index = 0; index < 10; index++) {
+      streamingNodes = parseMarkdownToStructure(source, streamingMd, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+      expect(JSON.stringify(streamingNodes)).toBe(stableSerialized)
+    }
+
+    const streamingMathBlocks = collectByType(streamingNodes, 'math_block')
+    expect(streamingMathBlocks).toHaveLength(1)
+    expect(streamingMathBlocks[0].markup).toBe('\\[\\]')
+    expect(streamingMathBlocks[0].content).toContain('f _ { x }')
+
+    const serialized = stableSerialized
+    expect(serialized).toContain('Before display')
+    expect(serialized).toContain('where')
+    expect(serialized).toContain('follows')
+
+    const inlineMath = collectByType(streamingNodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('x')
+  })
+
   it('preserves suffix after non-strict plain ] fallback for explicit \\[ blocks', () => {
     const md = getMarkdown('math-block-bracket-plain-close-suffix')
 
