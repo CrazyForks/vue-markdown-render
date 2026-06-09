@@ -7,13 +7,10 @@ const root = process.cwd()
 const distDir = join(root, 'dist')
 
 const budgets = {
-  // PR #489 adds Shiki `langs` runtime support across Vue3/React/Vue2.
-  // Keep the budget explicit so future regressions still fail CI, but accept
-  // this feature's expected package-size growth.
-  maxDistBytes: Number(process.env.MAX_DIST_BYTES || 980 * 1024),
-  maxJsChunkBytes: Number(process.env.MAX_JS_CHUNK_BYTES || 275 * 1024),
-  maxPackSizeBytes: Number(process.env.MAX_PACK_TGZ_BYTES || 280 * 1024),
-  maxPackUnpackedBytes: Number(process.env.MAX_PACK_UNPACKED_BYTES || 1080 * 1024),
+  maxDistBytes: Number(process.env.MAX_DIST_BYTES || 860 * 1024),
+  maxJsChunkBytes: Number(process.env.MAX_JS_CHUNK_BYTES || 235 * 1024),
+  maxPackSizeBytes: Number(process.env.MAX_PACK_TGZ_BYTES || 240 * 1024),
+  maxPackUnpackedBytes: Number(process.env.MAX_PACK_UNPACKED_BYTES || 930 * 1024),
 }
 
 function formatBytes(bytes) {

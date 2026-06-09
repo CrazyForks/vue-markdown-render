@@ -8,7 +8,7 @@ import {
   normalizeShikiLanguage,
   registerHighlightOnce,
 } from 'markstream-core'
-import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue-demi'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue-demi'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { getLanguageIcon, languageIconsRevision, languageMap, normalizeLanguageIdentifier } from '../../utils'
@@ -819,29 +819,11 @@ function cleanupRenderer() {
 
 renderFallback(props.node.code, true)
 
-if (getCurrentInstance()) {
-  onMounted(() => {
-    startRendererThemeObserver()
-    void safeInitRenderer()
-  })
-  onBeforeUnmount(cleanupRenderer)
-}
-else {
-  void nextTick(async () => {
-    await nextTick()
-    startRendererThemeObserver()
-    await safeInitRenderer()
-    if (!lastCommittedRenderSignature && hasRendererContent()) {
-      markRendererCommitted(
-        getRenderSignature(
-          rendererConfigKey ?? highlightRegistrationKey.value,
-          normalizeRendererLanguage(props.node.language),
-          props.node.code,
-        ),
-      )
-    }
-  })
-}
+onMounted(() => {
+  startRendererThemeObserver()
+  void safeInitRenderer()
+})
+onBeforeUnmount(cleanupRenderer)
 
 watch(highlightRegistrationKey, async () => {
   await safeInitRenderer()
