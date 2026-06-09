@@ -1228,14 +1228,10 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         }
       }
       // AI/LLM 输出中常见的异常格式：
-      //
       //   prefix text $
       //   E = mc^2
       //   $ suffix
-      //
-      // 这里在 markdown-it block rule 层做兜底，保证直接 md.parse/render
-      // 也不会丢 prefix/suffix；parseMarkdownToStructure 前置 normalizer
-      // 命中时通常不会走到这个分支。
+      // 在 markdown-it block rule 层修复，避免 prefix/suffix 被吞掉。
       else if ((open === '$$' || open === '\\[') && lineText.endsWith(open) && startLine + 1 < endLine) {
         const openIndex = lineText.length - open.length
         if (isEscapedAt(lineText, openIndex) || isInsideCodeSpanOrUnclosedTail(lineText, openIndex))

@@ -168,6 +168,38 @@ x + y = z
 
     const mathBlocks = collectByType(nodes, 'math_block')
     expect(mathBlocks).toHaveLength(1)
+
+    const stats = (md as any).stream.stats()
+    expect(stats.total).toBeGreaterThan(0)
+  })
+
+  it('does not bypass top-level stream parser for math boundary cases', () => {
+    const md = getMarkdown('stream-math-block-boundary-uses-stream-parser')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      'Before $a$ and display math $$',
+      'E=mc^2',
+      '$$ where $x$ follows.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+
+    // 这个断言很关键：不能为了解决 math boundary 直接 __disableStreamParse。
+    // 否则大文档 streaming 会退化成每次全量 md.parse + stream cache reset。
+    const stats = (md as any).stream.stats()
+    expect(stats.total).toBe(1)
   })
   it('keeps math block boundary normalization inside blockquotes', () => {
     const md = getMarkdown('math-block-boundary-blockquote')

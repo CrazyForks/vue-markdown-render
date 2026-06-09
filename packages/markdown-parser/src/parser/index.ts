@@ -3,7 +3,6 @@ import type { HtmlBlockNode, InternalParseOptions, MarkdownToken, ParsedNode, Pa
 import { normalizeCustomHtmlTags } from '../customHtmlTags'
 import { NON_STRUCTURING_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
 import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes, parseTagAttrs } from '../htmlTagUtils'
-import { isMathLike } from '../plugins/isMathLike'
 import { parseInlineTokens } from './inline-parsers'
 import { createLinkifyDemotionContextTracker } from './linkifyHeuristics'
 import { parseCommonBlockToken } from './node-parsers/block-token-parser'
@@ -2143,271 +2142,6 @@ function ensureBlankLineBeforeCustomHtmlBlocks(markdown: string, tags: string[])
   return out
 }
 
-function hasMathBlockSameLineBoundary(markdown: string) {
-  if (!markdown || (!markdown.includes('$$') && !markdown.includes('\\[') && !markdown.includes('\\]')))
-    return false
-
-  type CloseDelimiter = '$$' | '\\]'
-  type DisplayDelimiter = { open: '$$' | '\\[', close: CloseDelimiter }
-
-  const displayDelimiters: DisplayDelimiter[] = [
-    { open: '$$', close: '$$' },
-    { open: '\\[', close: '\\]' },
-  ]
-
-  const isIndentWs = (ch?: string) => ch === ' ' || ch === '\t'
-
-  const isEscapedAtIndex = (src: string, index: number) => {
-    let cursor = index - 1
-    let slashCount = 0
-
-    while (cursor >= 0 && src[cursor] === '\\') {
-      slashCount++
-      cursor--
-    }
-
-    return slashCount % 2 === 1
-  }
-
-  const findUnescapedDelimiter = (src: string, delimiter: string, startIndex = 0) => {
-    let searchIndex = Math.max(0, startIndex)
-
-    while (searchIndex < src.length) {
-      const index = src.indexOf(delimiter, searchIndex)
-      if (index === -1)
-        return -1
-
-      if (!isEscapedAtIndex(src, index))
-        return index
-
-      searchIndex = index + Math.max(1, delimiter.length)
-    }
-
-    return -1
-  }
-
-  const parseBlockquotePrefix = (line: string) => {
-    let index = 0
-    let prefixEnd = 0
-    let sawBlockquote = false
-
-    while (index < line.length) {
-      while (index < line.length && isIndentWs(line[index]))
-        index++
-
-      if (line[index] !== '>')
-        break
-
-      sawBlockquote = true
-      index++
-
-      while (index < line.length && isIndentWs(line[index]))
-        index++
-
-      prefixEnd = index
-    }
-
-    return sawBlockquote ? line.slice(prefixEnd) : line
-  }
-
-  const isBlank = (value: string) => {
-    for (let index = 0; index < value.length; index++) {
-      const ch = value[index]
-      if (ch !== ' ' && ch !== '\t' && ch !== '\r' && ch !== '\n')
-        return false
-    }
-    return true
-  }
-  const parseFenceMarker = (line: string) => {
-    let index = 0
-    while (index < line.length && isIndentWs(line[index]))
-      index++
-
-    const ch = line[index]
-    if (ch !== '`' && ch !== '~')
-      return null
-
-    let end = index
-    while (end < line.length && line[end] === ch)
-      end++
-
-    const len = end - index
-    if (len < 3)
-      return null
-
-    return {
-      markerChar: ch as '`' | '~',
-      markerLen: len,
-      rest: line.slice(end),
-    }
-  }
-
-  const isIndentedCodeLine = (line: string) => {
-    if (!line)
-      return false
-
-    if (line[0] === '\t')
-      return true
-
-    let spaces = 0
-    while (spaces < line.length && line[spaces] === ' ')
-      spaces++
-
-    return spaces >= 4
-  }
-
-  const findLineStartOpen = (line: string) => {
-    let start = 0
-    while (start < line.length && isIndentWs(line[start]))
-      start++
-
-    for (const delimiter of displayDelimiters) {
-      if (!line.startsWith(delimiter.open, start))
-        continue
-
-      if (isEscapedAtIndex(line, start))
-        continue
-
-      return {
-        ...delimiter,
-        start,
-      }
-    }
-
-    return null
-  }
-
-  const findTolerantOpenAtLineEnd = (line: string) => {
-    const trimmedRight = line.replace(/[\t ]+$/, '')
-
-    for (const delimiter of displayDelimiters) {
-      const openIndex = trimmedRight.length - delimiter.open.length
-      if (openIndex < 0)
-        continue
-
-      if (!trimmedRight.startsWith(delimiter.open, openIndex))
-        continue
-
-      if (isEscapedAtIndex(trimmedRight, openIndex))
-        continue
-
-      const before = trimmedRight.slice(0, openIndex)
-      if (!before.trim())
-        continue
-
-      return delimiter
-    }
-
-    return null
-  }
-
-  let index = 0
-  let inFence = false
-  let fenceChar: '`' | '~' | '' = ''
-  let fenceLen = 0
-  let activeMathClose: CloseDelimiter | '' = ''
-  let activeMathTolerant = false
-  let activeMathContent = ''
-
-  while (index < markdown.length) {
-    const nl = markdown.indexOf('\n', index)
-    const hasNl = nl !== -1
-    const lineEnd = hasNl && nl > index && markdown[nl - 1] === '\r'
-      ? nl - 1
-      : hasNl ? nl : markdown.length
-    const rawLine = markdown.slice(index, lineEnd)
-    const line = parseBlockquotePrefix(rawLine)
-
-    const fenceMatch = parseFenceMarker(line)
-    if (fenceMatch) {
-      if (inFence) {
-        if (fenceMatch.markerChar === fenceChar && fenceMatch.markerLen >= fenceLen && isBlank(fenceMatch.rest)) {
-          inFence = false
-          fenceChar = ''
-          fenceLen = 0
-        }
-      }
-      else {
-        inFence = true
-        fenceChar = fenceMatch.markerChar
-        fenceLen = fenceMatch.markerLen
-      }
-
-      index = hasNl ? nl + 1 : markdown.length
-      continue
-    }
-
-    if (inFence || isIndentedCodeLine(line)) {
-      index = hasNl ? nl + 1 : markdown.length
-      continue
-    }
-
-    if (activeMathClose) {
-      const closeIndex = findUnescapedDelimiter(line, activeMathClose)
-      if (closeIndex !== -1) {
-        const beforeClose = line.slice(0, closeIndex)
-        if (beforeClose)
-          activeMathContent += (activeMathContent ? '\n' : '') + beforeClose
-
-        const activeLooksMath = !activeMathTolerant || isMathLike(activeMathContent)
-        const afterClose = line.slice(closeIndex + activeMathClose.length)
-        if (activeLooksMath && afterClose.trim())
-          return true
-
-        // Tolerant opener itself is a same-line boundary even when the close
-        // delimiter is alone on its line, but only if the captured content is
-        // actually math-like. Otherwise ordinary text ending with "$$" can be
-        // misdetected and force repeated full reparses during streaming.
-        if (activeMathTolerant && activeLooksMath)
-          return true
-
-        activeMathClose = ''
-        activeMathTolerant = false
-        activeMathContent = ''
-      }
-      else {
-        activeMathContent += (activeMathContent ? '\n' : '') + line
-      }
-
-      index = hasNl ? nl + 1 : markdown.length
-      continue
-    }
-
-    const tolerantOpen = findTolerantOpenAtLineEnd(line)
-    if (tolerantOpen) {
-      activeMathClose = tolerantOpen.close
-      activeMathTolerant = true
-      activeMathContent = ''
-      index = hasNl ? nl + 1 : markdown.length
-      continue
-    }
-
-    const lineStartOpen = findLineStartOpen(line)
-    if (lineStartOpen) {
-      const closeIndex = findUnescapedDelimiter(
-        line,
-        lineStartOpen.close,
-        lineStartOpen.start + lineStartOpen.open.length,
-      )
-
-      if (closeIndex === -1) {
-        activeMathClose = lineStartOpen.close
-        activeMathTolerant = false
-        activeMathContent = line.slice(lineStartOpen.start + lineStartOpen.open.length)
-      }
-      else {
-        const afterClose = line.slice(closeIndex + lineStartOpen.close.length)
-        if (afterClose.trim())
-          return true
-      }
-    }
-
-    index = hasNl ? nl + 1 : markdown.length
-  }
-
-  return activeMathTolerant && isMathLike(activeMathContent)
-}
-
 export function parseMarkdownToStructure(
   markdown: string,
   md: MarkdownIt,
@@ -2420,14 +2154,7 @@ export function parseMarkdownToStructure(
   // todo: 下面的特殊 math 其实应该更精确匹配到() 或者 $$ $$ 或者 \[ \] 内部的内容
   let safeMarkdown = (markdown ?? '').toString().replace(/([^\\])\r(ight|ho)/g, '$1\\r$2').replace(/([^\\])\n(abla|eq|ot|exists)/g, '$1\\n$2')
 
-  const shouldBypassStreamParseForMathBoundary = !isFinal && hasMathBlockSameLineBoundary(safeMarkdown)
-  const parseOptions: ParseOptions = shouldBypassStreamParseForMathBoundary
-    ? ({ ...(options as InternalParseOptions), __disableStreamParse: true } as InternalParseOptions)
-    : options
-
-  if (shouldBypassStreamParseForMathBoundary && md.stream?.enabled === true && typeof md.stream.reset === 'function')
-    md.stream.reset()
-  else if (shouldResetTopLevelStreamCacheForFinalAutoParse(md, parseOptions))
+  if (shouldResetTopLevelStreamCacheForFinalAutoParse(md, options))
     md.stream!.reset!()
 
   if (!isFinal) {
@@ -2499,8 +2226,8 @@ export function parseMarkdownToStructure(
   // (like a list/table/blockquote/fence) is parsed as Markdown blocks, insert
   // a single empty line after the closing tag when the next line begins with a
   // block-level marker.
-  if (parseOptions.customHtmlTags?.length && safeMarkdown.includes('<')) {
-    const tags = normalizeCustomHtmlTags(parseOptions.customHtmlTags)
+  if (options.customHtmlTags?.length && safeMarkdown.includes('<')) {
+    const tags = normalizeCustomHtmlTags(options.customHtmlTags)
 
     if (tags.length) {
       safeMarkdown = ensureBlankLineBeforeInlineMultilineCustomHtmlBlocks(safeMarkdown, tags)
@@ -2550,10 +2277,10 @@ export function parseMarkdownToStructure(
   if (standaloneHtmlDocument) {
     // Keep pre/post hooks observable for callers that rely on them for
     // instrumentation, but preserve the full-document html_block shape.
-    const preHook = parseOptions.preTransformTokens
-    const postHook = parseOptions.postTransformTokens
-    if (shouldUseTopLevelStreamParse(md, parseOptions) || typeof preHook === 'function' || typeof postHook === 'function') {
-      const rawTokens = parseTopLevelTokens(md, safeMarkdown, { __markstreamFinal: isFinal }, parseOptions) as unknown as MarkdownToken[]
+    const preHook = options.preTransformTokens
+    const postHook = options.postTransformTokens
+    if (shouldUseTopLevelStreamParse(md, options) || typeof preHook === 'function' || typeof postHook === 'function') {
+      const rawTokens = parseTopLevelTokens(md, safeMarkdown, { __markstreamFinal: isFinal }, options) as unknown as MarkdownToken[]
       const hookedTokens = typeof preHook === 'function' ? (preHook(rawTokens) || rawTokens) : rawTokens
       if (typeof postHook === 'function')
         postHook(hookedTokens)
@@ -2562,13 +2289,13 @@ export function parseMarkdownToStructure(
   }
 
   // Get tokens from markdown-it
-  const tokens = parseTopLevelTokens(md, safeMarkdown, { __markstreamFinal: isFinal }, parseOptions)
+  const tokens = parseTopLevelTokens(md, safeMarkdown, { __markstreamFinal: isFinal }, options)
   // Defensive: ensure tokens is an array
   if (!tokens || !Array.isArray(tokens))
     return finishTimedParse([], timing, parseStartedAt)
   // Allow consumers to transform tokens before processing
-  const pre = parseOptions.preTransformTokens
-  const post = parseOptions.postTransformTokens
+  const pre = options.preTransformTokens
+  const post = options.postTransformTokens
   let transformedTokens = tokens as unknown as MarkdownToken[]
   if (pre && typeof pre === 'function') {
     transformedTokens = pre(transformedTokens) || transformedTokens
@@ -2582,9 +2309,9 @@ export function parseMarkdownToStructure(
   // md.set({ validateLink }) is applied when we emit link nodes (tokens may
   // bypass the tokenizer's link rule, e.g. synthetic links from fixLinkTokens).
   const mdAny = md as { options?: { validateLink?: (url: string) => boolean }, validateLink?: (url: string) => boolean }
-  const validateLink = parseOptions.validateLink ?? mdAny.options?.validateLink ?? (typeof mdAny.validateLink === 'function' ? mdAny.validateLink : undefined)
+  const validateLink = options.validateLink ?? mdAny.options?.validateLink ?? (typeof mdAny.validateLink === 'function' ? mdAny.validateLink : undefined)
   const internalOptions: InternalParseOptions = {
-    ...parseOptions,
+    ...options,
     validateLink,
     __markdownIt: md,
     __sourceMarkdown: safeMarkdown,
@@ -2612,8 +2339,8 @@ export function parseMarkdownToStructure(
   }
 
   result = mergeSplitTopLevelHtmlBlocks(result, isFinal, safeMarkdown)
-  result = combineStructuredDetailsHtmlBlocks(result, safeMarkdown, md, parseOptions, isFinal)[0]
-  result = structureGenericHtmlBlockChildren(result, md, parseOptions, isFinal)
+  result = combineStructuredDetailsHtmlBlocks(result, safeMarkdown, md, options, isFinal)[0]
+  result = structureGenericHtmlBlockChildren(result, md, options, isFinal)
 
   if (isFinal) {
     const seen = new WeakSet<object>()
@@ -2641,7 +2368,7 @@ export function parseMarkdownToStructure(
     finalizeHtmlBlockLoading(result)
   }
 
-  if (parseOptions.debug) {
+  if (options.debug) {
     console.log('Parsed Markdown Tree Structure:', result)
   }
   return finishTimedParse(result, timing, parseStartedAt)
