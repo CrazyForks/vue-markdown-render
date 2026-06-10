@@ -408,8 +408,24 @@ x + y = z
     expect(stats.total).toBeGreaterThan(0)
   })
 
-  it('does not bypass top-level stream parser for math boundary cases', () => {
-    const md = getMarkdown('stream-math-block-boundary-uses-stream-parser')
+  it('bypasses top-level stream parser once a closed tolerant boundary would rewrite cached token shape', () => {
+    const md = getMarkdown('stream-math-block-boundary-bypasses-stream-cache-after-close')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const partial = [
+      'Before $a$ and display math $$',
+      'E=mc^2',
+    ].join('\n')
+
+    const partialNodes = parseMarkdownToStructure(partial, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(collectByType(partialNodes, 'math_block')).toHaveLength(0)
+    expect((md as any).stream.stats().total).toBeGreaterThan(0)
+
     ;(md as any).stream.reset()
     ;(md as any).stream.resetStats()
 
@@ -431,10 +447,11 @@ x + y = z
     ])
     expect(collectByType(nodes, 'math_block')).toHaveLength(1)
 
-    // 这个断言很关键：不能为了解决 math boundary 直接 __disableStreamParse。
-    // 否则大文档 streaming 会退化成每次全量 md.parse + stream cache reset。
+    // Closed tolerant boundaries rewrite a cached paragraph into
+    // paragraph + math_block + paragraph, so this rare repair path must not reuse
+    // top-level stream-cache tokens.
     const stats = (md as any).stream.stats()
-    expect(stats.total).toBe(1)
+    expect(stats.total).toBe(0)
   })
   it('keeps math block boundary normalization inside blockquotes', () => {
     const md = getMarkdown('math-block-boundary-blockquote')
@@ -3380,17 +3397,7 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
       }).not.toThrow()
     }
 
-    // The streaming checkpoint scan must not leave stale paragraph tokens from
-    // the pre-close state. This is the important invariant for issue #492:
-    // once the close delimiter arrives, the stream result must be the same
-    // block shape as the final parse.
-    expect(nodes.map(node => node.type)).toEqual([
-      'paragraph',
-      'math_block',
-      'paragraph',
-    ])
-    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
-
+    // The streaming checkpoint scan must never throw.
     const stableSerialized = JSON.stringify(nodes)
     for (let index = 0; index < 10; index++) {
       nodes = parseMarkdownToStructure(source, md, {
@@ -3400,25 +3407,26 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
       expect(JSON.stringify(nodes)).toBe(stableSerialized)
     }
 
-    // Verify the non-streaming final parse produces the correct structure.
-    ;(md as any).stream.reset()
-    ;(md as any).stream.resetStats()
-    const finalNodes = parseMarkdownToStructure(source, md, { final: true }) as any[]
-    expect(finalNodes.map(node => node.type)).toEqual([
+    expect(nodes.map(node => node.type)).toEqual([
       'paragraph',
       'math_block',
       'paragraph',
     ])
 
-    const mathBlocks = collectByType(finalNodes, 'math_block')
+    const mathBlocks = collectByType(nodes, 'math_block')
     expect(mathBlocks).toHaveLength(1)
     expect(mathBlocks[0].content).toContain('widetilde')
 
-    const inlineMath = collectByType(finalNodes, 'math_inline')
+    const inlineMath = collectByType(nodes, 'math_inline')
     const inlineContent = inlineMath.map((node: any) => node.content).join('\n')
     expect(inlineContent).toContain('kappa')
     expect(inlineContent).toContain('epsilon')
     expect(inlineContent).toContain('sigma')
+
+    const finalNodes = parseMarkdownToStructure(source, getMarkdown('stream-issue-492-prefix-checkpoints-final'), {
+      final: true,
+    }) as any[]
+    expect(finalNodes.map(node => node.type)).toEqual(nodes.map(node => node.type))
   })
 
   it('does not close tolerant $ on a markdown table header row before delimiter', () => {

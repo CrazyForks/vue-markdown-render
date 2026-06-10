@@ -584,6 +584,12 @@ function isLikelyClosedTolerantSingleAtomMath(content: string) {
     || /^(?:[A-Z][a-z]?(?:_\{?\d+\}?|\^\{?\d+\}?)?)+$/.test(stripped)
 }
 
+function isLikelySpacedSuperSubscriptMath(content: string) {
+  const stripped = String(content ?? '').trim()
+  if (!stripped || stripped.length > 400)
+    return false
+  return /(?:^|[^\p{L}\p{N}\\])(?:[A-Z]|\\[A-Z]+)\s*[_^]\s*(?:\{[^{}\n]{1,120}\}|[A-Z0-9\\]+)(?:$|[^\p{L}\p{N}])/iu.test(stripped)
+}
 function isLikelyTolerantExplicitMathBlockContent(content: string, closed: boolean) {
   const stripped = String(content ?? '').trim()
   if (!stripped)
@@ -1040,6 +1046,85 @@ function shouldAbortTolerantBoundaryScan(
   return isTolerantBoundaryScanStopLine(currentLine, nextLine)
 }
 
+function appendTolerantBoundaryContent(content: string, line: string) {
+  if (!content)
+    return line
+  if (!line)
+    return content
+  return `${content}\n${line}`
+}
+
+export function hasClosedTolerantMathBlockBoundaryCandidate(markdown: string) {
+  const source = String(markdown ?? '')
+  if (!source || (!source.includes('$$') && !source.includes('\\[')))
+    return false
+
+  const lines = source.split(/\r?\n/)
+  const candidates: Array<[string, string]> = [
+    ['$$', '$$'],
+    ['\\[', '\\]'],
+  ]
+
+  for (let startLine = 0; startLine < lines.length - 1; startLine++) {
+    const lineText = lines[startLine].trim()
+    if (!lineText)
+      continue
+
+    for (const [open, close] of candidates) {
+      if (!lineText.endsWith(open))
+        continue
+
+      if (lineText.startsWith(open))
+        continue
+
+      const openIndex = lineText.length - open.length
+      if (isEscapedAt(lineText, openIndex) || isInsideCodeSpanOrUnclosedTail(lineText, openIndex))
+        continue
+
+      if (openIndex > 0 && lineText[openIndex - 1] === open[0])
+        continue
+
+      const before = lineText.slice(0, openIndex).replace(/[\t ]+$/, '')
+      if (!before.trim())
+        continue
+
+      const codeSpanRanges = buildCodeSpanRanges(lineText)
+      const previousOpenCount = countUnescapedDelimiter(lineText, open, 0, openIndex, codeSpanRanges)
+      const previousCloseCount = open === '$$'
+        ? 0
+        : countUnescapedDelimiter(lineText, close, 0, openIndex, codeSpanRanges)
+
+      if (open === '$$' ? previousOpenCount % 2 === 1 : previousOpenCount > previousCloseCount)
+        continue
+
+      let content = ''
+
+      for (let currentLineNumber = startLine + 1; currentLineNumber < lines.length; currentLineNumber++) {
+        const currentLine = lines[currentLineNumber]
+        if (shouldAbortTolerantBoundaryScan(currentLine, startLine, currentLineNumber, content))
+          break
+
+        const closeIndex = findUnescapedDelimiter(currentLine, close)
+        const fallbackCloseIndex = open === '\\['
+          ? findPlainBracketFallbackClose(currentLine)
+          : -1
+        const endIndex = closeIndex !== -1 ? closeIndex : fallbackCloseIndex
+
+        if (endIndex !== -1) {
+          const beforeClose = currentLine.slice(0, endIndex)
+          const candidateContent = appendTolerantBoundaryContent(content, beforeClose)
+          if (isLikelyTolerantExplicitMathBlockContent(candidateContent, true))
+            return true
+          break
+        }
+
+        content = appendTolerantBoundaryContent(content, currentLine)
+      }
+    }
+  }
+
+  return false
+}
 function isLikelyCurrencyRangeDollar(content: string, nextChar?: string) {
   const stripped = String(content ?? '').trim()
   if (!stripped)
@@ -1069,22 +1154,6 @@ function isLikelyPlaceholderDollar(content: string) {
     return false
   // Placeholder text like "$...$" / "$…$" is not math.
   return /^(?:\.{3,}|…+)$/.test(stripped)
-}
-
-function isLikelySpacedSuperSubscriptMath(content: string) {
-  const stripped = String(content ?? '').trim()
-  if (!stripped || stripped.length > 400)
-    return false
-
-  // Keep this deliberately narrow:
-  // - only a single variable / TeX command before _ or ^
-  // - optional spaces around _/^
-  // - braced or simple alnum command suffix
-  //
-  // This covers real display math that is already supported for normal
-  // standalone $ blocks, for example `f _ { x }`, without turning ordinary
-  // prose like "foo _ bar" into a tolerant math block.
-  return /(?:^|[^\p{L}\p{N}\\])(?:[A-Z]|\\[A-Z]+)\s*[_^]\s*(?:\{[^{}\n]{1,120}\}|[A-Z0-9\\]+)(?:$|[^\p{L}\p{N}])/iu.test(stripped)
 }
 
 function pushSyntheticInlineParagraph(s: MathBlockState, content: string, line: number) {
