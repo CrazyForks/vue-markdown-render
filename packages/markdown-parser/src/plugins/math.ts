@@ -546,7 +546,7 @@ function findPlainBracketFallbackClose(src: string) {
   return index
 }
 
-const TOLERANT_VALUE_ATOM = String.raw`(?:[A-Z]|\d+(?:\.\d+)?|\\[a-z]+)`
+const TOLERANT_VALUE_ATOM = String.raw`(?:[A-Za-z]|\d+(?:\.\d+)?|\\[a-z]+)`
 const TOLERANT_BOUNDARY_BEFORE = String.raw`(?:^|[^\p{L}\p{N}\\])`
 const TOLERANT_BOUNDARY_AFTER = String.raw`(?:$|[^\p{L}\p{N}])`
 const TOLERANT_OPERATOR = String.raw`(?:[=+*/<>]|-(?!\s*\p{L}{2,}\b))`
@@ -662,6 +662,52 @@ function isSpaceOrTab(ch?: string) {
   return ch === ' ' || ch === '\t'
 }
 
+function splitTolerantBoundaryBlockquotePrefix(line: string) {
+  const source = String(line ?? '')
+  let cursor = 0
+  let contentStart = 0
+
+  while (cursor < source.length) {
+    const markerStart = cursor
+    let spaces = 0
+
+    // CommonMark allows up to 3 spaces before a blockquote marker.
+    while (spaces < 4 && isSpaceOrTab(source[cursor])) {
+      cursor++
+      spaces++
+    }
+
+    if (spaces >= 4 || source[cursor] !== '>') {
+      cursor = markerStart
+      break
+    }
+
+    cursor++
+
+    // The optional post-marker space belongs to the blockquote prefix.
+    if (isSpaceOrTab(source[cursor]))
+      cursor++
+
+    contentStart = cursor
+  }
+
+  return {
+    prefix: source.slice(0, contentStart),
+    content: source.slice(contentStart),
+  }
+}
+
+function getTolerantBoundaryScanLine(line: string, expectedBlockquotePrefix: string) {
+  if (!expectedBlockquotePrefix)
+    return { matched: true, content: String(line ?? '') }
+
+  const parsed = splitTolerantBoundaryBlockquotePrefix(line)
+  return {
+    matched: parsed.prefix === expectedBlockquotePrefix,
+    content: parsed.content,
+  }
+}
+
 function hashTolerantBoundaryCacheText(value: string) {
   // Small deterministic hash for cache identity. The tolerant boundary scan is
   // capped by MAX_TOLERANT_BOUNDARY_CHARS, so this stays bounded and avoids
@@ -692,7 +738,9 @@ export function getCompletedTolerantMathBlockBoundaryCacheKey(markdown: string) 
       continue
 
     const line = lines[startLine]
-    const lineWithoutTrailingWs = line.replace(/[\t ]+$/, "")
+    const openingLine = splitTolerantBoundaryBlockquotePrefix(line)
+    const openingBlockquotePrefix = openingLine.prefix
+    const lineWithoutTrailingWs = openingLine.content.replace(/[\t ]+$/, "")
     if (!lineWithoutTrailingWs.trim())
       continue
 
@@ -730,8 +778,16 @@ export function getCompletedTolerantMathBlockBoundaryCacheKey(markdown: string) 
         currentLineNumber < lines.length;
         currentLineNumber++
       ) {
-        const currentLine = lines[currentLineNumber]
-        const nextLine = lines[currentLineNumber + 1] ?? ""
+        const currentScanLine = getTolerantBoundaryScanLine(
+          lines[currentLineNumber],
+          openingBlockquotePrefix,
+        )
+        if (!currentScanLine.matched)
+          break
+
+        const currentLine = currentScanLine.content
+        const nextRawLine = lines[currentLineNumber + 1] ?? ""
+        const nextLine = getTolerantBoundaryScanLine(nextRawLine, openingBlockquotePrefix).content
 
         if (shouldAbortTolerantBoundaryScan(currentLine, startLine, currentLineNumber, content, nextLine))
           break

@@ -18,7 +18,7 @@ function collectByType(nodes: any, type: string, out: any[] = []) {
 }
 
 describe('math block same-line boundary regression', () => {
-  it('resets stream cache only once for a completed tolerant boundary, not on every parse', () => {
+  it('resets stream cache when completed tolerant boundary source changes, not for identical repeated parses', () => {
     const md = getMarkdown('stream-math-boundary-completed-reset')
     ;(md as any).stream.reset()
     ;(md as any).stream.resetStats()
@@ -47,7 +47,7 @@ describe('math block same-line boundary regression', () => {
     // The completed tolerant boundary rewrites a previously cached paragraph
     // shape, so the stream cache must be reset once when that completed
     // boundary first appears. Repeated parses of the same completed source
-    // should not keep resetting the stream cache.
+    // must not keep resetting the stream cache.
     expect(resetCount).toBe(1)
     const stats = (md as any).stream.stats()
     expect(stats.total).toBeGreaterThan(0)
@@ -127,15 +127,12 @@ describe('math block same-line boundary regression', () => {
       streamParse: true,
     }) as any[]
 
-    // The second tolerant opener is not closed yet, so the completed-boundary
-    // key is unchanged and should not force another reset.
-    // NOTE: This assertion currently FAILS because markdown-it-ts's stream
-    // parser re-processes `$ after first $a$.` as a standalone opener when
-    // extending incrementally, creating 2 math_blocks instead of 1.
-    // This is the root duplicate-token bug the unconditional reset was hiding.
-    // Fix the stream parser, then this will pass.
-    expect(resetCount).toBe(1)
-    // expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+    // The first tolerant boundary is already completed and the source changed.
+    // Reusing the previous incremental cache here can duplicate the first
+    // boundary suffix as a new fake opener. Reset once for this changed source.
+    expect(resetCount).toBe(2)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+    expect(collectByType(nodes, 'math_block')[0].content).toContain('a = 1')
 
     const secondComplete = [
       firstComplete,
@@ -150,7 +147,7 @@ describe('math block same-line boundary regression', () => {
       streamParse: true,
     }) as any[]
 
-    expect(resetCount).toBe(2)
+    expect(resetCount).toBe(3)
     expect(nodes.map(node => node.type)).toEqual([
       'paragraph',
       'math_block',
@@ -178,8 +175,49 @@ describe('math block same-line boundary regression', () => {
       }) as any[]
 
       expect(JSON.stringify(nodes)).toBe(stableSerialized)
-      expect(resetCount).toBe(2)
+      expect(resetCount).toBe(3)
     }
+  })
+
+  it('resets stream cache for completed tolerant boundary inside blockquotes when source changes', () => {
+    const md = getMarkdown('stream-math-boundary-blockquote-completed-reset')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    const dollar = '\u0024\u0024'
+    const partial = [
+      `> Text before display ${dollar}`,
+      '> a = 1',
+    ].join('\n')
+
+    const partialNodes = parseMarkdownToStructure(partial, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+    expect(collectByType(partialNodes, 'math_block')).toHaveLength(0)
+    expect(resetCount).toBe(0)
+
+    const complete = [
+      partial,
+      `> ${dollar} after display with $a$ inline.`,
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(complete, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('a')
   })
 
   it('keeps math block boundary normalization inside blockquotes', () => {

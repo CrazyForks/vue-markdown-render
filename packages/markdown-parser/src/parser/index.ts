@@ -295,7 +295,12 @@ function shouldResetTopLevelStreamCacheForFinalAutoParse(md: MarkdownIt, options
     && typeof stream.reset === 'function'
 }
 
-const completedTolerantMathBoundaryResetKeyCache = new WeakMap<object, string | null>()
+interface CompletedTolerantMathBoundaryResetState {
+  key: string | null
+  source: string
+}
+
+const completedTolerantMathBoundaryResetKeyCache = new WeakMap<object, CompletedTolerantMathBoundaryResetState>()
 
 function shouldResetTopLevelStreamCacheForCompletedTolerantMathBoundary(
   md: MarkdownIt,
@@ -316,11 +321,10 @@ function shouldResetTopLevelStreamCacheForCompletedTolerantMathBoundary(
   // ("$ where ...") without the full opener context and misinterprets the
   // closing $ as a new opener, creating spurious duplicate tokens.
   //
-  // Reset the stream only when a completed tolerant boundary first appears or
-  // when the completed-boundary set changes (e.g. a second boundary completes).
-  // Repeated parses of the same completed source must stay on the stream cache
-  // path; otherwise this workaround becomes a permanent performance cliff and
-  // hides duplicate-token bugs.
+  // Reset when a completed tolerant boundary exists and the source changed
+  // since the previous parse. Re-parsing the exact same completed source can
+  // reuse the cache; appending after an already-completed tolerant boundary
+  // cannot safely reuse the previous incremental cache.
   if (options.final === true || !shouldUseTopLevelStreamParse(md, options))
     return false
 
@@ -330,15 +334,18 @@ function shouldResetTopLevelStreamCacheForCompletedTolerantMathBoundary(
 
   const key = getCompletedTolerantMathBlockBoundaryCacheKey(source)
   const cacheOwner = md as unknown as object
-  const previousKey = completedTolerantMathBoundaryResetKeyCache.get(cacheOwner) ?? null
+  const previous = completedTolerantMathBoundaryResetKeyCache.get(cacheOwner) ?? {
+    key: null,
+    source: '',
+  }
 
-  completedTolerantMathBoundaryResetKeyCache.set(cacheOwner, key)
+  completedTolerantMathBoundaryResetKeyCache.set(cacheOwner, {
+    key,
+    source,
+  })
 
-  // Reset only when a completed tolerant boundary first appears or when the
-  // completed-boundary set changes. Repeated parses of the exact same completed
-  // source must stay on the stream cache path; otherwise this workaround becomes
-  // a permanent performance cliff and hides duplicate-token bugs.
-  return key !== null && key !== previousKey
+  return key !== null
+    && (key !== previous.key || source !== previous.source)
 }
 
 function shouldCloneTopLevelStreamTokens(options: ParseOptions) {
