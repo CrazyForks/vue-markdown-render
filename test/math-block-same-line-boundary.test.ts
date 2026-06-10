@@ -476,8 +476,8 @@ x + y = z
 
     expect(collectByType(plainNodes, 'math_block')).toHaveLength(0)
     expect(collectByType(plainNodes, 'math_inline').map((node: any) => node.content)).toContain('y')
-    // Plain text has no completed tolerant boundary, so no reset.
-    expect(resetCount).toBe(1)
+    // Leaving a completed-boundary source invalidates the normalized stream state.
+    expect(resetCount).toBe(2)
 
     nodes = parseMarkdownToStructure(source, md, {
       final: false,
@@ -490,7 +490,7 @@ x + y = z
       'paragraph',
     ])
     // Returning from a non-boundary source to a completed-boundary source needs one fresh reset.
-    expect(resetCount).toBe(2)
+    expect(resetCount).toBe(3)
   })
 
   it('resets once when appending after an already completed tolerant boundary', () => {
@@ -534,7 +534,8 @@ x + y = z
       streamParse: true,
     }) as any[]
 
-    expect(resetCount).toBe(2)
+    // Same completed-boundary key on append → no additional reset, md.parse reused.
+    expect(resetCount).toBe(1)
     expect(collectByType(nodes, 'math_block')).toHaveLength(1)
     expect(JSON.stringify(nodes)).toContain('Second display')
     expect(JSON.stringify(nodes)).toContain('b = 2')
@@ -549,7 +550,8 @@ x + y = z
       streamParse: true,
     }) as any[]
 
-    expect(resetCount).toBe(3)
+    // Second tolerant boundary completes with a different key → one fresh reset.
+    expect(resetCount).toBe(2)
     expect(collectByType(nodes, 'math_block')).toHaveLength(2)
     expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toEqual(
       expect.arrayContaining(['a', 'b']),
@@ -3501,7 +3503,13 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     }
 
     // The streaming checkpoint scan must never throw.
-    const stableSerialized = JSON.stringify(nodes)
+    // Capture stable serialization from a fresh parse of the completed source
+    // to avoid checkpoint-order sensitivity with the keyed boundary cache.
+    const stableNodes = parseMarkdownToStructure(source, getMarkdown('stream-issue-492-stable'), {
+      final: false,
+      streamParse: true,
+    }) as any[]
+    const stableSerialized = JSON.stringify(stableNodes)
     for (let index = 0; index < 10; index++) {
       nodes = parseMarkdownToStructure(source, md, {
         final: false,

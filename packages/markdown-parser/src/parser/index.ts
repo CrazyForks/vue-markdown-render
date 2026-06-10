@@ -3,7 +3,7 @@ import type { HtmlBlockNode, InternalParseOptions, MarkdownToken, ParsedNode, Pa
 import { normalizeCustomHtmlTags } from '../customHtmlTags'
 import { NON_STRUCTURING_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
 import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes, parseTagAttrs } from '../htmlTagUtils'
-import { hasClosedTolerantMathBlockBoundaryCandidate } from '../plugins/math'
+import { getCompletedTolerantMathBlockBoundaryCacheKey } from '../plugins/math'
 import { parseInlineTokens } from './inline-parsers'
 import { createLinkifyDemotionContextTracker } from './linkifyHeuristics'
 import { parseCommonBlockToken } from './node-parsers/block-token-parser'
@@ -295,22 +295,62 @@ function shouldResetTopLevelStreamCacheForFinalAutoParse(md: MarkdownIt, options
     && typeof stream.reset === 'function'
 }
 
-const completedTolerantMathBoundaryStreamBypassSourceCache = new WeakMap<object, string>()
+interface CompletedTolerantMathBoundaryStreamState {
+  key: string
+  source: string
+}
 
-function resetTopLevelStreamCacheBeforeCompletedTolerantMathBoundaryBypass(
+const completedTolerantMathBoundaryStreamStateCache = new WeakMap<object, CompletedTolerantMathBoundaryStreamState>()
+
+function syncTopLevelStreamCacheForCompletedTolerantMathBoundary(
   md: MarkdownIt,
   source: string,
-) {
+  boundaryKey: string,
+): 'parse' | 'stream' {
   const stream = md.stream
   if (typeof stream?.reset !== 'function')
-    return
+    return 'parse'
 
   const cacheOwner = md as unknown as object
-  if (completedTolerantMathBoundaryStreamBypassSourceCache.get(cacheOwner) === source)
+  const previous = completedTolerantMathBoundaryStreamStateCache.get(cacheOwner)
+
+  if (previous?.key === boundaryKey) {
+    if (source === previous.source) {
+      // Same completed tolerant boundary already handled. Reuse md.parse
+      // without resetting the stream cache so repeated parses stay stable.
+      return 'parse'
+    }
+    if (source.startsWith(previous.source)) {
+      // Pure append with same boundary key — the structural rewrite has
+      // already been applied. Continue with md.stream.parse so subsequent
+      // chunks do not permanently degrade into full markdown-it parses.
+      previous.source = source
+      return 'stream'
+    }
+  }
+
+  // New or changed completed tolerant boundary — must invalidate the stream
+  // cache. Because the structural rewrite (paragraph → math_block → paragraph)
+  // cannot be safely tail-reparsed, use a full md.parse for this render.
+  // Subsequent appends will continue with md.stream.parse.
+  stream.reset()
+  completedTolerantMathBoundaryStreamStateCache.set(cacheOwner, {
+    key: boundaryKey,
+    source,
+  })
+  return 'parse'
+}
+
+function resetTopLevelStreamCacheAfterCompletedTolerantMathBoundary(md: MarkdownIt) {
+  const cacheOwner = md as unknown as object
+  if (!completedTolerantMathBoundaryStreamStateCache.has(cacheOwner))
     return
 
-  stream.reset()
-  completedTolerantMathBoundaryStreamBypassSourceCache.set(cacheOwner, source)
+  completedTolerantMathBoundaryStreamStateCache.delete(cacheOwner)
+
+  const stream = md.stream
+  if (typeof stream?.reset === 'function')
+    stream.reset()
 }
 
 function shouldCloneTopLevelStreamTokens(options: ParseOptions) {
@@ -330,20 +370,29 @@ function parseTopLevelTokens(
   if (!shouldUseTopLevelStreamParse(md, options))
     return md.parse(source, env)
 
-  // A completed tolerant same-line display-math boundary rewrites an already
+  // A completed tolerant same-line display-math boundary rewrites a previously
   // streamed paragraph into:
   //
   //   paragraph + math_block + paragraph
   //
-  // This is a structural rewrite across line boundaries, and the incremental
-  // stream parser cannot safely tail-reparse it. Do not feed this source to
-  // md.stream.parse at all; use a stateless markdown-it parse for this render.
-  if (hasClosedTolerantMathBlockBoundaryCandidate(source)) {
-    resetTopLevelStreamCacheBeforeCompletedTolerantMathBoundaryBypass(md, source)
-    return md.parse(source, env)
+  // That rewrite must invalidate the incremental token cache once. It should
+  // not permanently bypass md.stream.parse, otherwise every later streaming
+  // chunk after the first completed tolerant boundary becomes a full parse.
+  const completedTolerantBoundaryKey = getCompletedTolerantMathBlockBoundaryCacheKey(source)
+  if (completedTolerantBoundaryKey) {
+    const mode = syncTopLevelStreamCacheForCompletedTolerantMathBoundary(
+      md,
+      source,
+      completedTolerantBoundaryKey,
+    )
+
+    if (mode === 'parse')
+      return md.parse(source, env)
+  }
+  else {
+    resetTopLevelStreamCacheAfterCompletedTolerantMathBoundary(md)
   }
 
-  completedTolerantMathBoundaryStreamBypassSourceCache.delete(md as unknown as object)
   const tokens = md.stream!.parse!(source, getStableStreamEnv(md, env))
   if (!shouldCloneTopLevelStreamTokens(options))
     return tokens

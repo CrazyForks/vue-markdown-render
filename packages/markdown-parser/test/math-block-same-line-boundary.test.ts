@@ -69,8 +69,8 @@ describe('math block same-line boundary regression', () => {
 
     expect(collectByType(plainNodes, 'math_block')).toHaveLength(0)
     expect(collectByType(plainNodes, 'math_inline').map((node: any) => node.content)).toContain('y')
-    // Plain text has no completed tolerant boundary, so no reset.
-    expect(resetCount).toBe(1)
+    // Leaving a completed-boundary source invalidates the normalized stream state.
+    expect(resetCount).toBe(2)
 
     nodes = parseMarkdownToStructure(source, md, {
       final: false,
@@ -82,9 +82,8 @@ describe('math block same-line boundary regression', () => {
       'math_block',
       'paragraph',
     ])
-    // Returning from a non-boundary source to a completed-boundary source needs
-    // one fresh reset because the stream cache now contains unrelated plain text.
-    expect(resetCount).toBe(2)
+    // Returning from a non-boundary source to a completed-boundary source needs one fresh reset.
+    expect(resetCount).toBe(3)
   })
 
   it('resets stream cache when a later second tolerant boundary completes', () => {
@@ -126,10 +125,9 @@ describe('math block same-line boundary regression', () => {
       streamParse: true,
     }) as any[]
 
-    // The first tolerant boundary is already completed and the source changed.
-    // Reusing the previous incremental cache here can duplicate the first
-    // boundary suffix as a new fake opener. Reset once for this changed source.
-    expect(resetCount).toBe(2)
+    // Appending after an already completed boundary keeps the same boundary key,
+    // so the stream parser should continue incrementally without another reset.
+    expect(resetCount).toBe(1)
     expect(collectByType(nodes, 'math_block')).toHaveLength(1)
     expect(collectByType(nodes, 'math_block')[0].content).toContain('a = 1')
 
@@ -146,7 +144,7 @@ describe('math block same-line boundary regression', () => {
       streamParse: true,
     }) as any[]
 
-    expect(resetCount).toBe(3)
+    expect(resetCount).toBe(2)
     expect(nodes.map(node => node.type)).toEqual([
       'paragraph',
       'math_block',
@@ -174,8 +172,67 @@ describe('math block same-line boundary regression', () => {
       }) as any[]
 
       expect(JSON.stringify(nodes)).toBe(stableSerialized)
-      expect(resetCount).toBe(3)
+      expect(resetCount).toBe(2)
     }
+  })
+
+  it('continues using stream parser after the first completed tolerant boundary while appending', () => {
+    const md = getMarkdown('stream-math-boundary-append-keeps-stream-parser')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    const originalParse = stream.parse.bind(stream)
+    let resetCount = 0
+    let streamParseCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+    stream.parse = (...args: any[]) => {
+      streamParseCount++
+      return originalParse(...args)
+    }
+
+    const partial = [
+      'Before display $$',
+      'a = 1',
+    ].join('\n')
+
+    parseMarkdownToStructure(partial, md, {
+      final: false,
+      streamParse: true,
+    })
+
+    expect(resetCount).toBe(0)
+    expect(streamParseCount).toBe(1)
+
+    const complete = [
+      partial,
+      '$$ after $a$ follows.',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(complete, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(streamParseCount).toBe(1)
+    expect(nodes.map(node => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
+
+    const appended = `${complete} More suffix text.`
+    nodes = parseMarkdownToStructure(appended, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(streamParseCount).toBe(2)
+    expect(nodes.map(node => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
+    expect(JSON.stringify(nodes)).toContain('More suffix text')
   })
 
   it('resets stream cache for completed tolerant boundary inside blockquotes when source changes', () => {
