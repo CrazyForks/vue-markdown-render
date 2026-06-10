@@ -190,6 +190,76 @@ E=mc^2`, md, {
     expect(mathBlocks[0].loading).toBe(true)
     expect(mathBlocks[0].content).toContain('E=mc^2')
   })
+  it('still emits loading math_block for real standalone $$ opener with weak spaced-subscript content during streaming', () => {
+    const md = getMarkdown('stream-standalone-dollar-loading-spaced-subscript')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      '$$',
+      'f _ { x }',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+
+    for (let index = 0; index < 8; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].markup).toBe('$$')
+    expect(mathBlocks[0].loading).toBe(true)
+    expect(mathBlocks[0].content).toContain('f _ { x }')
+  })
+
+  it('still emits loading math_block for real standalone explicit \\[ opener with weak spaced-subscript content during streaming', () => {
+    const md = getMarkdown('stream-standalone-bracket-loading-spaced-subscript')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      '\\[',
+      'f _ { x }',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+
+    for (let index = 0; index < 8; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].markup).toBe('\\[\\]')
+    expect(mathBlocks[0].loading).toBe(true)
+    expect(mathBlocks[0].content).toContain('f _ { x }')
+  })
+
 
   it('preserves inline math before tolerant $$ block and text after closing $', () => {
     const md = getMarkdown('issue-492-math-boundary')

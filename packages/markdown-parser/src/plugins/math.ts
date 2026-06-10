@@ -546,7 +546,15 @@ function findPlainBracketFallbackClose(src: string) {
 }
 
 function hasTolerantFormulaOperatorSignal(content: string) {
-  return /(?:^|[^\p{L}\p{N}\\])(?:[A-Z]|\d+(?:\.\d+)?|\\[a-z]+)\s*(?:[=+*/<>]|-(?!\s*[\p{L}]{2,}\b))\s*(?:[A-Z]|\d+(?:\.\d+)?|\\[a-z]+)(?:$|[^\p{L}\p{N}])/iu.test(content)
+  const valueAtom = String.raw`(?:[A-Z]|\d+(?:\.\d+)?|\\[a-z]+)`
+  const boundaryBefore = String.raw`(?:^|[^\p{L}\p{N}\\])`
+  const boundaryAfter = String.raw`(?:$|[^\p{L}\p{N}])`
+  const operator = String.raw`(?:[=+*/<>]|-(?!\s*[\p{L}]{2,}\b))`
+
+  return new RegExp(
+    String.raw`${boundaryBefore}${valueAtom}\s*${operator}\s*${valueAtom}${boundaryAfter}`,
+    'iu',
+  ).test(content)
 }
 
 function hasTolerantAbsoluteValueSignal(content: string) {
@@ -572,6 +580,23 @@ function isLikelyTolerantExplicitMathBlockContent(content: string, closed: boole
     || hasTolerantFormulaOperatorSignal(stripped)
     || hasTolerantAbsoluteValueSignal(stripped)
     || (closed && isLikelySpacedSuperSubscriptMath(stripped))
+}
+
+function isLikelyStandaloneLoadingExplicitMathBlockContent(content: string) {
+  const stripped = String(content ?? '').trim()
+  if (!stripped)
+    return false
+
+  // Real line-start display delimiters are stronger than tolerant same-line
+  // repair boundaries. During streaming, keep valid weak math shapes such as:
+  //
+  //   $
+  //   f _ { x }
+  //
+  // as loading math_block nodes. Tolerant same-line repair still waits for a
+  // close delimiter before emitting any math_block.
+  return isLikelyTolerantExplicitMathBlockContent(stripped, false)
+    || isLikelySpacedSuperSubscriptMath(stripped)
 }
 
 function isInsideCodeSpanOrUnclosedTail(src: string, index: number) {
@@ -777,7 +802,9 @@ function parseSyntheticInlineChildren(md: MarkdownIt, s: MathBlockState, content
 }
 
 function pushSyntheticInlineParagraph(s: MathBlockState, md: MarkdownIt, content: string, line: number) {
-  const paragraphContent = String(content ?? '').replace(/^[\t ]+/, '').replace(/[\t ]+$/, '')
+  const paragraphContent = String(content ?? '')
+    .replace(/^[\t ]+/, '')
+    .replace(/[\t ]+$/, '')
   if (!paragraphContent)
     return
 
@@ -1535,8 +1562,9 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     if (
       tolerantBoundary
       && shouldAbortTolerantBoundaryScan(firstLineContent, startLine, firstLineNumber, '')
-    )
+    ) {
       return false
+    }
 
     const firstLineCloseIndex = findUnescapedDelimiter(firstLineContent, closeDelim)
 
@@ -1565,7 +1593,9 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           return false
         }
 
-        const escapedPlainBracketCloseInLine = !strict && openDelim === '[' ? findUnescapedDelimiter(currentLine, '\\]') : -1
+        const escapedPlainBracketCloseInLine = !strict && openDelim === '['
+          ? findUnescapedDelimiter(currentLine, '\\]')
+          : -1
         const closeIndexInLine = findUnescapedDelimiter(currentLine, closeDelim)
         const fallbackPlainBracketCloseInLine = fallbackPlainBracketClose
           ? findPlainBracketFallbackClose(currentLine)
@@ -1642,8 +1672,8 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     // should not produce a ghost math_block. Apply the same tolerant-content
     // heuristic used for same-line boundaries so streaming does not emit
     // loading math_blocks for ordinary text.
-    if (allowLoading && !tolerantBoundary && !found && (openDelim === '$$' || openDelim === '\\[')) {
-      if (!isLikelyTolerantExplicitMathBlockContent(content, found))
+    if (allowLoading && !tolerantBoundary && !found && (openDelim === '$' || openDelim === '\\[')) {
+      if (!isLikelyStandaloneLoadingExplicitMathBlockContent(content))
         return false
     }
 
