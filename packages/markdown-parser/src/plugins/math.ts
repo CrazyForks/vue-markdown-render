@@ -625,33 +625,66 @@ function isInsideCodeSpanOrUnclosedTail(src: string, index: number) {
 const MAX_TOLERANT_BOUNDARY_LINES = 80
 const MAX_TOLERANT_BOUNDARY_CHARS = 20000
 
+function isThematicOrSetextBoundaryLine(trimmed: string) {
+  // Tolerant math repair must not scan across horizontal rules or setext
+  // heading underlines. Otherwise ordinary text ending with "$" can consume
+  // a later unrelated "$" and swallow the block boundary in between.
+  // Covers: "---", "- - -", "***", "* * *", "___", "_ _ _", "===".
+  return /^(?:(?:-[\t ]*){3,}|(?:\*[\t ]*){3,}|(?:_[\t ]*){3,}|={3,})$/.test(trimmed)
+}
+
 function isLikelyMarkdownTableBoundaryLine(trimmed: string) {
+  // Markdown table delimiter rows may omit leading/trailing pipes:
+  //
+  //   A | B
+  //   --- | ---
+  //
+  // If a tolerant math opener appears before such a table, scanning must abort
+  // on the separator row instead of treating the table as formula content.
+  if (/^\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?$/.test(trimmed))
+    return true
+
   if (!trimmed.startsWith('|'))
     return false
 
-  // Keep this intentionally narrower than "contains pipes".
+  // Keep this narrower than "contains pipes".
   // A valid display formula may start with absolute values, e.g.
   //
   //   |x| = y
   //
-  // That must not abort tolerant math-boundary scanning. Real markdown table
-  // rows usually keep the trailing pipe, contain an inner cell separator, or are
-  // separator rows like `| --- |`.
-  if (!/\|[\t ]*$/.test(trimmed))
+  // That must not abort tolerant math-boundary scanning. But markdown table
+  // rows do not always need a trailing pipe, e.g.:
+  //
+  //   | x + y = z | label
+  //   | --- | ---
+  const pipeCount = (trimmed.match(/\|/g) ?? []).length
+  if (pipeCount < 2)
     return false
 
-  const pipeCount = (trimmed.match(/\|/g) ?? []).length
   if (pipeCount >= 3)
     return true
 
-  const inner = trimmed.replace(/^\|/, '').replace(/\|[\t ]*$/, '')
-  return /^[\t :|-]+$/.test(inner) || /^\|[\t ]+/.test(trimmed) || /[\t ]+\|[\t ]*$/.test(trimmed)
+  if (/^\|[\t ]+/.test(trimmed))
+    return true
+
+  if (/[\t ]+\|(?:[\t ]+\S|\S)/.test(trimmed))
+    return true
+
+  if (/\|[\t ]*$/.test(trimmed)) {
+    const inner = trimmed.replace(/^\|/, '').replace(/\|[\t ]*$/, '')
+    return /^[\t :|-]+$/.test(inner) || /[\t ]+\|[\t ]*$/.test(trimmed)
+  }
+
+  return false
 }
 
 function isTolerantBoundaryScanStopLine(line: string) {
   const trimmed = String(line ?? '').trimStart()
 
   if (!trimmed)
+    return true
+
+  if (isThematicOrSetextBoundaryLine(trimmed))
     return true
 
   // Tolerant same-line math boundaries are an LLM-output repair path, not a
@@ -661,7 +694,7 @@ function isTolerantBoundaryScanStopLine(line: string) {
   // `|x| = y` can still be parsed as math.
   if (isLikelyMarkdownTableBoundaryLine(trimmed))
     return true
-  if (/^(?:#{1,6}[\t ]+\S|>{1,}[\t ]*\S|(?:[*+-]|\d+[.)])[\t ]+\S|`{3,}|~{3,}|:{3,}[\t ]*\S|<\s*[A-Za-z][\w:-]*(?:\s|>|\/))/.test(trimmed))
+  if (/^(?:#{1,6}[\t ]+\S|>{1,}[\t ]*\S|(?:[*+-]|\d+[.)])[\t ]+\S|`{3,}|~{3,}|:{3,}[\t ]*\S|<\s*\/?\s*[A-Za-z][\w:-]*(?:\s|>|\/))/.test(trimmed))
     return true
 
   // Reference/definition-style boundaries are not formula content.
@@ -733,7 +766,35 @@ function isLikelySpacedSuperSubscriptMath(content: string) {
   return /(?:^|[^\p{L}\p{N}\\])(?:[A-Z]|\\[A-Z]+)\s*[_^]\s*(?:\{[^{}\n]{1,120}\}|[A-Z0-9\\]+)(?:$|[^\p{L}\p{N}])/iu.test(stripped)
 }
 
-function pushSyntheticInlineParagraph(s: MathBlockState, content: string, line: number) {
+function parseSyntheticInlineChildren(md: MarkdownIt, s: MathBlockState, content: string) {
+  const children: MarkdownToken[] = []
+
+  const inlineParser = (md as unknown as {
+    inline?: {
+      parse?: (
+        src: string,
+        md: MarkdownIt,
+        env: Record<string, unknown>,
+        outTokens: MarkdownToken[],
+      ) => void
+    }
+  }).inline
+
+  if (typeof inlineParser?.parse === 'function') {
+    inlineParser.parse(content, md, s.env ?? {}, children)
+    return children
+  }
+
+  children.push({
+    type: 'text',
+    tag: '',
+    nesting: 0,
+    content,
+  } as MarkdownToken)
+  return children
+}
+
+function pushSyntheticInlineParagraph(s: MathBlockState, md: MarkdownIt, content: string, line: number) {
   const paragraphContent = String(content ?? '').replace(/^[\t ]+/, '').replace(/[\t ]+$/, '')
   if (!paragraphContent)
     return
@@ -744,7 +805,7 @@ function pushSyntheticInlineParagraph(s: MathBlockState, content: string, line: 
   const inlineToken = s.push('inline', '', 0)
   inlineToken.content = paragraphContent
   inlineToken.map = [line, line + 1]
-  inlineToken.children = []
+  inlineToken.children = parseSyntheticInlineChildren(md, s, paragraphContent)
 
   s.push('paragraph_close', 'p', -1)
 }
@@ -1471,7 +1532,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
 
       const trailingAfterClose = lineText.slice(sameLineCloseIndex + sameLineCloseDelim.length)
       if (trailingAfterClose.trim())
-        pushSyntheticInlineParagraph(s, trailingAfterClose, startLine)
+        pushSyntheticInlineParagraph(s, md, trailingAfterClose, startLine)
 
       return true
     }
@@ -1617,7 +1678,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       return true
 
     if (prefixBeforeOpen)
-      pushSyntheticInlineParagraph(s, prefixBeforeOpen, startLine)
+      pushSyntheticInlineParagraph(s, md, prefixBeforeOpen, startLine)
 
     const token = s.push('math_block', 'math', 0)
     token.content = normalizeStandaloneBackslashT(content)
@@ -1631,7 +1692,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     s.line = blockEndLine
 
     if (trailingAfterClose.trim())
-      pushSyntheticInlineParagraph(s, trailingAfterClose, trailingAfterCloseLine)
+      pushSyntheticInlineParagraph(s, md, trailingAfterClose, trailingAfterCloseLine)
 
     return true
   }
