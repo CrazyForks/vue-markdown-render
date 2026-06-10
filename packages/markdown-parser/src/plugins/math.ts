@@ -502,13 +502,13 @@ function isPlainBracketFallbackCloseMathContinuation(tail: string) {
   if (/^\\[a-z]+/i.test(stripped))
     return true
 
-  if (/^[+*/^_=<>]\s*(?:[A-Za-z0-9\\({]|$)/.test(stripped))
+  if (/^[+*/^_=<>]\s*(?:[a-z0-9\\({]|$)/i.test(stripped))
     return true
 
   // `] - x` can be math continuation, but `] - where ...` is normal suffix.
   // Keep hyphen conservative: treat it as math only when the right side is a
   // short variable/number/TeX command, not a prose word.
-  return /^-\s*(?:[A-Za-z](?:\b|[_^])|\d|\\[a-z]+|[({]|$)/i.test(stripped)
+  return /^-\s*(?:[a-z](?![a-z0-9])|[\d({]|\\[a-z]+|$)/i.test(stripped)
 }
 
 function findPlainBracketFallbackClose(src: string) {
@@ -549,15 +549,13 @@ function findPlainBracketFallbackClose(src: string) {
 const TOLERANT_VALUE_ATOM = String.raw`(?:[A-Z]|\d+(?:\.\d+)?|\\[a-z]+)`
 const TOLERANT_BOUNDARY_BEFORE = String.raw`(?:^|[^\p{L}\p{N}\\])`
 const TOLERANT_BOUNDARY_AFTER = String.raw`(?:$|[^\p{L}\p{N}])`
-const TOLERANT_OPERATOR = String.raw`(?:[=+*/<>]|-(?!\s*[\p{L}]{2,}\b))`
+const TOLERANT_OPERATOR = String.raw`(?:[=+*/<>]|-(?!\s*\p{L}{2,}\b))`
 const TOLERANT_FORMULA_OPERATOR_SIGNAL_RE = new RegExp(
   String.raw`${TOLERANT_BOUNDARY_BEFORE}${TOLERANT_VALUE_ATOM}\s*${TOLERANT_OPERATOR}\s*${TOLERANT_VALUE_ATOM}${TOLERANT_BOUNDARY_AFTER}`,
   'iu',
 )
-const TOLERANT_ABSOLUTE_VALUE_SIGNAL_RE = new RegExp(
-  String.raw`\|[^|\n]{1,160}\|\s*(?:[-=+*/<>]|\\(?:le|ge|neq|approx|sim)\b)|(?:[-=+*/<>]|\\(?:le|ge|neq|approx|sim)\b)\s*\|[^|\n]{1,160}\|`,
-  'u',
-)
+// eslint-disable-next-line regexp/no-useless-assertions
+const TOLERANT_ABSOLUTE_VALUE_SIGNAL_RE = /\|[^|\n]{1,160}\|\s*(?:[-=+*/<>]|\\(?:le|ge|neq|approx|sim)\b)|(?:[-=+*/<>]|\\(?:le|ge|neq|approx|sim)\b)\s*\|[^|\n]{1,160}\|/u
 
 function hasTolerantFormulaOperatorSignal(content: string) {
   return TOLERANT_FORMULA_OPERATOR_SIGNAL_RE.test(content)
@@ -595,7 +593,7 @@ function isLikelyTolerantExplicitMathBlockContent(content: string, closed: boole
   // Require a concrete math signal so ordinary prose ending with `$` does not
   // split into synthetic paragraph + math_block + paragraph.
   return /\\[a-z]+/i.test(stripped)
-    || /[A-Za-z0-9\\][_^](?:[A-Za-z0-9\\]|\{)/.test(stripped)
+    || /[a-z0-9\\][_^][a-z0-9\\{]/i.test(stripped)
     || /\\(?:times|pm|cdot|le|ge|neq)\b/.test(stripped)
     || hasTolerantFormulaOperatorSignal(stripped)
     || hasTolerantAbsoluteValueSignal(stripped)
@@ -656,6 +654,66 @@ const MAX_TOLERANT_BOUNDARY_CHARS = 20000
 
 function isSpaceOrTab(ch?: string) {
   return ch === ' ' || ch === '\t'
+}
+
+const TOLERANT_MATH_BLOCK_RESET_DELIMITERS = [
+  ['$', '$'],
+  ['\\[', '\\]'],
+] as const
+
+export function getCompletedTolerantMathBlockBoundaryCacheKey(markdown: string) {
+  const source = String(markdown ?? '')
+  if (!source)
+    return null
+
+  const lines = source.split(/\r?\n/)
+  let absoluteLineStart = 0
+
+  for (let lineNumber = 0; lineNumber < lines.length - 1; lineNumber++) {
+    const line = lines[lineNumber]
+    const lineWithoutTrailingWs = line.replace(/[\t ]+$/, '')
+
+    for (const [open, close] of TOLERANT_MATH_BLOCK_RESET_DELIMITERS) {
+      if (!lineWithoutTrailingWs.endsWith(open))
+        continue
+
+      const openIndex = lineWithoutTrailingWs.length - open.length
+      if (openIndex <= 0)
+        continue
+
+      if (isEscapedAt(lineWithoutTrailingWs, openIndex) || isInsideCodeSpanOrUnclosedTail(lineWithoutTrailingWs, openIndex))
+        continue
+
+      if (!lineWithoutTrailingWs.slice(0, openIndex).trim())
+        continue
+
+      let scannedChars = 0
+      let closeAbsoluteLineStart = absoluteLineStart + line.length + 1
+
+      for (
+        let closeLineNumber = lineNumber + 1;
+        closeLineNumber < lines.length && closeLineNumber - lineNumber <= MAX_TOLERANT_BOUNDARY_LINES;
+        closeLineNumber++
+      ) {
+        const candidate = lines[closeLineNumber]
+        scannedChars += candidate.length + 1
+        if (scannedChars > MAX_TOLERANT_BOUNDARY_CHARS)
+          break
+        if (!candidate.trim())
+          break
+
+        const closeIndex = findUnescapedDelimiter(candidate, close)
+        if (closeIndex !== -1)
+          return `${open}:${absoluteLineStart + openIndex}:${closeAbsoluteLineStart + closeIndex}`
+
+        closeAbsoluteLineStart += candidate.length + 1
+      }
+    }
+
+    absoluteLineStart += line.length + 1
+  }
+
+  return null
 }
 
 function hasNonSpaceOrTabAfter(value: string, start: number) {
@@ -794,6 +852,36 @@ function isLikelyMarkdownTableBoundaryLine(trimmed: string) {
   return true
 }
 
+function isLikelyMarkdownTableHeaderBeforeDelimiter(trimmed: string, nextLine?: string) {
+  const value = String(trimmed ?? '').trim()
+  if (!value || !value.includes('|'))
+    return false
+
+  const next = String(nextLine ?? '').trim()
+  if (!isLikelyMarkdownTableBoundaryLine(next))
+    return false
+
+  // A table header row followed by a delimiter row is a hard boundary for the
+  // tolerant same-line math repair. Without this guard, a header like:
+  //
+  //   Name $ | Value
+  //   --- | ---
+  //
+  // can be mistaken for the closing `$` of an earlier malformed display block.
+  // Keep absolute-value formula rows safe: `|x| = y` is not followed by a table
+  // delimiter in valid math-block repair cases, so it still parses as math.
+  const withoutLeadingPipe = value[0] === '|' ? value.slice(1) : value
+  const withoutEdgePipes = withoutLeadingPipe.endsWith('|')
+    ? withoutLeadingPipe.slice(0, -1)
+    : withoutLeadingPipe
+  const cells = withoutEdgePipes.split('|')
+
+  if (!cells.length)
+    return false
+
+  return cells.some(cell => cell.trim())
+}
+
 function isHeadingBoundaryLine(trimmed: string) {
   let level = 0
   while (trimmed[level] === '#')
@@ -893,7 +981,10 @@ function isReferenceDefinitionBoundaryLine(trimmed: string) {
     return false
 
   index++
-  return isSpaceOrTab(trimmed[index]) && hasNonSpaceOrTabAfter(trimmed, index + 1)
+  while (isSpaceOrTab(trimmed[index]))
+    index++
+
+  return hasNonSpaceOrTabAfter(trimmed, index)
 }
 
 function isMarkdownBlockBoundaryLine(trimmed: string) {
@@ -905,7 +996,7 @@ function isMarkdownBlockBoundaryLine(trimmed: string) {
     || isHtmlBoundaryLine(trimmed)
 }
 
-function isTolerantBoundaryScanStopLine(line: string) {
+function isTolerantBoundaryScanStopLine(line: string, nextLine = '') {
   const trimmed = String(line ?? '').trimStart()
 
   if (!trimmed)
@@ -919,6 +1010,8 @@ function isTolerantBoundaryScanStopLine(line: string) {
   // otherwise ordinary paragraphs ending with "$" can accidentally consume a
   // later unrelated "$". Keep pipe/table detection separate so formulas like
   // `|x| = y` can still be parsed as math.
+  if (isLikelyMarkdownTableHeaderBeforeDelimiter(trimmed, nextLine))
+    return true
   if (isLikelyMarkdownTableBoundaryLine(trimmed))
     return true
   if (isMarkdownBlockBoundaryLine(trimmed))
@@ -936,6 +1029,7 @@ function shouldAbortTolerantBoundaryScan(
   startLine: number,
   currentLineNumber: number,
   accumulatedContent: string,
+  nextLine = '',
 ) {
   if (currentLineNumber - startLine > MAX_TOLERANT_BOUNDARY_LINES)
     return true
@@ -943,7 +1037,7 @@ function shouldAbortTolerantBoundaryScan(
   if (accumulatedContent.length + currentLine.length > MAX_TOLERANT_BOUNDARY_CHARS)
     return true
 
-  return isTolerantBoundaryScanStopLine(currentLine)
+  return isTolerantBoundaryScanStopLine(currentLine, nextLine)
 }
 
 function isLikelyCurrencyRangeDollar(content: string, nextChar?: string) {
@@ -1754,10 +1848,18 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         : lineText === openDelim ? '' : lineText.slice(openDelim.length)
     const fallbackPlainBracketClose = !strict && openDelim === '\\[' ? ']' : ''
 
+    const getSourceLine = (line: number) => {
+      if (line < 0 || line >= endLine)
+        return ''
+      const lineStart = s.bMarks[line] + s.tShift[line]
+      const lineEnd = s.eMarks[line]
+      return s.src.slice(lineStart, lineEnd)
+    }
+
     const firstLineNumber = skipFirstLine ? startLine + 1 : startLine
     if (
       tolerantBoundary
-      && shouldAbortTolerantBoundaryScan(firstLineContent, startLine, firstLineNumber, '')
+      && shouldAbortTolerantBoundaryScan(firstLineContent, startLine, firstLineNumber, '', getSourceLine(firstLineNumber + 1))
     ) {
       return false
     }
@@ -1777,14 +1879,13 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         content = firstLineContent
 
       for (nextLine = startLine + 1; nextLine < endLine; nextLine++) {
-        const lineStart = s.bMarks[nextLine] + s.tShift[nextLine]
-        const lineEnd = s.eMarks[nextLine]
-        const currentLine = s.src.slice(lineStart, lineEnd)
+        const currentLine = getSourceLine(nextLine)
+        const nextSourceLine = getSourceLine(nextLine + 1)
         const currentLineTrimmed = currentLine.trim()
 
         if (
           tolerantBoundary
-          && shouldAbortTolerantBoundaryScan(currentLine, startLine, nextLine, content)
+          && shouldAbortTolerantBoundaryScan(currentLine, startLine, nextLine, content, nextSourceLine)
         ) {
           return false
         }
