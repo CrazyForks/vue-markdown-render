@@ -408,13 +408,21 @@ x + y = z
     expect(stats.total).toBeGreaterThan(0)
   })
 
-  it('bypasses top-level stream parser once a closed tolerant boundary would rewrite cached token shape', () => {
+  it('resets top-level stream parser once when a closed tolerant boundary rewrites cached token shape', () => {
     const md = getMarkdown('stream-math-block-boundary-bypasses-stream-cache-after-close')
     ;(md as any).stream.reset()
     ;(md as any).stream.resetStats()
 
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
     const partial = [
-      'Before $a$ and display math $$',
+      'Before $a$ and display math \u0024\u0024',
       'E=mc^2',
     ].join('\n')
 
@@ -425,17 +433,17 @@ x + y = z
 
     expect(collectByType(partialNodes, 'math_block')).toHaveLength(0)
     expect((md as any).stream.stats().total).toBeGreaterThan(0)
+    expect(resetCount).toBe(0)
 
-    ;(md as any).stream.reset()
     ;(md as any).stream.resetStats()
 
     const source = [
-      'Before $a$ and display math $$',
+      'Before $a$ and display math \u0024\u0024',
       'E=mc^2',
-      '$$ where $x$ follows.',
+      '\u0024\u0024 where $x$ follows.',
     ].join('\n')
 
-    const nodes = parseMarkdownToStructure(source, md, {
+    let nodes = parseMarkdownToStructure(source, md, {
       final: false,
       streamParse: true,
     }) as any[]
@@ -447,11 +455,50 @@ x + y = z
     ])
     expect(collectByType(nodes, 'math_block')).toHaveLength(1)
 
-    // Closed tolerant boundaries rewrite a cached paragraph into
-    // paragraph + math_block + paragraph, so this rare repair path must not reuse
-    // top-level stream-cache tokens.
+    // The completed tolerant boundary rewrites a previously cached paragraph
+    // shape, so the stream cache must be reset every time the completed
+    // boundary is present. markdown-it-ts's incremental stream parser cannot
+    // safely extend after a tolerant boundary repair without risk of
+    // duplicate tokens, so each parse triggers a fresh reset.
+    expect(resetCount).toBe(1)
     const stats = (md as any).stream.stats()
-    expect(stats.total).toBe(0)
+    expect(stats.total).toBeGreaterThan(0)
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 10; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+      // Each call resets the stream because the completed tolerant boundary
+      // is still present.
+      expect(resetCount).toBe(1 + index + 1)
+    }
+
+    const plainNodes = parseMarkdownToStructure('Plain $y$ text.', md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(collectByType(plainNodes, 'math_block')).toHaveLength(0)
+    expect(collectByType(plainNodes, 'math_inline').map((node: any) => node.content)).toContain('y')
+    // Plain text has no completed tolerant boundary, so no reset.
+    expect(resetCount).toBe(11)
+
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+    // One more reset from the tolerant boundary.
+    expect(resetCount).toBe(12)
   })
   it('keeps math block boundary normalization inside blockquotes', () => {
     const md = getMarkdown('math-block-boundary-blockquote')
@@ -3556,5 +3603,50 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
 
     const inlineMath = collectByType(nodes, 'math_inline')
     expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('z')
+  })
+
+  it('does not reset stream cache for ordinary single-dollar boundary-like paragraphs', () => {
+    const md = getMarkdown('stream-math-boundary-single-dollar-no-false-reset')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    const source = 'This is ordinary prose ending with $\nx + y = z\n$ suffix should remain text and $z$ should stay inline.'
+
+    let stableSerialized = ''
+    let nodes: any[] = []
+
+    for (let index = 0; index < 8; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(resetCount).toBe(0)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('ordinary prose ending with')
+    expect(serialized).toContain('x + y = z')
+    expect(serialized).toContain('suffix should remain text')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content)).toContain('z')
   })
 })

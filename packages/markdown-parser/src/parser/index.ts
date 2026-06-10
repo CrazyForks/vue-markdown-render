@@ -3,7 +3,7 @@ import type { HtmlBlockNode, InternalParseOptions, MarkdownToken, ParsedNode, Pa
 import { normalizeCustomHtmlTags } from '../customHtmlTags'
 import { NON_STRUCTURING_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
 import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes, parseTagAttrs } from '../htmlTagUtils'
-import { getCompletedTolerantMathBlockBoundaryCacheKey, hasClosedTolerantMathBlockBoundaryCandidate } from '../plugins/math'
+import { getCompletedTolerantMathBlockBoundaryCacheKey } from '../plugins/math'
 import { parseInlineTokens } from './inline-parsers'
 import { createLinkifyDemotionContextTracker } from './linkifyHeuristics'
 import { parseCommonBlockToken } from './node-parsers/block-token-parser'
@@ -22,7 +22,6 @@ type ParsedNodeWithFields = ParsedNode & {
 }
 
 const streamParseEnvCache = new WeakMap<object, Map<string, Record<string, unknown>>>()
-const streamTolerantMathBoundaryResetCache = new WeakMap<object, string>()
 
 interface ParseTimingMetrics {
   tokenCloneMs?: number
@@ -324,7 +323,7 @@ function shouldResetTopLevelStreamCacheForCompletedTolerantMathBoundary(
     return false
 
   const key = getCompletedTolerantMathBlockBoundaryCacheKey(source)
-  return !!key
+  return key !== null
 }
 
 function shouldCloneTopLevelStreamTokens(options: ParseOptions) {
@@ -2189,7 +2188,6 @@ export function parseMarkdownToStructure(
 
   if (shouldResetTopLevelStreamCacheForFinalAutoParse(md, options)) {
     md.stream!.reset!()
-    streamTolerantMathBoundaryResetCache.delete(md as unknown as object)
   }
   else if (shouldResetTopLevelStreamCacheForCompletedTolerantMathBoundary(md, safeMarkdown, options)) {
     md.stream!.reset!()
@@ -2311,32 +2309,14 @@ export function parseMarkdownToStructure(
   if (!isFinal)
     safeMarkdown = stripDanglingHtmlLikeTail(safeMarkdown)
 
-  // Tolerant same-line display math repair rewrites a previously parsed
-  // paragraph line:
-  //
-  //   prefix $$
-  //   E=mc^2
-  //   $$ suffix
-  //
-  // into:
-  //
-  //   paragraph(prefix), math_block, paragraph(suffix)
-  //
-  // That changes the shape of already-cached top-level stream tokens. Once the
-  // closing delimiter is present, use one full parse for this rare repair path
-  // so stale stream-cache paragraphs cannot be reused or duplicated.
-  const tokenParseOptions = !isFinal && hasClosedTolerantMathBlockBoundaryCandidate(safeMarkdown)
-    ? ({ ...options, __disableStreamParse: true } as InternalParseOptions)
-    : options
-
   const standaloneHtmlDocument = parseStandaloneHtmlDocument(safeMarkdown)
   if (standaloneHtmlDocument) {
     // Keep pre/post hooks observable for callers that rely on them for
     // instrumentation, but preserve the full-document html_block shape.
     const preHook = options.preTransformTokens
     const postHook = options.postTransformTokens
-    if (shouldUseTopLevelStreamParse(md, tokenParseOptions) || typeof preHook === 'function' || typeof postHook === 'function') {
-      const rawTokens = parseTopLevelTokens(md, safeMarkdown, { __markstreamFinal: isFinal }, tokenParseOptions) as unknown as MarkdownToken[]
+    if (shouldUseTopLevelStreamParse(md, options) || typeof preHook === 'function' || typeof postHook === 'function') {
+      const rawTokens = parseTopLevelTokens(md, safeMarkdown, { __markstreamFinal: isFinal }, options) as unknown as MarkdownToken[]
       const hookedTokens = typeof preHook === 'function' ? (preHook(rawTokens) || rawTokens) : rawTokens
       if (typeof postHook === 'function')
         postHook(hookedTokens)
@@ -2345,7 +2325,7 @@ export function parseMarkdownToStructure(
   }
 
   // Get tokens from markdown-it
-  const tokens = parseTopLevelTokens(md, safeMarkdown, { __markstreamFinal: isFinal }, tokenParseOptions)
+  const tokens = parseTopLevelTokens(md, safeMarkdown, { __markstreamFinal: isFinal }, options)
   // Defensive: ensure tokens is an array
   if (!tokens || !Array.isArray(tokens))
     return finishTimedParse([], timing, parseStartedAt)
@@ -2367,7 +2347,7 @@ export function parseMarkdownToStructure(
   const mdAny = md as { options?: { validateLink?: (url: string) => boolean }, validateLink?: (url: string) => boolean }
   const validateLink = options.validateLink ?? mdAny.options?.validateLink ?? (typeof mdAny.validateLink === 'function' ? mdAny.validateLink : undefined)
   const internalOptions: InternalParseOptions = {
-    ...tokenParseOptions,
+    ...options,
     validateLink,
     __markdownIt: md,
     __sourceMarkdown: safeMarkdown,
