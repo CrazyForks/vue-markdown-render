@@ -2979,4 +2979,98 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     expect(stableSerialized).toContain('formula signal')
   })
 
+  it('does not backtrack on long near-thematic tolerant $ boundary candidates', () => {
+    const md = getMarkdown('math-boundary-long-near-thematic-no-redos')
+
+    // A very long thematic break line (7000 underscores) is a valid
+    // horizontal-rule boundary that the tolerant scan must stop at.
+    // The old nested-quantifier regex `(?:_[\t ]*){3,}` can go
+    // pathological on this input; the deterministic scanner handles
+    // it in O(n).
+    const thematicLine = '_'.repeat(7000)
+    const content = [
+      'Text before malformed candidate $$',
+      'x + y = z',
+      thematicLine,
+      'Later text with $z$ inline math.',
+    ].join('\n')
+
+    let nodes: any[] = []
+    expect(() => {
+      nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+    }).not.toThrow()
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('Text before malformed candidate')
+    expect(serialized).toContain('Later text')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('z')
+  })
+
+  it('keeps streaming stable on long near-thematic tolerant $ boundary candidates', () => {
+    const md = getMarkdown('stream-math-boundary-long-near-thematic-no-redos')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const thematicLine = '_'.repeat(7000)
+    const source = [
+      'Text before malformed candidate $$',
+      'x + y = z',
+      thematicLine,
+      'Later text with $z$ inline math.',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+    for (let index = 0; index < 8; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(stableSerialized).toContain('Text before malformed candidate')
+    expect(stableSerialized).toContain('Later text')
+  })
+
+  it('does not backtrack on long table-delimiter-like tolerant $ candidates', () => {
+    const md = getMarkdown('math-boundary-long-malformed-table-delimiter-no-redos')
+
+    // A single-cell table delimiter where the cell content is very long.
+    // The old regex `:?-{3,}:?` can cause O(n) or worse scanning on long
+    // dash runs. The deterministic scanner handles it in a single linear pass.
+    const longDashes = '-'.repeat(7000)
+    const content = [
+      'Text before malformed candidate $$',
+      `| ${longDashes} |`,
+      'Later text with $z$ inline math.',
+    ].join('\n')
+
+    let nodes: any[] = []
+    expect(() => {
+      nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+    }).not.toThrow()
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('Text before malformed candidate')
+    expect(serialized).toContain('Later text')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('z')
+  })
+
 })

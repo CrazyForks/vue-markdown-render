@@ -650,15 +650,102 @@ function isInsideCodeSpanOrUnclosedTail(src: string, index: number) {
 const MAX_TOLERANT_BOUNDARY_LINES = 80
 const MAX_TOLERANT_BOUNDARY_CHARS = 20000
 
-function isThematicOrSetextBoundaryLine(trimmed: string) {
+function isSpaceOrTab(ch?: string) {
+  return ch === ' ' || ch === '\t'
+}
+
+function hasNonSpaceOrTabAfter(value: string, start: number) {
+  for (let i = Math.max(0, start); i < value.length; i++) {
+    if (!isSpaceOrTab(value[i]))
+      return true
+  }
+  return false
+}
+
+function isAsciiAlpha(ch?: string) {
+  if (!ch)
+    return false
+  const code = ch.charCodeAt(0)
+  return (code >= 65 && code <= 90) || (code >= 97 && code <= 122)
+}
+
+function isAsciiDigit(ch?: string) {
+  if (!ch)
+    return false
+  const code = ch.charCodeAt(0)
+  return code >= 48 && code <= 57
+}
+
+function isHtmlNameChar(ch?: string) {
+  return isAsciiAlpha(ch) || isAsciiDigit(ch) || ch === '_' || ch === ':' || ch === '-'
+}
+
+function isThematicOrSetextBoundaryLine(line: string) {
   // Tolerant math repair must not scan across horizontal rules or setext
   // heading underlines. Otherwise ordinary text ending with "$" can consume
   // a later unrelated "$" and swallow the block boundary in between.
   // Covers: "---", "- - -", "***", "* * *", "___", "_ _ _", "===".
-  return /^(?:(?:-[\t ]*){3,}|(?:\*[\t ]*){3,}|(?:_[\t ]*){3,}|={3,})$/.test(trimmed)
+  //
+  // Keep this as a deterministic scanner instead of a nested-quantifier regex.
+  // This function runs in the tolerant cross-line scan hot path. Regexes like
+  // `(?:-[\t ]*){3,}` are easy to make pathological with long near-matches,
+  // e.g. "- - - ... x".
+  const value = String(line ?? '').trim()
+  if (!value)
+    return false
+
+  if (value[0] === '=') {
+    if (value.length < 3)
+      return false
+    for (let i = 0; i < value.length; i++) {
+      if (value[i] !== '=')
+        return false
+    }
+    return true
+  }
+
+  const marker = value[0]
+  if (marker !== '-' && marker !== '*' && marker !== '_')
+    return false
+
+  let markerCount = 0
+  for (let i = 0; i < value.length; i++) {
+    const ch = value[i]
+    if (ch === marker) {
+      markerCount++
+      continue
+    }
+    if (isSpaceOrTab(ch))
+      continue
+    return false
+  }
+
+  return markerCount >= 3
 }
 
-const MARKDOWN_TABLE_DELIMITER_ROW_RE = /^\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)*\|?$/
+function isMarkdownTableDelimiterCell(cell: string) {
+  const value = String(cell ?? '').trim()
+  if (!value)
+    return false
+
+  let index = 0
+  if (value[index] === ':')
+    index++
+
+  let dashCount = 0
+  while (value[index] === '-') {
+    dashCount++
+    index++
+  }
+
+  if (dashCount < 3)
+    return false
+
+  if (value[index] === ':')
+    index++
+
+  return index === value.length
+}
 
 function isLikelyMarkdownTableBoundaryLine(trimmed: string) {
   // Markdown table delimiter rows may omit leading/trailing pipes:
@@ -682,7 +769,136 @@ function isLikelyMarkdownTableBoundaryLine(trimmed: string) {
   // rows:
   //
   //   --- | ---
-  return MARKDOWN_TABLE_DELIMITER_ROW_RE.test(String(trimmed ?? '').trim())
+  const value = String(trimmed ?? '').trim()
+  if (!value || !value.includes('|'))
+    return false
+
+  const withoutLeadingPipe = value[0] === '|' ? value.slice(1) : value
+  const withoutEdgePipes = withoutLeadingPipe.endsWith('|')
+    ? withoutLeadingPipe.slice(0, -1)
+    : withoutLeadingPipe
+  const cells = withoutEdgePipes.split('|')
+
+  if (!cells.length)
+    return false
+
+  for (const cell of cells) {
+    if (!isMarkdownTableDelimiterCell(cell))
+      return false
+  }
+
+  return true
+}
+
+function isHeadingBoundaryLine(trimmed: string) {
+  let level = 0
+  while (trimmed[level] === '#')
+    level++
+
+  if (level < 1 || level > 6)
+    return false
+
+  return isSpaceOrTab(trimmed[level]) && hasNonSpaceOrTabAfter(trimmed, level + 1)
+}
+
+function isFenceBoundaryLine(trimmed: string) {
+  const marker = trimmed[0]
+  if (marker !== '`' && marker !== '~')
+    return false
+
+  let count = 0
+  while (trimmed[count] === marker)
+    count++
+
+  return count >= 3
+}
+
+function isContainerBoundaryLine(trimmed: string) {
+  let count = 0
+  while (trimmed[count] === ':')
+    count++
+
+  return count >= 3
+}
+
+function isListBoundaryLine(trimmed: string) {
+  const first = trimmed[0]
+
+  if ((first === '*' || first === '+' || first === '-') && isSpaceOrTab(trimmed[1]))
+    return true
+
+  if (!isAsciiDigit(first))
+    return false
+
+  let index = 0
+  while (isAsciiDigit(trimmed[index]))
+    index++
+
+  if (trimmed[index] !== '.' && trimmed[index] !== ')')
+    return false
+
+  return isSpaceOrTab(trimmed[index + 1])
+}
+
+function isHtmlBoundaryLine(trimmed: string) {
+  if (trimmed[0] !== '<')
+    return false
+
+  let index = 1
+  while (isSpaceOrTab(trimmed[index]))
+    index++
+
+  if (trimmed[index] === '/') {
+    index++
+    while (isSpaceOrTab(trimmed[index]))
+      index++
+  }
+
+  if (!isAsciiAlpha(trimmed[index]))
+    return false
+
+  index++
+  while (isHtmlNameChar(trimmed[index]))
+    index++
+
+  const boundary = trimmed[index]
+  return boundary == null || isSpaceOrTab(boundary) || boundary === '>' || boundary === '/'
+}
+
+function isReferenceDefinitionBoundaryLine(trimmed: string) {
+  if (trimmed[0] !== '[')
+    return false
+
+  let index = 1
+  while (index < trimmed.length) {
+    const ch = trimmed[index]
+    if (ch === '\\') {
+      index += 2
+      continue
+    }
+    if (ch === ']')
+      break
+    index++
+  }
+
+  if (trimmed[index] !== ']')
+    return false
+
+  index++
+  if (trimmed[index] !== ':')
+    return false
+
+  index++
+  return isSpaceOrTab(trimmed[index]) && hasNonSpaceOrTabAfter(trimmed, index + 1)
+}
+
+function isMarkdownBlockBoundaryLine(trimmed: string) {
+  return isHeadingBoundaryLine(trimmed)
+    || trimmed[0] === '>'
+    || isListBoundaryLine(trimmed)
+    || isFenceBoundaryLine(trimmed)
+    || isContainerBoundaryLine(trimmed)
+    || isHtmlBoundaryLine(trimmed)
 }
 
 function isTolerantBoundaryScanStopLine(line: string) {
@@ -701,11 +917,11 @@ function isTolerantBoundaryScanStopLine(line: string) {
   // `|x| = y` can still be parsed as math.
   if (isLikelyMarkdownTableBoundaryLine(trimmed))
     return true
-  if (/^(?:#{1,6}[\t ]+\S|>{1,}[\t ]*\S|(?:[*+-]|\d+[.)])[\t ]+\S|`{3,}|~{3,}|:{3,}[\t ]*\S|<\s*\/?\s*[A-Za-z][\w:-]*(?:\s|>|\/))/.test(trimmed))
+  if (isMarkdownBlockBoundaryLine(trimmed))
     return true
 
   // Reference/definition-style boundaries are not formula content.
-  if (/^\[[^\]\n]+]:[\t ]+\S/.test(trimmed))
+  if (isReferenceDefinitionBoundaryLine(trimmed))
     return true
 
   return false
