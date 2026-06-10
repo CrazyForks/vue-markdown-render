@@ -295,6 +295,8 @@ function shouldResetTopLevelStreamCacheForFinalAutoParse(md: MarkdownIt, options
     && typeof stream.reset === 'function'
 }
 
+const completedTolerantMathBoundaryResetKeyCache = new WeakMap<object, string | null>()
+
 function shouldResetTopLevelStreamCacheForCompletedTolerantMathBoundary(
   md: MarkdownIt,
   source: string,
@@ -314,16 +316,29 @@ function shouldResetTopLevelStreamCacheForCompletedTolerantMathBoundary(
   // ("$ where ...") without the full opener context and misinterprets the
   // closing $ as a new opener, creating spurious duplicate tokens.
   //
-  // Force a full stream reset on every call where the source contains a
-  // completed tolerant boundary. This is more expensive than letting the
-  // stream extend incrementally, but it is the only way to guarantee a clean
-  // token tree. The number of such calls is bounded by the streaming chunk
-  // window (typically a few dozen).
+  // Reset the stream only when a completed tolerant boundary first appears or
+  // when the completed-boundary set changes (e.g. a second boundary completes).
+  // Repeated parses of the same completed source must stay on the stream cache
+  // path; otherwise this workaround becomes a permanent performance cliff and
+  // hides duplicate-token bugs.
   if (options.final === true || !shouldUseTopLevelStreamParse(md, options))
     return false
 
+  const stream = md.stream
+  if (typeof stream?.reset !== 'function')
+    return false
+
   const key = getCompletedTolerantMathBlockBoundaryCacheKey(source)
-  return key !== null
+  const cacheOwner = md as unknown as object
+  const previousKey = completedTolerantMathBoundaryResetKeyCache.get(cacheOwner) ?? null
+
+  completedTolerantMathBoundaryResetKeyCache.set(cacheOwner, key)
+
+  // Reset only when a completed tolerant boundary first appears or when the
+  // completed-boundary set changes. Repeated parses of the exact same completed
+  // source must stay on the stream cache path; otherwise this workaround becomes
+  // a permanent performance cliff and hides duplicate-token bugs.
+  return key !== null && key !== previousKey
 }
 
 function shouldCloneTopLevelStreamTokens(options: ParseOptions) {

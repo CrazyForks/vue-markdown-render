@@ -679,20 +679,22 @@ const TOLERANT_MATH_BLOCK_BOUNDARY_DELIMITERS = [
 ] as const
 
 export function getCompletedTolerantMathBlockBoundaryCacheKey(markdown: string) {
-  const source = String(markdown ?? '')
-  if (!source || (!source.includes('$') && !source.includes('\\[')))
+  const source = String(markdown ?? "")
+  if (!source || (!source.includes("$") && !source.includes("\\[")))
     return null
 
+  const keys: string[] = []
   const lines = source.split(/\r?\n/)
-  let absoluteLineStart = 0
+  let skipUntilLine = -1
 
   for (let startLine = 0; startLine < lines.length - 1; startLine++) {
-    const line = lines[startLine]
-    const lineWithoutTrailingWs = line.replace(/[\t ]+$/, '')
-    if (!lineWithoutTrailingWs.trim()) {
-      absoluteLineStart += line.length + 1
+    if (startLine <= skipUntilLine)
       continue
-    }
+
+    const line = lines[startLine]
+    const lineWithoutTrailingWs = line.replace(/[\t ]+$/, "")
+    if (!lineWithoutTrailingWs.trim())
+      continue
 
     for (const [open, close] of TOLERANT_MATH_BLOCK_BOUNDARY_DELIMITERS) {
       if (!lineWithoutTrailingWs.endsWith(open))
@@ -708,21 +710,20 @@ export function getCompletedTolerantMathBlockBoundaryCacheKey(markdown: string) 
       if (openIndex > 0 && lineWithoutTrailingWs[openIndex - 1] === open[0])
         continue
 
-      const before = lineWithoutTrailingWs.slice(0, openIndex).replace(/[\t ]+$/, '')
+      const before = lineWithoutTrailingWs.slice(0, openIndex).replace(/[\t ]+$/, "")
       if (!before.trim())
         continue
 
       const codeSpanRanges = buildCodeSpanRanges(lineWithoutTrailingWs)
       const previousOpenCount = countUnescapedDelimiter(lineWithoutTrailingWs, open, 0, openIndex, codeSpanRanges)
-      const previousCloseCount = open === '\u0024\u0024'
+      const previousCloseCount = open === "\u0024\u0024"
         ? 0
         : countUnescapedDelimiter(lineWithoutTrailingWs, close, 0, openIndex, codeSpanRanges)
 
-      if (open === '\u0024\u0024' ? previousOpenCount % 2 === 1 : previousOpenCount > previousCloseCount)
+      if (open === "\u0024\u0024" ? previousOpenCount % 2 === 1 : previousOpenCount > previousCloseCount)
         continue
 
-      let content = ''
-      let closeAbsoluteLineStart = absoluteLineStart + line.length + 1
+      let content = ""
 
       for (
         let currentLineNumber = startLine + 1;
@@ -730,13 +731,13 @@ export function getCompletedTolerantMathBlockBoundaryCacheKey(markdown: string) 
         currentLineNumber++
       ) {
         const currentLine = lines[currentLineNumber]
-        const nextLine = lines[currentLineNumber + 1] ?? ''
+        const nextLine = lines[currentLineNumber + 1] ?? ""
 
         if (shouldAbortTolerantBoundaryScan(currentLine, startLine, currentLineNumber, content, nextLine))
           break
 
         const closeIndex = findUnescapedDelimiter(currentLine, close)
-        const fallbackCloseIndex = open === '\\['
+        const fallbackCloseIndex = open === "\\["
           ? findPlainBracketFallbackClose(currentLine)
           : -1
         const endIndex = closeIndex !== -1 ? closeIndex : fallbackCloseIndex
@@ -745,23 +746,19 @@ export function getCompletedTolerantMathBlockBoundaryCacheKey(markdown: string) 
           const beforeClose = currentLine.slice(0, endIndex)
           const candidateContent = appendTolerantBoundaryContent(content, beforeClose)
           if (isLikelyTolerantExplicitMathBlockContent(candidateContent, true)) {
-            const absoluteOpen = absoluteLineStart + openIndex
-            const absoluteClose = closeAbsoluteLineStart + endIndex
             const contentHash = hashTolerantBoundaryCacheText(candidateContent)
-            return `${open}:${absoluteOpen}:${absoluteClose}:${contentHash}`
+            keys.push(`${open}:${startLine}:${openIndex}:${currentLineNumber}:${endIndex}:${contentHash}`)
+            skipUntilLine = currentLineNumber
           }
           break
         }
 
         content = appendTolerantBoundaryContent(content, currentLine)
-        closeAbsoluteLineStart += currentLine.length + 1
       }
     }
-
-    absoluteLineStart += line.length + 1
   }
 
-  return null
+  return keys.length ? keys.join("|") : null
 }
 
 function hasNonSpaceOrTabAfter(value: string, start: number) {
