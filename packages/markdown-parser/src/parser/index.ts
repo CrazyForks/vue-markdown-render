@@ -3,7 +3,7 @@ import type { HtmlBlockNode, InternalParseOptions, MarkdownToken, ParsedNode, Pa
 import { normalizeCustomHtmlTags } from '../customHtmlTags'
 import { NON_STRUCTURING_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
 import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes, parseTagAttrs } from '../htmlTagUtils'
-import { getCompletedTolerantMathBlockBoundaryCacheKey } from '../plugins/math'
+import { getActiveTolerantMathBlockBoundaryCacheKey } from '../plugins/math'
 import { parseInlineTokens } from './inline-parsers'
 import { createLinkifyDemotionContextTracker } from './linkifyHeuristics'
 import { parseCommonBlockToken } from './node-parsers/block-token-parser'
@@ -304,6 +304,23 @@ const completedTolerantMathBoundaryStreamStateCache = new WeakMap<object, Comple
 
 const TOLERANT_BOUNDARY_STREAM_LOOKBACK_CHARS = 20000
 
+function hasTolerantBoundaryOpenerNearTail(source: string) {
+  const value = String(source ?? '')
+  if (!value || (!value.includes('$') && !value.includes('\\[')))
+    return false
+
+  const tail = value.slice(Math.max(0, value.length - TOLERANT_BOUNDARY_STREAM_LOOKBACK_CHARS))
+  const lines = tail.split(/\r?\n/)
+
+  for (const line of lines) {
+    const trimmed = String(line ?? '').replace(/[\t ]+$/, '')
+    if (trimmed.endsWith('$$') || trimmed.endsWith('\\['))
+      return true
+  }
+
+  return false
+}
+
 function hasUnclosedTolerantBracketBoundaryOpenerNearTail(source: string) {
   const value = String(source ?? '')
   const tail = value.slice(Math.max(0, value.length - TOLERANT_BOUNDARY_STREAM_LOOKBACK_CHARS))
@@ -359,22 +376,25 @@ function syncTopLevelStreamCacheForCompletedTolerantMathBoundary(
   const previous = completedTolerantMathBoundaryStreamStateCache.get(cacheOwner)
 
   if (previous?.source === source && previous?.key !== null) {
-    // Exact same source with an established completed tolerant boundary.
-    // Keep using md.parse so repeated renders stay stable — md.stream.parse
-    // after md.parse can produce different token shapes for these sources.
-    return 'parse'
-  }
-
-  if (
-    previous
-    && source.startsWith(previous.source)
-    && !appendedChunkMayCompleteTolerantMathBoundary(previous.source, source)
-  ) {
-    previous.source = source
     return 'stream'
   }
 
-  const boundaryKey = getCompletedTolerantMathBlockBoundaryCacheKey(source)
+  if (previous && source.startsWith(previous.source)) {
+    const mayChangeBoundary
+      = appendedChunkMayCompleteTolerantMathBoundary(previous.source, source)
+        // If the previous source just ended with a tolerant opener, a later
+        // chunk can make the pending content math-like without containing the
+        // close delimiter yet. In that case we must rescan so we can reset once
+        // and enter predictive loading math_block mode safely.
+        || (previous.key === null && hasTolerantBoundaryOpenerNearTail(previous.source))
+
+    if (!mayChangeBoundary) {
+      previous.source = source
+      return 'stream'
+    }
+  }
+
+  const boundaryKey = getActiveTolerantMathBlockBoundaryCacheKey(source)
   const previousKey = previous?.key ?? null
 
   if (boundaryKey !== null && boundaryKey === previousKey) {
@@ -385,9 +405,9 @@ function syncTopLevelStreamCacheForCompletedTolerantMathBoundary(
     return 'stream'
   }
 
-  // New completed tolerant boundary, changed completed boundary set, or leaving
-  // a completed-boundary document. Invalidate stale incremental tokens once,
-  // then use a full md.parse for this render.
+  // New pending/completed tolerant boundary, changed boundary set, or leaving
+  // a tolerant-boundary document. Invalidate stale incremental tokens once.
+  // The caller will immediately rebuild the token cache with md.stream.parse.
   if (boundaryKey || previousKey)
     stream.reset()
 
@@ -396,9 +416,7 @@ function syncTopLevelStreamCacheForCompletedTolerantMathBoundary(
     source,
   })
 
-  // Use md.parse when a structural rewrite is needed (boundary entered/changed/left).
-  // Otherwise continue with md.stream.parse for normal streaming.
-  return (boundaryKey || previousKey) ? 'parse' : 'stream'
+  return 'stream'
 }
 
 function shouldCloneTopLevelStreamTokens(options: ParseOptions) {
