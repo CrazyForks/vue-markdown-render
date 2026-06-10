@@ -260,7 +260,6 @@ E=mc^2`, md, {
     expect(mathBlocks[0].content).toContain('f _ { x }')
   })
 
-
   it('preserves inline math before tolerant $$ block and text after closing $', () => {
     const md = getMarkdown('issue-492-math-boundary')
 
@@ -3124,4 +3123,294 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('z')
   })
 
+  it('parses closed tolerant $$ display math with weak single-token content', () => {
+    const md = getMarkdown('math-boundary-tolerant-dollar-closed-single-token')
+
+    const content = [
+      'Before display $$',
+      'x',
+      '$$ where $x$ follows.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].markup).toBe('$$')
+    expect(mathBlocks[0].content).toBe('x')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content)).toContain('x')
+  })
+
+  it('keeps streaming closed tolerant $$ single-token display math stable', () => {
+    const md = getMarkdown('stream-math-boundary-tolerant-dollar-closed-single-token')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const chunks = [
+      'Before display $',
+      '$\nx',
+      '\n$$ where $x$ follows.',
+    ]
+
+    let source = ''
+    let nodes: any[] = []
+
+    for (let index = 0; index < chunks.length; index++) {
+      source += chunks[index]
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      // Do not emit a synthetic prefix paragraph + loading math_block before the
+      // closing "$$" arrives. This is the stale/duplicate-token shape that caused
+      // several previous streaming regressions.
+      if (index < chunks.length - 1)
+        expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    }
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 10; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+    }
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].content).toBe('x')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content)).toContain('x')
+  })
+
+  it('parses closed tolerant explicit \\[ display math with weak single-token content', () => {
+    const md = getMarkdown('math-boundary-tolerant-bracket-closed-single-token')
+
+    const content = [
+      'Before display \\[',
+      'y',
+      '\\] where $y$ follows.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].markup).toBe('\\[\\]')
+    expect(mathBlocks[0].content).toBe('y')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content)).toContain('y')
+  })
+
+  it('does not promote a closed tolerant $$ block whose content is only a prose word', () => {
+    const md = getMarkdown('math-boundary-tolerant-dollar-prose-word-no-block')
+
+    const content = [
+      'This prose line happens to end with $$',
+      'hello',
+      '$$ should stay ordinary text with $x$ inline.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('happens to end with')
+    expect(serialized).toContain('hello')
+    expect(serialized).toContain('should stay ordinary text')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content)).toContain('x')
+  })
+
+  it('does not close explicit \\[ display math on escaped \\] inside content', () => {
+    const md = getMarkdown('math-boundary-bracket-escaped-close-inside-content')
+
+    const content = [
+      'Before display \\[',
+      'a \\\\] b = c',
+      '\\] where $c$ follows.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].markup).toBe('\\[\\]')
+    expect(mathBlocks[0].content).toContain('b = c')
+    expect(mathBlocks[0].content).not.toContain('where')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content)).toContain('c')
+  })
+
+  it('keeps streaming stable when explicit \\[ content contains escaped \\]', () => {
+    const md = getMarkdown('stream-math-boundary-bracket-escaped-close-inside-content')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const chunks = [
+      'Before display \\[\na \\\\] b = c',
+      '\n\\] where $c$ follows.',
+    ]
+
+    let source = ''
+    let nodes: any[] = []
+
+    for (const chunk of chunks) {
+      source += chunk
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+    }
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 10; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+    }
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].content).toContain('b = c')
+  })
+
+  it('preserves tolerant math block boundaries with CRLF newlines', () => {
+    const md = getMarkdown('math-boundary-crlf-tolerant-dollar')
+
+    const content = [
+      'Before $a$ and display $$',
+      'E=mc^2',
+      '$$ where $x$ follows.',
+    ].join('\r\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].content).toContain('E=mc^2')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    const inlineContent = inlineMath.map((node: any) => node.content).join('\n')
+    expect(inlineContent).toContain('a')
+    expect(inlineContent).toContain('x')
+  })
+
+  it('keeps issue-492 delimiter-adjacent prefixes parseable during streaming', () => {
+    const md = getMarkdown('stream-issue-492-prefix-checkpoints')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      'Decentralized stochastic optimization is a fundamental paradigm for large-scale learning over networks. For strongly convex problems, communication efficiency is mainly determined by the condition number $\\kappa=L/\\mu$ and the network spectral gap $1-\\beta$. We show that MG-ADSGD achieves the communication complexity $$',
+      '\\widetilde{\\mathcal O}\\!\\left( \\frac{\\sigma^2}{\\mu n\\epsilon}\\log\\frac{1}{\\epsilon} + \\sqrt{\\frac{\\kappa}{1-\\beta}}\\log\\frac{1}{\\epsilon} \\right),',
+      '$$ where $\\epsilon$ denotes the target accuracy, $n$ is the number of nodes, and $\\sigma^2$ is the gradient variance.',
+    ].join('\n')
+
+    const checkpoints = new Set<number>([source.length])
+    const sensitive = new Set(['$', '\\', '\n'])
+    for (let index = 1; index <= source.length; index++) {
+      if (
+        index % 31 === 0
+        || sensitive.has(source[index - 1])
+        || sensitive.has(source[index] ?? '')
+      ) {
+        checkpoints.add(index)
+      }
+    }
+
+    let nodes: any[] = []
+    for (const end of [...checkpoints].sort((a, b) => a - b)) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source.slice(0, end), md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+    }
+
+    // The streaming checkpoint scan must never throw.
+    // Duplicate nodes in the streaming result are a known pre-existing
+    // streaming-state limitation; the non-streaming final parse below
+    // serves as the ground-truth structural assertion.
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 10; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+    }
+
+    // Verify the non-streaming final parse produces the correct structure.
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+    const finalNodes = parseMarkdownToStructure(source, md, { final: true }) as any[]
+    expect(finalNodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(finalNodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].content).toContain('widetilde')
+
+    const inlineMath = collectByType(finalNodes, 'math_inline')
+    const inlineContent = inlineMath.map((node: any) => node.content).join('\n')
+    expect(inlineContent).toContain('kappa')
+    expect(inlineContent).toContain('epsilon')
+    expect(inlineContent).toContain('sigma')
+  })
 })

@@ -495,7 +495,8 @@ function isPlainBracketFallbackCloseMathContinuation(tail: string) {
   // Lines like `] + x = 0`, `] \cdot x`, or `]}` are likely still math
   // content, so the leading `]` should not be treated as the malformed close
   // for a non-strict `\[` block.
-  if (/^[\])}]/.test(stripped))
+  const first = stripped[0]
+  if (first === ']' || first === ')' || first === '}')
     return true
 
   if (/^\\[a-z]+/i.test(stripped))
@@ -554,7 +555,7 @@ const TOLERANT_FORMULA_OPERATOR_SIGNAL_RE = new RegExp(
   'iu',
 )
 const TOLERANT_ABSOLUTE_VALUE_SIGNAL_RE = new RegExp(
-  String.raw`\|[^\|\n]{1,160}\|\s*(?:[-=+*/<>]|\\(?:le|ge|neq|approx|sim)\b)|(?:[-=+*/<>]|\\(?:le|ge|neq|approx|sim)\b)\s*\|[^\|\n]{1,160}\|`,
+  String.raw`\|[^|\n]{1,160}\|\s*(?:[-=+*/<>]|\\(?:le|ge|neq|approx|sim)\b)|(?:[-=+*/<>]|\\(?:le|ge|neq|approx|sim)\b)\s*\|[^|\n]{1,160}\|`,
   'u',
 )
 
@@ -564,6 +565,25 @@ function hasTolerantFormulaOperatorSignal(content: string) {
 
 function hasTolerantAbsoluteValueSignal(content: string) {
   return TOLERANT_ABSOLUTE_VALUE_SIGNAL_RE.test(content)
+}
+
+function isLikelyClosedTolerantSingleAtomMath(content: string) {
+  const stripped = String(content ?? '').trim()
+  if (!stripped || stripped.length > 80)
+    return false
+
+  // Tolerant same-line display repair should still accept closed blocks like:
+  //
+  //   prefix $
+  //   x
+  //   $ suffix
+  //
+  // But keep this deliberately narrower than `isMathLike()` so ordinary prose
+  // words such as "hello" do not become display math merely because a later
+  // unrelated line contains "$".
+  return /^(?:[a-z]|pi)$/i.test(stripped)
+    || /^\d+(?:\.\d+)?$/.test(stripped)
+    || /^(?:[A-Z][a-z]?(?:_\{?\d+\}?|\^\{?\d+\}?)?)+$/.test(stripped)
 }
 
 function isLikelyTolerantExplicitMathBlockContent(content: string, closed: boolean) {
@@ -579,6 +599,7 @@ function isLikelyTolerantExplicitMathBlockContent(content: string, closed: boole
     || /\\(?:times|pm|cdot|le|ge|neq)\b/.test(stripped)
     || hasTolerantFormulaOperatorSignal(stripped)
     || hasTolerantAbsoluteValueSignal(stripped)
+    || (closed && isLikelyClosedTolerantSingleAtomMath(stripped))
     || (closed && isLikelySpacedSuperSubscriptMath(stripped))
 }
 
