@@ -773,35 +773,7 @@ function isLikelySpacedSuperSubscriptMath(content: string) {
   return /(?:^|[^\p{L}\p{N}\\])(?:[A-Z]|\\[A-Z]+)\s*[_^]\s*(?:\{[^{}\n]{1,120}\}|[A-Z0-9\\]+)(?:$|[^\p{L}\p{N}])/iu.test(stripped)
 }
 
-function parseSyntheticInlineChildren(md: MarkdownIt, s: MathBlockState, content: string) {
-  const children: MarkdownToken[] = []
-
-  const inlineParser = (md as unknown as {
-    inline?: {
-      parse?: (
-        src: string,
-        md: MarkdownIt,
-        env: Record<string, unknown>,
-        outTokens: MarkdownToken[],
-      ) => void
-    }
-  }).inline
-
-  if (typeof inlineParser?.parse === 'function') {
-    inlineParser.parse(content, md, s.env ?? {}, children)
-    return children
-  }
-
-  children.push({
-    type: 'text',
-    tag: '',
-    nesting: 0,
-    content,
-  } as MarkdownToken)
-  return children
-}
-
-function pushSyntheticInlineParagraph(s: MathBlockState, md: MarkdownIt, content: string, line: number) {
+function pushSyntheticInlineParagraph(s: MathBlockState, content: string, line: number) {
   const paragraphContent = String(content ?? '')
     .replace(/^[\t ]+/, '')
     .replace(/[\t ]+$/, '')
@@ -814,7 +786,11 @@ function pushSyntheticInlineParagraph(s: MathBlockState, md: MarkdownIt, content
   const inlineToken = s.push('inline', '', 0)
   inlineToken.content = paragraphContent
   inlineToken.map = [line, line + 1]
-  inlineToken.children = parseSyntheticInlineChildren(md, s, paragraphContent)
+  // Do not pre-parse children here. This helper runs during block parsing, and
+  // markdown-it's core inline rule will parse every `inline` token afterwards.
+  // Pre-filling children here makes the core rule append the same inline tokens
+  // again, which duplicates text/math_inline nodes in synthetic paragraphs.
+  inlineToken.children = []
 
   s.push('paragraph_close', 'p', -1)
 }
@@ -1541,7 +1517,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
 
       const trailingAfterClose = lineText.slice(sameLineCloseIndex + sameLineCloseDelim.length)
       if (trailingAfterClose.trim())
-        pushSyntheticInlineParagraph(s, md, trailingAfterClose, startLine)
+        pushSyntheticInlineParagraph(s, trailingAfterClose, startLine)
 
       return true
     }
@@ -1666,13 +1642,12 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     if (tolerantBoundary && !found)
       return false
 
-    // In streaming mode, an unclosed line-start $ or \[ is normally a valid
+    // In streaming mode, an unclosed line-start $$ or \[ is normally a valid
     // math block opener that deserves a loading token. However, plain prose
-    // that happens to start with $ (e.g. "$ should remain ordinary text.")
-    // should not produce a ghost math_block. Apply the same tolerant-content
-    // heuristic used for same-line boundaries so streaming does not emit
-    // loading math_blocks for ordinary text.
-    if (allowLoading && !tolerantBoundary && !found && (openDelim === '$' || openDelim === '\\[')) {
+    // that happens to start with $$ should not produce a ghost math_block.
+    // Apply the same tolerant-content heuristic used for same-line boundaries
+    // so streaming does not emit loading math_blocks for ordinary text.
+    if (allowLoading && !tolerantBoundary && !found && (openDelim === '$$' || openDelim === '\\[')) {
       if (!isLikelyStandaloneLoadingExplicitMathBlockContent(content))
         return false
     }
@@ -1701,7 +1676,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       return true
 
     if (prefixBeforeOpen)
-      pushSyntheticInlineParagraph(s, md, prefixBeforeOpen, startLine)
+      pushSyntheticInlineParagraph(s, prefixBeforeOpen, startLine)
 
     const token = s.push('math_block', 'math', 0)
     token.content = normalizeStandaloneBackslashT(content)
@@ -1715,7 +1690,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     s.line = blockEndLine
 
     if (trailingAfterClose.trim())
-      pushSyntheticInlineParagraph(s, md, trailingAfterClose, trailingAfterCloseLine)
+      pushSyntheticInlineParagraph(s, trailingAfterClose, trailingAfterCloseLine)
 
     return true
   }

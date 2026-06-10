@@ -2856,4 +2856,127 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     const inlineMath = collectByType(nodes, 'math_inline')
     expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('z')
   })
+
+  it('does not duplicate inline math inside synthetic prefix/suffix paragraphs', () => {
+    const md = getMarkdown('math-boundary-no-duplicate-synthetic-inline-children')
+
+    const content = [
+      'Before $a$ and display $$',
+      'E=mc^2',
+      '$$ where $x$ follows.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].content).toContain('E=mc^2')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content)).toEqual(['a', 'x'])
+  })
+
+  it('lets markdown-it core parse synthetic inline paragraphs exactly once', () => {
+    const md = getMarkdown('direct-md-parse-synthetic-inline-once')
+
+    const tokens = md.parse([
+      'Before $a$ and display $$',
+      'E=mc^2',
+      '$$ where $x$ follows.',
+    ].join('\n'), { __markstreamFinal: true }) as any[]
+
+    const inlineTokens = tokens.filter(token => token.type === 'inline')
+    expect(inlineTokens.map(token => token.content)).toEqual([
+      'Before $a$ and display',
+      'where $x$ follows.',
+    ])
+
+    expect(inlineTokens).toHaveLength(2)
+
+    const inlineMathContents = inlineTokens.flatMap((token: any) =>
+      (token.children ?? [])
+        .filter((child: any) => child.type === 'math_inline')
+        .map((child: any) => child.content),
+    )
+
+    expect(inlineMathContents).toEqual(['a', 'x'])
+
+    for (const inlineToken of inlineTokens) {
+      const mathChildren = (inlineToken.children ?? []).filter((child: any) => child.type === 'math_inline')
+      expect(mathChildren).toHaveLength(1)
+    }
+  })
+
+  it('does not emit loading math_block for standalone $$ opener with ordinary prose during streaming', () => {
+    const md = getMarkdown('stream-standalone-dollar-ordinary-prose-no-loading')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      '$$',
+      'this is ordinary prose without a formula signal',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+
+    for (let index = 0; index < 8; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(stableSerialized).toContain('ordinary prose')
+    expect(stableSerialized).toContain('formula signal')
+  })
+
+  it('does not emit loading math_block for standalone explicit \\[ opener with ordinary prose during streaming', () => {
+    const md = getMarkdown('stream-standalone-bracket-ordinary-prose-no-loading')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      '\\[',
+      'this is ordinary prose without a formula signal',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+
+    for (let index = 0; index < 8; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(stableSerialized).toContain('ordinary prose')
+    expect(stableSerialized).toContain('formula signal')
+  })
+
 })
