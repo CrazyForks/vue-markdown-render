@@ -219,6 +219,12 @@ describe('math block same-line boundary regression', () => {
       streamParse: true,
     }) as any[]
 
+    // Completion resets stale cache once, then uses md.parse for the structural
+    // rewrite. Same-source repeated parses continue with md.parse to keep
+    // token shapes stable; appends use md.stream.parse.
+    // Completion resets stale cache once, then uses md.parse for the structural
+    // rewrite. Same-source repeated parses continue with md.parse to keep
+    // token shapes stable; appends use md.stream.parse.
     expect(resetCount).toBe(1)
     expect(streamParseCount).toBe(1)
     expect(nodes.map(node => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
@@ -233,6 +239,149 @@ describe('math block same-line boundary regression', () => {
     expect(streamParseCount).toBe(2)
     expect(nodes.map(node => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
     expect(JSON.stringify(nodes)).toContain('More suffix text')
+  })
+
+  it('keeps completed tolerant boundary on stream parser for repeated parses and plain appends', () => {
+    const md = getMarkdown('stream-math-boundary-repeat-and-plain-append-stays-stream')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    const originalParse = stream.parse.bind(stream)
+    let resetCount = 0
+    let streamParseCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+    stream.parse = (...args: any[]) => {
+      streamParseCount++
+      return originalParse(...args)
+    }
+
+    let source = [
+      'Before display $$',
+      'a = 1',
+      '$$ after $a$.',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    // First parse with a completed tolerant boundary resets once and uses
+    // md.parse for the structural rewrite. Same-source repeated parses
+    // continue with md.parse to keep token shapes stable.
+    expect(resetCount).toBe(1)
+    expect(streamParseCount).toBe(0)
+    expect(nodes.map(node => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 6; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+      expect(resetCount).toBe(1)
+    }
+
+    // Same-source repeated parses use md.parse (not stream) to keep
+    // token shapes stable.
+    expect(streamParseCount).toBe(0)
+
+    // Append plain text — the fast-path skips the full tolerant scan
+    // since the new chunk cannot complete or change a math boundary.
+    source += ' More suffix text.'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(streamParseCount).toBe(1)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+    expect(JSON.stringify(nodes)).toContain('More suffix text')
+  })
+
+  it('resets once when tolerant $$ close delimiter is split across stream chunks', () => {
+    const md = getMarkdown('stream-math-boundary-split-dollar-close')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = [
+      'Before display $$',
+      'a = 1',
+      '$',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(0)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+
+    source += '$ after $a$.'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(nodes.map(node => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('a')
+  })
+
+  it('resets once when tolerant \\] close delimiter is split across stream chunks', () => {
+    const md = getMarkdown('stream-math-boundary-split-bracket-close')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = [
+      'Before display \\[',
+      'x + y = z',
+      '\\',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(0)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+
+    source += '] after $z$.'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(nodes.map(node => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('z')
   })
 
   it('resets stream cache for completed tolerant boundary inside blockquotes when source changes', () => {
