@@ -2578,7 +2578,12 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
         expect(serialized).toBe(stableSerialized)
     }
 
-    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    // In streaming mode, the standalone $$ on the last line is a line-start
+    // display math delimiter and deserves a loading token.
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(true)
+    expect(mathBlocks[0].markup).toBe('$$')
     expect(stableSerialized).toContain('This paragraph happens to end with')
     expect(stableSerialized).toContain('should remain ordinary text')
     expect(stableSerialized).toContain('label')
@@ -2810,7 +2815,12 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
         expect(serialized).toBe(stableSerialized)
     }
 
-    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    // In streaming mode, the standalone $$ on the last line is a line-start
+    // display math delimiter and deserves a loading token.
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(true)
+    expect(mathBlocks[0].markup).toBe('$$')
     expect(stableSerialized).toContain('Text before malformed candidate')
     expect(stableSerialized).toContain('should remain ordinary text')
   })
@@ -2913,14 +2923,14 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     }
   })
 
-  it('does not emit loading math_block for standalone $$ opener with ordinary prose during streaming', () => {
-    const md = getMarkdown('stream-standalone-dollar-ordinary-prose-no-loading')
+  it('still emits loading math_block for standalone $$ opener with weak single-token content during streaming', () => {
+    const md = getMarkdown('stream-standalone-dollar-weak-single-token-loading')
     ;(md as any).stream.reset()
     ;(md as any).stream.resetStats()
 
     const source = [
       '$$',
-      'this is ordinary prose without a formula signal',
+      'x',
     ].join('\n')
 
     let nodes: any[] = []
@@ -2941,19 +2951,58 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
         expect(serialized).toBe(stableSerialized)
     }
 
-    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
-    expect(stableSerialized).toContain('ordinary prose')
-    expect(stableSerialized).toContain('formula signal')
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].markup).toBe('$$')
+    expect(mathBlocks[0].loading).toBe(true)
+    expect(mathBlocks[0].content).toBe('x')
+    expect(stableSerialized).toContain('x')
   })
 
-  it('does not emit loading math_block for standalone explicit \\[ opener with ordinary prose during streaming', () => {
-    const md = getMarkdown('stream-standalone-bracket-ordinary-prose-no-loading')
+  it('still emits loading math_block for standalone explicit \\[ opener with weak single-token content during streaming', () => {
+    const md = getMarkdown('stream-standalone-bracket-weak-single-token-loading')
     ;(md as any).stream.reset()
     ;(md as any).stream.resetStats()
 
     const source = [
       '\\[',
-      'this is ordinary prose without a formula signal',
+      'y',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+
+    for (let index = 0; index < 8; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].markup).toBe('\\[\\]')
+    expect(mathBlocks[0].loading).toBe(true)
+    expect(mathBlocks[0].content).toBe('y')
+    expect(stableSerialized).toContain('y')
+  })
+
+  it('does not emit loading math_block for tolerant same-line $$ opener with weak content before close arrives', () => {
+    const md = getMarkdown('stream-tolerant-dollar-weak-content-waits-for-close')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      'Before display $$',
+      'x',
     ].join('\n')
 
     let nodes: any[] = []
@@ -2975,8 +3024,10 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     }
 
     expect(collectByType(nodes, 'math_block')).toHaveLength(0)
-    expect(stableSerialized).toContain('ordinary prose')
-    expect(stableSerialized).toContain('formula signal')
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0]?.type).toBe('paragraph')
+    expect(nodes[0]?.raw).toContain('Before display')
+    expect(nodes[0]?.raw).toContain('x')
   })
 
   it('does not backtrack on long near-thematic tolerant $ boundary candidates', () => {

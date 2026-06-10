@@ -545,25 +545,25 @@ function findPlainBracketFallbackClose(src: string) {
   return index
 }
 
-function hasTolerantFormulaOperatorSignal(content: string) {
-  const valueAtom = String.raw`(?:[A-Z]|\d+(?:\.\d+)?|\\[a-z]+)`
-  const boundaryBefore = String.raw`(?:^|[^\p{L}\p{N}\\])`
-  const boundaryAfter = String.raw`(?:$|[^\p{L}\p{N}])`
-  const operator = String.raw`(?:[=+*/<>]|-(?!\s*[\p{L}]{2,}\b))`
+const TOLERANT_VALUE_ATOM = String.raw`(?:[A-Z]|\d+(?:\.\d+)?|\\[a-z]+)`
+const TOLERANT_BOUNDARY_BEFORE = String.raw`(?:^|[^\p{L}\p{N}\\])`
+const TOLERANT_BOUNDARY_AFTER = String.raw`(?:$|[^\p{L}\p{N}])`
+const TOLERANT_OPERATOR = String.raw`(?:[=+*/<>]|-(?!\s*[\p{L}]{2,}\b))`
+const TOLERANT_FORMULA_OPERATOR_SIGNAL_RE = new RegExp(
+  String.raw`${TOLERANT_BOUNDARY_BEFORE}${TOLERANT_VALUE_ATOM}\s*${TOLERANT_OPERATOR}\s*${TOLERANT_VALUE_ATOM}${TOLERANT_BOUNDARY_AFTER}`,
+  'iu',
+)
+const TOLERANT_ABSOLUTE_VALUE_SIGNAL_RE = new RegExp(
+  String.raw`\|[^\|\n]{1,160}\|\s*(?:[-=+*/<>]|\\(?:le|ge|neq|approx|sim)\b)|(?:[-=+*/<>]|\\(?:le|ge|neq|approx|sim)\b)\s*\|[^\|\n]{1,160}\|`,
+  'u',
+)
 
-  return new RegExp(
-    String.raw`${boundaryBefore}${valueAtom}\s*${operator}\s*${valueAtom}${boundaryAfter}`,
-    'iu',
-  ).test(content)
+function hasTolerantFormulaOperatorSignal(content: string) {
+  return TOLERANT_FORMULA_OPERATOR_SIGNAL_RE.test(content)
 }
 
 function hasTolerantAbsoluteValueSignal(content: string) {
-  const boundedValue = String.raw`\|[^\|\n]{1,160}\|`
-  const operator = String.raw`(?:[-=+*/<>]|\\(?:le|ge|neq|approx|sim)\b)`
-  return new RegExp(
-    String.raw`${boundedValue}\s*${operator}|${operator}\s*${boundedValue}`,
-    'u',
-  ).test(content)
+  return TOLERANT_ABSOLUTE_VALUE_SIGNAL_RE.test(content)
 }
 
 function isLikelyTolerantExplicitMathBlockContent(content: string, closed: boolean) {
@@ -580,23 +580,6 @@ function isLikelyTolerantExplicitMathBlockContent(content: string, closed: boole
     || hasTolerantFormulaOperatorSignal(stripped)
     || hasTolerantAbsoluteValueSignal(stripped)
     || (closed && isLikelySpacedSuperSubscriptMath(stripped))
-}
-
-function isLikelyStandaloneLoadingExplicitMathBlockContent(content: string) {
-  const stripped = String(content ?? '').trim()
-  if (!stripped)
-    return false
-
-  // Real line-start display delimiters are stronger than tolerant same-line
-  // repair boundaries. During streaming, keep valid weak math shapes such as:
-  //
-  //   $
-  //   f _ { x }
-  //
-  // as loading math_block nodes. Tolerant same-line repair still waits for a
-  // close delimiter before emitting any math_block.
-  return isLikelyTolerantExplicitMathBlockContent(stripped, false)
-    || isLikelySpacedSuperSubscriptMath(stripped)
 }
 
 function isInsideCodeSpanOrUnclosedTail(src: string, index: number) {
@@ -1858,13 +1841,13 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     if (tolerantBoundary && !found)
       return false
 
-    // In streaming mode, an unclosed line-start $$ or \[ is normally a valid
-    // math block opener that deserves a loading token. However, plain prose
-    // that happens to start with $$ should not produce a ghost math_block.
-    // Apply the same tolerant-content heuristic used for same-line boundaries
-    // so streaming does not emit loading math_blocks for ordinary text.
+    // Standalone line-start $$ / \[ is a strong display math delimiter.
+    // Only guard against empty-content ghost math_blocks (e.g. when an
+    // intervening table was consumed by another rule before the math rule
+    // reached the close delimiter). Real math content like "x" or "f _ { x }"
+    // always deserves a loading token during streaming.
     if (allowLoading && !tolerantBoundary && !found && (openDelim === '$$' || openDelim === '\\[')) {
-      if (!isLikelyStandaloneLoadingExplicitMathBlockContent(content))
+      if (!String(content ?? '').trim())
         return false
     }
 
