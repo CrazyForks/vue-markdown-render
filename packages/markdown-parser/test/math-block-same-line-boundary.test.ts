@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getMarkdown, parseMarkdownToStructure } from '../src'
+import { hasClosedTolerantMathBlockBoundaryCandidate } from '../src/plugins/math'
 
 function collectByType(nodes: any, type: string, out: any[] = []) {
   if (!nodes)
@@ -49,8 +50,6 @@ describe('math block same-line boundary regression', () => {
     // boundary first appears. Repeated parses of the same completed source
     // must not keep resetting the stream cache.
     expect(resetCount).toBe(1)
-    const stats = (md as any).stream.stats()
-    expect(stats.total).toBeGreaterThan(0)
 
     const stableSerialized = JSON.stringify(nodes)
     for (let index = 0; index < 10; index++) {
@@ -238,5 +237,96 @@ describe('math block same-line boundary regression', () => {
     const mathBlocks = collectByType(nodes, 'math_block')
     expect(mathBlocks).toHaveLength(1)
     expect(mathBlocks[0].content).toContain('a = 1')
+  })
+
+  it('does not flag completed tolerant boundaries inside protected block syntax', () => {
+    const cases = [
+      [
+        'fenced code',
+        [
+          '```',
+          'literal $',
+          'E=mc^2',
+          '$ where this must stay code',
+          '```',
+        ].join('\n'),
+      ],
+      [
+        'indented code',
+        [
+          '    literal $',
+          '    E=mc^2',
+          '    $ where this must stay code',
+        ].join('\n'),
+      ],
+      [
+        'raw html',
+        [
+          '<pre>',
+          'literal $',
+          'E=mc^2',
+          '$ where this must stay html',
+          '</pre>',
+        ].join('\n'),
+      ],
+      [
+        'tilde fence',
+        [
+          '~~~',
+          'literal \\[',
+          'x + y = z',
+          '\\] where this must stay code',
+          '~~~',
+        ].join('\n'),
+      ],
+    ] as const
+
+    for (const [name, source] of cases)
+      expect(hasClosedTolerantMathBlockBoundaryCandidate(source), name).toBe(false)
+  })
+
+  it('does not reset stream cache for protected math-looking boundary noise', () => {
+    const md = getMarkdown('stream-math-boundary-protected-no-reset')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    const source = [
+      '```',
+      'literal $',
+      'E=mc^2',
+      '$ where this must stay fenced code',
+      '```',
+      '',
+      '    literal $',
+      '    E=mc^2',
+      '    $ where this must stay indented code',
+      '',
+      '<pre>',
+      'literal $',
+      'E=mc^2',
+      '$ where this must stay raw html',
+      '</pre>',
+      '',
+      'Plain $x$ text.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(0)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(collectByType(nodes, 'code_block')).toHaveLength(2)
+    expect(JSON.stringify(nodes)).toContain('where this must stay raw html')
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('x')
   })
 })

@@ -403,9 +403,6 @@ x + y = z
 
     const mathBlocks = collectByType(nodes, 'math_block')
     expect(mathBlocks).toHaveLength(1)
-
-    const stats = (md as any).stream.stats()
-    expect(stats.total).toBeGreaterThan(0)
   })
 
   it('resets top-level stream parser once when a closed tolerant boundary rewrites cached token shape', () => {
@@ -460,8 +457,6 @@ x + y = z
     // appears. Re-parsing the exact same completed source should stay stable
     // without repeated resets.
     expect(resetCount).toBe(1)
-    const stats = (md as any).stream.stats()
-    expect(stats.total).toBeGreaterThan(0)
 
     const stableSerialized = JSON.stringify(nodes)
     for (let index = 0; index < 10; index++) {

@@ -719,6 +719,197 @@ function hashTolerantBoundaryCacheText(value: string) {
   return hash.toString(36)
 }
 
+function isOnlySpaceOrTabFrom(value: string, start = 0) {
+  for (let i = Math.max(0, start); i < value.length; i++) {
+    if (!isSpaceOrTab(value[i]))
+      return false
+  }
+  return true
+}
+
+function isIndentedCodeLineForTolerantBoundary(line: string) {
+  const source = String(line ?? '')
+  if (!source.trim())
+    return false
+
+  let columns = 0
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i]
+    if (ch === ' ') {
+      columns++
+      if (columns >= 4)
+        return true
+      continue
+    }
+    if (ch === '\t')
+      return true
+    break
+  }
+  return false
+}
+
+function parseTolerantBoundaryFenceMarker(line: string) {
+  const source = String(line ?? '')
+  let index = 0
+  let spaces = 0
+
+  while (spaces < 4 && isSpaceOrTab(source[index])) {
+    index++
+    spaces++
+  }
+
+  if (spaces >= 4)
+    return null
+
+  const marker = source[index]
+  if (marker !== '`' && marker !== '~')
+    return null
+
+  let markerLen = 0
+  while (source[index + markerLen] === marker)
+    markerLen++
+
+  if (markerLen < 3)
+    return null
+
+  return {
+    markerChar: marker as '`' | '~',
+    markerLen,
+    rest: source.slice(index + markerLen),
+  }
+}
+
+function parseTolerantBoundaryHtmlOpen(line: string) {
+  const source = String(line ?? '')
+  let index = 0
+  let spaces = 0
+
+  while (spaces < 4 && isSpaceOrTab(source[index])) {
+    index++
+    spaces++
+  }
+
+  if (spaces >= 4 || source[index] !== '<')
+    return null
+
+  index++
+  while (isSpaceOrTab(source[index]))
+    index++
+
+  if (source[index] === '/' || source[index] === '!' || source[index] === '?')
+    return null
+
+  if (!isAsciiAlpha(source[index]))
+    return null
+
+  const nameStart = index
+  index++
+  while (isHtmlNameChar(source[index]))
+    index++
+
+  const tag = source.slice(nameStart, index).toLowerCase()
+  const boundary = source[index]
+  if (boundary && !isSpaceOrTab(boundary) && boundary !== '>' && boundary !== '/')
+    return null
+
+  let tagEnd = index
+  while (tagEnd < source.length && source[tagEnd] !== '>')
+    tagEnd++
+
+  if (tagEnd >= source.length) {
+    return {
+      tag,
+      closed: false,
+    }
+  }
+
+  let beforeClose = tagEnd - 1
+  while (beforeClose >= 0 && isSpaceOrTab(source[beforeClose]))
+    beforeClose--
+
+  const selfClosing = source[beforeClose] === '/'
+  const sameLineClose = hasTolerantBoundaryHtmlClose(source.slice(tagEnd + 1), tag)
+
+  return {
+    tag,
+    closed: selfClosing || sameLineClose,
+  }
+}
+
+function hasTolerantBoundaryHtmlClose(line: string, tag: string) {
+  const lower = String(line ?? '').toLowerCase()
+  const lowerTag = String(tag ?? '').toLowerCase()
+  if (!lower || !lowerTag)
+    return false
+
+  let pos = lower.indexOf('</')
+  while (pos !== -1) {
+    let index = pos + 2
+    while (isSpaceOrTab(lower[index]))
+      index++
+
+    if (lower.slice(index, index + lowerTag.length) === lowerTag) {
+      const boundary = lower[index + lowerTag.length]
+      if (!boundary || isSpaceOrTab(boundary) || boundary === '>')
+        return true
+    }
+
+    pos = lower.indexOf('</', pos + 2)
+  }
+
+  return false
+}
+
+function buildTolerantBoundaryProtectedLineMask(lines: string[]) {
+  const protectedLines = new Array<boolean>(lines.length).fill(false)
+  let fenceMarker: '`' | '~' | '' = ''
+  let fenceLen = 0
+  let htmlTag = ''
+
+  for (let lineNumber = 0; lineNumber < lines.length; lineNumber++) {
+    const line = lines[lineNumber]
+
+    if (htmlTag) {
+      protectedLines[lineNumber] = true
+      if (hasTolerantBoundaryHtmlClose(line, htmlTag))
+        htmlTag = ''
+      continue
+    }
+
+    if (fenceMarker) {
+      protectedLines[lineNumber] = true
+      const fence = parseTolerantBoundaryFenceMarker(line)
+      if (fence && fence.markerChar === fenceMarker && fence.markerLen >= fenceLen && isOnlySpaceOrTabFrom(fence.rest)) {
+        fenceMarker = ''
+        fenceLen = 0
+      }
+      continue
+    }
+
+    if (isIndentedCodeLineForTolerantBoundary(line)) {
+      protectedLines[lineNumber] = true
+      continue
+    }
+
+    const fence = parseTolerantBoundaryFenceMarker(line)
+    if (fence) {
+      protectedLines[lineNumber] = true
+      fenceMarker = fence.markerChar
+      fenceLen = fence.markerLen
+      continue
+    }
+
+    const html = parseTolerantBoundaryHtmlOpen(line)
+    if (html) {
+      protectedLines[lineNumber] = true
+      if (!html.closed)
+        htmlTag = html.tag
+    }
+  }
+
+  return protectedLines
+}
+
 const TOLERANT_MATH_BLOCK_BOUNDARY_DELIMITERS = [
   ['\u0024\u0024', '\u0024\u0024'],
   ['\\[', '\\]'],
@@ -731,10 +922,14 @@ export function getCompletedTolerantMathBlockBoundaryCacheKey(markdown: string) 
 
   const keys: string[] = []
   const lines = source.split(/\r?\n/)
+  const protectedLines = buildTolerantBoundaryProtectedLineMask(lines)
   let skipUntilLine = -1
 
   for (let startLine = 0; startLine < lines.length - 1; startLine++) {
     if (startLine <= skipUntilLine)
+      continue
+
+    if (protectedLines[startLine])
       continue
 
     const line = lines[startLine]
@@ -783,6 +978,9 @@ export function getCompletedTolerantMathBlockBoundaryCacheKey(markdown: string) 
           openingBlockquotePrefix,
         )
         if (!currentScanLine.matched)
+          break
+
+        if (protectedLines[currentLineNumber])
           break
 
         const currentLine = currentScanLine.content

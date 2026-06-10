@@ -3,7 +3,7 @@ import type { HtmlBlockNode, InternalParseOptions, MarkdownToken, ParsedNode, Pa
 import { normalizeCustomHtmlTags } from '../customHtmlTags'
 import { NON_STRUCTURING_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
 import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes, parseTagAttrs } from '../htmlTagUtils'
-import { getCompletedTolerantMathBlockBoundaryCacheKey } from '../plugins/math'
+import { hasClosedTolerantMathBlockBoundaryCandidate } from '../plugins/math'
 import { parseInlineTokens } from './inline-parsers'
 import { createLinkifyDemotionContextTracker } from './linkifyHeuristics'
 import { parseCommonBlockToken } from './node-parsers/block-token-parser'
@@ -295,57 +295,22 @@ function shouldResetTopLevelStreamCacheForFinalAutoParse(md: MarkdownIt, options
     && typeof stream.reset === 'function'
 }
 
-interface CompletedTolerantMathBoundaryResetState {
-  key: string | null
-  source: string
-}
+const completedTolerantMathBoundaryStreamBypassSourceCache = new WeakMap<object, string>()
 
-const completedTolerantMathBoundaryResetKeyCache = new WeakMap<object, CompletedTolerantMathBoundaryResetState>()
-
-function shouldResetTopLevelStreamCacheForCompletedTolerantMathBoundary(
+function resetTopLevelStreamCacheBeforeCompletedTolerantMathBoundaryBypass(
   md: MarkdownIt,
   source: string,
-  options: ParseOptions,
 ) {
-  // The tolerant same-line display-math repair can change an already streamed
-  // paragraph:
-  //
-  //   "prefix $\nE=mc^2"
-  //
-  // into three block tokens after the close arrives:
-  //
-  //   paragraph + math_block + paragraph
-  //
-  // markdown-it-ts's incremental stream append cannot handle this cross-line
-  // block-shape rewrite: its tail-reparse logic re-parses the suffix line
-  // ("$ where ...") without the full opener context and misinterprets the
-  // closing $ as a new opener, creating spurious duplicate tokens.
-  //
-  // Reset when a completed tolerant boundary exists and the source changed
-  // since the previous parse. Re-parsing the exact same completed source can
-  // reuse the cache; appending after an already-completed tolerant boundary
-  // cannot safely reuse the previous incremental cache.
-  if (options.final === true || !shouldUseTopLevelStreamParse(md, options))
-    return false
-
   const stream = md.stream
   if (typeof stream?.reset !== 'function')
-    return false
+    return
 
-  const key = getCompletedTolerantMathBlockBoundaryCacheKey(source)
   const cacheOwner = md as unknown as object
-  const previous = completedTolerantMathBoundaryResetKeyCache.get(cacheOwner) ?? {
-    key: null,
-    source: '',
-  }
+  if (completedTolerantMathBoundaryStreamBypassSourceCache.get(cacheOwner) === source)
+    return
 
-  completedTolerantMathBoundaryResetKeyCache.set(cacheOwner, {
-    key,
-    source,
-  })
-
-  return key !== null
-    && (key !== previous.key || source !== previous.source)
+  stream.reset()
+  completedTolerantMathBoundaryStreamBypassSourceCache.set(cacheOwner, source)
 }
 
 function shouldCloneTopLevelStreamTokens(options: ParseOptions) {
@@ -365,6 +330,20 @@ function parseTopLevelTokens(
   if (!shouldUseTopLevelStreamParse(md, options))
     return md.parse(source, env)
 
+  // A completed tolerant same-line display-math boundary rewrites an already
+  // streamed paragraph into:
+  //
+  //   paragraph + math_block + paragraph
+  //
+  // This is a structural rewrite across line boundaries, and the incremental
+  // stream parser cannot safely tail-reparse it. Do not feed this source to
+  // md.stream.parse at all; use a stateless markdown-it parse for this render.
+  if (hasClosedTolerantMathBlockBoundaryCandidate(source)) {
+    resetTopLevelStreamCacheBeforeCompletedTolerantMathBoundaryBypass(md, source)
+    return md.parse(source, env)
+  }
+
+  completedTolerantMathBoundaryStreamBypassSourceCache.delete(md as unknown as object)
   const tokens = md.stream!.parse!(source, getStableStreamEnv(md, env))
   if (!shouldCloneTopLevelStreamTokens(options))
     return tokens
@@ -2209,9 +2188,6 @@ export function parseMarkdownToStructure(
   let safeMarkdown = (markdown ?? '').toString().replace(/([^\\])\r(ight|ho)/g, '$1\\r$2').replace(/([^\\])\n(abla|eq|ot|exists)/g, '$1\\n$2')
 
   if (shouldResetTopLevelStreamCacheForFinalAutoParse(md, options)) {
-    md.stream!.reset!()
-  }
-  else if (shouldResetTopLevelStreamCacheForCompletedTolerantMathBoundary(md, safeMarkdown, options)) {
     md.stream!.reset!()
   }
 
