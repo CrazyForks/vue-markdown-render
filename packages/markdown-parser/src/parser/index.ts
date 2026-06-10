@@ -3,6 +3,7 @@ import type { HtmlBlockNode, InternalParseOptions, MarkdownToken, ParsedNode, Pa
 import { normalizeCustomHtmlTags } from '../customHtmlTags'
 import { NON_STRUCTURING_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
 import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes, parseTagAttrs } from '../htmlTagUtils'
+import { getCompletedTolerantMathBlockBoundaryCacheKey } from '../plugins/math'
 import { parseInlineTokens } from './inline-parsers'
 import { createLinkifyDemotionContextTracker } from './linkifyHeuristics'
 import { parseCommonBlockToken } from './node-parsers/block-token-parser'
@@ -21,6 +22,7 @@ type ParsedNodeWithFields = ParsedNode & {
 }
 
 const streamParseEnvCache = new WeakMap<object, Map<string, Record<string, unknown>>>()
+const streamTolerantMathBoundaryResetCache = new WeakMap<object, string>()
 
 interface ParseTimingMetrics {
   tokenCloneMs?: number
@@ -292,6 +294,37 @@ function shouldResetTopLevelStreamCacheForFinalAutoParse(md: MarkdownIt, options
     && internalOptions.__disableStreamParse !== true
     && stream?.enabled === true
     && typeof stream.reset === 'function'
+}
+
+function shouldResetTopLevelStreamCacheForCompletedTolerantMathBoundary(
+  md: MarkdownIt,
+  source: string,
+  options: ParseOptions,
+) {
+  // The tolerant same-line display-math repair can change an already streamed
+  // paragraph:
+  //
+  //   "prefix $\nE=mc^2"
+  //
+  // into three block tokens after the close arrives:
+  //
+  //   paragraph + math_block + paragraph
+  //
+  // markdown-it-ts's incremental stream append cannot handle this cross-line
+  // block-shape rewrite: its tail-reparse logic re-parses the suffix line
+  // ("$ where ...") without the full opener context and misinterprets the
+  // closing $ as a new opener, creating spurious duplicate tokens.
+  //
+  // Force a full stream reset on every call where the source contains a
+  // completed tolerant boundary. This is more expensive than letting the
+  // stream extend incrementally, but it is the only way to guarantee a clean
+  // token tree. The number of such calls is bounded by the streaming chunk
+  // window (typically a few dozen).
+  if (options.final === true || !shouldUseTopLevelStreamParse(md, options))
+    return false
+
+  const key = getCompletedTolerantMathBlockBoundaryCacheKey(source)
+  return !!key
 }
 
 function shouldCloneTopLevelStreamTokens(options: ParseOptions) {
@@ -2154,8 +2187,13 @@ export function parseMarkdownToStructure(
   // todo: 下面的特殊 math 其实应该更精确匹配到() 或者 $$ $$ 或者 \[ \] 内部的内容
   let safeMarkdown = (markdown ?? '').toString().replace(/([^\\])\r(ight|ho)/g, '$1\\r$2').replace(/([^\\])\n(abla|eq|ot|exists)/g, '$1\\n$2')
 
-  if (shouldResetTopLevelStreamCacheForFinalAutoParse(md, options))
+  if (shouldResetTopLevelStreamCacheForFinalAutoParse(md, options)) {
     md.stream!.reset!()
+    streamTolerantMathBoundaryResetCache.delete(md as unknown as object)
+  }
+  else if (shouldResetTopLevelStreamCacheForCompletedTolerantMathBoundary(md, safeMarkdown, options)) {
+    md.stream!.reset!()
+  }
 
   if (!isFinal) {
     if (safeMarkdown.endsWith('- *')) {

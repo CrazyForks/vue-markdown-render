@@ -3380,10 +3380,17 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
       }).not.toThrow()
     }
 
-    // The streaming checkpoint scan must never throw.
-    // Duplicate nodes in the streaming result are a known pre-existing
-    // streaming-state limitation; the non-streaming final parse below
-    // serves as the ground-truth structural assertion.
+    // The streaming checkpoint scan must not leave stale paragraph tokens from
+    // the pre-close state. This is the important invariant for issue #492:
+    // once the close delimiter arrives, the stream result must be the same
+    // block shape as the final parse.
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+
     const stableSerialized = JSON.stringify(nodes)
     for (let index = 0; index < 10; index++) {
       nodes = parseMarkdownToStructure(source, md, {
@@ -3412,5 +3419,134 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     expect(inlineContent).toContain('kappa')
     expect(inlineContent).toContain('epsilon')
     expect(inlineContent).toContain('sigma')
+  })
+
+  it('does not close tolerant $ on a markdown table header row before delimiter', () => {
+    const md = getMarkdown('math-boundary-dollar-no-close-on-table-header')
+
+    const content = [
+      'Text before malformed candidate $',
+      'x + y = z',
+      'Name $ | Value',
+      '--- | ---',
+      '$x$ | value',
+      'after $z$ remains inline.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+    const serialized = JSON.stringify(nodes)
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(serialized).toContain('Text before malformed candidate')
+    expect(serialized).toContain('x + y = z')
+    expect(serialized).toContain('Name')
+    expect(serialized).toContain('Value')
+    expect(serialized).toContain('after')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('z')
+  })
+
+  it('keeps streaming stable when tolerant $ reaches a markdown table header row before delimiter', () => {
+    const md = getMarkdown('stream-math-boundary-dollar-no-close-on-table-header')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      'Text before malformed candidate $',
+      'x + y = z',
+      'Name $ | Value',
+      '--- | ---',
+      '$x$ | value',
+      'after $z$ remains inline.',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+
+    for (let index = 0; index < 8; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(stableSerialized).toContain('Text before malformed candidate')
+    expect(stableSerialized).toContain('Name')
+    expect(stableSerialized).toContain('Value')
+    expect(stableSerialized).toContain('after')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('z')
+  })
+
+  it('does not close tolerant $ on a reference definition without whitespace after colon', () => {
+    const md = getMarkdown('math-boundary-dollar-no-close-on-reference-definition-no-space')
+
+    const content = [
+      'Text before malformed candidate $',
+      'x + y = z',
+      '[math-ref]:https://example.com/$-literal',
+      'after $z$ remains inline.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+    const serialized = JSON.stringify(nodes)
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(serialized).toContain('Text before malformed candidate')
+    expect(serialized).toContain('x + y = z')
+    expect(serialized).toContain('after')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('z')
+  })
+
+  it('keeps streaming stable when tolerant $ reaches a no-space reference definition', () => {
+    const md = getMarkdown('stream-math-boundary-dollar-no-close-on-reference-definition-no-space')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      'Text before malformed candidate $',
+      'x + y = z',
+      '[math-ref]:https://example.com/$-literal',
+      'after $z$ remains inline.',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+
+    for (let index = 0; index < 8; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(stableSerialized).toContain('Text before malformed candidate')
+    expect(stableSerialized).toContain('x + y = z')
+    expect(stableSerialized).toContain('after')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('z')
   })
 })
