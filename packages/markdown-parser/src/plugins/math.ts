@@ -633,6 +633,8 @@ function isThematicOrSetextBoundaryLine(trimmed: string) {
   return /^(?:(?:-[\t ]*){3,}|(?:\*[\t ]*){3,}|(?:_[\t ]*){3,}|={3,})$/.test(trimmed)
 }
 
+const MARKDOWN_TABLE_DELIMITER_ROW_RE = /^\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)*\|?$/
+
 function isLikelyMarkdownTableBoundaryLine(trimmed: string) {
   // Markdown table delimiter rows may omit leading/trailing pipes:
   //
@@ -640,42 +642,22 @@ function isLikelyMarkdownTableBoundaryLine(trimmed: string) {
   //   --- | ---
   //
   // If a tolerant math opener appears before such a table, scanning must abort
-  // on the separator row instead of treating the table as formula content.
-  if (/^\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?$/.test(trimmed))
-    return true
-
-  if (!trimmed.startsWith('|'))
-    return false
-
-  // Keep this narrower than "contains pipes".
-  // A valid display formula may start with absolute values, e.g.
+  // on the delimiter row instead of treating the table as formula content.
+  //
+  // Important: do NOT treat normal pipe-containing data rows as hard scan
+  // boundaries here. A valid display formula may start with absolute values,
+  // including spaced absolute values, e.g.
   //
   //   |x| = y
+  //   | x | = y
   //
-  // That must not abort tolerant math-boundary scanning. But markdown table
-  // rows do not always need a trailing pipe, e.g.:
+  // The previous implementation treated many pipe data rows as table
+  // boundaries, which made tolerant display math under-recognize valid absolute
+  // value expressions. Real markdown tables are still guarded by their delimiter
+  // rows:
   //
-  //   | x + y = z | label
-  //   | --- | ---
-  const pipeCount = (trimmed.match(/\|/g) ?? []).length
-  if (pipeCount < 2)
-    return false
-
-  if (pipeCount >= 3)
-    return true
-
-  if (/^\|[\t ]+/.test(trimmed))
-    return true
-
-  if (/[\t ]+\|(?:[\t ]+\S|\S)/.test(trimmed))
-    return true
-
-  if (/\|[\t ]*$/.test(trimmed)) {
-    const inner = trimmed.replace(/^\|/, '').replace(/\|[\t ]*$/, '')
-    return /^[\t :|-]+$/.test(inner) || /[\t ]+\|[\t ]*$/.test(trimmed)
-  }
-
-  return false
+  //   --- | ---
+  return MARKDOWN_TABLE_DELIMITER_ROW_RE.test(String(trimmed ?? '').trim())
 }
 
 function isTolerantBoundaryScanStopLine(line: string) {
@@ -1653,6 +1635,17 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     // the source of stale/duplicated paragraph triples in streaming mode.
     if (tolerantBoundary && !found)
       return false
+
+    // In streaming mode, an unclosed line-start $ or \[ is normally a valid
+    // math block opener that deserves a loading token. However, plain prose
+    // that happens to start with $ (e.g. "$ should remain ordinary text.")
+    // should not produce a ghost math_block. Apply the same tolerant-content
+    // heuristic used for same-line boundaries so streaming does not emit
+    // loading math_blocks for ordinary text.
+    if (allowLoading && !tolerantBoundary && !found && (openDelim === '$$' || openDelim === '\\[')) {
+      if (!isLikelyTolerantExplicitMathBlockContent(content, found))
+        return false
+    }
 
     // 追加检测内容是否是 math
     // For explicit $$ delimiters, skip the isMathLike check since $$ is already

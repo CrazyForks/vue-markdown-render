@@ -2257,6 +2257,85 @@ E=mc^2`, { __markstreamFinal: false }) as any[]
     expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('y')
   })
 
+  it('parses tolerant $$ display math whose first content line uses spaced absolute-value pipes', () => {
+    const md = getMarkdown('math-boundary-dollar-spaced-absolute-value-first-line')
+
+    const content = [
+      'Before absolute value display $$',
+      '| x | = y',
+      '$$ where $y$ follows.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].markup).toBe('$$')
+    expect(mathBlocks[0].content).toContain('| x | = y')
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('Before absolute value display')
+    expect(serialized).toContain('where')
+    expect(serialized).toContain('follows')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('y')
+  })
+
+  it('keeps streaming stable for tolerant $$ spaced absolute-value display math', () => {
+    const md = getMarkdown('stream-math-boundary-dollar-spaced-absolute-value-first-line')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const chunks = [
+      'Before absolute value display $',
+      '$\n| x | = y',
+      '\n$$ where $y$ follows.',
+    ]
+
+    let source = ''
+    let nodes: any[] = []
+
+    for (const chunk of chunks) {
+      source += chunk
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+    }
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 10; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+    }
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].markup).toBe('$$')
+    expect(mathBlocks[0].content).toContain('| x | = y')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('y')
+  })
+
   it('keeps streaming stable for tolerant $$ absolute-value display math', () => {
     const md = getMarkdown('stream-math-boundary-dollar-absolute-value-first-line')
     ;(md as any).stream.reset()
@@ -2429,15 +2508,15 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
         expect(serialized).toBe(stableSerialized)
     }
 
-    // Note: streaming path may not detect table rows as scan boundaries;
-    // the stable-serialized check above already validates consistent behaviour.
-    // Verify final parse is correct.
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(stableSerialized).toContain('This paragraph happens to end with')
+    expect(stableSerialized).toContain('should remain ordinary text')
+    expect(stableSerialized).toContain('label')
+    expect(stableSerialized).toContain('value')
+
     const finalNodes = parseMarkdownToStructure(source, md, { final: true }) as any[]
     expect(collectByType(finalNodes, 'math_block')).toHaveLength(0)
     expect(collectByType(finalNodes, 'table')).toHaveLength(1)
-    const finalSerialized = JSON.stringify(finalNodes)
-    expect(finalSerialized).toContain('This paragraph happens to end with')
-    expect(finalSerialized).toContain('should remain ordinary text')
   })
 
   it('still parses tolerant $$ absolute-value math and does not confuse it with a table', () => {
@@ -2607,6 +2686,62 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     expect(stableSerialized).toContain('Text before malformed candidate')
     expect(stableSerialized).toContain('E=mc')
     expect(stableSerialized).toContain('F=ma')
+    expect(stableSerialized).toContain('should remain ordinary text')
+  })
+
+  it('does not let tolerant $$ scan cross a one-column markdown table delimiter row', () => {
+    const md = getMarkdown('math-boundary-dollar-no-cross-one-column-table-delimiter')
+
+    const content = [
+      'Text before malformed candidate $$',
+      '| value |',
+      '| --- |',
+      '| $x$ |',
+      '$$ should remain ordinary text with $z$ inline.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+    const serialized = JSON.stringify(nodes)
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(collectByType(nodes, 'table')).toHaveLength(1)
+    expect(serialized).toContain('Text before malformed candidate')
+    expect(serialized).toContain('should remain ordinary text')
+  })
+
+  it('keeps streaming stable when tolerant $$ reaches a one-column markdown table delimiter row', () => {
+    const md = getMarkdown('stream-math-boundary-dollar-no-cross-one-column-table-delimiter')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      'Text before malformed candidate $$',
+      '| value |',
+      '| --- |',
+      '| $x$ |',
+      '$$ should remain ordinary text with $z$ inline.',
+    ].join('\n')
+
+    let stableSerialized = ''
+    let nodes: any[] = []
+
+    for (let index = 0; index < 8; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(stableSerialized).toContain('Text before malformed candidate')
     expect(stableSerialized).toContain('should remain ordinary text')
   })
 
