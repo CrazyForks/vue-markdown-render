@@ -2225,4 +2225,103 @@ E=mc^2`, { __markstreamFinal: false }) as any[]
     const inlineMath = collectByType(nodes, 'math_inline')
     expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('z')
   })
+
+  it('parses tolerant $$ display math whose first content line starts with absolute-value pipes', () => {
+    const md = getMarkdown('math-boundary-dollar-absolute-value-first-line')
+
+    const content = [
+      'Before absolute value display $$',
+      '|x| = y',
+      '$$ where $y$ follows.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].markup).toBe('$$')
+    expect(mathBlocks[0].content).toContain('|x| = y')
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('Before absolute value display')
+    expect(serialized).toContain('where')
+    expect(serialized).toContain('follows')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('y')
+  })
+
+  it('keeps streaming stable for tolerant $$ absolute-value display math', () => {
+    const md = getMarkdown('stream-math-boundary-dollar-absolute-value-first-line')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const chunks = [
+      'Before absolute value display $',
+      '$\n|x| = y',
+      '\n$$ where $y$ follows.',
+    ]
+
+    let source = ''
+    let nodes: any[] = []
+
+    for (const chunk of chunks) {
+      source += chunk
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+    }
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 10; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+    }
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].content).toContain('|x| = y')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content).join('\n')).toContain('y')
+  })
+
+  it('still treats real one-column markdown table rows as tolerant-scan boundaries', () => {
+    const md = getMarkdown('math-boundary-dollar-one-column-table-stop')
+
+    const content = [
+      'This paragraph happens to end with $$',
+      '| value |',
+      '| --- |',
+      '| $x$ |',
+      '$$ should remain ordinary text.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(content, md, { final: true }) as any[]
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(collectByType(nodes, 'table')).toHaveLength(1)
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('happens to end with')
+    expect(serialized).toContain('should remain ordinary text')
+  })
 })

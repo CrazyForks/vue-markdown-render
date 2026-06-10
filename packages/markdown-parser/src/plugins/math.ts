@@ -549,6 +549,15 @@ function hasTolerantFormulaOperatorSignal(content: string) {
   return /(?:^|[^\p{L}\p{N}\\])(?:[A-Z]|\d+(?:\.\d+)?|\\[a-z]+)\s*(?:[=+*/<>]|-(?!\s*[\p{L}]{2,}\b))\s*(?:[A-Z]|\d+(?:\.\d+)?|\\[a-z]+)(?:$|[^\p{L}\p{N}])/iu.test(content)
 }
 
+function hasTolerantAbsoluteValueSignal(content: string) {
+  const boundedValue = String.raw`\|[^\|\n]{1,160}\|`
+  const operator = String.raw`(?:[-=+*/<>]|\\(?:le|ge|neq|approx|sim)\b)`
+  return new RegExp(
+    String.raw`${boundedValue}\s*${operator}|${operator}\s*${boundedValue}`,
+    'u',
+  ).test(content)
+}
+
 function isLikelyTolerantExplicitMathBlockContent(content: string, closed: boolean) {
   const stripped = String(content ?? '').trim()
   if (!stripped)
@@ -561,6 +570,7 @@ function isLikelyTolerantExplicitMathBlockContent(content: string, closed: boole
     || /[A-Za-z0-9\\][_^](?:[A-Za-z0-9\\]|\{)/.test(stripped)
     || /\\(?:times|pm|cdot|le|ge|neq)\b/.test(stripped)
     || hasTolerantFormulaOperatorSignal(stripped)
+    || hasTolerantAbsoluteValueSignal(stripped)
     || (closed && isLikelySpacedSuperSubscriptMath(stripped))
 }
 
@@ -615,6 +625,29 @@ function isInsideCodeSpanOrUnclosedTail(src: string, index: number) {
 const MAX_TOLERANT_BOUNDARY_LINES = 80
 const MAX_TOLERANT_BOUNDARY_CHARS = 20000
 
+function isLikelyMarkdownTableBoundaryLine(trimmed: string) {
+  if (!trimmed.startsWith('|'))
+    return false
+
+  // Keep this intentionally narrower than "contains pipes".
+  // A valid display formula may start with absolute values, e.g.
+  //
+  //   |x| = y
+  //
+  // That must not abort tolerant math-boundary scanning. Real markdown table
+  // rows usually keep the trailing pipe, contain an inner cell separator, or are
+  // separator rows like `| --- |`.
+  if (!/\|[\t ]*$/.test(trimmed))
+    return false
+
+  const pipeCount = (trimmed.match(/\|/g) ?? []).length
+  if (pipeCount >= 3)
+    return true
+
+  const inner = trimmed.replace(/^\|/, '').replace(/\|[\t ]*$/, '')
+  return /^[\t :|-]+$/.test(inner) || /^\|[\t ]+/.test(trimmed) || /[\t ]+\|[\t ]*$/.test(trimmed)
+}
+
 function isTolerantBoundaryScanStopLine(line: string) {
   const trimmed = String(line ?? '').trimStart()
 
@@ -624,8 +657,11 @@ function isTolerantBoundaryScanStopLine(line: string) {
   // Tolerant same-line math boundaries are an LLM-output repair path, not a
   // general block parser. Do not scan across obvious markdown block boundaries;
   // otherwise ordinary paragraphs ending with "$" can accidentally consume a
-  // later unrelated "$".
-  if (/^(?:#{1,6}[\t ]+\S|>{1,}[\t ]*\S|(?:[*+-]|\d+[.)])[\t ]+\S|`{3,}|~{3,}|\|[^|\n]*\||:{3,}[\t ]*\S|<\s*[A-Za-z][\w:-]*(?:\s|>|\/))/.test(trimmed))
+  // later unrelated "$". Keep pipe/table detection separate so formulas like
+  // `|x| = y` can still be parsed as math.
+  if (isLikelyMarkdownTableBoundaryLine(trimmed))
+    return true
+  if (/^(?:#{1,6}[\t ]+\S|>{1,}[\t ]*\S|(?:[*+-]|\d+[.)])[\t ]+\S|`{3,}|~{3,}|:{3,}[\t ]*\S|<\s*[A-Za-z][\w:-]*(?:\s|>|\/))/.test(trimmed))
     return true
 
   // Reference/definition-style boundaries are not formula content.
