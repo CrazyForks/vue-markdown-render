@@ -305,6 +305,8 @@ interface ActiveTolerantMathBoundaryStreamState {
 
 const activeTolerantMathBoundaryStreamStateCache = new WeakMap<object, ActiveTolerantMathBoundaryStreamState>()
 
+const TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META = '__markstreamTolerantBoundarySyntheticParagraph'
+
 const TOLERANT_BOUNDARY_STREAM_LOOKBACK_CHARS = 20000
 
 function isSimpleThematicOrSetextLine(line: string) {
@@ -611,6 +613,14 @@ function sameParagraphTokenTriplet(tokens: Token[], leftIndex: number, rightInde
     && String(tokens[leftIndex + 1]?.content ?? '') === String(tokens[rightIndex + 1]?.content ?? '')
 }
 
+function isSyntheticTolerantBoundaryParagraphTriplet(tokens: Token[], index: number) {
+  if (!isParagraphTokenTriplet(tokens, index))
+    return false
+
+  return !!tokens[index]?.meta?.[TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META]
+    || !!tokens[index + 1]?.meta?.[TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META]
+}
+
 function compactDuplicatePendingTolerantMathPrefixTokens(tokens: Token[]) {
   let compacted = tokens
 
@@ -621,7 +631,12 @@ function compactDuplicatePendingTolerantMathPrefixTokens(tokens: Token[]) {
 
     let rightIndex = mathIndex - 3
     let leftIndex = rightIndex - 3
-    while (leftIndex >= 0 && sameParagraphTokenTriplet(compacted, leftIndex, rightIndex)) {
+    while (
+      leftIndex >= 0
+      && sameParagraphTokenTriplet(compacted, leftIndex, rightIndex)
+      && isSyntheticTolerantBoundaryParagraphTriplet(compacted, leftIndex)
+      && isSyntheticTolerantBoundaryParagraphTriplet(compacted, rightIndex)
+    ) {
       // The stream parser keeps private indexes into its token cache.
       if (compacted === tokens)
         compacted = tokens.slice()

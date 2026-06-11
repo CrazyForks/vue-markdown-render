@@ -26,6 +26,8 @@ interface MathBlockState {
 
 type TolerantMathToken = MarkdownToken & { tolerantBoundary?: boolean }
 
+const TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META = '__markstreamTolerantBoundarySyntheticParagraph'
+
 // Heuristic to decide whether a piece of text is likely math.
 // Matches common TeX commands, math operators, function-call patterns like f(x),
 // superscripts/subscripts, and common math words.
@@ -1578,6 +1580,17 @@ function isLikelyPlaceholderDollar(content: string) {
   return /^(?:\.{3,}|…+)$/.test(stripped)
 }
 
+function markSyntheticTolerantBoundaryParagraphToken(token: MarkdownToken) {
+  const previousMeta = token.meta && typeof token.meta === 'object'
+    ? token.meta
+    : {}
+
+  token.meta = {
+    ...previousMeta,
+    [TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META]: true,
+  }
+}
+
 function pushSyntheticInlineParagraph(s: MathBlockState, content: string, line: number) {
   const paragraphContent = String(content ?? '')
     .replace(/^[\t ]+/, '')
@@ -1587,17 +1600,20 @@ function pushSyntheticInlineParagraph(s: MathBlockState, content: string, line: 
 
   const paragraphOpen = s.push('paragraph_open', 'p', 1)
   paragraphOpen.map = [line, line + 1]
+  markSyntheticTolerantBoundaryParagraphToken(paragraphOpen)
 
   const inlineToken = s.push('inline', '', 0)
   inlineToken.content = paragraphContent
   inlineToken.map = [line, line + 1]
+  markSyntheticTolerantBoundaryParagraphToken(inlineToken)
   // Do not pre-parse children here. This helper runs during block parsing, and
   // markdown-it's core inline rule will parse every `inline` token afterwards.
   // Pre-filling children here makes the core rule append the same inline tokens
   // again, which duplicates text/math_inline nodes in synthetic paragraphs.
   inlineToken.children = []
 
-  s.push('paragraph_close', 'p', -1)
+  const paragraphClose = s.push('paragraph_close', 'p', -1)
+  markSyntheticTolerantBoundaryParagraphToken(paragraphClose)
 }
 
 export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {

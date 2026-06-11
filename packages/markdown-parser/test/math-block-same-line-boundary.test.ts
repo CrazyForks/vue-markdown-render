@@ -1079,4 +1079,150 @@ describe('math block same-line boundary regression', () => {
     expect(mathBlocks[0].content).not.toContain('where')
     expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('a')
   })
+
+  it('compacts only synthetic duplicate tolerant-boundary prefix paragraphs', () => {
+    const md = getMarkdown('pkg-stream-compact-synthetic-tolerant-prefix-only')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const syntheticMeta = {
+      __markstreamTolerantBoundarySyntheticParagraph: true,
+    }
+
+    const makeParagraphTriplet = () => [
+      {
+        type: 'paragraph_open',
+        tag: 'p',
+        nesting: 1,
+        map: [0, 1],
+        meta: syntheticMeta,
+      },
+      {
+        type: 'inline',
+        tag: '',
+        nesting: 0,
+        content: 'Before display',
+        map: [0, 1],
+        children: [
+          {
+            type: 'text',
+            tag: '',
+            nesting: 0,
+            content: 'Before display',
+          },
+        ],
+        meta: syntheticMeta,
+      },
+      {
+        type: 'paragraph_close',
+        tag: 'p',
+        nesting: -1,
+        map: [0, 1],
+        meta: syntheticMeta,
+      },
+    ]
+
+    const loadingMath = {
+      type: 'math_block',
+      tag: 'math',
+      nesting: 0,
+      content: 'a = 1',
+      markup: '$$',
+      raw: '$$a = 1$$',
+      map: [0, 2],
+      block: true,
+      loading: true,
+      tolerantBoundary: true,
+    }
+
+    ;(md as any).stream.parse = () => [
+      ...makeParagraphTriplet(),
+      ...makeParagraphTriplet(),
+      loadingMath,
+    ]
+
+    const nodes = parseMarkdownToStructure('placeholder', md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(nodes.map((node: any) => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+    ])
+    expect(nodes.filter((node: any) => node.type === 'paragraph')).toHaveLength(1)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+  })
+
+  it('does not compact unmarked duplicate paragraph triples before tolerant loading math', () => {
+    const md = getMarkdown('pkg-stream-do-not-compact-unmarked-duplicate-paragraphs')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const makeParagraphTriplet = () => [
+      {
+        type: 'paragraph_open',
+        tag: 'p',
+        nesting: 1,
+        map: [0, 1],
+      },
+      {
+        type: 'inline',
+        tag: '',
+        nesting: 0,
+        content: 'repeat',
+        map: [0, 1],
+        children: [
+          {
+            type: 'text',
+            tag: '',
+            nesting: 0,
+            content: 'repeat',
+          },
+        ],
+      },
+      {
+        type: 'paragraph_close',
+        tag: 'p',
+        nesting: -1,
+        map: [0, 1],
+      },
+    ]
+
+    const loadingMath = {
+      type: 'math_block',
+      tag: 'math',
+      nesting: 0,
+      content: 'a = 1',
+      markup: '$$',
+      raw: '$$a = 1$$',
+      map: [0, 2],
+      block: true,
+      loading: true,
+      tolerantBoundary: true,
+    }
+
+    ;(md as any).stream.parse = () => [
+      ...makeParagraphTriplet(),
+      ...makeParagraphTriplet(),
+      loadingMath,
+    ]
+
+    const nodes = parseMarkdownToStructure('placeholder', md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(nodes.map((node: any) => node.type)).toEqual([
+      'paragraph',
+      'paragraph',
+      'math_block',
+    ])
+    expect(nodes.filter((node: any) => node.type === 'paragraph')).toHaveLength(2)
+    expect(nodes.filter((node: any) => node.type === 'paragraph').map((node: any) => node.raw)).toEqual([
+      'repeat',
+      'repeat',
+    ])
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+  })
 })
