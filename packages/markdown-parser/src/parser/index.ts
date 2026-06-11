@@ -5,6 +5,7 @@ import { NON_STRUCTURING_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '.
 import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes, parseTagAttrs } from '../htmlTagUtils'
 import {
   getActiveTolerantMathBlockBoundaryCacheKey,
+  hasMarkstreamMathPlugin,
   mayContainPendingTolerantMathBlockBoundaryCandidate,
   TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META,
 } from '../plugins/math'
@@ -796,13 +797,26 @@ function parseTopLevelTokens(
   // Key transitions (new pending, pending→closed, closed→none) invalidate stale
   // stream tokens once. We then rebuild from the full current source through
   // md.stream.parse so the incremental cache remains hot.
-  const mode = syncTopLevelStreamCacheForActiveTolerantMathBoundary(md, source)
-  if (mode === 'parse')
-    return md.parse(source, env)
+  const useTolerantMathBoundarySync = hasMarkstreamMathPlugin(md)
+  if (useTolerantMathBoundarySync) {
+    const mode = syncTopLevelStreamCacheForActiveTolerantMathBoundary(md, source)
+    if (mode === 'parse')
+      return md.parse(source, env)
+  }
 
   const streamEnv = getStableStreamEnv(md, env)
-  streamEnv.__markstreamSource = source
-  const tokens = compactDuplicatePendingTolerantMathPrefixTokens(md.stream!.parse!(source, streamEnv))
+  const activeTolerantBoundaryState = useTolerantMathBoundarySync
+    ? activeTolerantMathBoundaryStreamStateCache.get(md as unknown as object)
+    : undefined
+
+  if (activeTolerantBoundaryState?.key)
+    streamEnv.__markstreamSource = source
+
+  const rawTokens = md.stream!.parse!(source, streamEnv)
+  const tokens = activeTolerantBoundaryState?.key
+    ? compactDuplicatePendingTolerantMathPrefixTokens(rawTokens)
+    : rawTokens
+
   if (!shouldCloneTopLevelStreamTokens(options))
     return tokens
 

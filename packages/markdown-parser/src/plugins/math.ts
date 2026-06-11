@@ -27,6 +27,15 @@ interface MathBlockState {
 type TolerantMathToken = MarkdownToken & { tolerantBoundary?: boolean }
 
 export const TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META = '__markstreamTolerantBoundarySyntheticParagraph'
+const MARKSTREAM_MATH_PLUGIN_APPLIED = '__markstreamMathPluginApplied'
+
+export function hasMarkstreamMathPlugin(md: MarkdownIt) {
+  return !!(md as unknown as Record<string, unknown>)[MARKSTREAM_MATH_PLUGIN_APPLIED]
+}
+
+function markMarkstreamMathPluginApplied(md: MarkdownIt) {
+  ;(md as unknown as Record<string, unknown>)[MARKSTREAM_MATH_PLUGIN_APPLIED] = true
+}
 
 // Heuristic to decide whether a piece of text is likely math.
 // Matches common TeX commands, math operators, function-call patterns like f(x),
@@ -1659,6 +1668,8 @@ function pushSyntheticInlineParagraph(s: MathBlockState, content: string, line: 
 }
 
 export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
+  markMarkstreamMathPluginApplied(md)
+
   // Inline rule for `\\(...\\)` and `$$...$$` and `$...$`
   const mathInline = (state: unknown, silent?: boolean) => {
     const s = state as MathInlineState
@@ -2310,6 +2321,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           const fullSource = typeof s.env?.__markstreamSource === 'string'
             ? s.env.__markstreamSource
             : ''
+          const hasStreamSource = fullSource.length > 0
           const fullSourceTailOffset = fullSource && fullSource !== s.src && fullSource.endsWith(s.src)
             ? fullSource.length - s.src.length
             : -1
@@ -2318,13 +2330,10 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
             : 0
           const rawCurrentLine = s.src.slice(s.bMarks[startLine], s.eMarks[startLine])
           const rawLineSearchStart = Math.max(0, startPos - s.bMarks[startLine])
-          const closeIndexInCurrentLine = Math.max(
-            0,
-            rawCurrentLine.indexOf(open, rawLineSearchStart),
-          )
+          const closeIndexInCurrentLine = rawCurrentLine.indexOf(open, rawLineSearchStart)
           const absoluteStartLine = fullSourceLineOffset + startLine
 
-          if (absoluteStartLine > 0 && (open === '$$' || open === '\\[')) {
+          if (absoluteStartLine > 0 && closeIndexInCurrentLine !== -1 && (open === '$$' || open === '\\[')) {
             const tokens = s.tokens
             for (let ti = tokens.length - 1; ti >= 0; ti--) {
               const prev = tokens[ti]
@@ -2338,7 +2347,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
                 break
             }
 
-            if (!closesExistingTolerantMath && open === '$$') {
+            if (!closesExistingTolerantMath && hasStreamSource && open === '$$') {
               const sourceThroughDelimiter = fullSourceTailOffset >= 0
                 ? fullSource.slice(0, fullSourceTailOffset + startPos + open.length)
                 : s.src.slice(0, startPos + open.length)

@@ -1679,7 +1679,10 @@ describe('math block same-line boundary regression', () => {
       loadingMath,
     ]
 
-    const nodes = parseMarkdownToStructure('placeholder', md, {
+    const nodes = parseMarkdownToStructure([
+      'Before display $$',
+      'a = 1',
+    ].join('\n'), md, {
       final: false,
       streamParse: true,
     }) as any[]
@@ -1762,5 +1765,86 @@ describe('math block same-line boundary regression', () => {
       'repeat',
     ])
     expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+  })
+
+  it('does not run tolerant math stream synchronization when math plugin is disabled', () => {
+    const md = getMarkdown('pkg-stream-math-disabled-no-tolerant-sync', {
+      enableMath: false,
+    })
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = [
+      'Before display $$',
+      'a = 1',
+      '$$ after $a$ should stay plain text when math is disabled.',
+    ].join('\n')
+
+    let nodes: any[] = []
+    for (let index = 0; index < 12; index++) {
+      source += ` tail-${index}`
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+    }
+
+    expect(resetCount).toBe(0)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(collectByType(nodes, 'math_inline')).toHaveLength(0)
+    expect(JSON.stringify(nodes)).toContain('tail-11')
+    expect(JSON.stringify(nodes)).toContain('should stay plain text')
+  })
+
+  it('does not enable tolerant close-line source lookup for ordinary line-start display math streams', () => {
+    const md = getMarkdown('pkg-stream-normal-display-math-no-tolerant-source-env')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalParse = stream.parse.bind(stream)
+    const observedSourceEnvValues: unknown[] = []
+
+    stream.parse = (src: string, env?: Record<string, unknown>) => {
+      observedSourceEnvValues.push(env?.__markstreamSource)
+      return originalParse(src, env)
+    }
+
+    const source = Array.from({ length: 40 }, (_, index) => {
+      return [
+        '$$',
+        `x_${index} = ${index}`,
+        '$$',
+        `After block ${index} with inline $x_${index}$.`,
+      ].join('\n')
+    }).join('\n\n')
+
+    let nodes: any[] = []
+    for (let index = 0; index < 8; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+    }
+
+    expect(observedSourceEnvValues).toHaveLength(8)
+    expect(observedSourceEnvValues.every(value => value === undefined)).toBe(true)
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(40)
+    expect(mathBlocks.every((node: any) => node.loading === false)).toBe(true)
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content)).toContain('x_0')
+    expect(inlineMath.map((node: any) => node.content)).toContain('x_39')
   })
 })
