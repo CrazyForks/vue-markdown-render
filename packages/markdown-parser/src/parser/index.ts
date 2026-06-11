@@ -3,7 +3,10 @@ import type { HtmlBlockNode, InternalParseOptions, MarkdownToken, ParsedNode, Pa
 import { normalizeCustomHtmlTags } from '../customHtmlTags'
 import { NON_STRUCTURING_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
 import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes, parseTagAttrs } from '../htmlTagUtils'
-import { getActiveTolerantMathBlockBoundaryCacheKey } from '../plugins/math'
+import {
+  getActiveTolerantMathBlockBoundaryCacheKey,
+  mayContainPendingTolerantMathBlockBoundaryCandidate,
+} from '../plugins/math'
 import { parseInlineTokens } from './inline-parsers'
 import { createLinkifyDemotionContextTracker } from './linkifyHeuristics'
 import { parseCommonBlockToken } from './node-parsers/block-token-parser'
@@ -328,23 +331,6 @@ function isSimpleThematicOrSetextLine(line: string) {
   return markerCount >= 3
 }
 
-function hasTolerantBoundaryOpenerNearTail(source: string) {
-  const value = String(source ?? '')
-  if (!value || (!value.includes('$') && !value.includes('\\[')))
-    return false
-
-  const tail = value.slice(Math.max(0, value.length - TOLERANT_BOUNDARY_STREAM_LOOKBACK_CHARS))
-  const lines = tail.split(/\r?\n/)
-
-  for (const line of lines) {
-    const trimmed = String(line ?? '').replace(/[\t ]+$/, '')
-    if (trimmed.endsWith('$$') || trimmed.endsWith('\\['))
-      return true
-  }
-
-  return false
-}
-
 function hasUnclosedTolerantBracketBoundaryOpenerNearTail(source: string) {
   const value = String(source ?? '')
   const tail = value.slice(Math.max(0, value.length - TOLERANT_BOUNDARY_STREAM_LOOKBACK_CHARS))
@@ -497,7 +483,7 @@ function syncTopLevelStreamCacheForCompletedTolerantMathBoundary(
     if (
       previousKey === null
       && !appendedChunkMayCompleteTolerantMathBoundary(previous.source, source)
-      && !hasTolerantBoundaryOpenerNearTail(previous.source)
+      && !mayContainPendingTolerantMathBlockBoundaryCandidate(previous.source)
     ) {
       previous.source = source
       return 'stream'
@@ -535,6 +521,20 @@ function shouldCloneTopLevelStreamTokens(options: ParseOptions) {
     || typeof options.postTransformTokens === 'function'
 }
 
+function sameTokenMap(a: Token | undefined, b: Token | undefined) {
+  const aMap = a?.map
+  const bMap = b?.map
+  if (!Array.isArray(aMap) || !Array.isArray(bMap))
+    return false
+  if (aMap.length !== bMap.length)
+    return false
+  for (let index = 0; index < aMap.length; index++) {
+    if (aMap[index] !== bMap[index])
+      return false
+  }
+  return true
+}
+
 function isParagraphTokenTriple(tokens: Token[], index: number) {
   return tokens[index]?.type === 'paragraph_open'
     && tokens[index + 1]?.type === 'inline'
@@ -568,6 +568,12 @@ function removeDuplicatePendingTolerantPrefixTokens(tokens: Token[], activeKey: 
     const previousInline = normalized[previousPrefixStart + 1]
     const duplicateInline = normalized[duplicatePrefixStart + 1]
     if (previousInline.content !== duplicateInline.content)
+      continue
+
+    // Only remove duplicated prefix paragraphs when they are clearly the same
+    // source slice replayed by stream cache. Legitimate user content can contain
+    // two identical paragraphs immediately before a pending tolerant math block.
+    if (!sameTokenMap(previousInline, duplicateInline))
       continue
 
     if (normalized === tokens)

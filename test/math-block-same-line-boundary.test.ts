@@ -4069,4 +4069,79 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     expect(suffixParagraphs).toHaveLength(1)
     expect(collectByType(nodes, 'math_block')).toHaveLength(1)
   })
+
+  it('does not remove a legitimate repeated paragraph before pending tolerant math prefix', () => {
+    const md = getMarkdown('stream-math-boundary-legitimate-repeated-prefix-paragraph')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      'repeat',
+      '',
+      'repeat $$',
+      'a = 1',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+
+    for (let index = 0; index < 8; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(nodes.map((node: any) => node.type)).toEqual([
+      'paragraph',
+      'paragraph',
+      'math_block',
+    ])
+
+    const repeatParagraphs = nodes.filter((node: any) => node.type === 'paragraph' && node.raw === 'repeat')
+    expect(repeatParagraphs).toHaveLength(2)
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(true)
+    expect(mathBlocks[0].content).toContain('a = 1')
+  })
+
+  it('updates pending tolerant math content on plain chunk append without extra reset', () => {
+    const md = getMarkdown('stream-math-boundary-pending-content-plain-append')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = 'Before display $$\na = 1'
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(collectByType(nodes, 'math_block')[0].content).toContain('a = 1')
+
+    source += ' + b'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(collectByType(nodes, 'math_block')[0].content).toContain('a = 1 + b')
+  })
 })

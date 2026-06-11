@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { getMarkdown, parseMarkdownToStructure } from '../src'
-import { hasClosedTolerantMathBlockBoundaryCandidate } from '../src/plugins/math'
+import {
+  hasClosedTolerantMathBlockBoundaryCandidate,
+  mayContainPendingTolerantMathBlockBoundaryCandidate,
+} from '../src/plugins/math'
 
 function collectByType(nodes: any, type: string, out: any[] = []) {
   if (!nodes)
@@ -690,5 +693,98 @@ describe('math block same-line boundary regression', () => {
       expect(mathBlocks[0].content).toContain('a = 1')
       expect(mathBlocks[0].content).not.toContain('where')
     }
+  })
+
+  it('distinguishes unresolved pending tolerant math tail from stopped ordinary trailing delimiters', () => {
+    expect(
+      mayContainPendingTolerantMathBlockBoundaryCandidate([
+        'Before display $$',
+        'a = 1',
+      ].join('\n')),
+    ).toBe(true)
+
+    expect(
+      mayContainPendingTolerantMathBlockBoundaryCandidate([
+        'This prose line happens to end with $$',
+        'hello world without math signal',
+        '',
+        'later normal text',
+      ].join('\n')),
+    ).toBe(false)
+
+    expect(
+      mayContainPendingTolerantMathBlockBoundaryCandidate([
+        'This prose line happens to end with $$',
+        'x + y = z',
+        '## next section',
+        'later normal text',
+      ].join('\n')),
+    ).toBe(false)
+
+    expect(
+      mayContainPendingTolerantMathBlockBoundaryCandidate([
+        '> ```',
+        '> literal $$',
+        '> E=mc^2',
+        '> $$ must stay code',
+        '> ```',
+      ].join('\n')),
+    ).toBe(false)
+  })
+
+  it('does not repeatedly reset stream cache after a stopped false tolerant candidate', () => {
+    const md = getMarkdown('stream-math-boundary-stopped-false-candidate-no-reset-loop')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = [
+      'This prose line happens to end with $$',
+      'x + y = z',
+      '',
+      'normal suffix',
+    ].join('\n')
+
+    let nodes: any[] = []
+    for (let index = 0; index < 40; index++) {
+      source += ` chunk-${index}`
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+    }
+
+    expect(resetCount).toBe(0)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(JSON.stringify(nodes)).toContain('chunk-39')
+  })
+
+  it('keeps pending-tail detector linear on long near-boundary lines', () => {
+    const longRuleLikeLine = '_'.repeat(7000)
+    const longTableLikeLine = `| ${'-'.repeat(7000)} |`
+
+    expect(
+      mayContainPendingTolerantMathBlockBoundaryCandidate([
+        'Text before malformed candidate $$',
+        'x + y = z',
+        longRuleLikeLine,
+        'later text',
+      ].join('\n')),
+    ).toBe(false)
+
+    expect(
+      mayContainPendingTolerantMathBlockBoundaryCandidate([
+        'Text before malformed candidate $$',
+        longTableLikeLine,
+        'later text',
+      ].join('\n')),
+    ).toBe(false)
   })
 })

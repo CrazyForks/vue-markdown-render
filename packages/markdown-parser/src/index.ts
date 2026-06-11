@@ -55,7 +55,13 @@ export { parseFenceToken } from './parser/inline-parsers/fence-parser'
 // Re-export plugins
 export { applyContainers } from './plugins/containers'
 export { ESCAPED_TEX_BRACE_COMMANDS, isMathLike, TEX_BRACE_COMMANDS } from './plugins/isMathLike'
-export { applyMath, KATEX_COMMANDS, normalizeStandaloneBackslashT } from './plugins/math'
+export {
+  applyMath,
+  hasClosedTolerantMathBlockBoundaryCandidate,
+  KATEX_COMMANDS,
+  mayContainPendingTolerantMathBlockBoundaryCandidate,
+  normalizeStandaloneBackslashT,
+} from './plugins/math'
 // Re-export the node types for backward compatibility
 export * from './types'
 

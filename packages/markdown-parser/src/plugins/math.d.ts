@@ -5,3 +5,7 @@ export declare const ESCAPED_KATEX_COMMANDS: string;
 export declare const ESCAPED_MKATWX_COMMANDS: RegExp;
 export declare function normalizeStandaloneBackslashT(s: string, opts?: MathOptions): string;
 export declare function applyMath(md: MarkdownIt, mathOpts?: MathOptions): void;
+export declare function getCompletedTolerantMathBlockBoundaryCacheKey(markdown: string): string | null;
+export declare function getActiveTolerantMathBlockBoundaryCacheKey(markdown: string): string | null;
+export declare function mayContainPendingTolerantMathBlockBoundaryCandidate(markdown: string): boolean;
+export declare function hasClosedTolerantMathBlockBoundaryCandidate(markdown: string): boolean;

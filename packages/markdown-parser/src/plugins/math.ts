@@ -1049,6 +1049,95 @@ export function getActiveTolerantMathBlockBoundaryCacheKey(markdown: string) {
   return getTolerantMathBlockBoundaryCacheKey(markdown, true)
 }
 
+export function mayContainPendingTolerantMathBlockBoundaryCandidate(markdown: string) {
+  const source = String(markdown ?? '')
+  if (!source || (!source.includes('$') && !source.includes('\\[')))
+    return false
+
+  const tail = source.slice(Math.max(0, source.length - MAX_TOLERANT_BOUNDARY_CHARS))
+  const lines = tail.split(/\r?\n/)
+  const protectedLines = buildTolerantBoundaryProtectedLineMask(lines)
+  const minStartLine = Math.max(0, lines.length - MAX_TOLERANT_BOUNDARY_LINES - 1)
+
+  for (let startLine = lines.length - 1; startLine >= minStartLine; startLine--) {
+    if (protectedLines[startLine])
+      continue
+
+    const openingLine = splitTolerantBoundaryBlockquotePrefix(lines[startLine])
+    const openingBlockquotePrefix = openingLine.prefix
+    const lineWithoutTrailingWs = openingLine.content.replace(/[\t ]+$/, '')
+    if (!lineWithoutTrailingWs.trim())
+      continue
+
+    for (const [open, close] of TOLERANT_MATH_BLOCK_BOUNDARY_DELIMITERS) {
+      if (!lineWithoutTrailingWs.endsWith(open))
+        continue
+
+      const openIndex = lineWithoutTrailingWs.length - open.length
+      if (openIndex <= 0)
+        continue
+
+      if (isEscapedAt(lineWithoutTrailingWs, openIndex) || isInsideCodeSpanOrUnclosedTail(lineWithoutTrailingWs, openIndex))
+        continue
+
+      if (openIndex > 0 && lineWithoutTrailingWs[openIndex - 1] === open[0])
+        continue
+
+      const before = lineWithoutTrailingWs.slice(0, openIndex).replace(/[\t ]+$/, '')
+      if (!before.trim())
+        continue
+
+      const codeSpanRanges = buildCodeSpanRanges(lineWithoutTrailingWs)
+      const previousOpenCount = countUnescapedDelimiter(lineWithoutTrailingWs, open, 0, openIndex, codeSpanRanges)
+      const previousCloseCount = open === '\u0024\u0024'
+        ? 0
+        : countUnescapedDelimiter(lineWithoutTrailingWs, close, 0, openIndex, codeSpanRanges)
+
+      if (open === '\u0024\u0024' ? previousOpenCount % 2 === 1 : previousOpenCount > previousCloseCount)
+        continue
+
+      if (startLine === lines.length - 1)
+        return true
+
+      let content = ''
+
+      for (let currentLineNumber = startLine + 1; currentLineNumber < lines.length; currentLineNumber++) {
+        const currentScanLine = getTolerantBoundaryScanLine(
+          lines[currentLineNumber],
+          openingBlockquotePrefix,
+        )
+        if (!currentScanLine.matched)
+          break
+
+        if (protectedLines[currentLineNumber])
+          break
+
+        const currentLine = currentScanLine.content
+        const nextRawLine = lines[currentLineNumber + 1] ?? ''
+        const nextLine = getTolerantBoundaryScanLine(nextRawLine, openingBlockquotePrefix).content
+
+        if (shouldAbortTolerantBoundaryScan(currentLine, startLine, currentLineNumber, content, nextLine))
+          break
+
+        const closeIndex = findUnescapedDelimiter(currentLine, close)
+        const fallbackCloseIndex = open === '\\['
+          ? findPlainBracketFallbackClose(currentLine)
+          : -1
+
+        if (closeIndex !== -1 || fallbackCloseIndex !== -1)
+          break
+
+        content = appendTolerantBoundaryContent(content, currentLine)
+
+        if (currentLineNumber === lines.length - 1)
+          return true
+      }
+    }
+  }
+
+  return false
+}
+
 function hasNonSpaceOrTabAfter(value: string, start: number) {
   for (let i = Math.max(0, start); i < value.length; i++) {
     if (!isSpaceOrTab(value[i]))
