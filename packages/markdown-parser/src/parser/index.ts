@@ -331,6 +331,65 @@ function isSimpleThematicOrSetextLine(line: string) {
   return markerCount >= 3
 }
 
+function isIndentedCodeLineLike(line: string) {
+  const source = String(line ?? '')
+  if (!source.trim())
+    return false
+
+  let columns = 0
+  for (let index = 0; index < source.length; index++) {
+    const ch = source[index]
+    if (ch === ' ') {
+      columns++
+      if (columns >= 4)
+        return true
+      continue
+    }
+    if (ch === '\t')
+      return true
+    break
+  }
+
+  return false
+}
+
+function isSimpleMarkdownTableDelimiterCell(cell: string) {
+  const value = String(cell ?? '').trim()
+  if (!value)
+    return false
+
+  let index = 0
+  if (value[index] === ':')
+    index++
+
+  let dashCount = 0
+  while (value[index] === '-') {
+    dashCount++
+    index++
+  }
+
+  if (dashCount < 3)
+    return false
+
+  if (value[index] === ':')
+    index++
+
+  return index === value.length
+}
+
+function isSimpleMarkdownTableDelimiterLine(line: string) {
+  const value = String(line ?? '').trim()
+  if (!value || !value.includes('|'))
+    return false
+
+  const withoutLeadingPipe = value[0] === '|' ? value.slice(1) : value
+  const withoutEdgePipes = withoutLeadingPipe.endsWith('|')
+    ? withoutLeadingPipe.slice(0, -1)
+    : withoutLeadingPipe
+
+  return withoutEdgePipes.split('|').every(isSimpleMarkdownTableDelimiterCell)
+}
+
 function hasUnclosedTolerantBracketBoundaryOpenerNearTail(source: string) {
   const value = String(source ?? '')
   const tail = value.slice(Math.max(0, value.length - TOLERANT_BOUNDARY_STREAM_LOOKBACK_CHARS))
@@ -375,10 +434,14 @@ function appendedChunkMayCompleteTolerantMathBoundary(previousSource: string, so
 }
 
 function isLikelyTolerantBoundaryStopLine(line: string) {
-  const trimmed = String(line ?? '').trimStart()
-  if (!trimmed)
+  const source = String(line ?? '')
+  if (!source.trim())
     return true
 
+  if (isIndentedCodeLineLike(source))
+    return true
+
+  const trimmed = source.trimStart()
   const first = trimmed[0]
   if (first === '>' || first === '|' || first === '<')
     return true
@@ -394,10 +457,13 @@ function isLikelyTolerantBoundaryStopLine(line: string) {
   if (trimmed.startsWith('```') || trimmed.startsWith('~~~') || trimmed.startsWith(':::'))
     return true
 
-  if ((trimmed[0] === '*' || trimmed[0] === '-') && (trimmed[1] === ' ' || trimmed[1] === '\t'))
+  if ((trimmed[0] === '*' || trimmed[0] === '-' || trimmed[0] === '+') && (trimmed[1] === ' ' || trimmed[1] === '\t'))
     return true
 
   if (/^\d+[.)][\t ]+/.test(trimmed))
+    return true
+
+  if (isSimpleMarkdownTableDelimiterLine(trimmed))
     return true
 
   if (isSimpleThematicOrSetextLine(trimmed))
@@ -602,10 +668,9 @@ function parseTopLevelTokens(
   //
   //   paragraph + math_block + paragraph
   //
-  // Key transitions (new pending, pending→closed, closed→none) require a full
-  // md.parse to produce correct tokens. After the full parse, prime the stream
-  // parser's state so subsequent incremental stream.parse calls track the
-  // correct baseline.
+  // Key transitions (new pending, pending→closed, closed→none) invalidate stale
+  // stream tokens once. We then rebuild from the full current source through
+  // md.stream.parse so the incremental cache remains hot.
   const mode = syncTopLevelStreamCacheForCompletedTolerantMathBoundary(md, source)
   if (mode === 'parse')
     return md.parse(source, env)

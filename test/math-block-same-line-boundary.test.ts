@@ -1,6 +1,10 @@
-import { getMarkdown, parseMarkdownToStructure, processTokens } from 'stream-markdown-parser'
+import {
+  getMarkdown,
+  hasClosedTolerantMathBlockBoundaryCandidate,
+  parseMarkdownToStructure,
+  processTokens,
+} from 'stream-markdown-parser'
 import { describe, expect, it } from 'vitest'
-import { hasClosedTolerantMathBlockBoundaryCandidate } from '../packages/markdown-parser/src/plugins/math'
 
 describe('math block same-line boundary regression', () => {
   function collectByType(nodes: any, type: string, out: any[] = [], seen = new WeakSet<object>()) {
@@ -4143,5 +4147,154 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
 
     expect(resetCount).toBe(1)
     expect(collectByType(nodes, 'math_block')[0].content).toContain('a = 1 + b')
+  })
+
+  it('drops pending tolerant $$ math when a plus list boundary arrives during streaming', () => {
+    const md = getMarkdown('stream-math-boundary-plus-list-stop')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    const pending = [
+      'Before display $$',
+      'a = 1',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(pending, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+    expect(collectByType(nodes, 'math_block')[0].loading).toBe(true)
+
+    const withListBoundary = [
+      pending,
+      '+ item should stay outside math',
+    ].join('\n')
+
+    nodes = parseMarkdownToStructure(withListBoundary, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBeGreaterThanOrEqual(2)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(JSON.stringify(nodes)).toContain('item should stay outside math')
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 6; index++) {
+      nodes = parseMarkdownToStructure(withListBoundary, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+    }
+  })
+
+  it('keeps plus formula continuation as pending tolerant math during streaming', () => {
+    const md = getMarkdown('stream-math-boundary-plus-formula-continuation')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      'Before display $$',
+      'a = 1',
+      '+ y',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+
+    for (let index = 0; index < 8; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(true)
+    expect(mathBlocks[0].content).toContain('a = 1')
+    expect(mathBlocks[0].content).toContain('+ y')
+  })
+
+  it('drops pending tolerant math when an indented code boundary arrives during streaming', () => {
+    const md = getMarkdown('stream-math-boundary-indented-code-stop')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const pending = [
+      'Before display $$',
+      'a = 1',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(pending, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+
+    const withIndentedCode = [
+      pending,
+      '    const value = 1',
+    ].join('\n')
+
+    nodes = parseMarkdownToStructure(withIndentedCode, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(JSON.stringify(nodes)).toContain('const value = 1')
+  })
+
+  it('drops pending tolerant math when a table delimiter boundary arrives during streaming', () => {
+    const md = getMarkdown('stream-math-boundary-table-delimiter-stop')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const pending = [
+      'Before display $$',
+      'a = 1',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(pending, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+
+    const withTableDelimiter = [
+      pending,
+      '--- | ---',
+      'value | another',
+    ].join('\n')
+
+    nodes = parseMarkdownToStructure(withTableDelimiter, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('--- | ---')
+    expect(serialized).toContain('value')
   })
 })

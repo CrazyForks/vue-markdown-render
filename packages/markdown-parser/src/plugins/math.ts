@@ -1419,6 +1419,9 @@ function isMarkdownBlockBoundaryLine(trimmed: string) {
 }
 
 function isTolerantBoundaryScanStopLine(line: string, nextLine = '') {
+  if (isIndentedCodeLineForTolerantBoundary(line))
+    return true
+
   const trimmed = String(line ?? '').trimStart()
 
   if (!trimmed)
@@ -1446,6 +1449,20 @@ function isTolerantBoundaryScanStopLine(line: string, nextLine = '') {
   return false
 }
 
+function isLikelyTolerantPlusMathContinuation(trimmed: string) {
+  const rest = String(trimmed ?? '').slice(1).trimStart()
+  if (!rest)
+    return false
+
+  if (/^\\[a-z]+/i.test(rest))
+    return true
+
+  if (/^[\d({|]/.test(rest))
+    return true
+
+  return /^[a-z](?:\s*[_^=+\-*/<>]|\s*$)/i.test(rest)
+}
+
 function shouldAbortTolerantBoundaryScan(
   currentLine: string,
   startLine: number,
@@ -1463,6 +1480,7 @@ function shouldAbortTolerantBoundaryScan(
   if (
     trimmed[0] === '+'
     && isSpaceOrTab(trimmed[1])
+    && isLikelyTolerantPlusMathContinuation(trimmed)
     && accumulatedContent.trim()
     && isLikelyTolerantExplicitMathBlockContent(`${accumulatedContent}\n${trimmed}`, false)
   ) {
@@ -2357,10 +2375,16 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       return s.src.slice(lineStart, lineEnd)
     }
 
+    const getRawSourceLine = (line: number) => {
+      if (line < 0 || line >= endLine)
+        return ''
+      return s.src.slice(s.bMarks[line], s.eMarks[line])
+    }
+
     const firstLineNumber = skipFirstLine ? startLine + 1 : startLine
     if (
       tolerantBoundary
-      && shouldAbortTolerantBoundaryScan(firstLineContent, startLine, firstLineNumber, '', getSourceLine(firstLineNumber + 1))
+      && shouldAbortTolerantBoundaryScan(getRawSourceLine(firstLineNumber), startLine, firstLineNumber, '', getRawSourceLine(firstLineNumber + 1))
     ) {
       return false
     }
@@ -2383,12 +2407,11 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
 
       for (nextLine = startLine + 1; nextLine < endLine; nextLine++) {
         const currentLine = getSourceLine(nextLine)
-        const nextSourceLine = getSourceLine(nextLine + 1)
         const currentLineTrimmed = currentLine.trim()
 
         if (
           tolerantBoundary
-          && shouldAbortTolerantBoundaryScan(currentLine, startLine, nextLine, content, nextSourceLine)
+          && shouldAbortTolerantBoundaryScan(getRawSourceLine(nextLine), startLine, nextLine, content, getRawSourceLine(nextLine + 1))
         ) {
           return false
         }

@@ -787,4 +787,60 @@ describe('math block same-line boundary regression', () => {
       ].join('\n')),
     ).toBe(false)
   })
+
+  it('treats plus list lines as tolerant-boundary stop lines, not math continuation', () => {
+    const source = [
+      'Before display $$',
+      'a = 1',
+      '+ item should be a list boundary',
+    ].join('\n')
+
+    expect(mayContainPendingTolerantMathBlockBoundaryCandidate(source)).toBe(false)
+    expect(hasClosedTolerantMathBlockBoundaryCandidate(`${source}\n$$ after $a$`)).toBe(false)
+  })
+
+  it('still allows short plus formula continuation in pending tolerant math', () => {
+    const source = [
+      'Before display $$',
+      'a = 1',
+      '+ y',
+    ].join('\n')
+
+    expect(mayContainPendingTolerantMathBlockBoundaryCandidate(source)).toBe(true)
+  })
+
+  it('treats indented code and table delimiter rows as pending tolerant-boundary stop lines', () => {
+    const indentedCode = [
+      'Before display $$',
+      'a = 1',
+      '    const x = 1',
+    ].join('\n')
+
+    const tableDelimiter = [
+      'Before display $$',
+      'a = 1',
+      '--- | ---',
+    ].join('\n')
+
+    expect(mayContainPendingTolerantMathBlockBoundaryCandidate(indentedCode)).toBe(false)
+    expect(mayContainPendingTolerantMathBlockBoundaryCandidate(tableDelimiter)).toBe(false)
+  })
+
+  it('does not close tolerant math across a plus list boundary', () => {
+    const md = getMarkdown('math-boundary-plus-list-stop-before-close')
+    const source = [
+      'Before display $$',
+      'a = 1',
+      '+ item should stay outside math',
+      '$$ should remain ordinary text with $x$ inline.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(source, md, { final: true }) as any[]
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('item should stay outside math')
+    expect(serialized).toContain('should remain ordinary text')
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('x')
+  })
 })
