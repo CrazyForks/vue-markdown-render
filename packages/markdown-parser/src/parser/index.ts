@@ -683,6 +683,24 @@ function mayContainTolerantBoundaryOpenerLineNearTail(source: string) {
   return false
 }
 
+function shouldRunTolerantMathBoundaryStreamSync(
+  source: string,
+  previous?: ActiveTolerantMathBoundaryStreamState,
+) {
+  if (previous?.key || previous?.pendingCandidate)
+    return true
+
+  const value = String(source ?? '')
+  if (!value)
+    return false
+
+  const tail = value.slice(Math.max(0, value.length - TOLERANT_BOUNDARY_STREAM_LOOKBACK_CHARS))
+  return tail.includes('$$')
+    || tail.includes('\\[')
+    || value.endsWith('$')
+    || value.endsWith('\\')
+}
+
 function syncTopLevelStreamCacheForActiveTolerantMathBoundary(
   md: MarkdownIt,
   source: string,
@@ -893,6 +911,27 @@ function compactDuplicateTolerantMathPrefixTokens(tokens: Token[], source: strin
   return compacted
 }
 
+function needsTolerantBoundaryTokenRepair(tokens: Token[]) {
+  for (const token of tokens) {
+    if (!token)
+      continue
+
+    const meta = token.meta
+    if (
+      meta
+      && typeof meta === 'object'
+      && Boolean((meta as Record<string, unknown>)[TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META])
+    ) {
+      return true
+    }
+
+    if ((token as Token & { tolerantBoundary?: boolean }).tolerantBoundary === true)
+      return true
+  }
+
+  return false
+}
+
 function parseTopLevelTokens(
   md: MarkdownIt,
   source: string,
@@ -913,7 +952,10 @@ function parseTopLevelTokens(
   // Key transitions (new pending, pending→closed, closed→none) invalidate stale
   // stream tokens once. We then rebuild from the full current source through
   // md.stream.parse so the incremental cache remains hot.
+  const previousTolerantBoundaryState = activeTolerantMathBoundaryStreamStateCache.get(md as unknown as object)
   const useTolerantMathBoundarySync = hasMarkstreamMathPlugin(md)
+    && shouldRunTolerantMathBoundaryStreamSync(source, previousTolerantBoundaryState)
+
   if (useTolerantMathBoundarySync) {
     const mode = syncTopLevelStreamCacheForActiveTolerantMathBoundary(md, source)
     if (mode === 'parse')
@@ -931,8 +973,9 @@ function parseTopLevelTokens(
   }
 
   const rawTokens = md.stream!.parse!(source, streamEnv)
-  const tokens = activeTolerantBoundaryState?.key
-    ? compactDuplicateTolerantMathPrefixTokens(rawTokens, source, activeTolerantBoundaryState.key)
+  const activeTolerantBoundaryKey = activeTolerantBoundaryState?.key ?? ''
+  const tokens = activeTolerantBoundaryKey && needsTolerantBoundaryTokenRepair(rawTokens)
+    ? compactDuplicateTolerantMathPrefixTokens(rawTokens, source, activeTolerantBoundaryKey)
     : rawTokens
 
   if (!shouldCloneTopLevelStreamTokens(options))

@@ -3016,4 +3016,162 @@ describe('math block same-line boundary regression', () => {
     expect(JSON.stringify(nodes)).toContain('hello world without math signal')
     expect(JSON.stringify(nodes)).toContain('chunk-15')
   })
+
+  it('does not enter tolerant display math for escaped opener tails', () => {
+    const cases = [
+      [
+        'escaped dollar opener',
+        [
+          'Escaped marker \\$$',
+          'x + y = z',
+          'plain suffix with inline $x$.',
+        ].join('\n'),
+      ],
+      [
+        'escaped bracket opener',
+        [
+          'Escaped marker \\\\[',
+          'x + y = z',
+          'plain suffix with inline $x$.',
+        ].join('\n'),
+      ],
+    ] as const
+
+    for (const [name, source] of cases) {
+      const md = getMarkdown(`pkg-final-escaped-tolerant-opener-${name.replace(/\s+/g, '-')}`)
+      const nodes = parseMarkdownToStructure(source, md, {
+        final: true,
+        streamParse: false,
+      }) as any[]
+
+      expect(collectByType(nodes, 'math_block'), name).toHaveLength(0)
+      expect(collectByType(nodes, 'math_inline').map((node: any) => node.content), name).toContain('x')
+      expect(JSON.stringify(nodes), name).toContain('Escaped marker')
+      expect(JSON.stringify(nodes), name).toContain('x + y = z')
+    }
+  })
+
+  it('does not repeatedly reset streaming cache for escaped tolerant opener tails', () => {
+    const cases = [
+      [
+        'escaped dollar opener',
+        [
+          'Escaped marker \\$$',
+          'x + y = z',
+          'plain suffix with inline $x$.',
+        ].join('\n'),
+      ],
+      [
+        'escaped bracket opener',
+        [
+          'Escaped marker \\\\[',
+          'x + y = z',
+          'plain suffix with inline $x$.',
+        ].join('\n'),
+      ],
+    ] as const
+
+    for (const [name, initialSource] of cases) {
+      const md = getMarkdown(`pkg-stream-escaped-tolerant-opener-no-reset-${name.replace(/\s+/g, '-')}`)
+      ;(md as any).stream.reset()
+      ;(md as any).stream.resetStats()
+
+      const stream = (md as any).stream
+      const originalReset = stream.reset.bind(stream)
+      let resetCount = 0
+      stream.reset = () => {
+        resetCount++
+        return originalReset()
+      }
+
+      let source = initialSource
+      let nodes: any[] = []
+      for (let index = 0; index < 24; index++) {
+        source += ` chunk-${index}`
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }
+
+      expect(resetCount, name).toBe(0)
+      expect(collectByType(nodes, 'math_block'), name).toHaveLength(0)
+      expect(collectByType(nodes, 'math_inline').map((node: any) => node.content), name).toContain('x')
+      expect(JSON.stringify(nodes), name).toContain('chunk-23')
+    }
+  })
+
+  it('does not promote unclosed code-span tails that end with tolerant delimiters', () => {
+    const cases = [
+      [
+        'code span dollar opener',
+        [
+          'Code tail `literal $$',
+          'x + y = z',
+          'plain suffix.',
+        ].join('\n'),
+      ],
+      [
+        'code span bracket opener',
+        [
+          'Code tail `literal \\[',
+          'x + y = z',
+          'plain suffix.',
+        ].join('\n'),
+      ],
+    ] as const
+
+    for (const [name, source] of cases) {
+      const md = getMarkdown(`pkg-final-code-tail-tolerant-opener-${name.replace(/\s+/g, '-')}`)
+      const nodes = parseMarkdownToStructure(source, md, {
+        final: true,
+        streamParse: false,
+      }) as any[]
+
+      expect(collectByType(nodes, 'math_block'), name).toHaveLength(0)
+      expect(JSON.stringify(nodes), name).toContain('Code tail')
+      expect(JSON.stringify(nodes), name).toContain('x + y = z')
+    }
+  })
+
+  it('does not treat table header rows ending with $$ as tolerant display math', () => {
+    const md = getMarkdown('pkg-stream-table-header-dollar-no-tolerant-math')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    const source = [
+      'Metric | Formula $$',
+      '--- | ---',
+      'loss | x + y = z',
+      'after table with inline $x$.',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+    for (let index = 0; index < 10; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(resetCount).toBe(0)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(collectByType(nodes, 'table')).toHaveLength(1)
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('x')
+  })
 })
