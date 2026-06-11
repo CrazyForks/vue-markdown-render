@@ -676,12 +676,21 @@ function mayContainTolerantBoundaryOpenerLineNearTail(source: string) {
   if (!value || (!value.includes('$$') && !value.includes('\\[')))
     return false
 
-  const tail = value.slice(Math.max(0, value.length - TOLERANT_BOUNDARY_STREAM_LOOKBACK_CHARS))
-  const lines = tail.split(/\r?\n/)
+  let lineStart = Math.max(0, value.length - TOLERANT_BOUNDARY_STREAM_LOOKBACK_CHARS)
 
-  for (const line of lines) {
+  while (lineStart < value.length) {
+    const newlineIndex = value.indexOf('\n', lineStart)
+    const hasNewline = newlineIndex !== -1
+    const lineEnd = hasNewline
+      ? (newlineIndex > lineStart && value[newlineIndex - 1] === '\r' ? newlineIndex - 1 : newlineIndex)
+      : value.length
+    const line = value.slice(lineStart, lineEnd)
     if (isPotentialTolerantBoundaryOpenerLine(line))
       return true
+
+    if (!hasNewline)
+      break
+    lineStart = newlineIndex + 1
   }
 
   return false
@@ -698,11 +707,23 @@ function shouldRunTolerantMathBoundaryStreamSync(
   if (!value)
     return false
 
-  const tail = value.slice(Math.max(0, value.length - TOLERANT_BOUNDARY_STREAM_LOOKBACK_CHARS))
-  return tail.includes('$$')
-    || tail.includes('\\[')
-    || value.endsWith('$')
-    || value.endsWith('\\')
+  if (previous) {
+    if (previous.source === source)
+      return false
+
+    if (
+      source.startsWith(previous.source)
+      && !appendedChunkMayCompleteTolerantMathBoundary(previous.source, source)
+    ) {
+      previous.source = source
+      return false
+    }
+  }
+
+  if (value.endsWith('$') || value.endsWith('\\'))
+    return true
+
+  return mayContainTolerantBoundaryOpenerLineNearTail(value)
 }
 
 function syncTopLevelStreamCacheForActiveTolerantMathBoundary(
@@ -957,13 +978,21 @@ function parseTopLevelTokens(
   // stream tokens once. We then rebuild from the full current source through
   // md.stream.parse so the incremental cache remains hot.
   const previousTolerantBoundaryState = activeTolerantMathBoundaryStreamStateCache.get(md as unknown as object)
-  const useTolerantMathBoundarySync = hasMarkstreamMathPlugin(md)
+  const mathPluginApplied = hasMarkstreamMathPlugin(md)
+  const useTolerantMathBoundarySync = mathPluginApplied
     && shouldRunTolerantMathBoundaryStreamSync(source, previousTolerantBoundaryState)
 
   if (useTolerantMathBoundarySync) {
     const mode = syncTopLevelStreamCacheForActiveTolerantMathBoundary(md, source)
     if (mode === 'parse')
       return md.parse(source, env)
+  }
+  else if (
+    mathPluginApplied
+    && !previousTolerantBoundaryState
+    && source
+  ) {
+    setActiveTolerantMathBoundaryStreamState(md as unknown as object, source, null, false)
   }
 
   const streamEnv = getStableStreamEnv(md, env)

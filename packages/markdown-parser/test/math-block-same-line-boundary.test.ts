@@ -3289,4 +3289,202 @@ describe('math block same-line boundary regression', () => {
     expect(collectByType(nodes, 'table')).toHaveLength(1)
     expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('x')
   })
+
+  it('keeps tolerant math block inside list item without flattening or duplicating inline math', () => {
+    const md = getMarkdown('pkg-math-boundary-list-item')
+
+    const source = [
+      '- Before $a$ and display $$',
+      '  x + y = z',
+      '  $$ where $z$ follows.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(source, md, { final: true }) as any[]
+
+    expect(nodes.map((node: any) => node.type)).toEqual(['list'])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].content).toContain('x + y = z')
+    expect(mathBlocks[0].loading).toBe(false)
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content)).toEqual(['a', 'z'])
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('Before')
+    expect(serialized).toContain('where')
+  })
+
+  it('keeps streaming tolerant math block inside list item stable across repeated parses', () => {
+    const md = getMarkdown('pkg-stream-math-boundary-list-item-stable')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    const source = [
+      '- Before $a$ and display $$',
+      '  x + y = z',
+      '  $$ where $z$ follows.',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(nodes.map((node: any) => node.type)).toEqual(['list'])
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toEqual(['a', 'z'])
+    expect(resetCount).toBe(1)
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 8; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+      expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+      expect(resetCount).toBe(1)
+    }
+  })
+
+  it('preserves suffix when the closing delimiter shares a line with math content', () => {
+    const md = getMarkdown('pkg-math-boundary-close-line-content-and-suffix')
+
+    const source = [
+      'Before $a$ display $$',
+      'x + y = z $$ where $z$ follows.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(source, md, { final: true }) as any[]
+
+    expect(nodes.map((node: any) => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].content).toContain('x + y = z')
+    expect(mathBlocks[0].content).not.toContain('where')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content)).toEqual(['a', 'z'])
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('Before')
+    expect(serialized).toContain('where')
+  })
+
+  it('keeps streaming stable when the closing delimiter shares a line with math content and suffix', () => {
+    const md = getMarkdown('pkg-stream-math-boundary-close-line-content-and-suffix')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    const source = [
+      'Before $a$ display $$',
+      'x + y = z $$ where $z$ follows.',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(nodes.map((node: any) => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toEqual(['a', 'z'])
+    expect(resetCount).toBe(1)
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 8; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+      expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+      expect(resetCount).toBe(1)
+    }
+  })
+
+  it('does not convert non-math tolerant-looking boundary into a math block', () => {
+    const md = getMarkdown('pkg-math-boundary-non-math-no-false-positive')
+
+    const source = [
+      'This is not display math $$',
+      'hello world prose',
+      '$$ after text with $x$ inline.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(source, md, { final: true }) as any[]
+    const serialized = JSON.stringify(nodes)
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(serialized).toContain('This is not display math')
+    expect(serialized).toContain('hello world prose')
+    expect(serialized).toContain('after text')
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('x')
+  })
+
+  it('keeps ordinary dollar-heavy streaming appends on the normal stream path', () => {
+    const md = getMarkdown('pkg-stream-normal-dollar-heavy-appends-fast-path')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    const originalParse = stream.parse.bind(stream)
+    let resetCount = 0
+    let streamParseCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+    stream.parse = (...args: any[]) => {
+      streamParseCount++
+      return originalParse(...args)
+    }
+
+    let source = 'Inline $a$ and same-line display $$E=mc^2$$ are normal.'
+
+    for (let index = 0; index < 30; index++) {
+      source += ` chunk ${index} with $x_${index}$`
+      const nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+      expect(collectByType(nodes, 'math_inline').length).toBeGreaterThanOrEqual(2)
+    }
+
+    expect(resetCount).toBe(0)
+    expect(streamParseCount).toBe(30)
+  })
 })
