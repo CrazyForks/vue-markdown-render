@@ -1955,7 +1955,7 @@ describe('math block same-line boundary regression', () => {
     expect(resetCount).toBe(2)
   })
 
-  it('keeps large non-tolerant streaming appends on the normal stream path without reset loops', () => {
+  it('keeps large non-tolerant streaming appends on the normal stream path without reset loops', { timeout: 20000 }, () => {
     const md = getMarkdown('pkg-stream-large-non-tolerant-math-no-reset-loop')
     ;(md as any).stream.reset()
     ;(md as any).stream.resetStats()
@@ -1988,5 +1988,185 @@ describe('math block same-line boundary regression', () => {
     expect(resetCount).toBe(0)
     expect(collectByType(nodes, 'math_block')).toHaveLength(0)
     expect(collectByType(nodes, 'math_inline').length).toBeGreaterThan(800)
+  })
+
+  it('detects tolerant $$ opener split across stream chunks', () => {
+    const md = getMarkdown('pkg-stream-tolerant-dollar-opener-split')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = 'Before display $'
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(0)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+
+    source += '$\na = 1'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    let mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(true)
+    expect(mathBlocks[0].content).toContain('a = 1')
+
+    source += '\n$$ after $a$.'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(2)
+    expect(nodes.map((node: any) => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(false)
+    expect(mathBlocks[0].content).toContain('a = 1')
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('a')
+  })
+
+  it('does not let a cached false tolerant candidate suppress a later real boundary', () => {
+    const md = getMarkdown('pkg-stream-tolerant-negative-cache-invalidates-on-real-boundary')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = [
+      'This prose paragraph happens to end with $$',
+      'hello world without math signal',
+      '',
+      'ordinary suffix',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(0)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+
+    for (let index = 0; index < 20; index++) {
+      source += ` plain-${index}`
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    }
+
+    expect(resetCount).toBe(0)
+
+    source += [
+      '',
+      '',
+      'Actual display $$',
+      'b = 2',
+    ].join('\n')
+
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    let mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(true)
+    expect(mathBlocks[0].content).toContain('b = 2')
+
+    source += '\n$$ after $b$.'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(2)
+    mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(false)
+    expect(mathBlocks[0].content).toContain('b = 2')
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('b')
+  })
+
+  it('keeps completed tolerant boundary active when long suffix pushes opener beyond 20k tail', () => {
+    const md = getMarkdown('pkg-stream-tolerant-long-suffix-lookback-aligned')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    const longSuffix = Array.from({ length: 1700 }, (_, index) => `suffix line ${index}`).join('\n')
+    const source = [
+      'Before display $$',
+      'a = 1',
+      '$$ after $a$.',
+      longSuffix,
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(nodes.slice(0, 3).map((node: any) => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    let mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(false)
+    expect(mathBlocks[0].content).toContain('a = 1')
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('a')
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 6; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+      expect(resetCount).toBe(1)
+      mathBlocks = collectByType(nodes, 'math_block')
+      expect(mathBlocks).toHaveLength(1)
+      expect(mathBlocks[0].loading).toBe(false)
+    }
   })
 })

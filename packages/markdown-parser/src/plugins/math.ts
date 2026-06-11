@@ -1084,6 +1084,22 @@ function getTolerantMathBlockBoundaryCacheKey(markdown: string, includePending: 
   const lines = source.split(/\r?\n/)
 
   const protectedLines = buildTolerantBoundaryProtectedLineMask(lines)
+  const protectedLinesByScanContext = new Map<string, boolean[]>()
+
+  const getProtectedLinesForScanContext = (context: TolerantBoundaryScanContext) => {
+    if (!context.listContinuationIndent)
+      return protectedLines
+
+    const key = `${context.blockquotePrefix}\u0000${context.listContinuationIndent}`
+    const cached = protectedLinesByScanContext.get(key)
+    if (cached)
+      return cached
+
+    const next = buildTolerantBoundaryProtectedLineMask(lines, context)
+    protectedLinesByScanContext.set(key, next)
+    return next
+  }
+
   let skipUntilLine = -1
 
   for (let startLine = 0; startLine < lines.length - 1; startLine++) {
@@ -1099,9 +1115,7 @@ function getTolerantMathBlockBoundaryCacheKey(markdown: string, includePending: 
       openingLine.content,
       openingLine.prefix,
     )
-    const scanProtectedLines = scanContext.listContinuationIndent
-      ? buildTolerantBoundaryProtectedLineMask(lines, scanContext)
-      : protectedLines
+    const scanProtectedLines = getProtectedLinesForScanContext(scanContext)
     const lineWithoutTrailingWs = openingLine.content.replace(/[\t ]+$/, '')
     if (!lineWithoutTrailingWs.trim())
       continue
@@ -1240,6 +1254,22 @@ export function mayContainPendingTolerantMathBlockBoundaryCandidate(markdown: st
   const tail = source.slice(Math.max(0, source.length - MAX_TOLERANT_BOUNDARY_CHARS))
   const lines = tail.split(/\r?\n/)
   const protectedLines = buildTolerantBoundaryProtectedLineMask(lines)
+  const protectedLinesByScanContext = new Map<string, boolean[]>()
+
+  const getProtectedLinesForScanContext = (context: TolerantBoundaryScanContext) => {
+    if (!context.listContinuationIndent)
+      return protectedLines
+
+    const key = `${context.blockquotePrefix}\u0000${context.listContinuationIndent}`
+    const cached = protectedLinesByScanContext.get(key)
+    if (cached)
+      return cached
+
+    const next = buildTolerantBoundaryProtectedLineMask(lines, context)
+    protectedLinesByScanContext.set(key, next)
+    return next
+  }
+
   const minStartLine = Math.max(0, lines.length - MAX_TOLERANT_BOUNDARY_LINES - 1)
 
   for (let startLine = lines.length - 1; startLine >= minStartLine; startLine--) {
@@ -1251,9 +1281,7 @@ export function mayContainPendingTolerantMathBlockBoundaryCandidate(markdown: st
       openingLine.content,
       openingLine.prefix,
     )
-    const scanProtectedLines = scanContext.listContinuationIndent
-      ? buildTolerantBoundaryProtectedLineMask(lines, scanContext)
-      : protectedLines
+    const scanProtectedLines = getProtectedLinesForScanContext(scanContext)
     const lineWithoutTrailingWs = openingLine.content.replace(/[\t ]+$/, '')
     if (!lineWithoutTrailingWs.trim())
       continue

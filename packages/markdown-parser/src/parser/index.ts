@@ -303,11 +303,33 @@ function shouldResetTopLevelStreamCacheForFinalAutoParse(md: MarkdownIt, options
 interface ActiveTolerantMathBoundaryStreamState {
   key: string | null
   source: string
+  pendingCandidate: boolean
 }
 
 const activeTolerantMathBoundaryStreamStateCache = new WeakMap<object, ActiveTolerantMathBoundaryStreamState>()
 
-const TOLERANT_BOUNDARY_STREAM_LOOKBACK_CHARS = 20000
+const TOLERANT_BOUNDARY_STREAM_LOOKBACK_CHARS = 30000
+
+function isPendingTolerantBoundaryKey(key: string | null) {
+  return typeof key === 'string' && key.startsWith('pending:')
+}
+
+function setActiveTolerantMathBoundaryStreamState(
+  cacheOwner: object,
+  source: string,
+  key: string | null,
+  pendingCandidate?: boolean,
+) {
+  activeTolerantMathBoundaryStreamStateCache.set(cacheOwner, {
+    key,
+    source,
+    pendingCandidate: pendingCandidate ?? (
+      key === null
+        ? mayContainPendingTolerantMathBlockBoundaryCandidate(source)
+        : isPendingTolerantBoundaryKey(key)
+    ),
+  })
+}
 
 function isSimpleThematicOrSetextLine(line: string) {
   const trimmed = String(line ?? '').trim()
@@ -646,18 +668,19 @@ function syncTopLevelStreamCacheForActiveTolerantMathBoundary(
   const cacheOwner = md as unknown as object
   const previous = activeTolerantMathBoundaryStreamStateCache.get(cacheOwner)
   const previousKey = previous?.key ?? null
+  const previousPendingCandidate = previous?.pendingCandidate ?? false
 
   if (previous && previous.source !== source && !source.startsWith(previous.source)) {
     stream.reset()
     const boundaryKey = getActiveTolerantMathBlockBoundaryCacheKey(source)
-    activeTolerantMathBoundaryStreamStateCache.set(cacheOwner, { key: boundaryKey, source })
+    setActiveTolerantMathBoundaryStreamState(cacheOwner, source, boundaryKey)
     return 'stream'
   }
 
   // Exact same active source: reuse the stream cache. The stale-cache risk
   // is handled by resetting exactly when the active tolerant-boundary key changes
   // or first appears. Repeated full md.parse here is the performance trap.
-  if (previous?.source === source && previousKey !== null)
+  if (previous?.source === source)
     return 'stream'
 
   if (previous && source.startsWith(previous.source)) {
@@ -672,7 +695,7 @@ function syncTopLevelStreamCacheForActiveTolerantMathBoundary(
     if (
       previousKey === null
       && !appendedChunkMayCompleteTolerantMathBoundary(previous.source, source)
-      && !mayContainPendingTolerantMathBlockBoundaryCandidate(previous.source)
+      && !previousPendingCandidate
     ) {
       previous.source = source
       return 'stream'
@@ -680,17 +703,14 @@ function syncTopLevelStreamCacheForActiveTolerantMathBoundary(
   }
 
   if (previousKey === null && !mayContainTolerantBoundaryOpenerLineNearTail(source)) {
-    activeTolerantMathBoundaryStreamStateCache.set(cacheOwner, { key: null, source })
+    setActiveTolerantMathBoundaryStreamState(cacheOwner, source, null, false)
     return 'stream'
   }
 
   const boundaryKey = getActiveTolerantMathBlockBoundaryCacheKey(source)
 
   if (boundaryKey !== null && boundaryKey === previousKey) {
-    activeTolerantMathBoundaryStreamStateCache.set(cacheOwner, {
-      key: boundaryKey,
-      source,
-    })
+    setActiveTolerantMathBoundaryStreamState(cacheOwner, source, boundaryKey)
     return 'stream'
   }
 
@@ -699,10 +719,7 @@ function syncTopLevelStreamCacheForActiveTolerantMathBoundary(
   if (boundaryKey || previousKey)
     stream.reset()
 
-  activeTolerantMathBoundaryStreamStateCache.set(cacheOwner, {
-    key: boundaryKey,
-    source,
-  })
+  setActiveTolerantMathBoundaryStreamState(cacheOwner, source, boundaryKey)
 
   // After reset, rebuild the stream cache from the full current source.
   // Do not fall back to md.parse here; that hides stream-cache bugs and turns
