@@ -1847,4 +1847,146 @@ describe('math block same-line boundary regression', () => {
     expect(inlineMath.map((node: any) => node.content)).toContain('x_0')
     expect(inlineMath.map((node: any) => node.content)).toContain('x_39')
   })
+
+  it('parses tolerant same-line math boundary inside wide ordered lists in final mode', () => {
+    const md = getMarkdown('pkg-final-tolerant-boundary-wide-ordered-list')
+
+    const source = [
+      '100. Before $p$ display $$',
+      '     a = 1',
+      '     $$ after $q$.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(source, md, {
+      final: true,
+      streamParse: false,
+    }) as any[]
+
+    expect(collectByType(nodes, 'list')).toHaveLength(1)
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(false)
+    expect(mathBlocks[0].content).toContain('a = 1')
+    expect(mathBlocks[0].content).not.toContain('after')
+
+    const inlineMath = collectByType(nodes, 'math_inline').map((node: any) => node.content)
+    expect(inlineMath).toContain('p')
+    expect(inlineMath).toContain('q')
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('Before')
+    expect(serialized).toContain('after')
+  })
+
+  it('does not miss pending/closed tolerant boundary transitions inside wide ordered lists while streaming', () => {
+    const md = getMarkdown('pkg-stream-tolerant-boundary-wide-ordered-list')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    const originalParse = stream.parse.bind(stream)
+    let resetCount = 0
+    let streamParseCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    stream.parse = (...args: any[]) => {
+      streamParseCount++
+      return originalParse(...args)
+    }
+
+    let source = '100. Before display $$'
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(0)
+    expect(streamParseCount).toBe(1)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+
+    source += '\n     a = 1'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(streamParseCount).toBe(2)
+    let mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(true)
+    expect(mathBlocks[0].content).toContain('a = 1')
+
+    source += '\n     $$ after $a$.'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(2)
+    expect(streamParseCount).toBe(3)
+
+    mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(false)
+    expect(mathBlocks[0].content).toContain('a = 1')
+
+    const inlineMath = collectByType(nodes, 'math_inline').map((node: any) => node.content)
+    expect(inlineMath).toContain('a')
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 10; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+      expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+      expect(collectByType(nodes, 'math_block')[0].loading).toBe(false)
+    }
+
+    expect(resetCount).toBe(2)
+  })
+
+  it('keeps large non-tolerant streaming appends on the normal stream path without reset loops', () => {
+    const md = getMarkdown('pkg-stream-large-non-tolerant-math-no-reset-loop')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = Array.from({ length: 800 }, (_, index) => `line ${index} with inline $x_${index}$ only`).join('\n')
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(0)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+
+    for (let index = 0; index < 50; index++) {
+      source += `\nappend ${index} with inline $y_${index}$ only`
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+    }
+
+    expect(resetCount).toBe(0)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(collectByType(nodes, 'math_inline').length).toBeGreaterThan(800)
+  })
 })

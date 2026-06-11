@@ -711,14 +711,124 @@ function splitTolerantBoundaryBlockquotePrefix(line: string) {
   }
 }
 
-function getTolerantBoundaryScanLine(line: string, expectedBlockquotePrefix: string) {
-  if (!expectedBlockquotePrefix)
-    return { matched: true, content: String(line ?? '') }
+interface TolerantBoundaryScanContext {
+  blockquotePrefix: string
+  listContinuationIndent: number
+}
+
+interface TolerantBoundaryScanLine {
+  matched: boolean
+  content: string
+  contentOffset: number
+}
+
+function parseTolerantBoundaryListContinuationIndent(line: string) {
+  const source = String(line ?? '')
+  let index = 0
+  let spaces = 0
+
+  while (spaces < 4 && isSpaceOrTab(source[index])) {
+    index++
+    spaces++
+  }
+
+  if (spaces >= 4)
+    return 0
+
+  const markerStart = index
+  const first = source[index]
+
+  if (first === '-' || first === '+' || first === '*') {
+    index++
+    if (!isSpaceOrTab(source[index]))
+      return 0
+
+    while (isSpaceOrTab(source[index]))
+      index++
+
+    return index > markerStart + 1 ? index : 0
+  }
+
+  if (!isAsciiDigit(first))
+    return 0
+
+  while (isAsciiDigit(source[index]))
+    index++
+
+  if (source[index] !== '.' && source[index] !== ')')
+    return 0
+
+  index++
+  if (!isSpaceOrTab(source[index]))
+    return 0
+
+  while (isSpaceOrTab(source[index]))
+    index++
+
+  return index
+}
+
+function buildTolerantBoundaryScanContext(openingContentLine: string, blockquotePrefix: string): TolerantBoundaryScanContext {
+  return {
+    blockquotePrefix,
+    listContinuationIndent: parseTolerantBoundaryListContinuationIndent(openingContentLine),
+  }
+}
+
+function stripTolerantBoundaryListContinuationIndent(line: string, indent: number) {
+  const source = String(line ?? '')
+  if (indent <= 0) {
+    return {
+      matched: true,
+      content: source,
+      offset: 0,
+    }
+  }
+
+  let cursor = 0
+  while (cursor < source.length && cursor < indent && isSpaceOrTab(source[cursor]))
+    cursor++
+
+  if (cursor >= indent) {
+    return {
+      matched: true,
+      content: source.slice(cursor),
+      offset: cursor,
+    }
+  }
+
+  if (!source.trim()) {
+    return {
+      matched: true,
+      content: '',
+      offset: source.length,
+    }
+  }
+
+  return {
+    matched: false,
+    content: source,
+    offset: 0,
+  }
+}
+
+function getTolerantBoundaryScanLine(line: string, context: TolerantBoundaryScanContext): TolerantBoundaryScanLine {
+  const expectedBlockquotePrefix = context.blockquotePrefix
+
+  if (!expectedBlockquotePrefix) {
+    const list = stripTolerantBoundaryListContinuationIndent(line, context.listContinuationIndent)
+    return { matched: list.matched, content: list.content, contentOffset: list.offset }
+  }
 
   const parsed = splitTolerantBoundaryBlockquotePrefix(line)
+  if (parsed.prefix !== expectedBlockquotePrefix)
+    return { matched: false, content: parsed.content, contentOffset: parsed.prefix.length }
+
+  const list = stripTolerantBoundaryListContinuationIndent(parsed.content, context.listContinuationIndent)
   return {
-    matched: parsed.prefix === expectedBlockquotePrefix,
-    content: parsed.content,
+    matched: list.matched,
+    content: list.content,
+    contentOffset: parsed.prefix.length + list.offset,
   }
 }
 
@@ -874,18 +984,21 @@ function hasTolerantBoundaryHtmlClose(line: string, tag: string) {
   return false
 }
 
-function getTolerantBoundaryProtectedLineContent(line: string) {
+function getTolerantBoundaryProtectedLineContent(line: string, context?: TolerantBoundaryScanContext) {
+  if (context)
+    return getTolerantBoundaryScanLine(line, context).content
+
   return splitTolerantBoundaryBlockquotePrefix(line).content
 }
 
-function buildTolerantBoundaryProtectedLineMask(lines: string[]) {
+function buildTolerantBoundaryProtectedLineMask(lines: string[], context?: TolerantBoundaryScanContext) {
   const protectedLines = new Array<boolean>(lines.length).fill(false)
   let fenceMarker: '`' | '~' | '' = ''
   let fenceLen = 0
   let htmlTag = ''
 
   for (let lineNumber = 0; lineNumber < lines.length; lineNumber++) {
-    const line = getTolerantBoundaryProtectedLineContent(lines[lineNumber])
+    const line = getTolerantBoundaryProtectedLineContent(lines[lineNumber], context)
 
     if (htmlTag) {
       protectedLines[lineNumber] = true
@@ -982,7 +1095,13 @@ function getTolerantMathBlockBoundaryCacheKey(markdown: string, includePending: 
 
     const line = lines[startLine]
     const openingLine = splitTolerantBoundaryBlockquotePrefix(line)
-    const openingBlockquotePrefix = openingLine.prefix
+    const scanContext = buildTolerantBoundaryScanContext(
+      openingLine.content,
+      openingLine.prefix,
+    )
+    const scanProtectedLines = scanContext.listContinuationIndent
+      ? buildTolerantBoundaryProtectedLineMask(lines, scanContext)
+      : protectedLines
     const lineWithoutTrailingWs = openingLine.content.replace(/[\t ]+$/, '')
     if (!lineWithoutTrailingWs.trim())
       continue
@@ -1022,21 +1141,21 @@ function getTolerantMathBlockBoundaryCacheKey(markdown: string, includePending: 
       for (; currentLineNumber < lines.length; currentLineNumber++) {
         const currentScanLine = getTolerantBoundaryScanLine(
           lines[currentLineNumber],
-          openingBlockquotePrefix,
+          scanContext,
         )
         if (!currentScanLine.matched) {
           stoppedBeforeTail = true
           break
         }
 
-        if (protectedLines[currentLineNumber]) {
+        if (scanProtectedLines[currentLineNumber]) {
           stoppedBeforeTail = true
           break
         }
 
         const currentLine = currentScanLine.content
         const nextRawLine = lines[currentLineNumber + 1] ?? ''
-        const nextLine = getTolerantBoundaryScanLine(nextRawLine, openingBlockquotePrefix).content
+        const nextLine = getTolerantBoundaryScanLine(nextRawLine, scanContext).content
 
         if (shouldAbortTolerantBoundaryScan(currentLine, startLine, currentLineNumber, content, nextLine)) {
           stoppedBeforeTail = true
@@ -1055,7 +1174,8 @@ function getTolerantMathBlockBoundaryCacheKey(markdown: string, includePending: 
           const candidateContent = appendTolerantBoundaryContent(content, beforeClose)
           if (isLikelyTolerantExplicitMathBlockContent(candidateContent, true)) {
             const contentHash = hashTolerantBoundaryCacheText(candidateContent)
-            keys.push(`closed:${open}:${lineOffset + startLine}:${openIndex}:${lineOffset + currentLineNumber}:${endIndex}:${contentHash}`)
+            const rawEndIndex = endIndex + currentScanLine.contentOffset
+            keys.push(`closed:${open}:${lineOffset + startLine}:${openIndex}:${lineOffset + currentLineNumber}:${rawEndIndex}:${contentHash}`)
             skipUntilLine = currentLineNumber
           }
           break
@@ -1127,7 +1247,13 @@ export function mayContainPendingTolerantMathBlockBoundaryCandidate(markdown: st
       continue
 
     const openingLine = splitTolerantBoundaryBlockquotePrefix(lines[startLine])
-    const openingBlockquotePrefix = openingLine.prefix
+    const scanContext = buildTolerantBoundaryScanContext(
+      openingLine.content,
+      openingLine.prefix,
+    )
+    const scanProtectedLines = scanContext.listContinuationIndent
+      ? buildTolerantBoundaryProtectedLineMask(lines, scanContext)
+      : protectedLines
     const lineWithoutTrailingWs = openingLine.content.replace(/[\t ]+$/, '')
     if (!lineWithoutTrailingWs.trim())
       continue
@@ -1167,17 +1293,17 @@ export function mayContainPendingTolerantMathBlockBoundaryCandidate(markdown: st
       for (let currentLineNumber = startLine + 1; currentLineNumber < lines.length; currentLineNumber++) {
         const currentScanLine = getTolerantBoundaryScanLine(
           lines[currentLineNumber],
-          openingBlockquotePrefix,
+          scanContext,
         )
         if (!currentScanLine.matched)
           break
 
-        if (protectedLines[currentLineNumber])
+        if (scanProtectedLines[currentLineNumber])
           break
 
         const currentLine = currentScanLine.content
         const nextRawLine = lines[currentLineNumber + 1] ?? ''
-        const nextLine = getTolerantBoundaryScanLine(nextRawLine, openingBlockquotePrefix).content
+        const nextLine = getTolerantBoundaryScanLine(nextRawLine, scanContext).content
 
         if (shouldAbortTolerantBoundaryScan(currentLine, startLine, currentLineNumber, content, nextLine))
           break
@@ -2471,16 +2597,10 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       return s.src.slice(lineStart, lineEnd)
     }
 
-    const getRawSourceLine = (line: number) => {
-      if (line < 0 || line >= endLine)
-        return ''
-      return s.src.slice(s.bMarks[line], s.eMarks[line])
-    }
-
     const firstLineNumber = skipFirstLine ? startLine + 1 : startLine
     if (
       tolerantBoundary
-      && shouldAbortTolerantBoundaryScan(getRawSourceLine(firstLineNumber), startLine, firstLineNumber, '', getRawSourceLine(firstLineNumber + 1))
+      && shouldAbortTolerantBoundaryScan(getSourceLine(firstLineNumber), startLine, firstLineNumber, '', getSourceLine(firstLineNumber + 1))
     ) {
       return false
     }
@@ -2507,7 +2627,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
 
         if (
           tolerantBoundary
-          && shouldAbortTolerantBoundaryScan(getRawSourceLine(nextLine), startLine, nextLine, content, getRawSourceLine(nextLine + 1))
+          && shouldAbortTolerantBoundaryScan(getSourceLine(nextLine), startLine, nextLine, content, getSourceLine(nextLine + 1))
         ) {
           return false
         }
