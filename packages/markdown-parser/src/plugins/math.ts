@@ -1263,12 +1263,15 @@ function getTolerantMathBlockBoundaryCacheKey(markdown: string, includePending: 
 
         if (endIndex !== -1) {
           closed = true
+          const closeDelimiterLength = closeIndex !== -1 ? close.length : 1
           const beforeClose = currentLine.slice(0, endIndex)
+          const trailingAfterClose = currentLine.slice(endIndex + closeDelimiterLength)
+          const suffixState = trailingAfterClose.trim() ? 'suffix' : 'nosuffix'
           const candidateContent = appendTolerantBoundaryContent(content, beforeClose)
           if (isLikelyTolerantExplicitMathBlockContent(candidateContent, true)) {
             const contentHash = hashTolerantBoundaryCacheText(candidateContent)
             const rawEndIndex = endIndex + currentScanLine.contentOffset
-            keys.push(`closed:${open}:${lineOffset + startLine}:${openIndex}:${lineOffset + currentLineNumber}:${rawEndIndex}:${contentHash}`)
+            keys.push(`closed:${open}:${lineOffset + startLine}:${openIndex}:${lineOffset + currentLineNumber}:${rawEndIndex}:${contentHash}:${suffixState}`)
             skipUntilLine = currentLineNumber
           }
           break

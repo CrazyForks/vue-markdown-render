@@ -2431,4 +2431,101 @@ describe('math block same-line boundary regression', () => {
       expect(mathBlocks[0].loading).toBe(false)
     }
   })
+
+  it('materializes suffix paragraph when suffix arrives after an already complete tolerant close delimiter', () => {
+    const cases = [
+      {
+        name: 'dollar',
+        open: '$$',
+        closeOnly: '$$',
+        formula: 'a = 1',
+        inline: 'a',
+        expectedMarkup: '$$',
+      },
+      {
+        name: 'explicit bracket',
+        open: '\\[',
+        closeOnly: '\\]',
+        formula: 'z + 1 = 2',
+        inline: 'z',
+        expectedMarkup: '\\[\\]',
+      },
+      {
+        name: 'fallback plain bracket',
+        open: '\\[',
+        closeOnly: ']',
+        formula: 'z + 1 = 2',
+        inline: 'z',
+        expectedMarkup: '\\[\\]',
+      },
+    ] as const
+
+    for (const item of cases) {
+      const md = getMarkdown(`pkg-stream-tolerant-close-suffix-late-${item.name.replace(/\s+/g, '-')}`)
+      ;(md as any).stream.reset()
+      ;(md as any).stream.resetStats()
+
+      const stream = (md as any).stream
+      const originalReset = stream.reset.bind(stream)
+      let resetCount = 0
+      stream.reset = () => {
+        resetCount++
+        return originalReset()
+      }
+
+      let source = [
+        `Before display ${item.open}`,
+        item.formula,
+        item.closeOnly,
+      ].join('\n')
+
+      let nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(resetCount, item.name).toBe(1)
+      expect(nodes.map((node: any) => node.type), item.name).toEqual([
+        'paragraph',
+        'math_block',
+      ])
+
+      let mathBlocks = collectByType(nodes, 'math_block')
+      expect(mathBlocks, item.name).toHaveLength(1)
+      expect(mathBlocks[0].loading, item.name).toBe(false)
+      expect(mathBlocks[0].markup, item.name).toBe(item.expectedMarkup)
+      expect(mathBlocks[0].content, item.name).toContain(item.formula)
+
+      source += ` where $${item.inline}$ follows.`
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(resetCount, item.name).toBe(2)
+      expect(nodes.map((node: any) => node.type), item.name).toEqual([
+        'paragraph',
+        'math_block',
+        'paragraph',
+      ])
+
+      mathBlocks = collectByType(nodes, 'math_block')
+      expect(mathBlocks, item.name).toHaveLength(1)
+      expect(mathBlocks[0].loading, item.name).toBe(false)
+      expect(mathBlocks[0].content, item.name).toContain(item.formula)
+      expect(mathBlocks[0].content, item.name).not.toContain('where')
+      expect(collectByType(nodes, 'math_inline').map((node: any) => node.content), item.name).toContain(item.inline)
+
+      const stableSerialized = JSON.stringify(nodes)
+      for (let index = 0; index < 8; index++) {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+
+        expect(JSON.stringify(nodes), item.name).toBe(stableSerialized)
+        expect(resetCount, item.name).toBe(2)
+      }
+    }
+  })
 })

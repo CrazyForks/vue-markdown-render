@@ -568,6 +568,27 @@ function appendedChunkMayEndPendingTolerantBoundary(appended: string) {
   return false
 }
 
+function isClosedTolerantBoundaryWithoutSameLineSuffix(key: string | null) {
+  if (!key)
+    return false
+
+  const parts = key.split('|')
+  const lastPart = parts[parts.length - 1]
+  if (!lastPart)
+    return false
+
+  const fields = lastPart.split(':')
+  return fields[0] === 'closed' && fields[7] === 'nosuffix'
+}
+
+function hasNonSpaceOrTab(value: string) {
+  for (let index = 0; index < value.length; index++) {
+    if (value[index] !== ' ' && value[index] !== '\t')
+      return true
+  }
+  return false
+}
+
 function appendedChunkMayChangeActiveTolerantMathBoundary(
   previousKey: string | null,
   previousSource: string,
@@ -590,6 +611,9 @@ function appendedChunkMayChangeActiveTolerantMathBoundary(
     return true
 
   if (previousSource.endsWith('\\') && (appended[0] === '[' || appended[0] === ']'))
+    return true
+
+  if (isClosedTolerantBoundaryWithoutSameLineSuffix(previousKey) && hasNonSpaceOrTab(appended))
     return true
 
   if (previousKey?.startsWith('pending:') && appendedChunkMayEndPendingTolerantBoundary(appended))
