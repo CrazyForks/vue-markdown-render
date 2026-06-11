@@ -489,14 +489,15 @@ function appendedChunkMayCompleteTolerantMathBoundary(previousSource: string, so
   if (appended.includes('$$') || appended.includes('\\]'))
     return true
 
-  // The close delimiter itself can be split across stream chunks:
+  // Tolerant display delimiters can be split across stream chunks:
   //
   //   "$" + "$ after ..."
+  //   "\\" + "[\n..."
   //   "\\" + "] after ..."
   if (previousSource.endsWith('$') && appended[0] === '$')
     return true
 
-  if (previousSource.endsWith('\\') && appended[0] === ']')
+  if (previousSource.endsWith('\\') && (appended[0] === '[' || appended[0] === ']'))
     return true
 
   // Non-strict malformed `\\[` blocks may close with a plain `]`. Avoid scanning
