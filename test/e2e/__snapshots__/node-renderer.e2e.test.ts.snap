@@ -70,7 +70,7 @@ exports[`markdownRender node e2e coverage > renders checkbox nodes 1`] = `
     <div data-v-8dfe8a80="" class="node-content">
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="fade" appear="true" persisted="false" css="true">
-        <ul data-v-b195669a="" data-v-8dfe8a80="" class="list-node list-disc" is-dark="false">
+        <ul data-v-b195669a="" data-v-8dfe8a80="" class="list-node list-disc">
           <li data-v-d94d2511="" data-v-b195669a="" class="list-item" dir="auto">
             <div data-v-8dfe8a80="" data-v-d94d2511="" class="markstream-vue markdown-renderer">
               <!--v-if-->
@@ -139,7 +139,7 @@ exports[`markdownRender node e2e coverage > renders complex inline code with emp
     <div data-v-8dfe8a80="" class="node-content">
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="fade" appear="true" persisted="false" css="true">
-        <ol data-v-b195669a="" data-v-8dfe8a80="" class="list-node list-decimal" is-dark="false">
+        <ol data-v-b195669a="" data-v-8dfe8a80="" class="list-node list-decimal">
           <li data-v-d94d2511="" data-v-b195669a="" class="list-item" dir="auto" value="1">
             <p data-v-d94d2511="" dir="auto" class="paragraph-node"><strong data-v-b1e65240="" class="strong-node"><span data-v-a84b8095="" data-v-b1e65240="" class="text-node" index-key="list-item-markdown-renderer-0-0-paragraph-0-0"><span data-v-a84b8095="">整合冗余条款：</span><!--v-if--></span></strong><span data-v-a84b8095="" class="text-node" index-key="list-item-markdown-renderer-0-0-paragraph-1"><span data-v-a84b8095=""> 将原</span>
               <!--v-if--></span><code data-v-36040df8="" class="inline-code" index-key="list-item-markdown-renderer-0-0-paragraph-2"><span data-v-36040df8="">1-(5)</span><!--v-if--></code><span data-v-a84b8095="" class="text-node" index-key="list-item-markdown-renderer-0-0-paragraph-3"><span data-v-a84b8095="">、</span>
@@ -479,7 +479,7 @@ exports[`markdownRender node e2e coverage > renders ordered list node 1`] = `
     <div data-v-8dfe8a80="" class="node-content">
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="fade" appear="true" persisted="false" css="true">
-        <ol data-v-b195669a="" data-v-8dfe8a80="" class="list-node list-decimal" is-dark="false">
+        <ol data-v-b195669a="" data-v-8dfe8a80="" class="list-node list-decimal">
           <li data-v-d94d2511="" data-v-b195669a="" class="list-item" dir="auto" value="1">
             <p data-v-d94d2511="" dir="auto" class="paragraph-node"><span data-v-a84b8095="" class="text-node" index-key="list-item-markdown-renderer-0-0-paragraph-0"><span data-v-a84b8095="">First entry</span>
               <!--v-if--></span>
@@ -719,7 +719,7 @@ exports[`markdownRender node e2e coverage > renders unordered list node 1`] = `
     <div data-v-8dfe8a80="" class="node-content">
       <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
       <transition-stub data-v-8dfe8a80="" name="fade" appear="true" persisted="false" css="true">
-        <ul data-v-b195669a="" data-v-8dfe8a80="" class="list-node list-disc" is-dark="false">
+        <ul data-v-b195669a="" data-v-8dfe8a80="" class="list-node list-disc">
           <li data-v-d94d2511="" data-v-b195669a="" class="list-item" dir="auto">
             <p data-v-d94d2511="" dir="auto" class="paragraph-node"><span data-v-a84b8095="" class="text-node" index-key="list-item-markdown-renderer-0-0-paragraph-0"><span data-v-a84b8095="">Item one</span>
               <!--v-if--></span>

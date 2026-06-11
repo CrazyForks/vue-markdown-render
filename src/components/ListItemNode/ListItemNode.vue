@@ -32,6 +32,7 @@ const props = defineProps<{
   fade?: boolean
   showTooltips?: boolean
   value?: number | null
+  isDark?: boolean
 }>()
 
 defineEmits<{
@@ -149,6 +150,7 @@ provide('markstreamFade', computed(() => props.fade))
         :show-tooltips="props.showTooltips"
         :typewriter="props.typewriter"
         :fade="props.fade"
+        :is-dark="props.isDark"
         :batch-rendering="false"
         :defer-nodes-until-visible="false"
         :render-as-fragment="true"
@@ -163,6 +165,7 @@ provide('markstreamFade', computed(() => props.fade))
       :custom-id="props.customId"
       :typewriter="props.typewriter"
       :fade="props.fade"
+      :is-dark="props.isDark"
       :batch-rendering="false"
       @copy="$emit('copy', $event)"
     />
