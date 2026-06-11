@@ -843,4 +843,100 @@ describe('math block same-line boundary regression', () => {
     expect(serialized).toContain('should remain ordinary text')
     expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('x')
   })
+
+  it('does not keep prose-only unresolved tolerant tail as a pending scan candidate', () => {
+    expect(
+      mayContainPendingTolerantMathBlockBoundaryCandidate([
+        'This prose paragraph happens to end with $$',
+        'hello world without math signal',
+      ].join('\n')),
+    ).toBe(false)
+
+    expect(
+      mayContainPendingTolerantMathBlockBoundaryCandidate([
+        'This prose paragraph happens to end with \\[',
+        'hello world without math signal',
+      ].join('\n')),
+    ).toBe(false)
+
+    expect(
+      mayContainPendingTolerantMathBlockBoundaryCandidate([
+        'Before display $$',
+        'x',
+      ].join('\n')),
+    ).toBe(true)
+
+    expect(
+      mayContainPendingTolerantMathBlockBoundaryCandidate([
+        'Before display $$',
+        'x +',
+      ].join('\n')),
+    ).toBe(true)
+  })
+
+  it('does not repeatedly reset stream cache for prose-only unresolved tolerant tails', () => {
+    const md = getMarkdown('pkg-stream-prose-only-unresolved-tolerant-tail-no-reset-loop')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = [
+      'This prose paragraph happens to end with $$',
+      'hello world without math signal',
+    ].join('\n')
+
+    let nodes: any[] = []
+    for (let index = 0; index < 40; index++) {
+      source += ` chunk-${index}`
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+    }
+
+    expect(resetCount).toBe(0)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(JSON.stringify(nodes)).toContain('chunk-39')
+  })
+
+  it('does not reparse indented list tolerant $$ close line as a second math_block', () => {
+    const md = getMarkdown('pkg-stream-list-tolerant-dollar-close-line-not-new-opener')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      '- Before display $$',
+      '  a = 1',
+      '  $$ where $a$ follows.',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+    for (let index = 0; index < 12; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(false)
+    expect(mathBlocks[0].content).toContain('a = 1')
+    expect(mathBlocks[0].content).not.toContain('where')
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('a')
+  })
 })

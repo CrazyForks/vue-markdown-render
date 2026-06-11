@@ -1049,6 +1049,26 @@ export function getActiveTolerantMathBlockBoundaryCacheKey(markdown: string) {
   return getTolerantMathBlockBoundaryCacheKey(markdown, true)
 }
 
+function isPotentialTolerantPendingMathContent(content: string) {
+  const stripped = String(content ?? '').trim()
+  if (!stripped)
+    return false
+
+  if (stripped.length > MAX_TOLERANT_BOUNDARY_CHARS)
+    return true
+
+  if (isLikelyTolerantExplicitMathBlockContent(stripped, false))
+    return true
+
+  if (/^(?:[a-z]|pi|\\[a-z]*|\d+(?:\.\d+)?)$/i.test(stripped))
+    return true
+
+  if (/[=+\-*/^_<>|\\({]\s*$/.test(stripped) || stripped.endsWith('['))
+    return true
+
+  return /(?:^|[^\p{L}\p{N}\\])(?:[a-z]|\\[a-z]+)\s*[-+*/=<>_^]\s*$/iu.test(stripped)
+}
+
 export function mayContainPendingTolerantMathBlockBoundaryCandidate(markdown: string) {
   const source = String(markdown ?? '')
   if (!source || (!source.includes('$') && !source.includes('\\[')))
@@ -1130,7 +1150,7 @@ export function mayContainPendingTolerantMathBlockBoundaryCandidate(markdown: st
         content = appendTolerantBoundaryContent(content, currentLine)
 
         if (currentLineNumber === lines.length - 1)
-          return true
+          return isPotentialTolerantPendingMathContent(content)
       }
     }
   }
@@ -2236,6 +2256,12 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           const fullSourceLineOffset = fullSourceTailOffset >= 0
             ? countLineBreaks(fullSource.slice(0, fullSourceTailOffset))
             : 0
+          const rawCurrentLine = s.src.slice(s.bMarks[startLine], s.eMarks[startLine])
+          const rawLineSearchStart = Math.max(0, startPos - s.bMarks[startLine])
+          const closeIndexInCurrentLine = Math.max(
+            0,
+            rawCurrentLine.indexOf(open, rawLineSearchStart),
+          )
           const absoluteStartLine = fullSourceLineOffset + startLine
 
           if (absoluteStartLine > 0 && (open === '$$' || open === '\\[')) {
@@ -2258,7 +2284,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
               closesExistingTolerantMath = hasTolerantBoundaryCloseAtLine(
                 sourceThroughDelimiter,
                 absoluteStartLine,
-                0,
+                closeIndexInCurrentLine,
                 open,
               )
             }
