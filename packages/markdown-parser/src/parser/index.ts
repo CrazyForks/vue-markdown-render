@@ -593,6 +593,44 @@ function hasNonSpaceOrTab(value: string) {
   return false
 }
 
+function findLastNonSpaceOrTab(value: string) {
+  for (let index = value.length - 1; index >= 0; index--) {
+    const ch = value[index]
+    if (ch !== ' ' && ch !== '\t')
+      return ch
+  }
+  return ''
+}
+
+function findFirstNonSpaceOrTab(value: string) {
+  for (let index = 0; index < value.length; index++) {
+    const ch = value[index]
+    if (ch !== ' ' && ch !== '\t')
+      return ch
+  }
+  return ''
+}
+
+function appendedChunkMayTurnPendingTolerantBoundaryIntoPlainWord(previousSource: string, source: string) {
+  if (!previousSource || !source.startsWith(previousSource))
+    return false
+
+  const appended = source.slice(previousSource.length)
+  if (!appended)
+    return false
+
+  const previousLast = findLastNonSpaceOrTab(previousSource)
+  const appendedFirst = findFirstNonSpaceOrTab(appended)
+  if (!isTolerantBoundaryAsciiAlpha(previousLast) || !isTolerantBoundaryAsciiAlpha(appendedFirst))
+    return false
+
+  const previousTail = previousSource.slice(Math.max(0, previousSource.length - 80))
+  if (/\\[a-z]*$/i.test(previousTail))
+    return false
+
+  return true
+}
+
 function appendedChunkMayChangeActiveTolerantMathBoundary(
   previousKey: string | null,
   previousSource: string,
@@ -606,6 +644,9 @@ function appendedChunkMayChangeActiveTolerantMathBoundary(
     return false
 
   if (appended.includes('$$') || appended.includes('\\[') || appended.includes('\\]'))
+    return true
+
+  if (isPendingTolerantBoundaryKey(previousKey) && appendedChunkMayTurnPendingTolerantBoundaryIntoPlainWord(previousSource, source))
     return true
 
   if (previousKey?.includes('\\[') && appended.includes(']'))
@@ -778,6 +819,10 @@ function syncTopLevelStreamCacheForActiveTolerantMathBoundary(
 
   const boundaryKey = getActiveTolerantMathBlockBoundaryCacheKey(source)
 
+  const keepLoosePendingCandidate = boundaryKey === null
+    && (isPendingTolerantBoundaryKey(previousKey) || previousPendingCandidate)
+    && mayContainTolerantBoundaryOpenerLineNearTail(source)
+
   if (boundaryKey !== null && boundaryKey === previousKey) {
     setActiveTolerantMathBoundaryStreamState(cacheOwner, source, boundaryKey)
     return 'stream'
@@ -788,7 +833,12 @@ function syncTopLevelStreamCacheForActiveTolerantMathBoundary(
   if (boundaryKey || previousKey)
     stream.reset()
 
-  setActiveTolerantMathBoundaryStreamState(cacheOwner, source, boundaryKey)
+  setActiveTolerantMathBoundaryStreamState(
+    cacheOwner,
+    source,
+    boundaryKey,
+    keepLoosePendingCandidate ? true : undefined,
+  )
 
   // After reset, rebuild the stream cache from the full current source.
   // Do not fall back to md.parse here; that hides stream-cache bugs and turns
