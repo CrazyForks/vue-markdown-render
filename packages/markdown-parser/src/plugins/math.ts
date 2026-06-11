@@ -2561,14 +2561,11 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         }
         else {
           // When the stream parser re-processes a changed line that starts
-          // with `$` or `\[`, the markdown-it block rule may be invoked for
+          // with `$$`, the markdown-it block rule may be invoked for
           // a line that was already consumed as the *close* delimiter of a
           // tolerant same-line boundary on an earlier line. Without this guard,
           // the stream parser creates a duplicate math_block for the close.
           //
-          // Check existing tokens: if the most recent math_block was emitted
-          // by a tolerant boundary and its map ends exactly at this line,
-          // treat this delimiter as its close rather than a new opener.
           let closesExistingTolerantMath = false
           const tolerantBoundaryStreamKey = typeof s.env?.[TOLERANT_BOUNDARY_STREAM_CACHE_KEY_ENV] === 'string'
             ? String(s.env[TOLERANT_BOUNDARY_STREAM_CACHE_KEY_ENV])
@@ -2588,39 +2585,27 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           const closeIndexInCurrentLine = rawCurrentLine.indexOf(open, rawLineSearchStart)
           const absoluteStartLine = fullSourceLineOffset + startLine
 
-          if (absoluteStartLine > 0 && closeIndexInCurrentLine !== -1 && (open === '$$' || open === '\\[')) {
-            const tokens = s.tokens
-            for (let ti = tokens.length - 1; ti >= 0; ti--) {
-              const prev = tokens[ti]
-              if (prev.type === 'math_block') {
-                const prevMath = prev as TolerantMathToken
-                if (prevMath.tolerantBoundary && prev.map && prev.map[1] === startLine)
-                  closesExistingTolerantMath = true
-                break
-              }
-              if (prev.type !== 'inline' && prev.type !== 'paragraph_open' && prev.type !== 'paragraph_close')
-                break
-            }
+          if (absoluteStartLine > 0 && closeIndexInCurrentLine !== -1 && open === '$$') {
+            // map[1] is exclusive; a repaired close line can share it with the
+            // next real display opener, so close ownership must come from the
+            // boundary key or bounded source lookup.
+            closesExistingTolerantMath = tolerantBoundaryKeyHasCloseAtLine(
+              tolerantBoundaryStreamKey,
+              absoluteStartLine,
+              closeIndexInCurrentLine,
+              open,
+            )
 
-            if (!closesExistingTolerantMath && open === '$$') {
-              closesExistingTolerantMath = tolerantBoundaryKeyHasCloseAtLine(
-                tolerantBoundaryStreamKey,
+            if (!closesExistingTolerantMath && hasStreamSource) {
+              const sourceThroughDelimiter = fullSourceTailOffset >= 0
+                ? fullSource.slice(0, fullSourceTailOffset + startPos + open.length)
+                : s.src.slice(0, startPos + open.length)
+              closesExistingTolerantMath = hasTolerantBoundaryCloseAtLine(
+                sourceThroughDelimiter,
                 absoluteStartLine,
                 closeIndexInCurrentLine,
                 open,
               )
-
-              if (!closesExistingTolerantMath && hasStreamSource) {
-                const sourceThroughDelimiter = fullSourceTailOffset >= 0
-                  ? fullSource.slice(0, fullSourceTailOffset + startPos + open.length)
-                  : s.src.slice(0, startPos + open.length)
-                closesExistingTolerantMath = hasTolerantBoundaryCloseAtLine(
-                  sourceThroughDelimiter,
-                  absoluteStartLine,
-                  closeIndexInCurrentLine,
-                  open,
-                )
-              }
             }
           }
 

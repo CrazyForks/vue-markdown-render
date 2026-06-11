@@ -790,12 +790,75 @@ function isSyntheticTolerantBoundaryParagraphTriplet(tokens: Token[], index: num
     || !!tokens[index + 1]?.meta?.[TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META]
 }
 
-function compactDuplicatePendingTolerantMathPrefixTokens(tokens: Token[]) {
-  let compacted = tokens
+function restoreStaleCompletedTolerantMathTokens(tokens: Token[], source: string, boundaryKey: string) {
+  let restored = tokens
+  const lines = source.split(/\r?\n/)
 
-  for (let mathIndex = tokens.length - 1; mathIndex >= 0; mathIndex--) {
+  for (const part of boundaryKey.split('|')) {
+    const fields = part.split(':')
+    if (fields[0] !== 'closed' || fields[1] !== '$$' || fields[7] !== 'nosuffix')
+      continue
+
+    const openLine = Number(fields[2])
+    const closeLine = Number(fields[4])
+    const closeIndex = Number(fields[5])
+    if (!Number.isInteger(openLine) || !Number.isInteger(closeLine) || !Number.isInteger(closeIndex))
+      continue
+
+    const expectedParagraphContent = lines.slice(openLine + 1, closeLine + 1).join('\n')
+    const contentLines = lines.slice(openLine + 1, closeLine)
+    const closeLineBeforeDelimiter = String(lines[closeLine] ?? '').slice(0, closeIndex)
+    if (closeLineBeforeDelimiter)
+      contentLines.push(closeLineBeforeDelimiter)
+
+    const content = contentLines.join('\n')
+    for (let prefixIndex = 0; prefixIndex <= restored.length - 6; prefixIndex++) {
+      if (!isSyntheticTolerantBoundaryParagraphTriplet(restored, prefixIndex))
+        continue
+
+      const prefixMap = restored[prefixIndex]?.map
+      if (!prefixMap || prefixMap[0] !== openLine || prefixMap[1] !== openLine + 1)
+        continue
+
+      const paragraphIndex = prefixIndex + 3
+      if (!isParagraphTokenTriplet(restored, paragraphIndex))
+        continue
+
+      const paragraphMap = restored[paragraphIndex]?.map
+      if (!paragraphMap || paragraphMap[0] !== openLine + 1 || paragraphMap[1] !== closeLine + 1)
+        continue
+
+      if (String(restored[paragraphIndex + 1]?.content ?? '') !== expectedParagraphContent)
+        continue
+
+      if (restored === tokens)
+        restored = tokens.slice()
+
+      restored.splice(paragraphIndex, 3, {
+        type: 'math_block',
+        tag: 'math',
+        nesting: 0,
+        content,
+        markup: '$$',
+        raw: `$$${content}${content.startsWith('\n') ? '\n' : ''}$$`,
+        map: [openLine + 1, closeLine + 1],
+        block: true,
+        loading: false,
+        tolerantBoundary: true,
+      } as unknown as Token)
+      break
+    }
+  }
+
+  return restored
+}
+
+function compactDuplicateTolerantMathPrefixTokens(tokens: Token[], source: string, boundaryKey: string) {
+  let compacted = restoreStaleCompletedTolerantMathTokens(tokens, source, boundaryKey)
+
+  for (let mathIndex = compacted.length - 1; mathIndex >= 0; mathIndex--) {
     const token = compacted[mathIndex] as Token & { loading?: boolean, tolerantBoundary?: boolean }
-    if (!token || token.type !== 'math_block' || token.loading !== true || token.tolerantBoundary !== true)
+    if (!token || token.type !== 'math_block' || token.tolerantBoundary !== true)
       continue
 
     let rightIndex = mathIndex - 3
@@ -859,7 +922,7 @@ function parseTopLevelTokens(
 
   const rawTokens = md.stream!.parse!(source, streamEnv)
   const tokens = activeTolerantBoundaryState?.key
-    ? compactDuplicatePendingTolerantMathPrefixTokens(rawTokens)
+    ? compactDuplicateTolerantMathPrefixTokens(rawTokens, source, activeTolerantBoundaryState.key)
     : rawTokens
 
   if (!shouldCloneTopLevelStreamTokens(options))

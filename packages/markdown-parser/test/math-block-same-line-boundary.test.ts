@@ -1877,6 +1877,76 @@ describe('math block same-line boundary regression', () => {
     expect(collectByType(nodes, 'math_block')).toHaveLength(1)
   })
 
+  it('compacts synthetic duplicate tolerant-boundary prefix paragraphs before completed math blocks too', () => {
+    const md = getMarkdown('pkg-stream-compact-completed-synthetic-tolerant-prefix')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const syntheticMeta = {
+      [TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META]: true,
+    }
+
+    const makeParagraphTriplet = () => [
+      {
+        type: 'paragraph_open',
+        tag: 'p',
+        nesting: 1,
+        map: [0, 1],
+        meta: syntheticMeta,
+      },
+      {
+        type: 'inline',
+        tag: '',
+        nesting: 0,
+        content: 'Before display',
+        map: [0, 1],
+        children: [{ type: 'text', tag: '', nesting: 0, content: 'Before display' }],
+        meta: syntheticMeta,
+      },
+      {
+        type: 'paragraph_close',
+        tag: 'p',
+        nesting: -1,
+        map: [0, 1],
+        meta: syntheticMeta,
+      },
+    ]
+
+    ;(md as any).stream.parse = () => [
+      ...makeParagraphTriplet(),
+      ...makeParagraphTriplet(),
+      {
+        type: 'math_block',
+        tag: 'math',
+        nesting: 0,
+        content: 'a = 1',
+        markup: '$$',
+        raw: '$$a = 1$$',
+        map: [1, 3],
+        block: true,
+        loading: false,
+        tolerantBoundary: true,
+      },
+    ]
+
+    const nodes = parseMarkdownToStructure([
+      'Before display $$',
+      'a = 1',
+      '$$',
+    ].join('\n'), md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(nodes.map((node: any) => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+    ])
+    expect(nodes.filter((node: any) => node.type === 'paragraph')).toHaveLength(1)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+    expect(collectByType(nodes, 'math_block')[0].loading).toBe(false)
+  })
+
   it('does not compact unmarked duplicate paragraph triples before tolerant loading math', () => {
     const md = getMarkdown('pkg-stream-do-not-compact-unmarked-duplicate-paragraphs')
     ;(md as any).stream.reset()
@@ -1985,6 +2055,89 @@ describe('math block same-line boundary regression', () => {
     expect(collectByType(nodes, 'math_inline')).toHaveLength(0)
     expect(JSON.stringify(nodes)).toContain('tail-11')
     expect(JSON.stringify(nodes)).toContain('should stay plain text')
+  })
+
+  it('does not suppress an adjacent real line-start $$ block after a close-only tolerant boundary while streaming', () => {
+    const md = getMarkdown('pkg-stream-tolerant-close-only-then-real-display')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    const originalParse = stream.parse.bind(stream)
+    let resetCount = 0
+    let streamParseCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+    stream.parse = (...args: any[]) => {
+      streamParseCount++
+      return originalParse(...args)
+    }
+
+    let source = [
+      'Before tolerant display $$',
+      'a = 1',
+      '$$',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(streamParseCount).toBe(1)
+    expect(nodes.map((node: any) => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+    ])
+
+    source += [
+      '',
+      '$$',
+      'b = 2',
+      '$$',
+      'After second display with $b$ inline.',
+    ].join('\n')
+
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(streamParseCount).toBe(2)
+    expect(nodes.map((node: any) => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'math_block',
+      'paragraph',
+    ])
+
+    let mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(2)
+    expect(mathBlocks[0].loading).toBe(false)
+    expect(mathBlocks[1].loading).toBe(false)
+    expect(mathBlocks[0].content).toContain('a = 1')
+    expect(mathBlocks[1].content).toContain('b = 2')
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('b')
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 10; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+      mathBlocks = collectByType(nodes, 'math_block')
+      expect(mathBlocks).toHaveLength(2)
+      expect(mathBlocks.every((node: any) => node.loading === false)).toBe(true)
+      expect(resetCount).toBe(1)
+    }
   })
 
   it('does not enable tolerant close-line source lookup for ordinary line-start display math streams', () => {
