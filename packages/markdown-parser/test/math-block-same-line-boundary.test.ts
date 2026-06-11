@@ -250,10 +250,8 @@ describe('math block same-line boundary regression', () => {
     const stream = (md as any).stream
     const originalReset = stream.reset.bind(stream)
     const originalParse = stream.parse.bind(stream)
-    const originalPeek = stream.peek?.bind(stream)
     let resetCount = 0
     let streamParseCount = 0
-    let peekCount = 0
 
     stream.reset = () => {
       resetCount++
@@ -262,12 +260,6 @@ describe('math block same-line boundary regression', () => {
     stream.parse = (...args: any[]) => {
       streamParseCount++
       return originalParse(...args)
-    }
-    if (originalPeek) {
-      stream.peek = () => {
-        peekCount++
-        return originalPeek()
-      }
     }
 
     let source = [
@@ -282,7 +274,7 @@ describe('math block same-line boundary regression', () => {
     }) as any[]
 
     // First parse with a completed tolerant boundary resets once and rebuilds
-    // through stream.parse. Repeated parses of the same key reuse stream.peek.
+    // through stream.parse. Repeated parses must stay stable without reset.
     expect(resetCount).toBe(1)
     expect(streamParseCount).toBe(1)
     expect(nodes.map(node => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
@@ -298,13 +290,7 @@ describe('math block same-line boundary regression', () => {
       expect(resetCount).toBe(1)
     }
 
-    if (originalPeek) {
-      expect(streamParseCount).toBe(1)
-      expect(peekCount).toBe(6)
-    }
-    else {
-      expect(streamParseCount).toBe(7)
-    }
+    expect(streamParseCount).toBe(7)
 
     // Append plain text without resetting since the new chunk cannot complete
     // or change a math boundary.
@@ -315,11 +301,79 @@ describe('math block same-line boundary regression', () => {
     }) as any[]
 
     expect(resetCount).toBe(1)
-    expect(streamParseCount).toBe(originalPeek ? 2 : 8)
+    expect(streamParseCount).toBe(8)
     expect(nodes.map(node => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
     expect(collectByType(nodes, 'math_block')).toHaveLength(1)
     expect(collectByType(nodes, 'math_block')[0].loading).toBe(false)
     expect(JSON.stringify(nodes)).toContain('More suffix text')
+  })
+
+  it('does not reset on every normal chunk while a tolerant $$ boundary is pending', () => {
+    const md = getMarkdown('stream-math-boundary-pending-append-no-reset-loop')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    const originalParse = stream.parse.bind(stream)
+    let resetCount = 0
+    let streamParseCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+    stream.parse = (...args: any[]) => {
+      streamParseCount++
+      return originalParse(...args)
+    }
+
+    let source = [
+      'Before display $$',
+      'a = 1',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(streamParseCount).toBe(1)
+    expect(nodes.map((node: any) => node.type)).toEqual(['paragraph', 'math_block'])
+
+    let mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(true)
+    expect(mathBlocks[0].content).toContain('a = 1')
+
+    source += '\nb = 2'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(streamParseCount).toBe(2)
+    expect(nodes.map((node: any) => node.type)).toEqual(['paragraph', 'math_block'])
+    mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(true)
+    expect(mathBlocks[0].content).toContain('a = 1')
+    expect(mathBlocks[0].content).toContain('b = 2')
+
+    source += '\nc = 3'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(streamParseCount).toBe(3)
+    expect(nodes.map((node: any) => node.type)).toEqual(['paragraph', 'math_block'])
+    mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].content).toContain('c = 3')
   })
 
   it('resets once when tolerant $$ close delimiter is split across stream chunks', () => {
@@ -668,30 +722,28 @@ describe('math block same-line boundary regression', () => {
 
     source += '\n+ b = 2'
     nodes = parseMarkdownToStructure(source, md, { final: false, streamParse: true }) as any[]
-    expect(resetCount).toBe(2)
+    expect(resetCount).toBe(1)
     expect(streamParseCount).toBe(3)
     expect(collectByType(nodes, 'math_block')).toHaveLength(1)
     expect(collectByType(nodes, 'math_block')[0].content).toContain('+ b = 2')
 
     source += '\n$$ after $a$ follows.'
     nodes = parseMarkdownToStructure(source, md, { final: false, streamParse: true }) as any[]
-    expect(resetCount).toBe(3)
+    expect(resetCount).toBe(2)
     expect(streamParseCount).toBe(4)
     expect(nodes.map((node: any) => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
   })
 
-  it('reuses stream cache for repeated active pending tolerant boundary source', () => {
-    const md = getMarkdown('pkg-stream-tolerant-pending-uses-peek')
+  it('keeps pending tolerant boundary stable for repeated parses', () => {
+    const md = getMarkdown('pkg-stream-tolerant-pending-stable-repeated-parse')
     ;(md as any).stream.reset()
     ;(md as any).stream.resetStats()
 
     const stream = (md as any).stream
     const originalReset = stream.reset.bind(stream)
     const originalParse = stream.parse.bind(stream)
-    const originalPeek = stream.peek?.bind(stream)
     let resetCount = 0
     let streamParseCount = 0
-    let peekCount = 0
 
     stream.reset = () => {
       resetCount++
@@ -700,12 +752,6 @@ describe('math block same-line boundary regression', () => {
     stream.parse = (...args: any[]) => {
       streamParseCount++
       return originalParse(...args)
-    }
-    if (originalPeek) {
-      stream.peek = () => {
-        peekCount++
-        return originalPeek()
-      }
     }
 
     const source = [
@@ -733,10 +779,7 @@ describe('math block same-line boundary regression', () => {
     }
 
     expect(resetCount).toBe(1)
-    if (originalPeek) {
-      expect(streamParseCount).toBe(1)
-      expect(peekCount).toBe(8)
-    }
+    expect(streamParseCount).toBe(9)
   })
 
   it('preserves legitimate duplicate paragraphs before pending tolerant math', () => {

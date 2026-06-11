@@ -522,7 +522,7 @@ function appendedChunkMayChangeActiveTolerantMathBoundary(
 function syncTopLevelStreamCacheForCompletedTolerantMathBoundary(
   md: MarkdownIt,
   source: string,
-): 'parse' | 'stream' | 'peek' {
+): 'parse' | 'stream' {
   const stream = md.stream
   if (typeof stream?.reset !== 'function')
     return 'parse'
@@ -534,19 +534,14 @@ function syncTopLevelStreamCacheForCompletedTolerantMathBoundary(
   // Exact same active source: reuse the stream cache. The stale-cache risk
   // is handled by resetting exactly when the active tolerant-boundary key changes
   // or first appears. Repeated full md.parse here is the performance trap.
-  if (previous?.source === source && previousKey !== null) {
-    if (typeof stream.peek === 'function')
-      return 'peek'
+  if (previous?.source === source && previousKey !== null)
     return 'stream'
-  }
 
   if (previous && source.startsWith(previous.source)) {
     if (
       previousKey !== null
       && !appendedChunkMayChangeActiveTolerantMathBoundary(previousKey, previous.source, source)
     ) {
-      if (previousKey.startsWith('pending:'))
-        stream.reset()
       previous.source = source
       return 'stream'
     }
@@ -564,8 +559,6 @@ function syncTopLevelStreamCacheForCompletedTolerantMathBoundary(
   const boundaryKey = getActiveTolerantMathBlockBoundaryCacheKey(source)
 
   if (boundaryKey !== null && boundaryKey === previousKey) {
-    if (boundaryKey.startsWith('pending:') && previous?.source !== source)
-      stream.reset()
     activeTolerantMathBoundaryStreamStateCache.set(cacheOwner, {
       key: boundaryKey,
       source,
@@ -594,6 +587,55 @@ function shouldCloneTopLevelStreamTokens(options: ParseOptions) {
     || typeof options.postTransformTokens === 'function'
 }
 
+function sameTokenMap(left: Token | undefined, right: Token | undefined) {
+  const leftMap = left?.map
+  const rightMap = right?.map
+  if (!leftMap || !rightMap)
+    return leftMap === rightMap
+
+  return leftMap[0] === rightMap[0] && leftMap[1] === rightMap[1]
+}
+
+function isParagraphTokenTriplet(tokens: Token[], index: number) {
+  return tokens[index]?.type === 'paragraph_open'
+    && tokens[index + 1]?.type === 'inline'
+    && tokens[index + 2]?.type === 'paragraph_close'
+}
+
+function sameParagraphTokenTriplet(tokens: Token[], leftIndex: number, rightIndex: number) {
+  if (!isParagraphTokenTriplet(tokens, leftIndex) || !isParagraphTokenTriplet(tokens, rightIndex))
+    return false
+
+  return sameTokenMap(tokens[leftIndex], tokens[rightIndex])
+    && sameTokenMap(tokens[leftIndex + 1], tokens[rightIndex + 1])
+    && String(tokens[leftIndex + 1]?.content ?? '') === String(tokens[rightIndex + 1]?.content ?? '')
+}
+
+function compactDuplicatePendingTolerantMathPrefixTokens(tokens: Token[]) {
+  let compacted = tokens
+
+  for (let mathIndex = tokens.length - 1; mathIndex >= 0; mathIndex--) {
+    const token = compacted[mathIndex] as Token & { loading?: boolean, tolerantBoundary?: boolean }
+    if (!token || token.type !== 'math_block' || token.loading !== true || token.tolerantBoundary !== true)
+      continue
+
+    let rightIndex = mathIndex - 3
+    let leftIndex = rightIndex - 3
+    while (leftIndex >= 0 && sameParagraphTokenTriplet(compacted, leftIndex, rightIndex)) {
+      // The stream parser keeps private indexes into its token cache.
+      if (compacted === tokens)
+        compacted = tokens.slice()
+
+      compacted.splice(leftIndex, 3)
+      mathIndex -= 3
+      rightIndex -= 3
+      leftIndex -= 3
+    }
+  }
+
+  return compacted
+}
+
 function parseTopLevelTokens(
   md: MarkdownIt,
   source: string,
@@ -620,9 +662,7 @@ function parseTopLevelTokens(
 
   const streamEnv = getStableStreamEnv(md, env)
   streamEnv.__markstreamSource = source
-  const tokens = mode === 'peek' && typeof md.stream?.peek === 'function'
-    ? md.stream.peek()
-    : md.stream!.parse!(source, streamEnv)
+  const tokens = compactDuplicatePendingTolerantMathPrefixTokens(md.stream!.parse!(source, streamEnv))
   if (!shouldCloneTopLevelStreamTokens(options))
     return tokens
 
