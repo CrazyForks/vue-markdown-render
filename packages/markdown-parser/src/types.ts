@@ -299,6 +299,7 @@ export type MarkdownTokenMeta = Record<string, unknown>
 type MarkdownTokenBase = Omit<Token, 'children' | 'meta'> & {
   children?: MarkdownToken[] | null
   loading?: boolean
+  tolerantBoundary?: boolean
   mark?: string
   meta?: MarkdownTokenMeta | null
   raw?: string
@@ -321,6 +322,7 @@ export interface MarkdownTokenLite {
   level?: number
   children?: MarkdownToken[] | null
   loading?: boolean
+  tolerantBoundary?: boolean
   raw?: string
 }
 

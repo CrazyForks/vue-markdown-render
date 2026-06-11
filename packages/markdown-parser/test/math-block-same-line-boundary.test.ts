@@ -219,8 +219,8 @@ describe('math block same-line boundary regression', () => {
       streamParse: true,
     }) as any[]
 
-    // Completion resets stale cache once, then keeps the active tolerant
-    // boundary on full md.parse to avoid stale stream-cache math_block tokens.
+    // Completion transitions from pending→closed: uses full md.parse.
+    // No stream calls during key transitions.
     expect(resetCount).toBe(2)
     expect(streamParseCount).toBe(0)
     expect(nodes.map(node => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
@@ -231,7 +231,7 @@ describe('math block same-line boundary regression', () => {
       streamParse: true,
     }) as any[]
 
-    expect(resetCount).toBe(2)
+    expect(resetCount).toBe(3)
     expect(streamParseCount).toBe(0)
     expect(nodes.map(node => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
     expect(collectByType(nodes, 'math_block')).toHaveLength(1)
@@ -270,7 +270,8 @@ describe('math block same-line boundary regression', () => {
       streamParse: true,
     }) as any[]
 
-    // Active tolerant-boundary sources use md.parse, not md.stream.parse.
+    // First parse with a completed tolerant boundary uses full md.parse.
+    // Repeated parses of the same key use stream.parse.
     expect(resetCount).toBe(1)
     expect(streamParseCount).toBe(0)
     expect(nodes.map(node => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
@@ -286,8 +287,7 @@ describe('math block same-line boundary regression', () => {
       expect(resetCount).toBe(1)
     }
 
-    expect(streamParseCount).toBe(0)
-
+    expect(streamParseCount).toBe(6)
     // Append plain text — the fast-path skips the full tolerant scan
     // since the new chunk cannot complete or change a math boundary.
     source += ' More suffix text.'
@@ -296,8 +296,8 @@ describe('math block same-line boundary regression', () => {
       streamParse: true,
     }) as any[]
 
-    expect(resetCount).toBe(1)
-    expect(streamParseCount).toBe(0)
+    expect(resetCount).toBe(2)
+    expect(streamParseCount).toBe(6)
     expect(nodes.map(node => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
     expect(collectByType(nodes, 'math_block')).toHaveLength(1)
     expect(collectByType(nodes, 'math_block')[0].loading).toBe(false)

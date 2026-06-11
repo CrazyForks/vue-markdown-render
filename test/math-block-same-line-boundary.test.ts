@@ -1,5 +1,6 @@
-import { getMarkdown, hasClosedTolerantMathBlockBoundaryCandidate, parseMarkdownToStructure, processTokens } from 'stream-markdown-parser'
+import { getMarkdown, parseMarkdownToStructure, processTokens } from 'stream-markdown-parser'
 import { describe, expect, it } from 'vitest'
+import { hasClosedTolerantMathBlockBoundaryCandidate } from '../packages/markdown-parser/src/plugins/math'
 
 describe('math block same-line boundary regression', () => {
   function collectByType(nodes: any, type: string, out: any[] = [], seen = new WeakSet<object>()) {
@@ -1683,7 +1684,7 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
 
     const mathBlocks = tokens.filter(token => token.type === 'math_block')
     expect(mathBlocks).toHaveLength(1)
-    expect(mathBlocks[0].map).toEqual([0, 3])
+    expect(mathBlocks[0].map).toEqual([1, 2])
     expect(mathBlocks[0].content).toContain('E=mc^2')
   })
 
@@ -3918,5 +3919,76 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
       expect(collectByType(nodes, 'math_block')).toHaveLength(1)
       expect(collectByType(nodes, 'math_block')[0].loading).toBe(false)
     }
+  })
+
+  it('uses non-overlapping line maps for tolerant prefix/math/suffix tokens', () => {
+    const md = getMarkdown('direct-md-parse-boundary-non-overlap-maps')
+
+    const tokens = md.parse([
+      'Before $a$ and display $$',
+      'E=mc^2',
+      '$$ where $x$ follows.',
+    ].join('\n'), { __markstreamFinal: true }) as any[]
+
+    const inlineTokens = tokens.filter(token => token.type === 'inline')
+    const mathBlocks = tokens.filter(token => token.type === 'math_block')
+
+    expect(inlineTokens.map(token => token.content)).toEqual([
+      'Before $a$ and display',
+      'where $x$ follows.',
+    ])
+    expect(inlineTokens.map(token => token.map)).toEqual([
+      [0, 1],
+      [2, 3],
+    ])
+
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].map).toEqual([1, 2])
+    expect(mathBlocks[0].content).toContain('E=mc^2')
+  })
+
+  it('does not duplicate tolerant prefix/suffix paragraphs when stream parser is reused after reset', () => {
+    const md = getMarkdown('stream-boundary-no-duplicate-with-stream-cache')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      'Before $a$ and display $$',
+      'E=mc^2',
+      '$$ where $x$ follows.',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+
+    for (let index = 0; index < 12; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(nodes.map((node: any) => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const prefixParagraphs = nodes.filter(
+      (node: any) => node.type === 'paragraph' && String(node.raw ?? '').includes('Before'),
+    )
+    const suffixParagraphs = nodes.filter(
+      (node: any) => node.type === 'paragraph' && String(node.raw ?? '').includes('where'),
+    )
+
+    expect(prefixParagraphs).toHaveLength(1)
+    expect(suffixParagraphs).toHaveLength(1)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
   })
 })

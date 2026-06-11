@@ -546,7 +546,7 @@ function findPlainBracketFallbackClose(src: string) {
   return index
 }
 
-const TOLERANT_VALUE_ATOM = String.raw`(?:[A-Za-z]|\d+(?:\.\d+)?|\\[a-z]+)`
+const TOLERANT_VALUE_ATOM = String.raw`(?:[a-z]|\d+(?:\.\d+)?|\\[a-z]+)`
 const TOLERANT_BOUNDARY_BEFORE = String.raw`(?:^|[^\p{L}\p{N}\\])`
 const TOLERANT_BOUNDARY_AFTER = String.raw`(?:$|[^\p{L}\p{N}])`
 const TOLERANT_OPERATOR = String.raw`(?:[=+*/<>]|-(?!\s*\p{L}{2,}\b))`
@@ -2076,10 +2076,36 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           }
         }
         else {
-          matched = true
-          openDelim = open
-          closeDelim = close
-          break
+          // When the stream parser re-processes a changed line that starts
+          // with `$` or `\[`, the markdown-it block rule may be invoked for
+          // a line that was already consumed as the *close* delimiter of a
+          // tolerant same-line boundary on an earlier line. Without this guard,
+          // the stream parser creates a duplicate math_block for the close.
+          //
+          // Check existing tokens: if the most recent math_block was emitted
+          // by a tolerant boundary and its map ends at or before this line,
+          // treat this delimiter as its close rather than a new opener.
+          let closesExistingTolerantMath = false
+          if (startLine > 0 && (open === '$' || open === '\\[')) {
+            const tokens = s.tokens
+            for (let ti = tokens.length - 1; ti >= 0; ti--) {
+              const prev = tokens[ti]
+              if (prev.type === 'math_block') {
+                if (prev.tolerantBoundary && prev.map && prev.map[1] <= startLine)
+                  closesExistingTolerantMath = true
+                break
+              }
+              if (prev.type !== 'inline' && prev.type !== 'paragraph_open' && prev.type !== 'paragraph_close')
+                break
+            }
+          }
+
+          if (!closesExistingTolerantMath) {
+            matched = true
+            openDelim = open
+            closeDelim = close
+            break
+          }
         }
       }
       // AI/LLM 输出中常见的异常格式：
@@ -2169,6 +2195,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     let found = false
     let trailingAfterClose = ''
     let trailingAfterCloseLine = startLine
+    let closeLineHasContentBeforeDelim = false
 
     const firstLineContent
       = skipFirstLine
@@ -2196,8 +2223,10 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
 
     if (firstLineCloseIndex !== -1) {
       const endIndex = firstLineCloseIndex
-      content = firstLineContent.slice(0, endIndex)
+      const beforeClose = firstLineContent.slice(0, endIndex)
+      content = beforeClose
       trailingAfterClose = firstLineContent.slice(endIndex + closeDelim.length)
+      closeLineHasContentBeforeDelim = !!beforeClose.trim()
       trailingAfterCloseLine = skipFirstLine ? startLine + 1 : startLine
       found = true
       nextLine = skipFirstLine ? startLine + 1 : startLine
@@ -2239,8 +2268,10 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           closeDelim = fallbackPlainBracketClose
           found = true
           const beforeClose = currentLine.slice(0, fallbackPlainBracketCloseInLine)
-          if (beforeClose.trim())
+          if (beforeClose.trim()) {
             content += (content ? '\n' : '') + beforeClose
+            closeLineHasContentBeforeDelim = true
+          }
           trailingAfterClose = currentLine.slice(fallbackPlainBracketCloseInLine + closeDelim.length)
           trailingAfterCloseLine = nextLine
           break
@@ -2254,8 +2285,10 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           const endIndex = escapedPlainBracketCloseInLine
           const beforeClose = currentLine.slice(0, endIndex)
           closeDelim = '\\]'
-          if (beforeClose)
+          if (beforeClose) {
             content += (content ? '\n' : '') + beforeClose
+            closeLineHasContentBeforeDelim = !!beforeClose.trim()
+          }
           trailingAfterClose = currentLine.slice(endIndex + closeDelim.length)
           trailingAfterCloseLine = nextLine
           break
@@ -2264,8 +2297,10 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           found = true
           const endIndex = closeIndexInLine
           const beforeClose = currentLine.slice(0, endIndex)
-          if (beforeClose)
+          if (beforeClose) {
             content += (content ? '\n' : '') + beforeClose
+            closeLineHasContentBeforeDelim = !!beforeClose.trim()
+          }
           trailingAfterClose = currentLine.slice(endIndex + closeDelim.length)
           trailingAfterCloseLine = nextLine
           break
@@ -2320,11 +2355,36 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     token.markup
       = openDelim === '$$' ? '$$' : openDelim === '[' ? '[]' : '\\[\\]'
     token.raw = `${openDelim}${content}${content.startsWith('\n') ? '\n' : ''}${closeDelim}`
-    const blockEndLine = found ? nextLine + 1 : endLine
-    token.map = [startLine, blockEndLine]
+
+    const consumedEndLine = found ? nextLine + 1 : endLine
+
+    // Tolerant same-line repair emits synthetic prefix/suffix paragraphs around
+    // the display math. Do not give the math_block a line map that overlaps
+    // those synthetic paragraphs; stream parser cache invalidation is line-map
+    // based and overlapping maps are what caused stale loading blocks and
+    // duplicated paragraphs.
+    const mapStartLine = tolerantBoundary
+      ? firstLineNumber
+      : startLine
+
+    let mapEndLine = consumedEndLine
+    if (
+      tolerantBoundary
+      && found
+      && trailingAfterClose.trim()
+      && !closeLineHasContentBeforeDelim
+    ) {
+      mapEndLine = trailingAfterCloseLine
+    }
+
+    if (mapEndLine <= mapStartLine)
+      mapEndLine = mapStartLine + 1
+
+    token.map = [mapStartLine, mapEndLine]
     token.block = true
     token.loading = !found
-    s.line = blockEndLine
+    token.tolerantBoundary = tolerantBoundary
+    s.line = consumedEndLine
 
     if (trailingAfterClose.trim())
       pushSyntheticInlineParagraph(s, trailingAfterClose, trailingAfterCloseLine)
