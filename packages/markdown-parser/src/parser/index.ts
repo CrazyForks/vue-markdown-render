@@ -2737,7 +2737,10 @@ export function parseMarkdownToStructure(
       // streaming 中间态：单独的 "*"/"+" 行会被识别成空的 list item，导致 UI 闪出一个圆点
       safeMarkdown = safeMarkdown.replace(/\n\s*[*+]\s*$/, '\n')
     }
-    else if (/(?:^|\n)\s*\d+\s*$/.test(safeMarkdown)) {
+    else if (
+      /(?:^|\n)\s*\d+\s*$/.test(safeMarkdown)
+      && !(hasMarkstreamMathPlugin(md) && mayContainPendingTolerantMathBlockBoundaryCandidate(safeMarkdown))
+    ) {
       // streaming 中间态：单独的 "2" / "10" 行常是有序列表 marker 的前缀（下一字符才到 "." / ")"）。
       // 在此状态下 markdown-it 会把它解析成 paragraph/text，导致先撑开一段空白再被下一次解析替换，形成抖动。
       // 只裁剪末尾这一行，等 marker 完整或有内容后再正常解析。

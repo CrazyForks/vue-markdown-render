@@ -2528,4 +2528,160 @@ describe('math block same-line boundary regression', () => {
       }
     }
   })
+
+  it('keeps pending tolerant single-atom math aligned with stream cache', () => {
+    const cases = [
+      {
+        name: 'dollar single variable',
+        open: '$$',
+        close: '$$',
+        formula: 'x',
+        inline: 'x',
+        expectedMarkup: '$$',
+      },
+      {
+        name: 'dollar single number',
+        open: '$$',
+        close: '$$',
+        formula: '1',
+        inline: 'x',
+        expectedMarkup: '$$',
+      },
+      {
+        name: 'explicit bracket single variable',
+        open: '\\[',
+        close: '\\]',
+        formula: 'x',
+        inline: 'x',
+        expectedMarkup: '\\[\\]',
+      },
+      {
+        name: 'dollar spaced subscript',
+        open: '$$',
+        close: '$$',
+        formula: 'f _ { x }',
+        inline: 'x',
+        expectedMarkup: '$$',
+      },
+    ] as const
+
+    for (const item of cases) {
+      const md = getMarkdown(`pkg-stream-tolerant-pending-single-atom-${item.name.replace(/\s+/g, '-')}`)
+      ;(md as any).stream.reset()
+      ;(md as any).stream.resetStats()
+
+      const stream = (md as any).stream
+      const originalReset = stream.reset.bind(stream)
+      let resetCount = 0
+      stream.reset = () => {
+        resetCount++
+        return originalReset()
+      }
+
+      let source = [
+        `Before display ${item.open}`,
+        item.formula,
+      ].join('\n')
+
+      expect(
+        getActiveTolerantMathBlockBoundaryCacheKey(source),
+        item.name,
+      ).toEqual(expect.stringContaining('pending:'))
+
+      let nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(resetCount, item.name).toBe(1)
+      expect(nodes.map((node: any) => node.type), item.name).toEqual([
+        'paragraph',
+        'math_block',
+      ])
+
+      let mathBlocks = collectByType(nodes, 'math_block')
+      expect(mathBlocks, item.name).toHaveLength(1)
+      expect(mathBlocks[0].loading, item.name).toBe(true)
+      expect(mathBlocks[0].markup, item.name).toBe(item.expectedMarkup)
+      expect(mathBlocks[0].content, item.name).toContain(item.formula)
+
+      const pendingSerialized = JSON.stringify(nodes)
+      for (let index = 0; index < 6; index++) {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+
+        expect(JSON.stringify(nodes), item.name).toBe(pendingSerialized)
+        expect(resetCount, item.name).toBe(1)
+      }
+
+      source += `\n${item.close} after $${item.inline}$ follows.`
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(resetCount, item.name).toBe(2)
+      expect(nodes.map((node: any) => node.type), item.name).toEqual([
+        'paragraph',
+        'math_block',
+        'paragraph',
+      ])
+
+      mathBlocks = collectByType(nodes, 'math_block')
+      expect(mathBlocks, item.name).toHaveLength(1)
+      expect(mathBlocks[0].loading, item.name).toBe(false)
+      expect(mathBlocks[0].markup, item.name).toBe(item.expectedMarkup)
+      expect(mathBlocks[0].content, item.name).toContain(item.formula)
+      expect(mathBlocks[0].content, item.name).not.toContain('after')
+      expect(collectByType(nodes, 'math_inline').map((node: any) => node.content), item.name).toContain(item.inline)
+
+      const completedSerialized = JSON.stringify(nodes)
+      for (let index = 0; index < 6; index++) {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+
+        expect(JSON.stringify(nodes), item.name).toBe(completedSerialized)
+        expect(resetCount, item.name).toBe(2)
+      }
+    }
+  })
+
+  it('does not promote prose-only tolerant tails after pending predicate alignment', () => {
+    const md = getMarkdown('pkg-stream-tolerant-pending-prose-tail-stays-text')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = [
+      'This prose line happens to end with $$',
+      'hello world without math signal',
+    ].join('\n')
+
+    expect(getActiveTolerantMathBlockBoundaryCacheKey(source)).toBe(null)
+
+    let nodes: any[] = []
+    for (let index = 0; index < 16; index++) {
+      source += ` chunk-${index}`
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+    }
+
+    expect(resetCount).toBe(0)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(JSON.stringify(nodes)).toContain('hello world without math signal')
+    expect(JSON.stringify(nodes)).toContain('chunk-15')
+  })
 })

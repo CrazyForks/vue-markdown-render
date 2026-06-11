@@ -602,7 +602,7 @@ function isLikelySpacedSuperSubscriptMath(content: string) {
   const stripped = String(content ?? '').trim()
   if (!stripped || stripped.length > 400)
     return false
-  return /(?:^|[^\p{L}\p{N}\\])(?:[A-Z]|\\[A-Z]+)\s*[_^]\s*(?:\{[^{}\n]{1,120}\}|[A-Z0-9\\]+)(?:$|[^\p{L}\p{N}])/iu.test(stripped)
+  return /(?:^|[^\p{L}\p{N}\\])(?:[a-z]|\\[a-z]+)\s*[_^]\s*(?:\{[^{}\n]{1,120}\}|[a-z0-9\\]+)(?:$|[^\p{L}\p{N}])/iu.test(stripped)
 }
 function isLikelyTolerantExplicitMathBlockContent(content: string, closed: boolean) {
   const stripped = String(content ?? '').trim()
@@ -1285,7 +1285,7 @@ function getTolerantMathBlockBoundaryCacheKey(markdown: string, includePending: 
         && !closed
         && !stoppedBeforeTail
         && currentLineNumber >= lines.length
-        && isLikelyTolerantExplicitMathBlockContent(content, false)
+        && isPotentialTolerantPendingMathContent(content)
       ) {
         // Pending key deliberately does not include content hash. While the user
         // is still streaming math content, appending normal math text should not
@@ -1317,6 +1317,9 @@ function isPotentialTolerantPendingMathContent(content: string) {
     return true
 
   if (isLikelyTolerantExplicitMathBlockContent(stripped, false))
+    return true
+
+  if (isLikelySpacedSuperSubscriptMath(stripped))
     return true
 
   if (/^(?:[a-z]|pi|\\[a-z]*|\d+(?:\.\d+)?)$/i.test(stripped))
@@ -2853,14 +2856,18 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     // merely because the content has weak heuristic signals.
     // However, if the content starts with markdown special syntax like ![, skip.
     const hasMarkdownPrefix = /^\s*!\[/.test(content)
+    const looksTolerantBoundaryMath = !tolerantBoundary
+      || (found
+        ? isLikelyTolerantExplicitMathBlockContent(content, true)
+        : isPotentialTolerantPendingMathContent(content))
+
     const looksMath = openDelim === '$$' || openDelim === '\\['
-      ? !hasMarkdownPrefix && (
-          !tolerantBoundary
-          || isLikelyTolerantExplicitMathBlockContent(content, found)
+      ? !hasMarkdownPrefix && looksTolerantBoundaryMath
+      : (
+          openDelim === '['
+            ? isPlainBracketMathLike(content)
+            : isMathLike(content)
         )
-      : (openDelim === '['
-          ? isPlainBracketMathLike(content)
-          : isMathLike(content))
     if (!looksMath)
       return false
 
