@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getMarkdown, parseMarkdownToStructure } from '../src'
 import {
+  getActiveTolerantMathBlockBoundaryCacheKey,
   hasClosedTolerantMathBlockBoundaryCandidate,
   mayContainPendingTolerantMathBlockBoundaryCandidate,
   TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META,
@@ -813,6 +814,117 @@ describe('math block same-line boundary regression', () => {
         final: false,
         streamParse: true,
       }) as any[]
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(resetCount).toBe(0)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(collectByType(nodes, 'code_block')).toHaveLength(1)
+    expect(stableSerialized).toContain('where this must stay fenced code')
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('x')
+  })
+
+  it('does not flag tolerant boundaries when the scan window starts inside long protected blocks', () => {
+    const longFiller = Array.from({ length: 2600 }, (_, index) => `filler line ${index}`).join('\n')
+    const longBlockquotedFiller = longFiller
+      .split('\n')
+      .map(line => `> ${line}`)
+      .join('\n')
+
+    const cases = [
+      [
+        'long fenced code',
+        [
+          '```',
+          longFiller,
+          'literal $$',
+          'E=mc^2',
+          '$$ where this must stay code',
+          '```',
+        ].join('\n'),
+      ],
+      [
+        'long blockquoted fenced code',
+        [
+          '> ```',
+          longBlockquotedFiller,
+          '> literal $$',
+          '> E=mc^2',
+          '> $$ where this must stay code',
+          '> ```',
+        ].join('\n'),
+      ],
+      [
+        'long raw html',
+        [
+          '<pre>',
+          longFiller,
+          'literal $$',
+          'E=mc^2',
+          '$$ where this must stay html',
+          '</pre>',
+        ].join('\n'),
+      ],
+      [
+        'long bracket fenced code',
+        [
+          '~~~',
+          longFiller,
+          'literal \\[',
+          'x + y = z',
+          '\\] where this must stay code',
+          '~~~',
+        ].join('\n'),
+      ],
+    ] as const
+
+    for (const [name, source] of cases) {
+      expect(getActiveTolerantMathBlockBoundaryCacheKey(source), name).toBe(null)
+      expect(hasClosedTolerantMathBlockBoundaryCandidate(source), name).toBe(false)
+      expect(mayContainPendingTolerantMathBlockBoundaryCandidate(source), name).toBe(false)
+    }
+  })
+
+  it('keeps streaming stable for long protected blocks with boundary-looking tails', () => {
+    const md = getMarkdown('pkg-stream-long-protected-boundary-window-stable')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    const longFiller = Array.from({ length: 2600 }, (_, index) => `filler line ${index}`).join('\n')
+    const source = [
+      '```',
+      longFiller,
+      'literal $$',
+      'E=mc^2',
+      '$$ where this must stay fenced code',
+      '```',
+      '',
+      'after $x$ remains inline.',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+
+    for (let index = 0; index < 6; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
 
       const serialized = JSON.stringify(nodes)
       if (index === 0)

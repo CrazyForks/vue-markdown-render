@@ -1046,19 +1046,97 @@ const TOLERANT_MATH_BLOCK_BOUNDARY_DELIMITERS = [
   ['\\[', '\\]'],
 ] as const
 
-function getTolerantBoundaryCacheScanWindow(source: string) {
+function findLineStartAtOrBefore(source: string, index: number) {
+  const boundedIndex = Math.min(Math.max(0, index), source.length)
+  const previousNewline = source.lastIndexOf('\n', Math.max(0, boundedIndex - 1))
+  return previousNewline === -1 ? 0 : previousNewline + 1
+}
+
+function findTolerantBoundaryProtectedContextStart(source: string, targetIndex: number) {
+  const target = Math.min(Math.max(0, targetIndex), source.length)
+  let index = 0
+
+  let fenceMarker: '`' | '~' | '' = ''
+  let fenceLen = 0
+  let fenceStart = -1
+
+  let htmlTag = ''
+  let htmlStart = -1
+
+  while (index < source.length && index < target) {
+    const newlineIndex = source.indexOf('\n', index)
+    const hasNewline = newlineIndex !== -1
+    const rawLineEnd = hasNewline
+      ? (newlineIndex > index && source[newlineIndex - 1] === '\r' ? newlineIndex - 1 : newlineIndex)
+      : source.length
+    const rawLine = source.slice(index, rawLineEnd)
+    const line = splitTolerantBoundaryBlockquotePrefix(rawLine).content
+
+    if (htmlTag) {
+      if (hasTolerantBoundaryHtmlClose(line, htmlTag)) {
+        htmlTag = ''
+        htmlStart = -1
+      }
+    }
+    else if (fenceMarker) {
+      const fence = parseTolerantBoundaryFenceMarker(line)
+      if (
+        fence
+        && fence.markerChar === fenceMarker
+        && fence.markerLen >= fenceLen
+        && isOnlySpaceOrTabFrom(fence.rest)
+      ) {
+        fenceMarker = ''
+        fenceLen = 0
+        fenceStart = -1
+      }
+    }
+    else if (!isIndentedCodeLineForTolerantBoundary(line)) {
+      const fence = parseTolerantBoundaryFenceMarker(line)
+      if (fence) {
+        fenceMarker = fence.markerChar
+        fenceLen = fence.markerLen
+        fenceStart = index
+      }
+      else {
+        const html = parseTolerantBoundaryHtmlOpen(line)
+        if (html && !html.closed) {
+          htmlTag = html.tag
+          htmlStart = index
+        }
+      }
+    }
+
+    if (!hasNewline)
+      break
+
+    index = newlineIndex + 1
+  }
+
+  if (fenceMarker && fenceStart !== -1)
+    return fenceStart
+
+  if (htmlTag && htmlStart !== -1)
+    return htmlStart
+
+  return findLineStartAtOrBefore(source, target)
+}
+
+function getTolerantBoundaryCacheScanWindow(source: string, maxChars = MAX_TOLERANT_BOUNDARY_CACHE_SCAN_CHARS) {
   const value = String(source ?? '')
-  if (value.length <= MAX_TOLERANT_BOUNDARY_CACHE_SCAN_CHARS) {
+  if (value.length <= maxChars) {
     return {
       source: value,
       lineOffset: 0,
     }
   }
 
-  let windowStart = value.length - MAX_TOLERANT_BOUNDARY_CACHE_SCAN_CHARS
+  let windowStart = value.length - maxChars
   const nextLineBreak = value.indexOf('\n', windowStart)
   if (nextLineBreak !== -1)
     windowStart = nextLineBreak + 1
+
+  windowStart = findTolerantBoundaryProtectedContextStart(value, windowStart)
 
   const prefix = value.slice(0, windowStart)
   return {
@@ -1251,7 +1329,7 @@ export function mayContainPendingTolerantMathBlockBoundaryCandidate(markdown: st
   if (!source || (!source.includes('$') && !source.includes('\\[')))
     return false
 
-  const tail = source.slice(Math.max(0, source.length - MAX_TOLERANT_BOUNDARY_CHARS))
+  const { source: tail } = getTolerantBoundaryCacheScanWindow(source, MAX_TOLERANT_BOUNDARY_CHARS)
   const lines = tail.split(/\r?\n/)
   const protectedLines = buildTolerantBoundaryProtectedLineMask(lines)
   const protectedLinesByScanContext = new Map<string, boolean[]>()
