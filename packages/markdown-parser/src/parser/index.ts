@@ -304,6 +304,30 @@ const activeTolerantMathBoundaryStreamStateCache = new WeakMap<object, ActiveTol
 
 const TOLERANT_BOUNDARY_STREAM_LOOKBACK_CHARS = 20000
 
+function isSimpleThematicOrSetextLine(line: string) {
+  const trimmed = String(line ?? '').trim()
+  if (trimmed.length < 3)
+    return false
+
+  const marker = trimmed[0]
+  if (marker !== '-' && marker !== '*' && marker !== '_' && marker !== '=')
+    return false
+
+  let markerCount = 0
+  for (let index = 0; index < trimmed.length; index++) {
+    const ch = trimmed[index]
+    if (ch === marker) {
+      markerCount++
+      continue
+    }
+    if (ch === ' ' || ch === '\t')
+      continue
+    return false
+  }
+
+  return markerCount >= 3
+}
+
 function hasTolerantBoundaryOpenerNearTail(source: string) {
   const value = String(source ?? '')
   if (!value || (!value.includes('$') && !value.includes('\\[')))
@@ -364,6 +388,85 @@ function appendedChunkMayCompleteTolerantMathBoundary(previousSource: string, so
   return false
 }
 
+function isLikelyTolerantBoundaryStopLine(line: string) {
+  const trimmed = String(line ?? '').trimStart()
+  if (!trimmed)
+    return true
+
+  const first = trimmed[0]
+  if (first === '>' || first === '|' || first === '<')
+    return true
+
+  if (first === '#') {
+    let level = 0
+    while (trimmed[level] === '#')
+      level++
+    if (level >= 1 && level <= 6 && (trimmed[level] === ' ' || trimmed[level] === '\t'))
+      return true
+  }
+
+  if (trimmed.startsWith('```') || trimmed.startsWith('~~~') || trimmed.startsWith(':::'))
+    return true
+
+  if ((trimmed[0] === '*' || trimmed[0] === '-') && (trimmed[1] === ' ' || trimmed[1] === '\t'))
+    return true
+
+  if (/^\d+[.)][\t ]+/.test(trimmed))
+    return true
+
+  if (isSimpleThematicOrSetextLine(trimmed))
+    return true
+
+  if (/^\[[^\]]+\]:\s*\S/.test(trimmed))
+    return true
+
+  return false
+}
+
+function appendedChunkMayEndPendingTolerantBoundary(appended: string) {
+  if (!appended.includes('\n') && !appended.includes('\r'))
+    return false
+
+  const lines = appended.split(/\r?\n/)
+  const startIndex = appended.startsWith('\n') || appended.startsWith('\r\n') ? 1 : 0
+  for (let index = startIndex; index < lines.length; index++) {
+    const line = lines[index]
+    if (isLikelyTolerantBoundaryStopLine(line))
+      return true
+  }
+  return false
+}
+
+function appendedChunkMayChangeActiveTolerantMathBoundary(
+  previousKey: string | null,
+  previousSource: string,
+  source: string,
+) {
+  if (!previousSource || !source.startsWith(previousSource))
+    return true
+
+  const appended = source.slice(previousSource.length)
+  if (!appended)
+    return false
+
+  if (appended.includes('$$') || appended.includes('\\[') || appended.includes('\\]'))
+    return true
+
+  if (previousKey?.includes('\\[') && appended.includes(']'))
+    return true
+
+  if (previousSource.endsWith('$') && appended[0] === '$')
+    return true
+
+  if (previousSource.endsWith('\\') && (appended[0] === '[' || appended[0] === ']'))
+    return true
+
+  if (previousKey?.startsWith('pending:') && appendedChunkMayEndPendingTolerantBoundary(appended))
+    return true
+
+  return false
+}
+
 function syncTopLevelStreamCacheForCompletedTolerantMathBoundary(
   md: MarkdownIt,
   source: string,
@@ -383,43 +486,19 @@ function syncTopLevelStreamCacheForCompletedTolerantMathBoundary(
     return 'stream'
 
   if (previous && source.startsWith(previous.source)) {
-    if (previousKey !== null) {
-      const boundaryKey = getActiveTolerantMathBlockBoundaryCacheKey(source)
-
-      if (boundaryKey === previousKey) {
-        // Same key but source grew (append). The stream parser's line-based
-        // incremental diff still misidentifies the close `$` as a new opener
-        // because it re-processes changed lines independently of previous
-        // block-rule decisions. Use full md.parse to stay correct.
-        stream.reset()
-        activeTolerantMathBoundaryStreamStateCache.set(cacheOwner, {
-          key: boundaryKey,
-          source,
-        })
-        return 'parse'
-      }
-
-      // The active boundary changed, completed, or disappeared. The token shape
-      // fundamentally changes (e.g. loading→completed, or paragraph splits into
-      // prefix+math+suffix). The stream parser's line-based incremental diff
-      // cannot reconstruct this transition correctly, so use full md.parse.
-      stream.reset()
-      activeTolerantMathBoundaryStreamStateCache.set(cacheOwner, {
-        key: boundaryKey,
-        source,
-      })
-      return boundaryKey ? 'parse' : 'stream'
+    if (
+      previousKey !== null
+      && !appendedChunkMayChangeActiveTolerantMathBoundary(previousKey, previous.source, source)
+    ) {
+      previous.source = source
+      return 'stream'
     }
 
-    const mayChangeBoundary
-      = appendedChunkMayCompleteTolerantMathBoundary(previous.source, source)
-        // If the previous source just ended with a tolerant opener, a later
-        // chunk can make the pending content math-like without containing the
-        // close delimiter yet. In that case we must rescan so we can reset once
-        // and enter predictive loading math_block mode safely.
-        || hasTolerantBoundaryOpenerNearTail(previous.source)
-
-    if (!mayChangeBoundary) {
+    if (
+      previousKey === null
+      && !appendedChunkMayCompleteTolerantMathBoundary(previous.source, source)
+      && !hasTolerantBoundaryOpenerNearTail(previous.source)
+    ) {
       previous.source = source
       return 'stream'
     }
@@ -445,15 +524,59 @@ function syncTopLevelStreamCacheForCompletedTolerantMathBoundary(
     source,
   })
 
-  // When entering a new tolerant boundary (or transitioning between boundary
-  // states), use full md.parse to establish a clean token baseline. Subsequent
-  // parses of the same key will use the faster stream.parse path.
-  return boundaryKey ? 'parse' : 'stream'
+  // After reset, rebuild the stream cache from the full current source.
+  // Do not fall back to md.parse here; that hides stream-cache bugs and turns
+  // long active math streams into repeated full parses.
+  return 'stream'
 }
 
 function shouldCloneTopLevelStreamTokens(options: ParseOptions) {
   return typeof options.preTransformTokens === 'function'
     || typeof options.postTransformTokens === 'function'
+}
+
+function isParagraphTokenTriple(tokens: Token[], index: number) {
+  return tokens[index]?.type === 'paragraph_open'
+    && tokens[index + 1]?.type === 'inline'
+    && tokens[index + 2]?.type === 'paragraph_close'
+}
+
+function removeDuplicatePendingTolerantPrefixTokens(tokens: Token[], activeKey: string | null) {
+  if (!activeKey?.startsWith('pending:'))
+    return tokens
+
+  let normalized = tokens
+  for (let index = 0; index < normalized.length; index++) {
+    const token = normalized[index] as Token & {
+      loading?: boolean
+      tolerantBoundary?: boolean
+    }
+    if (token?.type !== 'math_block' || !token.loading || !token.tolerantBoundary)
+      continue
+
+    const duplicatePrefixStart = index - 3
+    const previousPrefixStart = index - 6
+    if (
+      duplicatePrefixStart < 0
+      || previousPrefixStart < 0
+      || !isParagraphTokenTriple(normalized, previousPrefixStart)
+      || !isParagraphTokenTriple(normalized, duplicatePrefixStart)
+    ) {
+      continue
+    }
+
+    const previousInline = normalized[previousPrefixStart + 1]
+    const duplicateInline = normalized[duplicatePrefixStart + 1]
+    if (previousInline.content !== duplicateInline.content)
+      continue
+
+    if (normalized === tokens)
+      normalized = tokens.slice()
+    normalized.splice(duplicatePrefixStart, 3)
+    index -= 3
+  }
+
+  return normalized
 }
 
 function parseTopLevelTokens(
@@ -481,7 +604,13 @@ function parseTopLevelTokens(
   if (mode === 'parse')
     return md.parse(source, env)
 
-  const tokens = md.stream!.parse!(source, getStableStreamEnv(md, env))
+  const streamEnv = getStableStreamEnv(md, env)
+  streamEnv.__markstreamSource = source
+  const activeKey = activeTolerantMathBoundaryStreamStateCache.get(md as unknown as object)?.key ?? null
+  const tokens = removeDuplicatePendingTolerantPrefixTokens(
+    md.stream!.parse!(source, streamEnv),
+    activeKey,
+  )
   if (!shouldCloneTopLevelStreamTokens(options))
     return tokens
 

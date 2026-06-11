@@ -3720,7 +3720,7 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     expect(inlineMath.map((node: any) => node.content)).toContain('z')
   })
 
-  it('enters predictive tolerant $$ loading mode with one stream reset, then completes with one more reset', () => {
+  it('enters predictive tolerant $$ loading mode without repeated reset/full-parse while math content appends', () => {
     const md = getMarkdown('stream-tolerant-dollar-pending-and-completed-cache-reset')
     ;(md as any).stream.reset()
     ;(md as any).stream.resetStats()
@@ -3757,7 +3757,7 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     }) as any[]
 
     expect(resetCount).toBe(1)
-    expect(streamParseCount).toBe(1)
+    expect(streamParseCount).toBe(2)
     expect(nodes.map((node: any) => node.type)).toEqual(['paragraph', 'math_block'])
 
     const pendingMathBlocks = collectByType(nodes, 'math_block')
@@ -3765,9 +3765,20 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     expect(pendingMathBlocks[0].loading).toBe(true)
     expect(pendingMathBlocks[0].content).toContain('a = 1')
 
+    const pendingAppend = `${pending}\n+ b = 2`
+    nodes = parseMarkdownToStructure(pendingAppend, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(streamParseCount).toBe(3)
+    expect(nodes.map((node: any) => node.type)).toEqual(['paragraph', 'math_block'])
+    expect(collectByType(nodes, 'math_block')[0].content).toContain('+ b = 2')
+
     const pendingStable = JSON.stringify(nodes)
     for (let index = 0; index < 6; index++) {
-      nodes = parseMarkdownToStructure(pending, md, {
+      nodes = parseMarkdownToStructure(pendingAppend, md, {
         final: false,
         streamParse: true,
       }) as any[]
@@ -3775,19 +3786,21 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     }
     expect(resetCount).toBe(1)
 
-    const completed = `${pending}\n$$ after $a$ follows.`
+    const completed = `${pendingAppend}\n$$ after $a$ follows.`
     nodes = parseMarkdownToStructure(completed, md, {
       final: false,
       streamParse: true,
     }) as any[]
 
     expect(resetCount).toBe(2)
+    expect(streamParseCount).toBe(10)
     expect(nodes.map((node: any) => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
 
     const completedMathBlocks = collectByType(nodes, 'math_block')
     expect(completedMathBlocks).toHaveLength(1)
     expect(completedMathBlocks[0].loading).toBe(false)
     expect(completedMathBlocks[0].content).toContain('a = 1')
+    expect(completedMathBlocks[0].content).toContain('+ b = 2')
     expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('a')
   })
 
@@ -3820,6 +3833,71 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     expect(collectByType(nodes, 'math_block')).toHaveLength(0)
     expect(stableSerialized).toContain('happens to end with')
     expect(stableSerialized).toContain('hello world without math signal')
+  })
+
+  it('does not reparse tolerant $$ close line as a second loading math_block in stream mode', () => {
+    const md = getMarkdown('stream-tolerant-dollar-close-line-not-new-opener')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      'Before display $$',
+      'a = 1',
+      '$$ where $a$ follows.',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(nodes.map((node: any) => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
+
+    for (let index = 0; index < 8; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      const mathBlocks = collectByType(nodes, 'math_block')
+      expect(mathBlocks).toHaveLength(1)
+      expect(mathBlocks[0].loading).toBe(false)
+      expect(mathBlocks[0].content).toContain('a = 1')
+      expect(mathBlocks[0].content).not.toContain('where')
+    }
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content)).toContain('a')
+  })
+
+  it('does not reset on every non-structural append after a completed tolerant boundary', () => {
+    const md = getMarkdown('stream-tolerant-completed-plain-append-no-repeat-reset')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = [
+      'Before display $$',
+      'a = 1',
+      '$$ where $a$ follows.',
+    ].join('\n')
+
+    parseMarkdownToStructure(source, md, { final: false, streamParse: true })
+    expect(resetCount).toBe(1)
+
+    for (const chunk of [' more', ' plain', ' suffix', ' text']) {
+      source += chunk
+      const nodes = parseMarkdownToStructure(source, md, { final: false, streamParse: true })
+      expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+      expect(resetCount).toBe(1)
+    }
   })
 
   it('does not flag completed tolerant boundaries inside blockquoted protected block syntax', () => {

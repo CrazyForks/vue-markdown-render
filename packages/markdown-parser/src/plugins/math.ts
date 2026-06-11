@@ -1370,6 +1370,16 @@ function shouldAbortTolerantBoundaryScan(
   if (accumulatedContent.length + currentLine.length > MAX_TOLERANT_BOUNDARY_CHARS)
     return true
 
+  const trimmed = String(currentLine ?? '').trimStart()
+  if (
+    trimmed[0] === '+'
+    && isSpaceOrTab(trimmed[1])
+    && accumulatedContent.trim()
+    && isLikelyTolerantExplicitMathBlockContent(`${accumulatedContent}\n${trimmed}`, false)
+  ) {
+    return false
+  }
+
   return isTolerantBoundaryScanStopLine(currentLine, nextLine)
 }
 
@@ -1384,6 +1394,30 @@ function appendTolerantBoundaryContent(content: string, line: string) {
 export function hasClosedTolerantMathBlockBoundaryCandidate(markdown: string) {
   return getCompletedTolerantMathBlockBoundaryCacheKey(markdown) !== null
 }
+
+function hasTolerantBoundaryCloseAtLine(markdown: string, line: number, closeIndex: number, delimiter: string) {
+  const key = getCompletedTolerantMathBlockBoundaryCacheKey(markdown)
+  if (!key)
+    return false
+
+  return key.split('|').some((part) => {
+    const fields = part.split(':')
+    return fields[0] === 'closed'
+      && fields[1] === delimiter
+      && Number(fields[4]) === line
+      && Number(fields[5]) === closeIndex
+  })
+}
+
+function countLineBreaks(value: string) {
+  let count = 0
+  for (let index = 0; index < value.length; index++) {
+    if (value.charCodeAt(index) === 10)
+      count++
+  }
+  return count
+}
+
 function isLikelyCurrencyRangeDollar(content: string, nextChar?: string) {
   const stripped = String(content ?? '').trim()
   if (!stripped)
@@ -2086,7 +2120,18 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           // by a tolerant boundary and its map ends at or before this line,
           // treat this delimiter as its close rather than a new opener.
           let closesExistingTolerantMath = false
-          if (startLine > 0 && (open === '$' || open === '\\[')) {
+          const fullSource = typeof s.env?.__markstreamSource === 'string'
+            ? s.env.__markstreamSource
+            : ''
+          const fullSourceTailOffset = fullSource && fullSource !== s.src && fullSource.endsWith(s.src)
+            ? fullSource.length - s.src.length
+            : -1
+          const fullSourceLineOffset = fullSourceTailOffset >= 0
+            ? countLineBreaks(fullSource.slice(0, fullSourceTailOffset))
+            : 0
+          const absoluteStartLine = fullSourceLineOffset + startLine
+
+          if (absoluteStartLine > 0 && (open === '$$' || open === '\\[')) {
             const tokens = s.tokens
             for (let ti = tokens.length - 1; ti >= 0; ti--) {
               const prev = tokens[ti]
@@ -2097,6 +2142,18 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
               }
               if (prev.type !== 'inline' && prev.type !== 'paragraph_open' && prev.type !== 'paragraph_close')
                 break
+            }
+
+            if (!closesExistingTolerantMath && open === '$$') {
+              const sourceThroughDelimiter = fullSourceTailOffset >= 0
+                ? fullSource.slice(0, fullSourceTailOffset + startPos + open.length)
+                : s.src.slice(0, startPos + open.length)
+              closesExistingTolerantMath = hasTolerantBoundaryCloseAtLine(
+                sourceThroughDelimiter,
+                absoluteStartLine,
+                0,
+                open,
+              )
             }
           }
 
@@ -2358,13 +2415,11 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
 
     const consumedEndLine = found ? nextLine + 1 : endLine
 
-    // Tolerant same-line repair emits synthetic prefix/suffix paragraphs around
-    // the display math. Do not give the math_block a line map that overlaps
-    // those synthetic paragraphs; stream parser cache invalidation is line-map
-    // based and overlapping maps are what caused stale loading blocks and
-    // duplicated paragraphs.
+    // Completed tolerant repairs keep non-overlapping maps for prefix/math/suffix.
+    // Pending loading blocks include the opener line so stream tail reparse keeps
+    // the tolerant-boundary context while content is still appending.
     const mapStartLine = tolerantBoundary
-      ? firstLineNumber
+      ? (found ? firstLineNumber : startLine)
       : startLine
 
     let mapEndLine = consumedEndLine
