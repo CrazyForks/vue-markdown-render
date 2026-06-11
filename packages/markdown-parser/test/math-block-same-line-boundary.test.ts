@@ -930,6 +930,121 @@ describe('math block same-line boundary regression', () => {
     }
   })
 
+  it('does not suppress a later legitimate line-start $$ block after a completed tolerant boundary in streaming mode', () => {
+    const md = getMarkdown('pkg-stream-tolerant-followed-by-real-display-block')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      'Before tolerant display $$',
+      'a = 1',
+      '$$ after first display with $a$ inline.',
+      '',
+      'Now a normal display block follows:',
+      '$$',
+      'b = 2',
+      '$$',
+      'After second display with $b$ inline.',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    for (let index = 0; index < 8; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      const mathBlocks = collectByType(nodes, 'math_block')
+      expect(mathBlocks).toHaveLength(2)
+      expect(mathBlocks[0].loading).toBe(false)
+      expect(mathBlocks[1].loading).toBe(false)
+      expect(mathBlocks[0].content).toContain('a = 1')
+      expect(mathBlocks[1].content).toContain('b = 2')
+    }
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+      .map((node: any) => node.content)
+
+    expect(inlineMath).toContain('a')
+    expect(inlineMath).toContain('b')
+    expect(JSON.stringify(nodes)).toContain('Now a normal display block follows')
+    expect(JSON.stringify(nodes)).toContain('After second display')
+  })
+
+  it('does not suppress a later legitimate line-start $$ block after an intervening paragraph', () => {
+    const md = getMarkdown('pkg-final-tolerant-followed-by-paragraph-and-real-display')
+
+    const source = [
+      'Before tolerant display $$',
+      'a = 1',
+      '$$ after first display.',
+      '',
+      'This paragraph is between the repaired block and the next block.',
+      '',
+      '$$',
+      'c = 3',
+      '$$',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(source, md, {
+      final: true,
+      streamParse: false,
+    }) as any[]
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(2)
+    expect(mathBlocks[0].content).toContain('a = 1')
+    expect(mathBlocks[1].content).toContain('c = 3')
+    expect(JSON.stringify(nodes)).toContain('paragraph is between')
+  })
+
+  it('does not hang or repeatedly reset on long near-miss tolerant-boundary noise while streaming', () => {
+    const md = getMarkdown('pkg-stream-long-tolerant-boundary-near-miss-no-loop')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    const noisyThematicLikeLine = `not-a-rule ${'- '.repeat(6000)}`
+    const noisyReferenceLikeLine = `not-a-real-boundary-after-math [${'x'.repeat(6000)}]:`
+    const source = [
+      'This prose line happens to end with $$',
+      noisyThematicLikeLine,
+      noisyReferenceLikeLine,
+      '',
+      'Final paragraph with inline $x$.',
+    ].join('\n')
+
+    let stableSerialized = ''
+    for (let index = 0; index < 12; index++) {
+      const nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+
+      expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+      expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('x')
+    }
+
+    expect(resetCount).toBe(0)
+  })
+
   it('distinguishes unresolved pending tolerant math tail from stopped ordinary trailing delimiters', () => {
     expect(
       mayContainPendingTolerantMathBlockBoundaryCandidate([

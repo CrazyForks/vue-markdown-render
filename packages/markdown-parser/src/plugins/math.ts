@@ -661,6 +661,7 @@ function isInsideCodeSpanOrUnclosedTail(src: string, index: number) {
 
 const MAX_TOLERANT_BOUNDARY_LINES = 80
 const MAX_TOLERANT_BOUNDARY_CHARS = 20000
+const MAX_TOLERANT_BOUNDARY_CACHE_SCAN_CHARS = MAX_TOLERANT_BOUNDARY_CHARS + 8192
 
 function isSpaceOrTab(ch?: string) {
   return ch === ' ' || ch === '\t'
@@ -923,8 +924,37 @@ const TOLERANT_MATH_BLOCK_BOUNDARY_DELIMITERS = [
   ['\\[', '\\]'],
 ] as const
 
+function getTolerantBoundaryCacheScanWindow(source: string) {
+  const value = String(source ?? '')
+  if (value.length <= MAX_TOLERANT_BOUNDARY_CACHE_SCAN_CHARS) {
+    return {
+      source: value,
+      lineOffset: 0,
+    }
+  }
+
+  let windowStart = value.length - MAX_TOLERANT_BOUNDARY_CACHE_SCAN_CHARS
+  const nextLineBreak = value.indexOf('\n', windowStart)
+  if (nextLineBreak !== -1)
+    windowStart = nextLineBreak + 1
+
+  const prefix = value.slice(0, windowStart)
+  return {
+    source: value.slice(windowStart),
+    lineOffset: countLineBreaks(prefix),
+  }
+}
+
 function getTolerantMathBlockBoundaryCacheKey(markdown: string, includePending: boolean) {
-  const source = String(markdown ?? '')
+  const fullSource = String(markdown ?? '')
+  if (!fullSource || (!fullSource.includes('$') && !fullSource.includes('\\[')))
+    return null
+
+  const {
+    source,
+    lineOffset,
+  } = getTolerantBoundaryCacheScanWindow(fullSource)
+
   if (!source || (!source.includes('$') && !source.includes('\\[')))
     return null
 
@@ -1016,7 +1046,7 @@ function getTolerantMathBlockBoundaryCacheKey(markdown: string, includePending: 
           const candidateContent = appendTolerantBoundaryContent(content, beforeClose)
           if (isLikelyTolerantExplicitMathBlockContent(candidateContent, true)) {
             const contentHash = hashTolerantBoundaryCacheText(candidateContent)
-            keys.push(`closed:${open}:${startLine}:${openIndex}:${currentLineNumber}:${endIndex}:${contentHash}`)
+            keys.push(`closed:${open}:${lineOffset + startLine}:${openIndex}:${lineOffset + currentLineNumber}:${endIndex}:${contentHash}`)
             skipUntilLine = currentLineNumber
           }
           break
@@ -1036,7 +1066,7 @@ function getTolerantMathBlockBoundaryCacheKey(markdown: string, includePending: 
         // is still streaming math content, appending normal math text should not
         // reset on every chunk. We only need one reset when entering this pending
         // tolerant-boundary shape; completion will produce a different closed key.
-        keys.push(`pending:${open}:${startLine}:${openIndex}`)
+        keys.push(`pending:${open}:${lineOffset + startLine}:${openIndex}`)
         skipUntilLine = lines.length - 1
       }
     }
@@ -2274,7 +2304,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           // the stream parser creates a duplicate math_block for the close.
           //
           // Check existing tokens: if the most recent math_block was emitted
-          // by a tolerant boundary and its map ends at or before this line,
+          // by a tolerant boundary and its map ends exactly at this line,
           // treat this delimiter as its close rather than a new opener.
           let closesExistingTolerantMath = false
           const fullSource = typeof s.env?.__markstreamSource === 'string'
@@ -2300,7 +2330,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
               const prev = tokens[ti]
               if (prev.type === 'math_block') {
                 const prevMath = prev as TolerantMathToken
-                if (prevMath.tolerantBoundary && prev.map && prev.map[1] <= startLine)
+                if (prevMath.tolerantBoundary && prev.map && prev.map[1] === startLine)
                   closesExistingTolerantMath = true
                 break
               }
