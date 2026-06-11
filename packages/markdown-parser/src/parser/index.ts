@@ -354,6 +354,56 @@ function isIndentedCodeLineLike(line: string) {
   return false
 }
 
+function isTolerantBoundaryAsciiAlpha(ch?: string) {
+  if (!ch)
+    return false
+
+  const code = ch.charCodeAt(0)
+  return (code >= 65 && code <= 90) || (code >= 97 && code <= 122)
+}
+
+function isTolerantBoundaryHtmlNameChar(ch?: string) {
+  if (!ch)
+    return false
+
+  const code = ch.charCodeAt(0)
+  return (code >= 65 && code <= 90)
+    || (code >= 97 && code <= 122)
+    || (code >= 48 && code <= 57)
+    || ch === '_'
+    || ch === ':'
+    || ch === '-'
+}
+
+function isSimpleHtmlBoundaryLineLike(line: string) {
+  const trimmed = String(line ?? '').trimStart()
+  if (trimmed[0] !== '<')
+    return false
+
+  let index = 1
+  while (trimmed[index] === ' ' || trimmed[index] === '\t')
+    index++
+
+  if (trimmed[index] === '!' || trimmed[index] === '?')
+    return true
+
+  if (trimmed[index] === '/') {
+    index++
+    while (trimmed[index] === ' ' || trimmed[index] === '\t')
+      index++
+  }
+
+  if (!isTolerantBoundaryAsciiAlpha(trimmed[index]))
+    return false
+
+  index++
+  while (isTolerantBoundaryHtmlNameChar(trimmed[index]))
+    index++
+
+  const boundary = trimmed[index]
+  return boundary == null || boundary === ' ' || boundary === '\t' || boundary === '>' || boundary === '/'
+}
+
 function isSimpleMarkdownTableDelimiterCell(cell: string) {
   const value = String(cell ?? '').trim()
   if (!value)
@@ -444,7 +494,10 @@ function isLikelyTolerantBoundaryStopLine(line: string) {
 
   const trimmed = source.trimStart()
   const first = trimmed[0]
-  if (first === '>' || first === '|' || first === '<')
+  if (first === '>')
+    return true
+
+  if (isSimpleHtmlBoundaryLineLike(trimmed))
     return true
 
   if (first === '#') {
@@ -592,6 +645,13 @@ function syncTopLevelStreamCacheForActiveTolerantMathBoundary(
   const cacheOwner = md as unknown as object
   const previous = activeTolerantMathBoundaryStreamStateCache.get(cacheOwner)
   const previousKey = previous?.key ?? null
+
+  if (previous && previous.source !== source && !source.startsWith(previous.source)) {
+    stream.reset()
+    const boundaryKey = getActiveTolerantMathBlockBoundaryCacheKey(source)
+    activeTolerantMathBoundaryStreamStateCache.set(cacheOwner, { key: boundaryKey, source })
+    return 'stream'
+  }
 
   // Exact same active source: reuse the stream cache. The stale-cache risk
   // is handled by resetting exactly when the active tolerant-boundary key changes

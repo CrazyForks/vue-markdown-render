@@ -23,6 +23,129 @@ function collectByType(nodes: any, type: string, out: any[] = []) {
 }
 
 describe('math block same-line boundary regression', () => {
+  it('resets stream cache for non-append replacements even when tolerant boundary key is unchanged', () => {
+    const md = getMarkdown('stream-math-boundary-non-append-replacement-reset')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    const first = [
+      'Before display $$',
+      'a = 1',
+      '$$ after $a$.',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(first, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(nodes.map((node: any) => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+    expect(JSON.stringify(nodes)).toContain('Before display')
+
+    const replaced = [
+      'Prefix display $$',
+      'a = 1',
+      '$$ after $a$.',
+    ].join('\n')
+
+    nodes = parseMarkdownToStructure(replaced, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(2)
+    expect(nodes.map((node: any) => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('Prefix display')
+    expect(serialized).not.toContain('Before display')
+
+    for (let index = 0; index < 6; index++) {
+      nodes = parseMarkdownToStructure(replaced, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(nodes)).toBe(serialized)
+      expect(resetCount).toBe(2)
+    }
+  })
+
+  it('does not reset pending tolerant boundary for absolute-value or angle-bracket math continuation lines', () => {
+    const md = getMarkdown('stream-math-boundary-pending-absolute-angle-no-reset')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    const originalParse = stream.parse.bind(stream)
+    let resetCount = 0
+    let streamParseCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+    stream.parse = (...args: any[]) => {
+      streamParseCount++
+      return originalParse(...args)
+    }
+
+    let source = [
+      'Before display $$',
+      'a = 1',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(streamParseCount).toBe(1)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+    expect(collectByType(nodes, 'math_block')[0].loading).toBe(true)
+
+    source += '\n|x| = 2'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(streamParseCount).toBe(2)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+    expect(collectByType(nodes, 'math_block')[0].content).toContain('|x| = 2')
+
+    source += '\n<x, y> = 0'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(streamParseCount).toBe(3)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+    expect(collectByType(nodes, 'math_block')[0].content).toContain('<x, y> = 0')
+  })
+
   it('resets stream cache when completed tolerant boundary source changes, not for identical repeated parses', () => {
     const md = getMarkdown('stream-math-boundary-completed-reset')
     ;(md as any).stream.reset()
