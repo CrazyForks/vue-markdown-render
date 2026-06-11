@@ -1473,8 +1473,16 @@ function isTolerantBoundaryScanStopLine(line: string, nextLine = '') {
   return false
 }
 
-function isLikelyTolerantPlusMathContinuation(trimmed: string) {
-  const rest = String(trimmed ?? '').slice(1).trimStart()
+function isLikelyTolerantSignedMathContinuation(trimmed: string) {
+  const source = String(trimmed ?? '')
+  const sign = source[0]
+  if (sign !== '+' && sign !== '-')
+    return false
+
+  if (!isSpaceOrTab(source[1]))
+    return false
+
+  const rest = source.slice(1).trimStart()
   if (!rest)
     return false
 
@@ -1501,14 +1509,18 @@ function shouldAbortTolerantBoundaryScan(
     return true
 
   const trimmed = String(currentLine ?? '').trimStart()
-  if (
-    trimmed[0] === '+'
-    && isSpaceOrTab(trimmed[1])
-    && isLikelyTolerantPlusMathContinuation(trimmed)
-    && accumulatedContent.trim()
-    && isLikelyTolerantExplicitMathBlockContent(`${accumulatedContent}\n${trimmed}`, false)
-  ) {
-    return false
+  if (isLikelyTolerantSignedMathContinuation(trimmed)) {
+    const signedCandidateContent = appendTolerantBoundaryContent(
+      accumulatedContent,
+      trimmed,
+    )
+
+    if (
+      isLikelyTolerantExplicitMathBlockContent(signedCandidateContent, false)
+      || isPotentialTolerantPendingMathContent(signedCandidateContent)
+    ) {
+      return false
+    }
   }
 
   return isTolerantBoundaryScanStopLine(currentLine, nextLine)

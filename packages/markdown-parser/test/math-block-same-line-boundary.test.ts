@@ -1023,15 +1023,23 @@ describe('math block same-line boundary regression', () => {
     ).toBe(false)
   })
 
-  it('treats plus list lines as tolerant-boundary stop lines, not math continuation', () => {
-    const source = [
-      'Before display $$',
-      'a = 1',
-      '+ item should be a list boundary',
-    ].join('\n')
+  it('treats signed prose list lines as tolerant-boundary stop lines, not math continuation', () => {
+    for (const marker of ['+', '-']) {
+      const source = [
+        'Before display $$',
+        'a = 1',
+        `${marker} item should be a list boundary`,
+      ].join('\n')
 
-    expect(mayContainPendingTolerantMathBlockBoundaryCandidate(source)).toBe(false)
-    expect(hasClosedTolerantMathBlockBoundaryCandidate(`${source}\n$$ after $a$`)).toBe(false)
+      expect(
+        mayContainPendingTolerantMathBlockBoundaryCandidate(source),
+        marker,
+      ).toBe(false)
+      expect(
+        hasClosedTolerantMathBlockBoundaryCandidate(`${source}\n$$ after $a$`),
+        marker,
+      ).toBe(false)
+    }
   })
 
   it('still allows short plus formula continuation in pending tolerant math', () => {
@@ -1042,6 +1050,68 @@ describe('math block same-line boundary regression', () => {
     ].join('\n')
 
     expect(mayContainPendingTolerantMathBlockBoundaryCandidate(source)).toBe(true)
+  })
+
+  it('allows first signed formula line in tolerant math during streaming', () => {
+    const cases = [
+      ['plus', '+ x = y'],
+      ['minus', '- x = y'],
+      ['negative tex', '- \\frac{a}{b} = c'],
+    ] as const
+
+    for (const [name, formulaLine] of cases) {
+      const md = getMarkdown(`pkg-stream-tolerant-first-signed-formula-${name}`)
+      ;(md as any).stream.reset()
+      ;(md as any).stream.resetStats()
+
+      const stream = (md as any).stream
+      const originalReset = stream.reset.bind(stream)
+      const originalParse = stream.parse.bind(stream)
+      let resetCount = 0
+      let streamParseCount = 0
+
+      stream.reset = () => {
+        resetCount++
+        return originalReset()
+      }
+      stream.parse = (...args: any[]) => {
+        streamParseCount++
+        return originalParse(...args)
+      }
+
+      let source = [
+        'Before display $$',
+        formulaLine,
+      ].join('\n')
+
+      let nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(collectByType(nodes, 'math_block'), name).toHaveLength(1)
+      expect(collectByType(nodes, 'math_block')[0].loading, name).toBe(true)
+      expect(collectByType(nodes, 'math_block')[0].content, name).toContain(formulaLine)
+      expect(resetCount, name).toBe(1)
+      expect(streamParseCount, name).toBe(1)
+
+      source += '\n$$ after $y$ follows.'
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(nodes.map((node: any) => node.type), name).toEqual([
+        'paragraph',
+        'math_block',
+        'paragraph',
+      ])
+      expect(collectByType(nodes, 'math_block'), name).toHaveLength(1)
+      expect(collectByType(nodes, 'math_block')[0].loading, name).toBe(false)
+      expect(collectByType(nodes, 'math_inline').map((node: any) => node.content), name).toContain('y')
+      expect(resetCount, name).toBe(2)
+      expect(streamParseCount, name).toBe(2)
+    }
   })
 
   it('treats indented code and table delimiter rows as pending tolerant-boundary stop lines', () => {
@@ -1061,22 +1131,24 @@ describe('math block same-line boundary regression', () => {
     expect(mayContainPendingTolerantMathBlockBoundaryCandidate(tableDelimiter)).toBe(false)
   })
 
-  it('does not close tolerant math across a plus list boundary', () => {
-    const md = getMarkdown('math-boundary-plus-list-stop-before-close')
-    const source = [
-      'Before display $$',
-      'a = 1',
-      '+ item should stay outside math',
-      '$$ should remain ordinary text with $x$ inline.',
-    ].join('\n')
+  it('does not close tolerant math across signed prose list boundaries', () => {
+    for (const marker of ['+', '-']) {
+      const md = getMarkdown(`math-boundary-signed-list-stop-before-close-${marker === '+' ? 'plus' : 'minus'}`)
+      const source = [
+        'Before display $$',
+        'a = 1',
+        `${marker} item should stay outside math`,
+        '$$ should remain ordinary text with $x$ inline.',
+      ].join('\n')
 
-    const nodes = parseMarkdownToStructure(source, md, { final: true }) as any[]
+      const nodes = parseMarkdownToStructure(source, md, { final: true }) as any[]
 
-    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
-    const serialized = JSON.stringify(nodes)
-    expect(serialized).toContain('item should stay outside math')
-    expect(serialized).toContain('should remain ordinary text')
-    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('x')
+      expect(collectByType(nodes, 'math_block'), marker).toHaveLength(0)
+      const serialized = JSON.stringify(nodes)
+      expect(serialized).toContain('item should stay outside math')
+      expect(serialized).toContain('should remain ordinary text')
+      expect(collectByType(nodes, 'math_inline').map((node: any) => node.content), marker).toContain('x')
+    }
   })
 
   it('does not keep prose-only unresolved tolerant tail as a pending scan candidate', () => {
