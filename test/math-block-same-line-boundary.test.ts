@@ -438,7 +438,6 @@ x + y = z
 
     expect(collectByType(partialNodes, 'math_block')).toHaveLength(1)
     expect(collectByType(partialNodes, 'math_block')[0].loading).toBe(true)
-    expect((md as any).stream.stats().total).toBeGreaterThan(0)
     expect(resetCount).toBe(1)
 
     ;(md as any).stream.resetStats()
@@ -3757,7 +3756,7 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     }) as any[]
 
     expect(resetCount).toBe(1)
-    expect(streamParseCount).toBe(2)
+    expect(streamParseCount).toBe(1)
     expect(nodes.map((node: any) => node.type)).toEqual(['paragraph', 'math_block'])
 
     const pendingMathBlocks = collectByType(nodes, 'math_block')
@@ -3840,5 +3839,84 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
 
     for (const [name, source] of cases)
       expect(hasClosedTolerantMathBlockBoundaryCandidate(source), name).toBe(false)
+  })
+
+  it('does not duplicate or leave loading math_block when issue-492 tolerant boundary closes during streaming', () => {
+    const md = getMarkdown('stream-issue-492-no-duplicate-or-loading-loop')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const chunks = [
+      'Decentralized stochastic optimization is a fundamental paradigm for large-scale learning over networks, where agents communicate only with their neighbors and no central coordinator is required. For strongly convex problems, communication efficiency is mainly determined by the condition number $\\kappa=L/\\mu$ and the network spectral gap $1-\\beta$. Although deterministic decentralized methods can simultaneously achieve accelerated $\\sqrt{\\kappa}$ and $1/\\sqrt{1-\\beta}$ dependences, no existing stochastic method attains both improvements at once. In this paper, we propose *Multi-Gossip Accelerated DSGD* (MG-ADSGD), a decentralized stochastic algorithm that combines Nesterov-type primal--dual extrapolation with multi-round fast gossip averaging. The key idea is to couple the gossip depth with the mini-batch size so that additional communication rounds simultaneously improve consensus accuracy and reduce gradient variance. We show that MG-ADSGD achieves the communication complexity $$\n',
+      '\\widetilde{\\mathcal O}\\!\\left( \\frac{\\sigma^2}{\\mu n\\epsilon}\\log\\frac{1}{\\epsilon} + \\sqrt{\\frac{\\kappa}{1-\\beta}}\\log\\frac{1}{\\epsilon} \\right),\n',
+      '$',
+      '$ where $\\epsilon$ denotes the target accuracy, $n$ is the number of nodes, and $\\sigma^2$ is the gradient variance.',
+      ' To the best of our knowledge, this bound yields the best currently available communication complexity.',
+    ]
+
+    let source = ''
+    let nodes: any[] = []
+
+    for (const chunk of chunks) {
+      source += chunk
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+    }
+
+    expect(nodes.map((node: any) => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(false)
+    expect(mathBlocks[0].content).toContain('widetilde')
+    expect(mathBlocks[0].content).toContain('sigma')
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('where')
+    expect(serialized).toContain('target accuracy')
+    expect(serialized).toContain('best currently available communication complexity')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    const inlineContent = inlineMath.map((node: any) => node.content).join('\n')
+    expect(inlineContent).toContain('kappa')
+    expect(inlineContent).toContain('epsilon')
+    expect(inlineContent).toContain('n')
+    expect(inlineContent).toContain('sigma')
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 10; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+      expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+      expect(collectByType(nodes, 'math_block')[0].loading).toBe(false)
+    }
+
+    for (const suffixChunk of [' More', ' suffix', ' tokens.']) {
+      source += suffixChunk
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(nodes.map((node: any) => node.type)).toEqual([
+        'paragraph',
+        'math_block',
+        'paragraph',
+      ])
+      expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+      expect(collectByType(nodes, 'math_block')[0].loading).toBe(false)
+    }
   })
 })

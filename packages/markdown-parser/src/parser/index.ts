@@ -374,19 +374,50 @@ function syncTopLevelStreamCacheForCompletedTolerantMathBoundary(
 
   const cacheOwner = md as unknown as object
   const previous = completedTolerantMathBoundaryStreamStateCache.get(cacheOwner)
+  const previousKey = previous?.key ?? null
 
-  if (previous?.source === source && previous?.key !== null) {
-    return 'stream'
-  }
+  // Active tolerant same-line math boundaries synthesize overlapping block-level
+  // tokens:
+  //
+  //   prefix paragraph + math_block + suffix paragraph
+  //
+  // The markdown-it stream cache can diff this shape incorrectly and leave stale
+  // loading math_block tokens or duplicated paragraphs. While the source remains
+  // in an active tolerant-boundary state, use full md.parse. This preserves
+  // predictive loading math without letting the incremental cache loop.
+  if (previous?.source === source && previousKey !== null)
+    return 'parse'
 
   if (previous && source.startsWith(previous.source)) {
+    if (previousKey !== null) {
+      const boundaryKey = getActiveTolerantMathBlockBoundaryCacheKey(source)
+
+      if (boundaryKey === previousKey) {
+        completedTolerantMathBoundaryStreamStateCache.set(cacheOwner, {
+          key: boundaryKey,
+          source,
+        })
+        return 'parse'
+      }
+
+      // The active boundary changed, completed, or disappeared. Invalidate the
+      // stale stream cache once. If the source is still active, keep using
+      // md.parse; otherwise let the caller rebuild the normal stream cache.
+      stream.reset()
+      completedTolerantMathBoundaryStreamStateCache.set(cacheOwner, {
+        key: boundaryKey,
+        source,
+      })
+      return boundaryKey ? 'parse' : 'stream'
+    }
+
     const mayChangeBoundary
       = appendedChunkMayCompleteTolerantMathBoundary(previous.source, source)
         // If the previous source just ended with a tolerant opener, a later
         // chunk can make the pending content math-like without containing the
         // close delimiter yet. In that case we must rescan so we can reset once
         // and enter predictive loading math_block mode safely.
-        || (previous.key === null && hasTolerantBoundaryOpenerNearTail(previous.source))
+        || hasTolerantBoundaryOpenerNearTail(previous.source)
 
     if (!mayChangeBoundary) {
       previous.source = source
@@ -395,19 +426,17 @@ function syncTopLevelStreamCacheForCompletedTolerantMathBoundary(
   }
 
   const boundaryKey = getActiveTolerantMathBlockBoundaryCacheKey(source)
-  const previousKey = previous?.key ?? null
 
   if (boundaryKey !== null && boundaryKey === previousKey) {
     completedTolerantMathBoundaryStreamStateCache.set(cacheOwner, {
       key: boundaryKey,
       source,
     })
-    return 'stream'
+    return 'parse'
   }
 
   // New pending/completed tolerant boundary, changed boundary set, or leaving
   // a tolerant-boundary document. Invalidate stale incremental tokens once.
-  // The caller will immediately rebuild the token cache with md.stream.parse.
   if (boundaryKey || previousKey)
     stream.reset()
 
@@ -416,7 +445,7 @@ function syncTopLevelStreamCacheForCompletedTolerantMathBoundary(
     source,
   })
 
-  return 'stream'
+  return boundaryKey ? 'parse' : 'stream'
 }
 
 function shouldCloneTopLevelStreamTokens(options: ParseOptions) {
@@ -441,9 +470,9 @@ function parseTopLevelTokens(
   //
   //   paragraph + math_block + paragraph
   //
-  // Reset only when the new chunk can actually complete/change such a boundary.
-  // After reset, still use md.stream.parse so the rebuilt full-source token list
-  // becomes the new incremental cache.
+  // While that tolerant boundary is active, bypass md.stream.parse because the
+  // synthetic token shape overlaps source lines and can leave stale loading
+  // math_block tokens in the stream cache.
   const mode = syncTopLevelStreamCacheForCompletedTolerantMathBoundary(md, source)
   if (mode === 'parse')
     return md.parse(source, env)

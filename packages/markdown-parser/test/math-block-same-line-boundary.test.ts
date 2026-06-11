@@ -207,7 +207,7 @@ describe('math block same-line boundary regression', () => {
     })
 
     expect(resetCount).toBe(1)
-    expect(streamParseCount).toBe(1)
+    expect(streamParseCount).toBe(0)
 
     const complete = [
       partial,
@@ -219,10 +219,10 @@ describe('math block same-line boundary regression', () => {
       streamParse: true,
     }) as any[]
 
-    // Completion resets stale cache once, then uses md.stream.parse for the
-    // structural rewrite.
+    // Completion resets stale cache once, then keeps the active tolerant
+    // boundary on full md.parse to avoid stale stream-cache math_block tokens.
     expect(resetCount).toBe(2)
-    expect(streamParseCount).toBe(2)
+    expect(streamParseCount).toBe(0)
     expect(nodes.map(node => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
 
     const appended = `${complete} More suffix text.`
@@ -232,10 +232,10 @@ describe('math block same-line boundary regression', () => {
     }) as any[]
 
     expect(resetCount).toBe(2)
-    expect(streamParseCount).toBe(3)
-    // md.stream.parse on appended source may produce different token shapes;
-    // the key assertions are stable reset/parse counts and content inclusion.
-    expect(collectByType(nodes, 'math_block').length).toBeGreaterThanOrEqual(1)
+    expect(streamParseCount).toBe(0)
+    expect(nodes.map(node => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+    expect(collectByType(nodes, 'math_block')[0].loading).toBe(false)
     expect(JSON.stringify(nodes)).toContain('More suffix text')
   })
 
@@ -270,11 +270,9 @@ describe('math block same-line boundary regression', () => {
       streamParse: true,
     }) as any[]
 
-    // First parse with a completed tolerant boundary resets once and uses
-    // md.parse for the structural rewrite. Same-source repeated parses
-    // continue with md.parse to keep token shapes stable.
+    // Active tolerant-boundary sources use md.parse, not md.stream.parse.
     expect(resetCount).toBe(1)
-    expect(streamParseCount).toBe(1)
+    expect(streamParseCount).toBe(0)
     expect(nodes.map(node => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
 
     const stableSerialized = JSON.stringify(nodes)
@@ -288,9 +286,7 @@ describe('math block same-line boundary regression', () => {
       expect(resetCount).toBe(1)
     }
 
-    // Same-source repeated parses use md.parse (not stream) to keep
-    // token shapes stable.
-    expect(streamParseCount).toBe(7)
+    expect(streamParseCount).toBe(0)
 
     // Append plain text — the fast-path skips the full tolerant scan
     // since the new chunk cannot complete or change a math boundary.
@@ -301,10 +297,10 @@ describe('math block same-line boundary regression', () => {
     }) as any[]
 
     expect(resetCount).toBe(1)
-    expect(streamParseCount).toBe(8)
-    // md.stream.parse on appended source may produce a stale loading math_block
-    // artifact; the key assertions are stable reset/parse counts.
-    expect(collectByType(nodes, 'math_block').length).toBeGreaterThanOrEqual(1)
+    expect(streamParseCount).toBe(0)
+    expect(nodes.map(node => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+    expect(collectByType(nodes, 'math_block')[0].loading).toBe(false)
     expect(JSON.stringify(nodes)).toContain('More suffix text')
   })
 
@@ -540,5 +536,84 @@ describe('math block same-line boundary regression', () => {
     expect(collectByType(nodes, 'code_block')).toHaveLength(2)
     expect(JSON.stringify(nodes)).toContain('where this must stay raw html')
     expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('x')
+  })
+
+  it('does not duplicate or leave loading math_block when issue-492 tolerant boundary closes during streaming', () => {
+    const md = getMarkdown('stream-issue-492-no-duplicate-or-loading-loop')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const chunks = [
+      'Decentralized stochastic optimization is a fundamental paradigm for large-scale learning over networks, where agents communicate only with their neighbors and no central coordinator is required. For strongly convex problems, communication efficiency is mainly determined by the condition number $\\kappa=L/\\mu$ and the network spectral gap $1-\\beta$. Although deterministic decentralized methods can simultaneously achieve accelerated $\\sqrt{\\kappa}$ and $1/\\sqrt{1-\\beta}$ dependences, no existing stochastic method attains both improvements at once. In this paper, we propose *Multi-Gossip Accelerated DSGD* (MG-ADSGD), a decentralized stochastic algorithm that combines Nesterov-type primal--dual extrapolation with multi-round fast gossip averaging. The key idea is to couple the gossip depth with the mini-batch size so that additional communication rounds simultaneously improve consensus accuracy and reduce gradient variance. We show that MG-ADSGD achieves the communication complexity $$\n',
+      '\\widetilde{\\mathcal O}\\!\\left( \\frac{\\sigma^2}{\\mu n\\epsilon}\\log\\frac{1}{\\epsilon} + \\sqrt{\\frac{\\kappa}{1-\\beta}}\\log\\frac{1}{\\epsilon} \\right),\n',
+      '$',
+      '$ where $\\epsilon$ denotes the target accuracy, $n$ is the number of nodes, and $\\sigma^2$ is the gradient variance.',
+      ' To the best of our knowledge, this bound yields the best currently available communication complexity.',
+    ]
+
+    let source = ''
+    let nodes: any[] = []
+
+    for (const chunk of chunks) {
+      source += chunk
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+    }
+
+    expect(nodes.map((node: any) => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(false)
+    expect(mathBlocks[0].content).toContain('widetilde')
+    expect(mathBlocks[0].content).toContain('sigma')
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('where')
+    expect(serialized).toContain('target accuracy')
+    expect(serialized).toContain('best currently available communication complexity')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    const inlineContent = inlineMath.map((node: any) => node.content).join('\n')
+    expect(inlineContent).toContain('kappa')
+    expect(inlineContent).toContain('epsilon')
+    expect(inlineContent).toContain('n')
+    expect(inlineContent).toContain('sigma')
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 10; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+      expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+      expect(collectByType(nodes, 'math_block')[0].loading).toBe(false)
+    }
+
+    for (const suffixChunk of [' More', ' suffix', ' tokens.']) {
+      source += suffixChunk
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(nodes.map((node: any) => node.type)).toEqual([
+        'paragraph',
+        'math_block',
+        'paragraph',
+      ])
+      expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+      expect(collectByType(nodes, 'math_block')[0].loading).toBe(false)
+    }
   })
 })

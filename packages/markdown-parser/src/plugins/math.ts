@@ -1012,7 +1012,7 @@ function getTolerantMathBlockBoundaryCacheKey(markdown: string, includePending: 
           const candidateContent = appendTolerantBoundaryContent(content, beforeClose)
           if (isLikelyTolerantExplicitMathBlockContent(candidateContent, true)) {
             const contentHash = hashTolerantBoundaryCacheText(candidateContent)
-            keys.push('closed:' + open + ':' + startLine + ':' + openIndex + ':' + currentLineNumber + ':' + endIndex + ':' + contentHash)
+            keys.push(`closed:${open}:${startLine}:${openIndex}:${currentLineNumber}:${endIndex}:${contentHash}`)
             skipUntilLine = currentLineNumber
           }
           break
@@ -1032,7 +1032,7 @@ function getTolerantMathBlockBoundaryCacheKey(markdown: string, includePending: 
         // is still streaming math content, appending normal math text should not
         // reset on every chunk. We only need one reset when entering this pending
         // tolerant-boundary shape; completion will produce a different closed key.
-        keys.push('pending:' + open + ':' + startLine + ':' + openIndex)
+        keys.push(`pending:${open}:${startLine}:${openIndex}`)
         skipUntilLine = lines.length - 1
       }
     }
@@ -1048,7 +1048,6 @@ export function getCompletedTolerantMathBlockBoundaryCacheKey(markdown: string) 
 export function getActiveTolerantMathBlockBoundaryCacheKey(markdown: string) {
   return getTolerantMathBlockBoundaryCacheKey(markdown, true)
 }
-
 
 function hasNonSpaceOrTabAfter(value: string, start: number) {
   for (let i = Math.max(0, start); i < value.length; i++) {
