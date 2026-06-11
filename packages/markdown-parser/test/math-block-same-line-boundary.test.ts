@@ -1633,6 +1633,185 @@ describe('math block same-line boundary regression', () => {
     expect(JSON.stringify(nodes)).toContain('chunk-39')
   })
 
+  it('detects tolerant \\[ opener appended after a plain cached stream and keeps pending state stable', () => {
+    const md = getMarkdown('pkg-stream-appended-bracket-opener-enters-pending')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    const originalParse = stream.parse.bind(stream)
+    let resetCount = 0
+    let streamParseCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+    stream.parse = (...args: any[]) => {
+      streamParseCount++
+      return originalParse(...args)
+    }
+
+    let source = 'Intro paragraph with inline $u$.'
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(0)
+    expect(streamParseCount).toBe(1)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('u')
+
+    source += [
+      '',
+      '',
+      'Before bracket display \\[',
+      'x + y = z',
+    ].join('\n')
+
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(streamParseCount).toBe(2)
+    expect(nodes.map((node: any) => node.type)).toEqual([
+      'paragraph',
+      'paragraph',
+      'math_block',
+    ])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(true)
+    expect(mathBlocks[0].content).toContain('x + y = z')
+
+    const pendingSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 8; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(nodes)).toBe(pendingSerialized)
+      expect(resetCount).toBe(1)
+    }
+  })
+
+  it('does not leave stale paragraph or duplicate math when tolerant \\[ closes without suffix during streaming', () => {
+    for (const [name, closeLine] of [
+      ['escaped close', '\\]'],
+      ['plain fallback close', ']'],
+    ] as const) {
+      const md = getMarkdown(`pkg-stream-bracket-nosuffix-close-${name.replace(/\s+/g, '-')}`)
+      ;(md as any).stream.reset()
+      ;(md as any).stream.resetStats()
+
+      const stream = (md as any).stream
+      const originalReset = stream.reset.bind(stream)
+      const originalParse = stream.parse.bind(stream)
+      let resetCount = 0
+      let streamParseCount = 0
+
+      stream.reset = () => {
+        resetCount++
+        return originalReset()
+      }
+      stream.parse = (...args: any[]) => {
+        streamParseCount++
+        return originalParse(...args)
+      }
+
+      let source = [
+        'Before bracket display \\[',
+        'x + y = z',
+      ].join('\n')
+
+      let nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(resetCount, name).toBe(1)
+      expect(streamParseCount, name).toBe(1)
+      expect(nodes.map((node: any) => node.type), name).toEqual([
+        'paragraph',
+        'math_block',
+      ])
+      expect(collectByType(nodes, 'math_block')[0].loading, name).toBe(true)
+
+      source += `\n${closeLine}`
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(resetCount, name).toBe(2)
+      expect(streamParseCount, name).toBe(2)
+      expect(nodes.map((node: any) => node.type), name).toEqual([
+        'paragraph',
+        'math_block',
+      ])
+
+      let mathBlocks = collectByType(nodes, 'math_block')
+      expect(mathBlocks, name).toHaveLength(1)
+      expect(mathBlocks[0].loading, name).toBe(false)
+      expect(mathBlocks[0].content, name).toContain('x + y = z')
+
+      const serialized = JSON.stringify(nodes)
+      expect(serialized, name).toContain('Before bracket display')
+      expect(serialized, name).not.toContain('"raw":"x + y = z\\n')
+
+      for (let index = 0; index < 10; index++) {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+
+        expect(JSON.stringify(nodes), name).toBe(serialized)
+        mathBlocks = collectByType(nodes, 'math_block')
+        expect(mathBlocks, name).toHaveLength(1)
+        expect(mathBlocks[0].loading, name).toBe(false)
+        expect(resetCount, name).toBe(2)
+      }
+    }
+  })
+
+  it('does not repeatedly reset stream cache for prose-only unresolved bracket tolerant tails', () => {
+    const md = getMarkdown('pkg-stream-prose-only-unresolved-bracket-tail-no-reset-loop')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = [
+      'This prose paragraph happens to end with \\[',
+      'hello world without math signal',
+    ].join('\n')
+
+    let nodes: any[] = []
+    for (let index = 0; index < 40; index++) {
+      source += ` chunk-${index}`
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+    }
+
+    expect(resetCount).toBe(0)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(JSON.stringify(nodes)).toContain('chunk-39')
+  })
+
   it('does not reparse indented list tolerant $$ close line as a second math_block', () => {
     const md = getMarkdown('pkg-stream-list-tolerant-dollar-close-line-not-new-opener')
     ;(md as any).stream.reset()

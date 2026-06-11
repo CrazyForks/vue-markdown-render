@@ -486,8 +486,8 @@ function appendedChunkMayCompleteTolerantMathBoundary(previousSource: string, so
 
   // Fast path for the common case: normal text is appended after a completed
   // tolerant boundary. Do not full-scan the entire accumulated stream unless
-  // the new chunk can actually contain or complete a close delimiter.
-  if (appended.includes('$$') || appended.includes('\\]'))
+  // the new chunk can actually introduce or complete a tolerant display boundary.
+  if (appended.includes('$$') || appended.includes('\\[') || appended.includes('\\]'))
     return true
 
   // Tolerant display delimiters can be split across stream chunks:
@@ -796,7 +796,11 @@ function restoreStaleCompletedTolerantMathTokens(tokens: Token[], source: string
 
   for (const part of boundaryKey.split('|')) {
     const fields = part.split(':')
-    if (fields[0] !== 'closed' || fields[1] !== '$$' || fields[7] !== 'nosuffix')
+    if (fields[0] !== 'closed' || fields[7] !== 'nosuffix')
+      continue
+
+    const openDelim = fields[1]
+    if (openDelim !== '$$' && openDelim !== '\\[')
       continue
 
     const openLine = Number(fields[2])
@@ -812,6 +816,12 @@ function restoreStaleCompletedTolerantMathTokens(tokens: Token[], source: string
       contentLines.push(closeLineBeforeDelimiter)
 
     const content = contentLines.join('\n')
+    const closeLineSource = String(lines[closeLine] ?? '')
+    const closeDelim = openDelim === '$$'
+      ? '$$'
+      : closeLineSource.slice(closeIndex, closeIndex + 2) === '\\]' ? '\\]' : ']'
+    const markup = openDelim === '$$' ? '$$' : '\\[\\]'
+
     for (let prefixIndex = 0; prefixIndex <= restored.length - 6; prefixIndex++) {
       if (!isSyntheticTolerantBoundaryParagraphTriplet(restored, prefixIndex))
         continue
@@ -839,8 +849,8 @@ function restoreStaleCompletedTolerantMathTokens(tokens: Token[], source: string
         tag: 'math',
         nesting: 0,
         content,
-        markup: '$$',
-        raw: `$$${content}${content.startsWith('\n') ? '\n' : ''}$$`,
+        markup,
+        raw: `${openDelim}${content}${content.startsWith('\n') ? '\n' : ''}${closeDelim}`,
         map: [openLine + 1, closeLine + 1],
         block: true,
         loading: false,

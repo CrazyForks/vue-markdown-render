@@ -51,4 +51,29 @@ describe('math block same-line boundary package entry smoke test', () => {
     const inlineMath = collectByType(nodes, 'math_inline')
     expect(inlineMath.map((node: any) => node.content)).toEqual(['a', 'x'])
   })
+
+  it('preserves bracket tolerant display math through package entry', () => {
+    const md = getMarkdown('root-smoke-bracket-math-boundary')
+
+    const source = [
+      'Before $a$ and bracket display \\[',
+      'x + y = z',
+      '\\] where $z$ follows.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(source, md, { final: true }) as any[]
+
+    expect(nodes.map((node: any) => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].content).toContain('x + y = z')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content)).toEqual(['a', 'z'])
+  })
 })
