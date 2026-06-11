@@ -3,6 +3,7 @@ import { getMarkdown, parseMarkdownToStructure } from '../src'
 import {
   hasClosedTolerantMathBlockBoundaryCandidate,
   mayContainPendingTolerantMathBlockBoundaryCandidate,
+  TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META,
 } from '../src/plugins/math'
 
 function collectByType(nodes: any, type: string, out: any[] = []) {
@@ -610,6 +611,100 @@ describe('math block same-line boundary regression', () => {
     expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('x')
   })
 
+  it('does not flag completed or pending tolerant boundaries inside blockquoted protected blocks', () => {
+    const cases = [
+      [
+        'blockquoted fenced code with dollar',
+        [
+          '> ```',
+          '> literal $$',
+          '> E=mc^2',
+          '> $$ where this must stay code',
+          '> ```',
+        ].join('\n'),
+      ],
+      [
+        'blockquoted fenced code with bracket',
+        [
+          '> ```',
+          '> literal \\[',
+          '> x + y = z',
+          '> \\] where this must stay code',
+          '> ```',
+        ].join('\n'),
+      ],
+      [
+        'blockquoted indented code',
+        [
+          '>     literal $$',
+          '>     E=mc^2',
+          '>     $$ where this must stay code',
+        ].join('\n'),
+      ],
+      [
+        'blockquoted raw html',
+        [
+          '> <pre>',
+          '> literal $$',
+          '> E=mc^2',
+          '> $$ where this must stay html',
+          '> </pre>',
+        ].join('\n'),
+      ],
+    ] as const
+
+    for (const [name, source] of cases) {
+      expect(hasClosedTolerantMathBlockBoundaryCandidate(source), name).toBe(false)
+      expect(mayContainPendingTolerantMathBlockBoundaryCandidate(source), name).toBe(false)
+    }
+  })
+
+  it('does not create math blocks from blockquoted protected boundary-looking content in streaming mode', () => {
+    const md = getMarkdown('pkg-stream-blockquote-protected-boundary-no-math')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    const source = [
+      '> ```',
+      '> literal $$',
+      '> E=mc^2',
+      '> $$ where this must stay fenced code',
+      '> ```',
+      '',
+      'after $x$ remains inline.',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+
+    for (let index = 0; index < 8; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(resetCount).toBe(0)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(collectByType(nodes, 'code_block')).toHaveLength(1)
+    expect(stableSerialized).toContain('where this must stay fenced code')
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('x')
+  })
+
   it('does not duplicate or leave loading math_block when issue-492 tolerant boundary closes during streaming', () => {
     const md = getMarkdown('stream-issue-492-no-duplicate-or-loading-loop')
     ;(md as any).stream.reset()
@@ -1080,13 +1175,146 @@ describe('math block same-line boundary regression', () => {
     expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('a')
   })
 
+  it('does not reparse tolerant \\] close line as duplicate loading math_block', () => {
+    const md = getMarkdown('pkg-stream-tolerant-bracket-close-line-not-new-opener')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      'Before display \\[',
+      'x + y = z',
+      '\\] where $z$ follows.',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+
+    for (let index = 0; index < 12; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+
+      const mathBlocks = collectByType(nodes, 'math_block')
+      expect(mathBlocks).toHaveLength(1)
+      expect(mathBlocks[0].loading).toBe(false)
+      expect(mathBlocks[0].markup).toBe('\\[\\]')
+      expect(mathBlocks[0].content).toContain('x + y = z')
+      expect(mathBlocks[0].content).not.toContain('where')
+    }
+
+    expect(nodes.map((node: any) => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('z')
+  })
+
+  it('does not reparse indented list tolerant \\] close line as duplicate math_block', () => {
+    const md = getMarkdown('pkg-stream-list-tolerant-bracket-close-line-not-new-opener')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      '- Before display \\[',
+      '  x + y = z',
+      '  \\] where $z$ follows.',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+
+    for (let index = 0; index < 12; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0]?.type).toBe('list')
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(false)
+    expect(mathBlocks[0].markup).toBe('\\[\\]')
+    expect(mathBlocks[0].content).toContain('x + y = z')
+    expect(mathBlocks[0].content).not.toContain('where')
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('z')
+  })
+
+  it('does not reset or create math_block for large inline-math-only streams without tolerant opener', () => {
+    const md = getMarkdown('pkg-stream-large-inline-math-no-tolerant-opener')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = Array.from(
+      { length: 600 },
+      (_, index) => `line ${index}: inline math $x_${index}$ and text with no display opener.`,
+    ).join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+
+    for (let index = 0; index < 8; index++) {
+      source += ` chunk-${index}`
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toContain(`chunk-${index}`)
+    }
+
+    expect(resetCount).toBe(0)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(collectByType(nodes, 'math_inline').length).toBeGreaterThan(100)
+    expect(JSON.stringify(nodes)).toContain('line 599')
+    expect(stableSerialized).toContain('line 0')
+  })
+
+  it('keeps active tolerant-boundary detectors false for large inline-math-only documents', () => {
+    const source = Array.from(
+      { length: 600 },
+      (_, index) => `line ${index}: inline math $x_${index}$ and $y_${index}$ only.`,
+    ).join('\n')
+
+    expect(hasClosedTolerantMathBlockBoundaryCandidate(source)).toBe(false)
+    expect(mayContainPendingTolerantMathBlockBoundaryCandidate(source)).toBe(false)
+  })
+
   it('compacts only synthetic duplicate tolerant-boundary prefix paragraphs', () => {
     const md = getMarkdown('pkg-stream-compact-synthetic-tolerant-prefix-only')
     ;(md as any).stream.reset()
     ;(md as any).stream.resetStats()
 
     const syntheticMeta = {
-      __markstreamTolerantBoundarySyntheticParagraph: true,
+      [TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META]: true,
     }
 
     const makeParagraphTriplet = () => [

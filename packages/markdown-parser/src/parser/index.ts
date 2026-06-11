@@ -6,6 +6,7 @@ import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes, parseTagAttrs } fro
 import {
   getActiveTolerantMathBlockBoundaryCacheKey,
   mayContainPendingTolerantMathBlockBoundaryCandidate,
+  TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META,
 } from '../plugins/math'
 import { parseInlineTokens } from './inline-parsers'
 import { createLinkifyDemotionContextTracker } from './linkifyHeuristics'
@@ -305,8 +306,6 @@ interface ActiveTolerantMathBoundaryStreamState {
 
 const activeTolerantMathBoundaryStreamStateCache = new WeakMap<object, ActiveTolerantMathBoundaryStreamState>()
 
-const TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META = '__markstreamTolerantBoundarySyntheticParagraph'
-
 const TOLERANT_BOUNDARY_STREAM_LOOKBACK_CHARS = 20000
 
 function isSimpleThematicOrSetextLine(line: string) {
@@ -521,7 +520,68 @@ function appendedChunkMayChangeActiveTolerantMathBoundary(
   return false
 }
 
-function syncTopLevelStreamCacheForCompletedTolerantMathBoundary(
+function stripSimpleBlockquotePrefixForTolerantBoundaryLookup(line: string) {
+  const source = String(line ?? '')
+  let cursor = 0
+  let contentStart = 0
+
+  while (cursor < source.length) {
+    const markerStart = cursor
+    let spaces = 0
+
+    while (spaces < 4 && (source[cursor] === ' ' || source[cursor] === '\t')) {
+      cursor++
+      spaces++
+    }
+
+    if (spaces >= 4 || source[cursor] !== '>') {
+      cursor = markerStart
+      break
+    }
+
+    cursor++
+    if (source[cursor] === ' ' || source[cursor] === '\t')
+      cursor++
+
+    contentStart = cursor
+  }
+
+  return source.slice(contentStart)
+}
+
+function isPotentialTolerantBoundaryOpenerLine(line: string) {
+  const content = stripSimpleBlockquotePrefixForTolerantBoundaryLookup(line)
+    .replace(/[\t ]+$/, '')
+
+  if (!content.trim())
+    return false
+
+  if (content.endsWith('$$'))
+    return !!content.slice(0, -2).trim()
+
+  if (content.endsWith('\\['))
+    return !!content.slice(0, -2).trim()
+
+  return false
+}
+
+function mayContainTolerantBoundaryOpenerLineNearTail(source: string) {
+  const value = String(source ?? '')
+  if (!value || (!value.includes('$$') && !value.includes('\\[')))
+    return false
+
+  const tail = value.slice(Math.max(0, value.length - TOLERANT_BOUNDARY_STREAM_LOOKBACK_CHARS))
+  const lines = tail.split(/\r?\n/)
+
+  for (const line of lines) {
+    if (isPotentialTolerantBoundaryOpenerLine(line))
+      return true
+  }
+
+  return false
+}
+
+function syncTopLevelStreamCacheForActiveTolerantMathBoundary(
   md: MarkdownIt,
   source: string,
 ): 'parse' | 'stream' {
@@ -556,6 +616,11 @@ function syncTopLevelStreamCacheForCompletedTolerantMathBoundary(
       previous.source = source
       return 'stream'
     }
+  }
+
+  if (previousKey === null && !mayContainTolerantBoundaryOpenerLineNearTail(source)) {
+    activeTolerantMathBoundaryStreamStateCache.set(cacheOwner, { key: null, source })
+    return 'stream'
   }
 
   const boundaryKey = getActiveTolerantMathBlockBoundaryCacheKey(source)
@@ -671,7 +736,7 @@ function parseTopLevelTokens(
   // Key transitions (new pending, pending→closed, closed→none) invalidate stale
   // stream tokens once. We then rebuild from the full current source through
   // md.stream.parse so the incremental cache remains hot.
-  const mode = syncTopLevelStreamCacheForCompletedTolerantMathBoundary(md, source)
+  const mode = syncTopLevelStreamCacheForActiveTolerantMathBoundary(md, source)
   if (mode === 'parse')
     return md.parse(source, env)
 

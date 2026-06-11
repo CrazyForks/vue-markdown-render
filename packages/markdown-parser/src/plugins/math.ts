@@ -26,7 +26,7 @@ interface MathBlockState {
 
 type TolerantMathToken = MarkdownToken & { tolerantBoundary?: boolean }
 
-const TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META = '__markstreamTolerantBoundarySyntheticParagraph'
+export const TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META = '__markstreamTolerantBoundarySyntheticParagraph'
 
 // Heuristic to decide whether a piece of text is likely math.
 // Matches common TeX commands, math operators, function-call patterns like f(x),
