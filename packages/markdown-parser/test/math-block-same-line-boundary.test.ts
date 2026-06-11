@@ -4,6 +4,7 @@ import {
   getActiveTolerantMathBlockBoundaryCacheKey,
   hasClosedTolerantMathBlockBoundaryCandidate,
   mayContainPendingTolerantMathBlockBoundaryCandidate,
+  TOLERANT_BOUNDARY_STREAM_CACHE_KEY_ENV,
   TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META,
 } from '../src/plugins/math'
 
@@ -1280,6 +1281,75 @@ describe('math block same-line boundary regression', () => {
     expect(resetCount).toBe(0)
   })
 
+  it('does not turn ordinary prose after same-line $$ into streaming math', () => {
+    const md = getMarkdown('pkg-stream-tolerant-dollar-prose-near-miss')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const source = [
+      'This sentence contains a literal marker $$',
+      'this is ordinary prose without an equation',
+      'and it should remain normal text.',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(JSON.stringify(nodes)).toContain('literal marker')
+    expect(JSON.stringify(nodes)).toContain('ordinary prose')
+    expect(JSON.stringify(nodes)).toContain('normal text')
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 8; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+      expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    }
+  })
+
+  it('does not hang or misparse long near-miss boundary lines', () => {
+    const md = getMarkdown('pkg-stream-tolerant-long-near-miss-no-loop')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const longNearMiss = `not-a-formula ${'- '.repeat(6000)}tail`
+    const source = [
+      'Before display $$',
+      longNearMiss,
+      'plain tail text',
+    ].join('\n')
+
+    let nodes: any[] = []
+    let stableSerialized = ''
+
+    for (let index = 0; index < 5; index++) {
+      expect(() => {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }).not.toThrow()
+
+      const serialized = JSON.stringify(nodes)
+      if (index === 0)
+        stableSerialized = serialized
+      else
+        expect(serialized).toBe(stableSerialized)
+    }
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(stableSerialized).toContain('Before display')
+    expect(stableSerialized).toContain('not-a-formula')
+    expect(stableSerialized).toContain('plain tail text')
+  })
+
   it('distinguishes unresolved pending tolerant math tail from stopped ordinary trailing delimiters', () => {
     expect(
       mayContainPendingTolerantMathBlockBoundaryCandidate([
@@ -1925,9 +1995,11 @@ describe('math block same-line boundary regression', () => {
     const stream = (md as any).stream
     const originalParse = stream.parse.bind(stream)
     const observedSourceEnvValues: unknown[] = []
+    const observedBoundaryKeyEnvValues: unknown[] = []
 
     stream.parse = (src: string, env?: Record<string, unknown>) => {
       observedSourceEnvValues.push(env?.__markstreamSource)
+      observedBoundaryKeyEnvValues.push(env?.[TOLERANT_BOUNDARY_STREAM_CACHE_KEY_ENV])
       return originalParse(src, env)
     }
 
@@ -1950,6 +2022,8 @@ describe('math block same-line boundary regression', () => {
 
     expect(observedSourceEnvValues).toHaveLength(8)
     expect(observedSourceEnvValues.every(value => value === undefined)).toBe(true)
+    expect(observedBoundaryKeyEnvValues).toHaveLength(8)
+    expect(observedBoundaryKeyEnvValues.every(value => value === undefined)).toBe(true)
 
     const mathBlocks = collectByType(nodes, 'math_block')
     expect(mathBlocks).toHaveLength(40)
@@ -2154,6 +2228,17 @@ describe('math block same-line boundary regression', () => {
     expect(mathBlocks[0].loading).toBe(false)
     expect(mathBlocks[0].content).toContain('a = 1')
     expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('a')
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 8; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+      expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+    }
   })
 
   it('detects tolerant \\[ opener split across stream chunks', () => {

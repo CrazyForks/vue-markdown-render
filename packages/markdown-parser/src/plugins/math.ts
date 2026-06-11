@@ -27,6 +27,7 @@ interface MathBlockState {
 type TolerantMathToken = MarkdownToken & { tolerantBoundary?: boolean }
 
 export const TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META = '__markstreamTolerantBoundarySyntheticParagraph'
+export const TOLERANT_BOUNDARY_STREAM_CACHE_KEY_ENV = '__markstreamTolerantBoundaryStreamCacheKey'
 const MARKSTREAM_MATH_PLUGIN_APPLIED = '__markstreamMathPluginApplied'
 
 export function hasMarkstreamMathPlugin(md: MarkdownIt) {
@@ -1809,8 +1810,12 @@ export function hasClosedTolerantMathBlockBoundaryCandidate(markdown: string) {
   return getCompletedTolerantMathBlockBoundaryCacheKey(markdown) !== null
 }
 
-function hasTolerantBoundaryCloseAtLine(markdown: string, line: number, closeIndex: number, delimiter: string) {
-  const key = getCompletedTolerantMathBlockBoundaryCacheKey(markdown)
+function tolerantBoundaryKeyHasCloseAtLine(
+  key: string | null | undefined,
+  line: number,
+  closeIndex: number,
+  delimiter: string,
+) {
   if (!key)
     return false
 
@@ -1821,6 +1826,15 @@ function hasTolerantBoundaryCloseAtLine(markdown: string, line: number, closeInd
       && Number(fields[4]) === line
       && Number(fields[5]) === closeIndex
   })
+}
+
+function hasTolerantBoundaryCloseAtLine(markdown: string, line: number, closeIndex: number, delimiter: string) {
+  return tolerantBoundaryKeyHasCloseAtLine(
+    getCompletedTolerantMathBlockBoundaryCacheKey(markdown),
+    line,
+    closeIndex,
+    delimiter,
+  )
 }
 
 function countLineBreaks(value: string) {
@@ -2550,6 +2564,9 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           // by a tolerant boundary and its map ends exactly at this line,
           // treat this delimiter as its close rather than a new opener.
           let closesExistingTolerantMath = false
+          const tolerantBoundaryStreamKey = typeof s.env?.[TOLERANT_BOUNDARY_STREAM_CACHE_KEY_ENV] === 'string'
+            ? String(s.env[TOLERANT_BOUNDARY_STREAM_CACHE_KEY_ENV])
+            : ''
           const fullSource = typeof s.env?.__markstreamSource === 'string'
             ? s.env.__markstreamSource
             : ''
@@ -2579,16 +2596,25 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
                 break
             }
 
-            if (!closesExistingTolerantMath && hasStreamSource && open === '$$') {
-              const sourceThroughDelimiter = fullSourceTailOffset >= 0
-                ? fullSource.slice(0, fullSourceTailOffset + startPos + open.length)
-                : s.src.slice(0, startPos + open.length)
-              closesExistingTolerantMath = hasTolerantBoundaryCloseAtLine(
-                sourceThroughDelimiter,
+            if (!closesExistingTolerantMath && open === '$$') {
+              closesExistingTolerantMath = tolerantBoundaryKeyHasCloseAtLine(
+                tolerantBoundaryStreamKey,
                 absoluteStartLine,
                 closeIndexInCurrentLine,
                 open,
               )
+
+              if (!closesExistingTolerantMath && hasStreamSource) {
+                const sourceThroughDelimiter = fullSourceTailOffset >= 0
+                  ? fullSource.slice(0, fullSourceTailOffset + startPos + open.length)
+                  : s.src.slice(0, startPos + open.length)
+                closesExistingTolerantMath = hasTolerantBoundaryCloseAtLine(
+                  sourceThroughDelimiter,
+                  absoluteStartLine,
+                  closeIndexInCurrentLine,
+                  open,
+                )
+              }
             }
           }
 

@@ -7,6 +7,7 @@ import {
   getActiveTolerantMathBlockBoundaryCacheKey,
   hasMarkstreamMathPlugin,
   mayContainPendingTolerantMathBlockBoundaryCandidate,
+  TOLERANT_BOUNDARY_STREAM_CACHE_KEY_ENV,
   TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META,
 } from '../plugins/math'
 import { parseInlineTokens } from './inline-parsers'
@@ -827,8 +828,10 @@ function parseTopLevelTokens(
     ? activeTolerantMathBoundaryStreamStateCache.get(md as unknown as object)
     : undefined
 
-  if (activeTolerantBoundaryState?.key)
+  if (activeTolerantBoundaryState?.key) {
     streamEnv.__markstreamSource = source
+    streamEnv[TOLERANT_BOUNDARY_STREAM_CACHE_KEY_ENV] = activeTolerantBoundaryState.key
+  }
 
   const rawTokens = md.stream!.parse!(source, streamEnv)
   const tokens = activeTolerantBoundaryState?.key
