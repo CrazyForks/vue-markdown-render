@@ -1,11 +1,13 @@
 import {
   getMarkdown,
-  hasClosedTolerantMathBlockBoundaryCandidate,
-  mayContainPendingTolerantMathBlockBoundaryCandidate,
   parseMarkdownToStructure,
   processTokens,
 } from 'stream-markdown-parser'
 import { describe, expect, it } from 'vitest'
+import {
+  hasClosedTolerantMathBlockBoundaryCandidate,
+  mayContainPendingTolerantMathBlockBoundaryCandidate,
+} from '../packages/markdown-parser/src/plugins/math'
 
 describe('math block same-line boundary regression', () => {
   function collectByType(nodes: any, type: string, out: any[] = [], seen = new WeakSet<object>()) {
@@ -3725,7 +3727,7 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     expect(inlineMath.map((node: any) => node.content)).toContain('z')
   })
 
-  it('enters predictive tolerant $$ loading mode without repeated reset/full-parse while math content appends', () => {
+  it('enters predictive tolerant $$ loading mode and reuses cache for identical pending source', () => {
     const md = getMarkdown('stream-tolerant-dollar-pending-and-completed-cache-reset')
     ;(md as any).stream.reset()
     ;(md as any).stream.resetStats()
@@ -3733,8 +3735,10 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     const stream = (md as any).stream
     const originalReset = stream.reset.bind(stream)
     const originalParse = stream.parse.bind(stream)
+    const originalPeek = stream.peek?.bind(stream)
     let resetCount = 0
     let streamParseCount = 0
+    let peekCount = 0
 
     stream.reset = () => {
       resetCount++
@@ -3743,6 +3747,12 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     stream.parse = (...args: any[]) => {
       streamParseCount++
       return originalParse(...args)
+    }
+    if (originalPeek) {
+      stream.peek = () => {
+        peekCount++
+        return originalPeek()
+      }
     }
 
     const openerOnly = 'Before display $$'
@@ -3776,7 +3786,7 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
       streamParse: true,
     }) as any[]
 
-    expect(resetCount).toBe(1)
+    expect(resetCount).toBe(2)
     expect(streamParseCount).toBe(3)
     expect(nodes.map((node: any) => node.type)).toEqual(['paragraph', 'math_block'])
     expect(collectByType(nodes, 'math_block')[0].content).toContain('+ b = 2')
@@ -3789,7 +3799,11 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
       }) as any[]
       expect(JSON.stringify(nodes)).toBe(pendingStable)
     }
-    expect(resetCount).toBe(1)
+    expect(resetCount).toBe(2)
+    if (originalPeek) {
+      expect(streamParseCount).toBe(3)
+      expect(peekCount).toBe(6)
+    }
 
     const completed = `${pendingAppend}\n$$ after $a$ follows.`
     nodes = parseMarkdownToStructure(completed, md, {
@@ -3797,8 +3811,8 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
       streamParse: true,
     }) as any[]
 
-    expect(resetCount).toBe(2)
-    expect(streamParseCount).toBe(10)
+    expect(resetCount).toBe(3)
+    expect(streamParseCount).toBe(4)
     expect(nodes.map((node: any) => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
 
     const completedMathBlocks = collectByType(nodes, 'math_block')
@@ -3807,6 +3821,126 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     expect(completedMathBlocks[0].content).toContain('a = 1')
     expect(completedMathBlocks[0].content).toContain('+ b = 2')
     expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('a')
+  })
+
+  it('reuses stream cache for repeated active pending tolerant boundary source without reparsing', () => {
+    const md = getMarkdown('stream-tolerant-pending-uses-peek')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    const originalParse = stream.parse.bind(stream)
+    const originalPeek = stream.peek?.bind(stream)
+    let resetCount = 0
+    let streamParseCount = 0
+    let peekCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+    stream.parse = (...args: any[]) => {
+      streamParseCount++
+      return originalParse(...args)
+    }
+    if (originalPeek) {
+      stream.peek = () => {
+        peekCount++
+        return originalPeek()
+      }
+    }
+
+    const source = [
+      'Before display $$',
+      'a = 1',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(streamParseCount).toBe(1)
+    expect(nodes.map((node: any) => node.type)).toEqual(['paragraph', 'math_block'])
+    expect(collectByType(nodes, 'math_block')[0].loading).toBe(true)
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 8; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+    }
+
+    expect(resetCount).toBe(1)
+    if (originalPeek) {
+      expect(streamParseCount).toBe(1)
+      expect(peekCount).toBe(8)
+    }
+  })
+
+  it('reuses stream cache for repeated completed tolerant boundary source without reparsing', () => {
+    const md = getMarkdown('stream-tolerant-completed-uses-peek')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    const originalParse = stream.parse.bind(stream)
+    const originalPeek = stream.peek?.bind(stream)
+    let resetCount = 0
+    let streamParseCount = 0
+    let peekCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+    stream.parse = (...args: any[]) => {
+      streamParseCount++
+      return originalParse(...args)
+    }
+    if (originalPeek) {
+      stream.peek = () => {
+        peekCount++
+        return originalPeek()
+      }
+    }
+
+    const source = [
+      'Before display $$',
+      'a = 1',
+      '$$ after $a$ follows.',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(streamParseCount).toBe(1)
+    expect(nodes.map((node: any) => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 8; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+    }
+
+    expect(resetCount).toBe(1)
+    if (originalPeek) {
+      expect(streamParseCount).toBe(1)
+      expect(peekCount).toBe(8)
+    }
   })
 
   it('does not enter predictive tolerant loading for prose-only pending content', () => {
@@ -4118,7 +4252,7 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
     expect(mathBlocks[0].content).toContain('a = 1')
   })
 
-  it('updates pending tolerant math content on plain chunk append without extra reset', () => {
+  it('updates pending tolerant math content on plain chunk append after rebuilding cache', () => {
     const md = getMarkdown('stream-math-boundary-pending-content-plain-append')
     ;(md as any).stream.reset()
     ;(md as any).stream.resetStats()
@@ -4146,7 +4280,7 @@ $$ where $x$ follows.`, { __markstreamFinal: true }) as any[]
       streamParse: true,
     }) as any[]
 
-    expect(resetCount).toBe(1)
+    expect(resetCount).toBe(2)
     expect(collectByType(nodes, 'math_block')[0].content).toContain('a = 1 + b')
   })
 

@@ -24,6 +24,8 @@ interface MathBlockState {
   tokens: MarkdownToken[]
 }
 
+type TolerantMathToken = MarkdownToken & { tolerantBoundary?: boolean }
+
 // Heuristic to decide whether a piece of text is likely math.
 // Matches common TeX commands, math operators, function-call patterns like f(x),
 // superscripts/subscripts, and common math words.
@@ -2269,7 +2271,8 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
             for (let ti = tokens.length - 1; ti >= 0; ti--) {
               const prev = tokens[ti]
               if (prev.type === 'math_block') {
-                if (prev.tolerantBoundary && prev.map && prev.map[1] <= startLine)
+                const prevMath = prev as TolerantMathToken
+                if (prevMath.tolerantBoundary && prev.map && prev.map[1] <= startLine)
                   closesExistingTolerantMath = true
                 break
               }
@@ -2576,7 +2579,7 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     token.map = [mapStartLine, mapEndLine]
     token.block = true
     token.loading = !found
-    token.tolerantBoundary = tolerantBoundary
+    ;(token as TolerantMathToken).tolerantBoundary = tolerantBoundary
     s.line = consumedEndLine
 
     if (trailingAfterClose.trim())

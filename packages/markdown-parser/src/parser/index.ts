@@ -522,7 +522,7 @@ function appendedChunkMayChangeActiveTolerantMathBoundary(
 function syncTopLevelStreamCacheForCompletedTolerantMathBoundary(
   md: MarkdownIt,
   source: string,
-): 'parse' | 'stream' {
+): 'parse' | 'stream' | 'peek' {
   const stream = md.stream
   if (typeof stream?.reset !== 'function')
     return 'parse'
@@ -531,17 +531,22 @@ function syncTopLevelStreamCacheForCompletedTolerantMathBoundary(
   const previous = activeTolerantMathBoundaryStreamStateCache.get(cacheOwner)
   const previousKey = previous?.key ?? null
 
-  // Exact same active source: keep using the stream parser. The stale-cache risk
+  // Exact same active source: reuse the stream cache. The stale-cache risk
   // is handled by resetting exactly when the active tolerant-boundary key changes
   // or first appears. Repeated full md.parse here is the performance trap.
-  if (previous?.source === source && previousKey !== null)
+  if (previous?.source === source && previousKey !== null) {
+    if (typeof stream.peek === 'function')
+      return 'peek'
     return 'stream'
+  }
 
   if (previous && source.startsWith(previous.source)) {
     if (
       previousKey !== null
       && !appendedChunkMayChangeActiveTolerantMathBoundary(previousKey, previous.source, source)
     ) {
+      if (previousKey.startsWith('pending:'))
+        stream.reset()
       previous.source = source
       return 'stream'
     }
@@ -559,6 +564,8 @@ function syncTopLevelStreamCacheForCompletedTolerantMathBoundary(
   const boundaryKey = getActiveTolerantMathBlockBoundaryCacheKey(source)
 
   if (boundaryKey !== null && boundaryKey === previousKey) {
+    if (boundaryKey.startsWith('pending:') && previous?.source !== source)
+      stream.reset()
     activeTolerantMathBoundaryStreamStateCache.set(cacheOwner, {
       key: boundaryKey,
       source,
@@ -587,70 +594,6 @@ function shouldCloneTopLevelStreamTokens(options: ParseOptions) {
     || typeof options.postTransformTokens === 'function'
 }
 
-function sameTokenMap(a: Token | undefined, b: Token | undefined) {
-  const aMap = a?.map
-  const bMap = b?.map
-  if (!Array.isArray(aMap) || !Array.isArray(bMap))
-    return false
-  if (aMap.length !== bMap.length)
-    return false
-  for (let index = 0; index < aMap.length; index++) {
-    if (aMap[index] !== bMap[index])
-      return false
-  }
-  return true
-}
-
-function isParagraphTokenTriple(tokens: Token[], index: number) {
-  return tokens[index]?.type === 'paragraph_open'
-    && tokens[index + 1]?.type === 'inline'
-    && tokens[index + 2]?.type === 'paragraph_close'
-}
-
-function removeDuplicatePendingTolerantPrefixTokens(tokens: Token[], activeKey: string | null) {
-  if (!activeKey?.startsWith('pending:'))
-    return tokens
-
-  let normalized = tokens
-  for (let index = 0; index < normalized.length; index++) {
-    const token = normalized[index] as Token & {
-      loading?: boolean
-      tolerantBoundary?: boolean
-    }
-    if (token?.type !== 'math_block' || !token.loading || !token.tolerantBoundary)
-      continue
-
-    const duplicatePrefixStart = index - 3
-    const previousPrefixStart = index - 6
-    if (
-      duplicatePrefixStart < 0
-      || previousPrefixStart < 0
-      || !isParagraphTokenTriple(normalized, previousPrefixStart)
-      || !isParagraphTokenTriple(normalized, duplicatePrefixStart)
-    ) {
-      continue
-    }
-
-    const previousInline = normalized[previousPrefixStart + 1]
-    const duplicateInline = normalized[duplicatePrefixStart + 1]
-    if (previousInline.content !== duplicateInline.content)
-      continue
-
-    // Only remove duplicated prefix paragraphs when they are clearly the same
-    // source slice replayed by stream cache. Legitimate user content can contain
-    // two identical paragraphs immediately before a pending tolerant math block.
-    if (!sameTokenMap(previousInline, duplicateInline))
-      continue
-
-    if (normalized === tokens)
-      normalized = tokens.slice()
-    normalized.splice(duplicatePrefixStart, 3)
-    index -= 3
-  }
-
-  return normalized
-}
-
 function parseTopLevelTokens(
   md: MarkdownIt,
   source: string,
@@ -677,11 +620,9 @@ function parseTopLevelTokens(
 
   const streamEnv = getStableStreamEnv(md, env)
   streamEnv.__markstreamSource = source
-  const activeKey = activeTolerantMathBoundaryStreamStateCache.get(md as unknown as object)?.key ?? null
-  const tokens = removeDuplicatePendingTolerantPrefixTokens(
-    md.stream!.parse!(source, streamEnv),
-    activeKey,
-  )
+  const tokens = mode === 'peek' && typeof md.stream?.peek === 'function'
+    ? md.stream.peek()
+    : md.stream!.parse!(source, streamEnv)
   if (!shouldCloneTopLevelStreamTokens(options))
     return tokens
 
