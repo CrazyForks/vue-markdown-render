@@ -6,6 +6,7 @@ import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes, parseTagAttrs } fro
 import {
   getActiveTolerantMathBlockBoundaryCacheKey,
   hasMarkstreamMathPlugin,
+  isLikelyTolerantAngleBracketMathLine,
   mayContainPendingTolerantMathBlockBoundaryCandidate,
   TOLERANT_BOUNDARY_STREAM_CACHE_KEY_ENV,
   TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META,
@@ -402,6 +403,9 @@ function isTolerantBoundaryHtmlNameChar(ch?: string) {
 function isSimpleHtmlBoundaryLineLike(line: string) {
   const trimmed = String(line ?? '').trimStart()
   if (trimmed[0] !== '<')
+    return false
+
+  if (isLikelyTolerantAngleBracketMathLine(trimmed))
     return false
 
   let index = 1

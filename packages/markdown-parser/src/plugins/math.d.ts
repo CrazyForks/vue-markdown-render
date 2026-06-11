@@ -16,3 +16,4 @@ export declare function getCompletedTolerantMathBlockBoundaryCacheKey(markdown: 
 export declare function getActiveTolerantMathBlockBoundaryCacheKey(markdown: string): string | null;
 export declare function hasClosedTolerantMathBlockBoundaryCandidate(markdown: string): boolean;
 export declare function mayContainPendingTolerantMathBlockBoundaryCandidate(markdown: string): boolean;
+export declare function isLikelyTolerantAngleBracketMathLine(line: string): boolean;

@@ -617,6 +617,7 @@ function isLikelyTolerantExplicitMathBlockContent(content: string, closed: boole
     || /\\(?:times|pm|cdot|le|ge|neq)\b/.test(stripped)
     || hasTolerantFormulaOperatorSignal(stripped)
     || hasTolerantAbsoluteValueSignal(stripped)
+    || hasTolerantAngleBracketMathSignal(stripped)
     || (closed && isLikelyClosedTolerantSingleAtomMath(stripped))
     || (closed && isLikelySpacedSuperSubscriptMath(stripped))
 }
@@ -672,6 +673,7 @@ function isInsideCodeSpanOrUnclosedTail(src: string, index: number) {
 const MAX_TOLERANT_BOUNDARY_LINES = 80
 const MAX_TOLERANT_BOUNDARY_CHARS = 20000
 const MAX_TOLERANT_BOUNDARY_CACHE_SCAN_CHARS = MAX_TOLERANT_BOUNDARY_CHARS + 8192
+const MAX_TOLERANT_BOUNDARY_CACHE_SCAN_LINES = MAX_TOLERANT_BOUNDARY_LINES * 3 + 16
 
 function isSpaceOrTab(ch?: string) {
   return ch === ' ' || ch === '\t'
@@ -904,8 +906,186 @@ function parseTolerantBoundaryFenceMarker(line: string) {
   }
 }
 
+function skipTolerantAngleSpaces(source: string, index: number) {
+  let cursor = index
+  while (isSpaceOrTab(source[cursor]))
+    cursor++
+  return cursor
+}
+
+function readTolerantAngleCommandEnd(source: string, index: number) {
+  if (source[index] !== '\\')
+    return -1
+
+  let cursor = index + 1
+  const commandStart = cursor
+  while (isAsciiAlpha(source[cursor]))
+    cursor++
+
+  return cursor > commandStart ? cursor : -1
+}
+
+function readTolerantAngleScriptEnd(source: string, index: number) {
+  if (source[index] === '{') {
+    let cursor = index + 1
+    let sawContent = false
+    while (cursor < source.length && source[cursor] !== '}') {
+      const ch = source[cursor]
+      if (ch === '\n' || ch === '\r' || ch === '<' || ch === '>')
+        return -1
+      if (!isSpaceOrTab(ch))
+        sawContent = true
+      cursor++
+    }
+
+    return sawContent && source[cursor] === '}' ? cursor + 1 : -1
+  }
+
+  if (source[index] === '\\')
+    return readTolerantAngleCommandEnd(source, index)
+
+  if (isAsciiAlpha(source[index]) || isAsciiDigit(source[index])) {
+    let cursor = index
+    while (isAsciiAlpha(source[cursor]) || isAsciiDigit(source[cursor]))
+      cursor++
+
+    return cursor > index ? cursor : -1
+  }
+
+  return -1
+}
+
+function readTolerantAngleAtomEnd(source: string, index: number) {
+  let cursor = skipTolerantAngleSpaces(source, index)
+  if (source[cursor] === '\\') {
+    const commandEnd = readTolerantAngleCommandEnd(source, cursor)
+    if (commandEnd === -1)
+      return -1
+    cursor = commandEnd
+  }
+  else if (isAsciiAlpha(source[cursor])) {
+    const start = cursor
+    while (isAsciiAlpha(source[cursor]) || isAsciiDigit(source[cursor]))
+      cursor++
+
+    const word = source.slice(start, cursor)
+    // Avoid treating ordinary HTML tags like <span> or <table> as angle math.
+    // Short identifiers cover common variables: <x>, <x1>, <pi>.
+    if (word.length > 2 && word.toLowerCase() !== 'pi')
+      return -1
+  }
+  else if (isAsciiDigit(source[cursor])) {
+    const start = cursor
+    while (isAsciiDigit(source[cursor]))
+      cursor++
+
+    if (cursor === start)
+      return -1
+  }
+  else {
+    return -1
+  }
+
+  while (source[cursor] === '_' || source[cursor] === '^') {
+    const scriptEnd = readTolerantAngleScriptEnd(source, cursor + 1)
+    if (scriptEnd === -1)
+      return -1
+    cursor = scriptEnd
+  }
+
+  return cursor
+}
+
+function startsWithTolerantAngleRelationCommand(source: string, index: number) {
+  if (source[index] !== '\\')
+    return false
+
+  const commandEnd = readTolerantAngleCommandEnd(source, index)
+  if (commandEnd === -1)
+    return false
+
+  const command = source.slice(index + 1, commandEnd).toLowerCase()
+  switch (command) {
+    case 'le':
+    case 'ge':
+    case 'neq':
+    case 'approx':
+    case 'sim':
+    case 'lt':
+    case 'gt':
+    case 'in':
+    case 'notin':
+    case 'subset':
+    case 'supset':
+    case 'to':
+      return true
+    default:
+      return false
+  }
+}
+
+function isTolerantAngleMathOperatorAt(source: string, index: number) {
+  const ch = source[index]
+  return ch === '='
+    || ch === '+'
+    || ch === '-'
+    || ch === '*'
+    || ch === '/'
+    || ch === '^'
+    || ch === '_'
+    || ch === '<'
+    || ch === '>'
+    || ch === '|'
+    || startsWithTolerantAngleRelationCommand(source, index)
+}
+
+export function isLikelyTolerantAngleBracketMathLine(line: string) {
+  const source = String(line ?? '')
+  let cursor = skipTolerantAngleSpaces(source, 0)
+
+  if (source[cursor] !== '<')
+    return false
+
+  cursor++
+  let atomCount = 0
+  while (cursor < source.length) {
+    const atomEnd = readTolerantAngleAtomEnd(source, cursor)
+    if (atomEnd === -1)
+      return false
+
+    atomCount++
+    cursor = skipTolerantAngleSpaces(source, atomEnd)
+    if (source[cursor] !== ',')
+      break
+
+    cursor++
+  }
+
+  if (atomCount === 0)
+    return false
+
+  cursor = skipTolerantAngleSpaces(source, cursor)
+  if (source[cursor] !== '>')
+    return false
+
+  cursor = skipTolerantAngleSpaces(source, cursor + 1)
+  return cursor < source.length && isTolerantAngleMathOperatorAt(source, cursor)
+}
+
+function hasTolerantAngleBracketMathSignal(content: string) {
+  const lines = String(content ?? '').split(/\r?\n/)
+  for (const line of lines) {
+    if (isLikelyTolerantAngleBracketMathLine(line))
+      return true
+  }
+  return false
+}
+
 function parseTolerantBoundaryHtmlOpen(line: string) {
   const source = String(line ?? '')
+  if (isLikelyTolerantAngleBracketMathLine(source))
+    return null
+
   let index = 0
   let spaces = 0
 
@@ -1123,13 +1303,64 @@ function findTolerantBoundaryProtectedContextStart(source: string, targetIndex: 
   return findLineStartAtOrBefore(source, target)
 }
 
+function mayContainTolerantBoundaryDelimiter(line: string) {
+  return line.includes('$') || line.includes('\\[') || line.includes('\\]')
+}
+
+function findTolerantBoundaryLineStart(source: string, lineNumber: number) {
+  if (lineNumber <= 0)
+    return 0
+
+  let currentLine = 0
+  for (let index = 0; index < source.length; index++) {
+    if (source[index] !== '\n')
+      continue
+
+    currentLine++
+    if (currentLine === lineNumber)
+      return index + 1
+  }
+
+  return source.length
+}
+
+function getTolerantBoundaryDelimiterLineClampStart(lines: string[]) {
+  let delimiterLines = 0
+  for (let index = lines.length - 1; index >= 0; index--) {
+    if (!mayContainTolerantBoundaryDelimiter(lines[index]))
+      continue
+
+    delimiterLines++
+    if (delimiterLines > MAX_TOLERANT_BOUNDARY_CACHE_SCAN_LINES)
+      return index + 1
+  }
+
+  return 0
+}
+
+function clampTolerantBoundaryCacheScanWindowLines(window: { source: string, lineOffset: number }) {
+  const lines = window.source.split(/\r?\n/)
+  const keepStart = getTolerantBoundaryDelimiterLineClampStart(lines)
+  if (keepStart <= 0)
+    return window
+
+  let windowStart = findTolerantBoundaryLineStart(window.source, keepStart)
+  windowStart = findTolerantBoundaryProtectedContextStart(window.source, windowStart)
+
+  const prefix = window.source.slice(0, windowStart)
+  return {
+    source: window.source.slice(windowStart),
+    lineOffset: window.lineOffset + countLineBreaks(prefix),
+  }
+}
+
 function getTolerantBoundaryCacheScanWindow(source: string, maxChars = MAX_TOLERANT_BOUNDARY_CACHE_SCAN_CHARS) {
   const value = String(source ?? '')
   if (value.length <= maxChars) {
-    return {
+    return clampTolerantBoundaryCacheScanWindowLines({
       source: value,
       lineOffset: 0,
-    }
+    })
   }
 
   let windowStart = value.length - maxChars
@@ -1140,10 +1371,10 @@ function getTolerantBoundaryCacheScanWindow(source: string, maxChars = MAX_TOLER
   windowStart = findTolerantBoundaryProtectedContextStart(value, windowStart)
 
   const prefix = value.slice(0, windowStart)
-  return {
+  return clampTolerantBoundaryCacheScanWindowLines({
     source: value.slice(windowStart),
     lineOffset: countLineBreaks(prefix),
-  }
+  })
 }
 
 function getTolerantMathBlockBoundaryCacheKey(markdown: string, includePending: boolean) {
@@ -1658,6 +1889,9 @@ function isListBoundaryLine(trimmed: string) {
 
 function isHtmlBoundaryLine(trimmed: string) {
   if (trimmed[0] !== '<')
+    return false
+
+  if (isLikelyTolerantAngleBracketMathLine(trimmed))
     return false
 
   let index = 1

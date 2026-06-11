@@ -3,6 +3,7 @@ import { getMarkdown, parseMarkdownToStructure } from '../src'
 import {
   getActiveTolerantMathBlockBoundaryCacheKey,
   hasClosedTolerantMathBlockBoundaryCandidate,
+  isLikelyTolerantAngleBracketMathLine,
   mayContainPendingTolerantMathBlockBoundaryCandidate,
   TOLERANT_BOUNDARY_STREAM_CACHE_KEY_ENV,
   TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META,
@@ -146,6 +147,120 @@ describe('math block same-line boundary regression', () => {
     expect(streamParseCount).toBe(3)
     expect(collectByType(nodes, 'math_block')).toHaveLength(1)
     expect(collectByType(nodes, 'math_block')[0].content).toContain('<x, y> = 0')
+  })
+
+  it('parses single-variable angle-bracket tolerant display math instead of treating it as html', () => {
+    const md = getMarkdown('math-boundary-angle-bracket-single-variable')
+
+    expect(isLikelyTolerantAngleBracketMathLine('<x> = y')).toBe(true)
+    expect(isLikelyTolerantAngleBracketMathLine('<x_i> \\le y')).toBe(true)
+    expect(isLikelyTolerantAngleBracketMathLine('<span> = y')).toBe(false)
+
+    const source = [
+      'Before display $$',
+      '<x> = y',
+      '$$ where $y$ follows.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(source, md, { final: true }) as any[]
+    expect(nodes.map((node: any) => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].content).toContain('<x> = y')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content)).toContain('y')
+  })
+
+  it('keeps streaming pending tolerant math for single-variable angle-bracket continuation without duplicate blocks', () => {
+    const md = getMarkdown('stream-math-boundary-angle-bracket-single-variable')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    const source = [
+      'Before display $$',
+      '<x> = y',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(nodes.map((node: any) => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+    ])
+
+    let mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(true)
+    expect(mathBlocks[0].content).toContain('<x> = y')
+
+    const serialized = JSON.stringify(nodes)
+    for (let index = 0; index < 6; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(nodes)).toBe(serialized)
+      expect(resetCount).toBe(1)
+    }
+
+    const completed = [
+      source,
+      '$$ done.',
+    ].join('\n')
+
+    nodes = parseMarkdownToStructure(completed, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(false)
+    expect(mathBlocks[0].content).toContain('<x> = y')
+    expect(JSON.stringify(nodes)).toContain('done.')
+    expect(resetCount).toBe(2)
+  })
+
+  it('does not convert html-looking content into tolerant display math', () => {
+    const md = getMarkdown('math-boundary-html-looking-content')
+
+    const source = [
+      'Before display $$',
+      '<span>not math</span>',
+      '$$ after.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(source, md, { final: true }) as any[]
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(JSON.stringify(nodes)).toContain('Before display')
+    expect(JSON.stringify(nodes)).toContain('span')
+    expect(JSON.stringify(nodes)).toContain('after')
+  })
+
+  it('keeps tolerant boundary key scan bounded for delimiter-heavy tiny lines', () => {
+    const source = Array.from({ length: 2000 }, (_, index) => `noise ${index} $$`).join('\n')
+
+    expect(() => getActiveTolerantMathBlockBoundaryCacheKey(source)).not.toThrow()
+    expect(getActiveTolerantMathBlockBoundaryCacheKey(source)).toBe(null)
   })
 
   it('resets stream cache when completed tolerant boundary source changes, not for identical repeated parses', () => {
