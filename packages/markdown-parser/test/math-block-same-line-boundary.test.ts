@@ -3926,4 +3926,140 @@ describe('math block same-line boundary regression', () => {
     expect(resetCount).toBe(0)
     expect(streamParseCount).toBe(30)
   })
+
+  it('clears tolerant stream state when final auto parse resets stream cache', () => {
+    const md = getMarkdown('pkg-stream-final-reset-clears-tolerant-boundary-state')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    const boundarySource = [
+      'Before display $$',
+      'a = 1',
+      '$$ where $a$ follows.',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(boundarySource, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+
+    nodes = parseMarkdownToStructure(boundarySource, md, {
+      final: true,
+    }) as any[]
+
+    expect(resetCount).toBe(2)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+
+    const plainSource = 'Plain paragraph with inline $x$ only.'
+    nodes = parseMarkdownToStructure(plainSource, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(2)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('x')
+  })
+
+  it('shifts restored suffix token maps after stale no-suffix tolerant boundary repair', () => {
+    const md = getMarkdown('pkg-stream-restored-nosuffix-suffix-token-map-shift')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const makeParagraphTriplet = (
+      content: string,
+      map: [number, number],
+      synthetic = false,
+    ): any[] => {
+      const meta = synthetic
+        ? { [TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META]: true }
+        : undefined
+
+      return [
+        {
+          type: 'paragraph_open',
+          tag: 'p',
+          nesting: 1,
+          map: [...map],
+          ...(meta ? { meta } : {}),
+        },
+        {
+          type: 'inline',
+          tag: '',
+          nesting: 0,
+          content,
+          map: [...map],
+          children: [
+            {
+              type: 'text',
+              tag: '',
+              nesting: 0,
+              content,
+            },
+          ],
+          ...(meta ? { meta } : {}),
+        },
+        {
+          type: 'paragraph_close',
+          tag: 'p',
+          nesting: -1,
+          map: [...map],
+          ...(meta ? { meta } : {}),
+        },
+      ]
+    }
+
+    ;(md as any).stream.parse = () => [
+      ...makeParagraphTriplet('Before display', [0, 1], true),
+      ...makeParagraphTriplet([
+        'a = 1',
+        '$$',
+        '# Suffix heading',
+      ].join('\n'), [1, 4]),
+    ]
+
+    const source = [
+      'Before display $$',
+      'a = 1',
+      '$$',
+      '# Suffix heading',
+    ].join('\n')
+
+    const capturedHeadingMaps: Array<[number, number]> = []
+    const nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+      preTransformTokens(tokens: any[]) {
+        for (const token of tokens) {
+          if (token?.type === 'heading_open' && Array.isArray(token.map))
+            capturedHeadingMaps.push([token.map[0], token.map[1]])
+        }
+        return tokens
+      },
+    }) as any[]
+
+    expect(capturedHeadingMaps).toContainEqual([3, 4])
+    expect(capturedHeadingMaps).not.toContainEqual([0, 1])
+
+    expect(nodes.map((node: any) => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'heading',
+    ])
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+    expect(collectByType(nodes, 'math_block')[0].content).toBe('a = 1')
+    expect(nodes[2]?.text).toBe('Suffix heading')
+  })
 })

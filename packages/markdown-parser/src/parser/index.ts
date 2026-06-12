@@ -333,6 +333,10 @@ function setActiveTolerantMathBoundaryStreamState(
   })
 }
 
+function clearActiveTolerantMathBoundaryStreamState(cacheOwner: object) {
+  activeTolerantMathBoundaryStreamStateCache.delete(cacheOwner)
+}
+
 function isSimpleThematicOrSetextLine(line: string) {
   const trimmed = String(line ?? '').trim()
   if (trimmed.length < 3)
@@ -973,6 +977,34 @@ function parseTolerantBoundarySuffixTokens(
   return md.parse(source, suffixEnv) as Token[]
 }
 
+function shiftTokenMapInPlace(token: Token, lineOffset: number) {
+  if (!lineOffset)
+    return
+
+  const map = token.map
+  if (Array.isArray(map)) {
+    const start = Number(map[0])
+    const end = Number(map[1])
+    if (Number.isFinite(start) && Number.isFinite(end))
+      token.map = [start + lineOffset, end + lineOffset]
+  }
+
+  const children = token.children as Token[] | null | undefined
+  if (Array.isArray(children)) {
+    for (const child of children)
+      shiftTokenMapInPlace(child, lineOffset)
+  }
+}
+
+function shiftTokenMaps<T extends Token>(tokens: T[], lineOffset: number) {
+  if (!lineOffset)
+    return tokens
+
+  for (const token of tokens)
+    shiftTokenMapInPlace(token, lineOffset)
+  return tokens
+}
+
 function restoreStaleCompletedTolerantMathTokens(
   tokens: Token[],
   source: string,
@@ -1053,8 +1085,12 @@ function restoreStaleCompletedTolerantMathTokens(
         loading: false,
         tolerantBoundary: true,
       } as unknown as Token
+
       const suffixTokens = suffixSource
-        ? parseTolerantBoundarySuffixTokens(md, env, suffixSource)
+        ? shiftTokenMaps(
+            parseTolerantBoundarySuffixTokens(md, env, suffixSource),
+            closeLine + 1,
+          )
         : []
 
       restored.splice(paragraphIndex, 3, mathToken, ...suffixTokens)
@@ -3021,6 +3057,7 @@ export function parseMarkdownToStructure(
 
   if (shouldResetTopLevelStreamCacheForFinalAutoParse(md, options)) {
     md.stream!.reset!()
+    clearActiveTolerantMathBoundaryStreamState(md as unknown as object)
   }
 
   if (!isFinal) {
