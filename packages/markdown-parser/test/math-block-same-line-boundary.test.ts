@@ -350,6 +350,114 @@ describe('math block same-line boundary regression', () => {
     expect(resetCount).toBe(2)
   })
 
+  it('does not keep a loose pending tolerant boundary after the candidate becomes prose', () => {
+    const source = [
+      'Before display $$',
+      'alpha prose keeps streaming as text',
+    ].join('\n')
+
+    expect(mayContainPendingTolerantMathBlockBoundaryCandidate(source)).toBe(false)
+    expect(getActiveTolerantMathBlockBoundaryCacheKey(source)).toBe(null)
+
+    const md = getMarkdown('stream-math-boundary-prose-candidate-clears-pending-state')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let streamingSource = [
+      'Before display $$',
+      'a',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(streamingSource, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+
+    streamingSource += 'lpha prose'
+    nodes = parseMarkdownToStructure(streamingSource, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(2)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(JSON.stringify(nodes)).toContain('alpha prose')
+
+    for (const chunk of [' keeps', ' streaming', ' as', ' plain', ' text']) {
+      streamingSource += chunk
+      nodes = parseMarkdownToStructure(streamingSource, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+      expect(JSON.stringify(nodes)).toContain(streamingSource.slice(streamingSource.lastIndexOf('\n') + 1))
+      expect(resetCount).toBe(2)
+    }
+  })
+
+  it('does not treat inline code ending with $$ as tolerant math opener', () => {
+    const md = getMarkdown('math-boundary-inline-code-dollar-opener-guard')
+
+    const source = [
+      'Before `display $$`',
+      'x = 1',
+      '$$ after $x$.',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(source, md, { final: true }) as any[]
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('display $$')
+    expect(serialized).toContain('x = 1')
+    expect(serialized).toContain('after')
+  })
+
+  it('does not scan across markdown table boundaries after prose ending with $$', () => {
+    const md = getMarkdown('math-boundary-table-after-prose-dollar-guard')
+
+    const source = [
+      'The price marker is not display math $$',
+      'Name | Value',
+      '--- | ---',
+      'alpha | $x$',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(source, md, { final: true }) as any[]
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('Name')
+    expect(serialized).toContain('Value')
+    expect(serialized).toContain('alpha')
+  })
+
+  it('keeps bounded tolerant-boundary scan safe for long near-miss prose input', () => {
+    const lines = [
+      'Before display $$',
+      ...Array.from({ length: 160 }, (_, index) => `this is prose line ${index} with --- --- --- and pipes | not | formula`),
+      'tail text without a closing display delimiter',
+    ]
+    const source = lines.join('\n')
+
+    expect(() => getActiveTolerantMathBlockBoundaryCacheKey(source)).not.toThrow()
+    expect(getActiveTolerantMathBlockBoundaryCacheKey(source)).toBe(null)
+    expect(mayContainPendingTolerantMathBlockBoundaryCandidate(source)).toBe(false)
+  })
+
   it('invalidates pending tolerant boundary when a new physical line becomes prose', () => {
     const md = getMarkdown('stream-math-boundary-pending-newline-prose-reset')
     ;(md as any).stream.reset()

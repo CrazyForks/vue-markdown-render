@@ -955,6 +955,7 @@ function syncTopLevelStreamCacheForActiveTolerantMathBoundary(
   const keepLoosePendingCandidate = boundaryKey === null
     && (isPendingTolerantBoundaryKey(previousKey) || previousPendingCandidate)
     && mayContainTolerantBoundaryOpenerLineNearTail(source)
+    && mayContainPendingTolerantMathBlockBoundaryCandidate(source)
 
   if (boundaryKey !== null && boundaryKey === previousKey) {
     setActiveTolerantMathBoundaryStreamState(cacheOwner, source, boundaryKey)
@@ -966,12 +967,12 @@ function syncTopLevelStreamCacheForActiveTolerantMathBoundary(
   if (boundaryKey || previousKey)
     stream.reset()
 
-  setActiveTolerantMathBoundaryStreamState(
-    cacheOwner,
-    source,
-    boundaryKey,
-    keepLoosePendingCandidate ? true : undefined,
-  )
+  const nextPendingCandidate = boundaryKey === null
+    && (isPendingTolerantBoundaryKey(previousKey) || previousPendingCandidate)
+    ? keepLoosePendingCandidate
+    : undefined
+
+  setActiveTolerantMathBoundaryStreamState(cacheOwner, source, boundaryKey, nextPendingCandidate)
 
   // After reset, rebuild the stream cache from the full current source.
   // Do not fall back to md.parse here; that hides stream-cache bugs and turns
