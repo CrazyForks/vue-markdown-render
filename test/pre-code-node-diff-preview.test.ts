@@ -94,6 +94,17 @@ describe('pre code node diff preview', () => {
     expect(source).toContain('overflow-wrap: anywhere;')
   })
 
+  it('lets side-by-side diff fallback panes scroll horizontally when wrap is disabled', () => {
+    const source = readFileSync(
+      'src/components/PreCodeNode/PreCodeNode.vue',
+      'utf8',
+    )
+
+    expect(source).toContain('pre.markstream-pre--diff-preview:not(.is-wrap):not(.markstream-pre--diff-inline) .markstream-pre__diff-pane')
+    expect(source).toContain('overflow-x: auto;')
+    expect(source).toContain('overflow-y: hidden;')
+  })
+
   it('renders diff lines with index in v-for (row-height sync template wiring)', () => {
     const wrapper = mount(PreCodeNode, {
       props: {

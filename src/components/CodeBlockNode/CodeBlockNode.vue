@@ -311,6 +311,13 @@ function resolveDiffHideUnchangedRegionsOption(value: unknown) {
   return { ...defaultDiffHideUnchangedRegions }
 }
 
+function resolveDiffWordWrapOption(raw: Record<string, unknown>) {
+  if (raw.diffWordWrap !== undefined)
+    return raw.diffWordWrap
+
+  return 'off'
+}
+
 function resolveDiffRenderPair(original: string, updated: string) {
   return {
     original: String(original ?? ''),
@@ -383,6 +390,7 @@ const resolvedMonacoOptions = computed(() => {
   const activeHideUnchangedRegions = streamPreviewDiff
     ? { ...disabledDiffHideUnchangedRegions }
     : hideUnchangedRegions
+  const diffWordWrap = resolveDiffWordWrapOption(raw)
   const experimental = {
     ...((raw.experimental as Record<string, unknown> | undefined) ?? {}),
   }
@@ -406,6 +414,7 @@ const resolvedMonacoOptions = computed(() => {
     overviewRulerBorder: false,
     hideCursorInOverviewRuler: true,
     scrollBeyondLastLine: false,
+    diffWordWrap,
     renderSideBySide: raw.renderSideBySide ?? true,
     diffHideUnchangedRegions: activeDiffHideUnchangedRegions,
     useInlineViewWhenSpaceIsLimited: raw.useInlineViewWhenSpaceIsLimited ?? false,
@@ -421,6 +430,7 @@ const resolvedMonacoOptions = computed(() => {
     experimental,
     ...(activeHideUnchangedRegions === undefined ? {} : { hideUnchangedRegions: activeHideUnchangedRegions }),
     diffHideUnchangedRegions: activeDiffHideUnchangedRegions,
+    diffWordWrap,
   }
 })
 
@@ -437,6 +447,16 @@ const diffFallbackExitActive = ref(false)
 const diffFallbackFadingOut = ref(false)
 let diffFallbackExitTimer: number | null = null
 const preFallbackWrap = computed(() => {
+  if (isDiff.value) {
+    const diffWordWrap = resolvedMonacoOptions.value?.diffWordWrap
+    if (diffWordWrap === 'inherit') {
+      const wordWrap = props.monacoOptions?.wordWrap
+      return wordWrap == null || String(wordWrap) !== 'off'
+    }
+
+    return diffWordWrap === 'on'
+  }
+
   const wordWrap = props.monacoOptions?.wordWrap
   // Keep consistent with CodeBlockNode's default `wordWrap: 'on'`.
   if (wordWrap == null)

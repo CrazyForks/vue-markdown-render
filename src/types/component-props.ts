@@ -69,6 +69,7 @@ export interface CodeBlockMonacoOptions {
   padding?: { top?: number, bottom?: number }
   readOnly?: boolean
   wordWrap?: 'off' | 'on' | 'wordWrapColumn' | 'bounded' | string
+  diffWordWrap?: 'off' | 'on' | 'inherit'
   wrappingIndent?: 'none' | 'same' | 'indent' | 'deepIndent' | string
   theme?: string
   themes?: CodeBlockMonacoTheme[]

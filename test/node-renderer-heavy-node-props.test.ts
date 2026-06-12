@@ -72,6 +72,7 @@ const GenericCodeBlockAttrsProbe = defineComponent({
       'data-show-line-numbers': String(props.showLineNumbers),
       'data-has-stream': String(Object.prototype.hasOwnProperty.call(attrs, 'stream')),
       'data-has-monaco-options': String(Object.prototype.hasOwnProperty.call(attrs, 'monacoOptions')),
+      'data-monaco-options': JSON.stringify(attrs.monacoOptions ?? null),
       'data-has-themes': String(Object.prototype.hasOwnProperty.call(attrs, 'themes')),
       'data-langs': JSON.stringify(attrs.langs ?? null),
     })
@@ -434,6 +435,85 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
     const nestedCodeBlock = wrapper.get('li .code-block-container')
     expect(nestedCodeBlock.attributes('data-langs')).toBe('["tsx"]')
     expect(wrapper.find('li [data-markstream-code-block="1"]').exists()).toBe(false)
+  })
+
+  it('forwards Monaco diff options to code blocks nested inside list items', async () => {
+    setCustomComponents(customId, {
+      code_block: GenericCodeBlockAttrsProbe as any,
+    })
+
+    const monacoOptions = {
+      diffWordWrap: 'off',
+      renderSideBySide: true,
+      useInlineViewWhenSpaceIsLimited: false,
+    }
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId,
+        codeRenderer: 'monaco',
+        codeBlockMonacoOptions: monacoOptions,
+        codeBlockProps: {
+          showHeader: false,
+        },
+        content: [
+          '1. before:',
+          '   ```diff',
+          '   -old description that should stay on one source line',
+          '   +new description that should stay on one source line',
+          '   ```',
+        ].join('\n'),
+        final: true,
+        batchRendering: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+
+    const nestedCodeBlock = wrapper.get('li .generic-code-block-attrs-probe')
+    expect(nestedCodeBlock.attributes('data-show-header')).toBe('false')
+    expect(JSON.parse(nestedCodeBlock.attributes('data-monaco-options') ?? 'null')).toEqual(monacoOptions)
+  })
+
+  it('forwards Monaco diff options to code blocks rendered inside custom tag slots', async () => {
+    setCustomComponents(customId, {
+      'answer-box': AnswerBox,
+      'code_block': GenericCodeBlockAttrsProbe as any,
+    })
+
+    const monacoOptions = {
+      diffWordWrap: 'off',
+      renderSideBySide: true,
+      useInlineViewWhenSpaceIsLimited: false,
+    }
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId,
+        codeRenderer: 'monaco',
+        codeBlockMonacoOptions: monacoOptions,
+        codeBlockProps: {
+          showHeader: false,
+        },
+        content: [
+          '<answer-box>',
+          '```diff',
+          '-old description that should stay on one source line',
+          '+new description that should stay on one source line',
+          '```',
+          '</answer-box>',
+        ].join('\n'),
+        customHtmlTags: ['answer-box'],
+        final: true,
+        batchRendering: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+
+    const nestedCodeBlock = wrapper.get('.answer-box .generic-code-block-attrs-probe')
+    expect(nestedCodeBlock.attributes('data-show-header')).toBe('false')
+    expect(JSON.parse(nestedCodeBlock.attributes('data-monaco-options') ?? 'null')).toEqual(monacoOptions)
   })
 
   it('forwards top-level langs to custom code_block renderers without forcing codeRenderer="shiki"', async () => {

@@ -1556,6 +1556,8 @@ describe('codeBlockNode diff defaults', () => {
     expect(monacoOptions.overviewRulerBorder).toBe(false)
     expect(monacoOptions.hideCursorInOverviewRuler).toBe(true)
     expect(monacoOptions.scrollBeyondLastLine).toBe(false)
+    expect(monacoOptions.wordWrap).toBe('on')
+    expect(monacoOptions.diffWordWrap).toBe('off')
     expect(monacoOptions.renderSideBySide).toBe(true)
     expect(monacoOptions.useInlineViewWhenSpaceIsLimited).toBe(false)
     expect(monacoOptions.padding).toBeUndefined()
@@ -1566,6 +1568,186 @@ describe('codeBlockNode diff defaults', () => {
     expect(monacoOptions.maxComputationTime).toBe(0)
     expect(monacoOptions.diffAlgorithm).toBe('legacy')
     expect(monacoOptions.diffUpdateThrottleMs).toBe(120)
+
+    wrapper.unmount()
+  })
+
+  it('keeps side-by-side diff word wrapping off unless explicitly configured', async () => {
+    const helpers = getStreamMonacoHelpers()
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          diff: true,
+          originalCode: 'const a = 1\\nconst b = 2\\n',
+          updatedCode: 'const a = 1\\nconst c = 3\\n',
+          raw: '```diff\\n-const b = 2\\n+const c = 3\\n```',
+        },
+        monacoOptions: {
+          wordWrap: 'on',
+        },
+        loading: false,
+        showHeader: false,
+      },
+    })
+
+    await waitForCreateDiffEditorCalls(1, helpers)
+
+    expect(helpers.useMonaco.mock.calls[0]?.[0]?.wordWrap).toBe('on')
+    expect(helpers.useMonaco.mock.calls[0]?.[0]?.diffWordWrap).toBe('off')
+
+    wrapper.unmount()
+  })
+
+  it('keeps streaming side-by-side diff fallback unwrapped while Monaco is mounting', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let resolveCreate: (() => void) | null = null
+    helpers.createDiffEditor.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreate = () => resolve()
+        }),
+    )
+    const description = '  "description": "A Vue 3 component that renders Markdown string content as HTML, supporting custom components and advanced markdown features.",'
+    const originalCode = `{\n${description}\n}`
+    const updatedCode = `{\n${description}\n}`
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          diff: true,
+          originalCode,
+          updatedCode,
+          raw: `\`\`\`diff\n${originalCode}\n\`\`\``,
+        },
+        monacoOptions: {
+          wordWrap: 'on',
+          renderSideBySide: true,
+          useInlineViewWhenSpaceIsLimited: false,
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    try {
+      await flushPendingMicrotasks()
+      await waitForCreateDiffEditorCalls(1, helpers)
+
+      const fallback = wrapper.get('pre.code-pre-fallback')
+      expect(fallback.classes()).toContain('markstream-pre--diff-preview')
+      expect(fallback.classes()).not.toContain('markstream-pre--diff-inline')
+      expect(fallback.classes()).not.toContain('is-wrap')
+      expect(wrapper.findAll('.markstream-pre__diff-pane')).toHaveLength(2)
+      expect(wrapper.findAll('.markstream-pre__diff-content').filter(node => node.text() === description.trim())).toHaveLength(2)
+      expect(helpers.useMonaco.mock.calls[0]?.[0]?.wordWrap).toBe('on')
+      expect(helpers.useMonaco.mock.calls[0]?.[0]?.diffWordWrap).toBe('off')
+    }
+    finally {
+      resolveCreate?.()
+      wrapper.unmount()
+    }
+  })
+
+  it('allows callers to opt into diff word wrapping explicitly', async () => {
+    const helpers = getStreamMonacoHelpers()
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          diff: true,
+          originalCode: 'const a = 1\\nconst b = 2\\n',
+          updatedCode: 'const a = 1\\nconst c = 3\\n',
+          raw: '```diff\\n-const b = 2\\n+const c = 3\\n```',
+        },
+        monacoOptions: {
+          diffWordWrap: 'on',
+        },
+        loading: false,
+        showHeader: false,
+      },
+    })
+
+    await waitForCreateDiffEditorCalls(1, helpers)
+
+    expect(helpers.useMonaco.mock.calls[0]?.[0]?.diffWordWrap).toBe('on')
+
+    wrapper.unmount()
+  })
+
+  it('keeps diff word wrapping off after streaming settles', async () => {
+    const helpers = getStreamMonacoHelpers()
+    const initialDescription = '  "description": "A Vue 3 component that renders Markdown string content as HTML, supporting custom components and advanced markdown fea'
+    const completedDescription = '  "description": "A Vue 3 component that renders Markdown string content as HTML, supporting custom components and advanced markdown features.",'
+    const initialOriginal = `{\n${initialDescription}`
+    const initialUpdated = `{\n${initialDescription}`
+    const completedOriginal = `{\n${completedDescription}\n}`
+    const completedUpdated = `{\n${completedDescription}\n}`
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          diff: true,
+          originalCode: initialOriginal,
+          updatedCode: initialUpdated,
+          raw: `\`\`\`diff\n${initialOriginal}`,
+        },
+        monacoOptions: {
+          wordWrap: 'on',
+          renderSideBySide: true,
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await waitForCreateDiffEditorCalls(1, helpers)
+    const monacoOptions = helpers.useMonaco.mock.calls[0]?.[0] ?? {}
+    expect(monacoOptions.diffWordWrap).toBe('off')
+    expect(monacoOptions.diffHideUnchangedRegions).toEqual({
+      enabled: false,
+      contextLineCount: 2,
+      minimumLineCount: 4,
+      revealLineCount: 0,
+    })
+
+    helpers.refreshDiffPresentation.mockClear()
+    helpers.updateDiff.mockClear()
+
+    await wrapper.setProps({
+      loading: false,
+      node: {
+        type: 'code_block',
+        language: 'diff',
+        diff: true,
+        originalCode: completedOriginal,
+        updatedCode: completedUpdated,
+        raw: `\`\`\`diff\n${completedOriginal}\n\`\`\``,
+      },
+    })
+    await flushPendingMicrotasks()
+
+    await vi.waitFor(() => {
+      expect(helpers.refreshDiffPresentation).toHaveBeenCalled()
+    })
+    expect(helpers.updateDiff).toHaveBeenCalledWith(completedOriginal, completedUpdated, 'diff')
+    expect(monacoOptions.diffWordWrap).toBe('off')
+    expect(monacoOptions.diffHideUnchangedRegions).toEqual({
+      enabled: true,
+      contextLineCount: 2,
+      minimumLineCount: 4,
+      revealLineCount: 5,
+    })
 
     wrapper.unmount()
   })

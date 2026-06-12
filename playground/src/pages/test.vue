@@ -158,6 +158,11 @@ const RENDER_MODE_OPTIONS = [
   { value: 'markdown', label: 'MarkdownCodeBlock' },
   { value: 'pre', label: 'PreCodeNode' },
 ] as const satisfies ReadonlyArray<{ value: 'monaco' | 'markdown' | 'pre', label: string }>
+type DiffLayoutMode = 'inline' | 'side-by-side'
+const DIFF_LAYOUT_OPTIONS = [
+  { value: 'inline', label: 'Diff 1 列' },
+  { value: 'side-by-side', label: 'Diff 2 列' },
+] as const satisfies ReadonlyArray<{ value: DiffLayoutMode, label: string }>
 
 const frameworkCards = TEST_LAB_FRAMEWORKS
 const sampleCards = TEST_LAB_SAMPLES
@@ -179,15 +184,16 @@ function resolveInitialDarkMode() {
     : false
 }
 
-const diffLayoutMode = computed(() => {
+function resolveInitialDiffLayoutMode(): DiffLayoutMode {
   if (typeof window === 'undefined')
     return 'inline'
 
   return new URL(window.location.href).searchParams.get('diffLayout') === 'side-by-side'
     ? 'side-by-side'
     : 'inline'
-})
+}
 
+const diffLayoutMode = useLocalStorage<DiffLayoutMode>('vmr-test-diff-layout-mode', resolveInitialDiffLayoutMode())
 const testPageMonacoOptions = computed(() => {
   const sideBySide = diffLayoutMode.value === 'side-by-side'
   return {
@@ -228,6 +234,9 @@ const testPageCustomHtmlTags = ['think', 'thinking'] as const
 getUseMonaco()
 setKaTeXWorker(new KatexWorker())
 setMermaidWorker(new MermaidWorker())
+
+if (typeof window !== 'undefined' && new URL(window.location.href).searchParams.has('diffLayout'))
+  diffLayoutMode.value = resolveInitialDiffLayoutMode()
 
 const shareUrl = ref<string>('')
 const notice = ref<string>('')
@@ -3553,6 +3562,12 @@ watch(mermaidEnabled, (enabled) => {
               v-model="renderMode"
               label="代码块模式"
               :options="RENDER_MODE_OPTIONS"
+            />
+
+            <LabSelect
+              v-model="diffLayoutMode"
+              label="Diff 布局"
+              :options="DIFF_LAYOUT_OPTIONS"
             />
           </div>
         </div>

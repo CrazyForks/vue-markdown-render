@@ -647,6 +647,11 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
   overflow: hidden;
 }
 
+.markstream-vue pre.markstream-pre--diff-preview:not(.is-wrap):not(.markstream-pre--diff-inline) .markstream-pre__diff-pane {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
 .markstream-vue pre.markstream-pre--diff-preview.markstream-pre--diff-inline:not(.is-wrap) .markstream-pre__diff-pane {
   min-width: max-content;
   overflow: visible;
