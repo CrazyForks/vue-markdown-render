@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 describe('optional monaco dependency', () => {
   it('should handle missing stream-monaco gracefully', async () => {
@@ -26,5 +26,16 @@ describe('optional monaco dependency', () => {
 
     // Both calls should return the same result (either the module or null)
     expect(result1).toBe(result2)
+  })
+
+  it('treats an empty optional-peer stub as unavailable', async () => {
+    vi.resetModules()
+    vi.doMock('stream-monaco', () => ({
+      default: {},
+    }))
+
+    const { getUseMonaco } = await import('../src/components/CodeBlockNode/monaco')
+
+    await expect(getUseMonaco()).resolves.toBeNull()
   })
 })
