@@ -1,0 +1,130 @@
+# Mobile WebView Markdown Rendering
+
+Render streaming Markdown in mobile app WebViews with proper font scaling and performance.
+
+## The challenge
+
+Mobile apps often scale root font size for accessibility or design reasons. If your WebView sets `html { font-size: 14px }` or uses dynamic font scaling, Markstream's default `rem`-based CSS will scale unexpectedly — making rendered Markdown too large or too small.
+
+## Markstream's solution: `px` CSS
+
+Markstream provides `index.px.css` variants that use `px` units instead of `rem`:
+
+```ts
+// Instead of:
+import 'markstream-vue/index.css'
+
+// Use:
+import 'markstream-vue/index.px.css'
+```
+
+This prevents the renderer's internal sizing from being affected by root font size changes.
+
+All framework packages support `px` CSS:
+- `markstream-vue/index.px.css`
+- `markstream-react/index.px.css`
+- `markstream-svelte/index.px.css`
+
+## Framework setup for mobile
+
+### Vue 3 / Nuxt
+```ts
+// main.ts
+import 'markstream-vue/index.px.css'
+```
+
+### React / Next.js
+```tsx
+// App.tsx or layout
+import 'markstream-react/index.px.css'
+```
+
+### Svelte 5
+```svelte
+<script lang="ts">
+  import 'markstream-svelte/index.px.css'
+</script>
+```
+
+## Performance on mobile
+
+Mobile WebViews have less CPU and memory than desktop browsers. Key optimizations:
+
+### 1. Use `mode="chat"` for streaming
+```vue
+<MarkdownRender mode="chat" :content="content" :final="isDone" />
+```
+Chat mode uses smaller render batches and disables animations that may be expensive on mobile.
+
+### 2. Enable virtualization early
+```vue
+<MarkdownRender :virtual="true" :content="content" />
+```
+On mobile, enable virtualization for documents > 10KB (vs 100KB on desktop).
+
+### 3. Disable Monaco on mobile
+Monaco Editor is heavy for mobile WebViews. Use Shiki for syntax highlighting or fall back to `<pre>`:
+
+```vue
+<MarkdownRender
+  :content="content"
+  :render-code-blocks-as-pre="true"
+/>
+```
+
+### 4. Limit concurrent heavy blocks
+```vue
+<MarkdownRender
+  :content="content"
+  :viewport-priority="true"
+  :defer-nodes-until-visible="true"
+/>
+```
+
+## iOS-specific notes
+
+### WKWebView
+- Worker support is limited in some WKWebView configurations
+- Use CDN-backed workers if Web Workers aren't available
+- `index.px.css` is especially important for iOS dynamic type scaling
+
+### JavaScriptCore
+- Regex lookbehind assertions (`(?<=...)`) are not supported on iOS 15 and below
+- Markstream uses compatible regex patterns for iOS compatibility
+
+## Android-specific notes
+
+### Android WebView
+- Web Worker support varies by Android version and WebView implementation
+- Chrome Custom Tabs generally have better performance than embedded WebViews
+- Mermaid rendering may be slower on older Android devices
+
+### Font scaling
+- Android system font scaling affects `rem` units — use `index.px.css`
+- Test with accessibility font scaling enabled (up to 200%)
+
+## Recommended mobile config
+
+```vue
+<MarkdownRender
+  mode="chat"
+  :content="content"
+  :final="isDone"
+  :virtual="true"
+  :viewport-priority="true"
+  :render-code-blocks-as-pre="true"
+  :fade="false"
+  smooth-streaming="auto"
+/>
+```
+
+With `index.px.css` for CSS:
+```ts
+import 'markstream-vue/index.px.css'
+```
+
+## Related guides
+
+- [AI Chat Streaming](/use-cases/ai-chat-streaming)
+- [Long AI Responses](/use-cases/long-ai-responses)
+- [Installation guide](/guide/installation)

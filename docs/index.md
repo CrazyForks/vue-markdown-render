@@ -1,10 +1,10 @@
 ---
 layout: home
-description: Streaming-friendly Markdown renderer for Vue, React, Angular, Svelte, and Nuxt with guided docs for installation, VitePress, AI chat, overrides, and migration.
+description: Streaming Markdown renderers for AI applications across Vue, React, Svelte, Angular, Nuxt, and Next.js. Render LLM token streams, SSE/WebSocket output, AI chat messages, and long documents with progressive Mermaid, KaTeX, and streaming code blocks.
 hero:
-  name: markstream-vue
-  text: Streaming-friendly Markdown renderer
-  tagline: Vue 3 • Vue 2 • React • Angular • Svelte • Nuxt
+  name: Markstream
+  text: Streaming Markdown renderers for AI apps
+  tagline: Vue • React • Svelte • Angular • Nuxt • Next.js
   actions:
     - theme: brand
       text: Install by scenario
@@ -39,11 +39,11 @@ features:
     link: /guide/ai-workflows
 ---
 
-A streaming-friendly Markdown renderer with progressive Mermaid support, streaming diff code blocks, and high-performance handling of large documents.
+A streaming-friendly Markdown renderer family with progressive Mermaid support, streaming diff code blocks, and high-performance handling of large documents — available for Vue, React, Svelte, Angular, Nuxt, and Next.js.
 
 <SupportQRCodes
-  title="Support markstream-vue"
-  description="If markstream-vue helps your work, you can support ongoing maintenance with Alipay or WeChat Pay."
+  title="Support Markstream"
+  description="If Markstream helps your work, you can support ongoing maintenance with Alipay or WeChat Pay."
   note="Thank you for helping keep the docs, demos, and package maintenance moving."
   alipay-label="Alipay"
   wechat-label="WeChat Pay"

@@ -2,10 +2,10 @@
   "name": "markstream-svelte",
   "type": "module",
   "version": "0.0.1-beta.6",
-  "description": "Svelte Markdown renderer for Markstream, aligned with markstream-vue and markstream-react.",
+  "description": "Svelte 5 streaming Markdown renderer for AI chat, SSE/WebSocket output, long documents, custom components, and optional Mermaid, KaTeX, Shiki, Monaco.",
   "author": "Simon He",
   "license": "MIT",
-  "homepage": "https://github.com/Simon-He95/markstream-vue#readme",
+  "homepage": "https://markstream-vue-docs.simonhe.me/frameworks/svelte/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Simon-He95/markstream-vue.git",
@@ -16,11 +16,24 @@
   },
   "keywords": [
     "svelte",
+    "svelte5",
+    "sveltekit",
     "markdown",
     "markdown-renderer",
+    "svelte-markdown",
     "streaming-markdown",
-    "markstream",
-    "markstream-svelte"
+    "ai-chat",
+    "llm",
+    "sse",
+    "websocket",
+    "mermaid",
+    "katex",
+    "shiki",
+    "monaco-editor",
+    "large-documents",
+    "custom-components",
+    "markstream-svelte",
+    "markstream"
   ],
   "sideEffects": [
     "**/*.css"

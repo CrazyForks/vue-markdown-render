@@ -1,6 +1,6 @@
 # markstream-react
 
-React renderer that consumes the structured AST output from `stream-markdown-parser` and renders it with lightweight semantic HTML components. This is the React counter-part to the Vue renderer that powers `markstream-vue`.
+React/Next.js renderer for streaming Markdown. It can render raw Markdown strings via `content` and can accept pre-parsed `nodes` for high-frequency token streams. This is the React counterpart to the Vue renderer that powers `markstream-vue`.
 
 ## Development
 

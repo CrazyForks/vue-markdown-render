@@ -1,6 +1,15 @@
-# markstream-angular
+# markstream-angular — Angular streaming Markdown renderer for AI chat
 
-Angular version of Markstream: a streaming-friendly Markdown renderer with KaTeX, Mermaid, Monaco code blocks, D2, infographic blocks, custom HTML tags, and cross-framework playground parity.
+Angular standalone component for streaming Markdown: AI chat, SSE/WebSocket output, long documents, Mermaid, KaTeX, Monaco code blocks, D2, infographic blocks, custom HTML tags, and cross-framework playground parity.
+
+## When to use it
+
+Use `markstream-angular` when Markdown streams from an LLM, SSE, or WebSocket into an Angular app.
+For short static Markdown, a simpler parser may be enough.
+
+## Status
+
+This package is at `0.0.3` (alpha). The current direction is already aligned with `markstream-react` / `markstream-vue2` for node-component renderer structure, streaming code block behavior, shared fixtures, and cross-framework comparison. Check [the Angular guide](https://markstream-vue-docs.simonhe.me/guide/angular-quick-start) for current API maturity.
 
 ## Install
 

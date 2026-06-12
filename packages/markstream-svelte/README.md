@@ -1,6 +1,17 @@
 # markstream-svelte
 
-Svelte 5-only renderer aligned with `markstream-vue`, `markstream-vue2`, and `markstream-react`. Svelte 4 is not supported.
+Svelte 5 streaming Markdown renderer for AI chat, SSE/WebSocket output, long documents, custom components, Mermaid, KaTeX, Shiki, and Monaco.
+
+## When to use it
+
+Use `markstream-svelte` when Markdown changes while users are reading it:
+LLM output, SSE streams, WebSocket streams, AI chat messages, long generated answers,
+or progressive diagrams and code blocks.
+
+## Known limitations
+
+- **Svelte 5 only.** Svelte 4 is not supported.
+- This package is at `0.0.1-beta.6` — check [the Svelte guide](https://markstream-vue-docs.simonhe.me/guide/svelte) for current API maturity.
 
 ## Install
 

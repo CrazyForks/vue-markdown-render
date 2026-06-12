@@ -1,6 +1,8 @@
-# markstream-vue
+# Markstream
 
-> Fast, streaming-friendly Markdown rendering for Vue 3 — progressive Mermaid, streaming diff code blocks, and real-time previews optimized for large documents.
+> Streaming Markdown renderers for AI applications across Vue, React, Svelte, Angular, Nuxt, and Next.js.
+
+Markstream is built for Markdown that changes while users are watching it: LLM token streams, SSE/WebSocket output, AI chat messages, long documents, progressive Mermaid diagrams, KaTeX math, streaming code blocks, and safe component-based rendering.
 
 [![NPM version](https://img.shields.io/npm/v/markstream-vue?color=a1b858&label=)](https://www.npmjs.com/package/markstream-vue)
 [![中文版](https://img.shields.io/badge/docs-中文文档-blue)](README.zh-CN.md)
@@ -17,16 +19,33 @@
 [![CI](https://github.com/Simon-He95/markstream-vue/actions/workflows/ci.yml/badge.svg)](https://github.com/Simon-He95/markstream-vue/actions/workflows/ci.yml)
 [![License](https://img.shields.io/npm/l/markstream-vue)](./license)
 
-Looking for other frameworks?
+## Packages
 
-- Vue 2.6: use [`markstream-vue2`](./packages/markstream-vue2/README.md) (a baseline port with fewer advanced features)
-- React: see `packages/markstream-react` at [`packages/markstream-react/README.md`](./packages/markstream-react/README.md) (first-pass port)
+| Package | Framework | Install | Docs |
+| --- | --- | --- | --- |
+| `markstream-vue` | Vue 3 / Nuxt / VitePress | `pnpm add markstream-vue` | [Vue guide](https://markstream-vue-docs.simonhe.me/guide/) |
+| `markstream-react` | React / Next.js / Remix | `pnpm add markstream-react` | [React guide](https://markstream-vue-docs.simonhe.me/guide/react-quick-start) |
+| `markstream-svelte` | Svelte 5 | `pnpm add markstream-svelte svelte@^5` | [Svelte guide](https://markstream-vue-docs.simonhe.me/guide/svelte) |
+| `markstream-angular` | Angular standalone | `pnpm add markstream-angular` | [Angular guide](https://markstream-vue-docs.simonhe.me/guide/angular-quick-start) |
+| `markstream-vue2` | Vue 2.6 / 2.7 | `pnpm add markstream-vue2` | [Vue 2 guide](https://markstream-vue-docs.simonhe.me/guide/vue2-quick-start) |
+| `stream-markdown-parser` | Any JS/TS app | `pnpm add stream-markdown-parser` | [Parser guide](https://markstream-vue-docs.simonhe.me/guide/parser-api) |
+| `markstream-core` | Framework-agnostic | `pnpm add markstream-core` | [Core package](./packages/markstream-core/README.md) |
 
-## 1.0 stability scope
+### Which package should I use?
 
-`markstream-vue@1.0` is scoped to the Vue 3 renderer package. The stable surface is `MarkdownRender`, streaming content rendering, pre-parsed node rendering, the safe HTML policy, optional Mermaid / KaTeX / Monaco / D2 / Infographic integrations, virtual-scroll coordination, CSS exports, worker client subpaths, and SSR imports for Vite / Nuxt / VitePress.
+- **Vue 3 / Nuxt / VitePress** → `markstream-vue`
+- **React / Next.js / Remix** → `markstream-react`
+- **Svelte 5** → `markstream-svelte`
+- **Angular standalone** → `markstream-angular`
+- **Vue 2.6 / 2.7** → `markstream-vue2`
+- **Framework-agnostic parsing only** → `stream-markdown-parser`
+- **Streaming controller utilities** → `markstream-core`
 
-Experimental surfaces are the cross-framework adapters, repository skills/prompts, low-level worker entrypoints beyond documented clients, and internal performance/debug props such as `indexKey`, `renderAsFragment`, `debugPerformance`, batch budget internals, and height-estimation experiments.
+## Stability
+
+`markstream-vue@1.0` is the most mature renderer with a stable surface: `MarkdownRender`, streaming content rendering, pre-parsed node rendering, the safe HTML policy, optional Mermaid / KaTeX / Monaco / D2 / Infographic integrations, virtual-scroll coordination, CSS exports, worker client subpaths, and SSR imports for Vite / Nuxt / VitePress.
+
+Cross-framework renderers (`markstream-react`, `markstream-svelte`, `markstream-angular`, `markstream-vue2`) are available and actively developed. Check each package page for API maturity, framework support, and known limitations.
 
 For the full release contract and Go / No-Go checklist, see [1.0 Release Readiness](./docs/guide/release-1-0.md). For reproducible performance evidence, run `pnpm benchmark:1.0` and use the generated [1.0 Benchmark Report](./docs/guide/benchmark-1-0.md).
 

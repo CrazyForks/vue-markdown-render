@@ -2,10 +2,10 @@
   "name": "markstream-angular",
   "type": "module",
   "version": "0.0.3",
-  "description": "Experimental Angular Markdown renderer for Markstream, built on stream-markdown AST and a stable HTML baseline renderer.",
+  "description": "Angular standalone streaming Markdown renderer for AI chat, SSE/WebSocket output, long documents, Mermaid, KaTeX, Shiki, and Monaco.",
   "author": "Simon He",
   "license": "MIT",
-  "homepage": "https://github.com/Simon-He95/markstream-vue#readme",
+  "homepage": "https://markstream-vue-docs.simonhe.me/frameworks/angular/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Simon-He95/markstream-vue.git",
@@ -16,11 +16,23 @@
   },
   "keywords": [
     "angular",
+    "angular-standalone",
     "markdown",
     "markdown-renderer",
+    "angular-markdown",
     "streaming-markdown",
-    "markstream",
-    "markstream-angular"
+    "ai-chat",
+    "llm",
+    "sse",
+    "websocket",
+    "mermaid",
+    "katex",
+    "shiki",
+    "monaco-editor",
+    "large-documents",
+    "custom-components",
+    "markstream-angular",
+    "markstream"
   ],
   "sideEffects": [
     "**/*.css"

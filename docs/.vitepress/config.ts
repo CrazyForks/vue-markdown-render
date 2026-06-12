@@ -7,7 +7,7 @@ import { defineConfig } from 'vitepress'
 
 const docsSiteUrl = 'https://markstream-vue-docs.simonhe.me'
 const docsOgImageUrl = `${docsSiteUrl}/og-image.svg`
-const docsDefaultDescription = 'Streaming-friendly Markdown renderer for Vue 3, Vue 2, React, Angular, and Svelte'
+const docsDefaultDescription = 'Streaming Markdown renderers for AI apps across Vue, React, Svelte, Angular, Nuxt, and Next.js'
 const githubRepoUrl = 'https://github.com/Simon-He95/markstream-vue'
 const docsRootDir = fileURLToPath(new URL('..', import.meta.url))
 const workspaceRootDir = fileURLToPath(new URL('../..', import.meta.url))
@@ -98,9 +98,24 @@ const englishGuideSidebar = [
     ],
   },
   {
+    text: 'Use Cases',
+    collapsed: true,
+    items: [
+      { text: 'AI Chat Streaming Markdown', link: '/use-cases/ai-chat-streaming' },
+      { text: 'SSE & WebSocket Markdown', link: '/use-cases/sse-websocket' },
+      { text: 'Mobile WebView', link: '/use-cases/mobile-webview' },
+      { text: 'Streaming Mermaid & KaTeX', link: '/use-cases/streaming-mermaid-katex' },
+      { text: 'Long AI Responses', link: '/use-cases/long-ai-responses' },
+    ],
+  },
+  {
     text: 'Frameworks & Migration',
     collapsed: true,
     items: [
+      { text: 'Vue & Nuxt (SEO landing)', link: '/frameworks/vue' },
+      { text: 'React & Next.js (SEO landing)', link: '/frameworks/react' },
+      { text: 'Svelte (SEO landing)', link: '/frameworks/svelte' },
+      { text: 'Angular (SEO landing)', link: '/frameworks/angular' },
       { text: 'Nuxt SSR', link: '/nuxt-ssr' },
       { text: 'Vue 2 Quick Start', link: '/guide/vue2-quick-start' },
       { text: 'Vue 2 Installation', link: '/guide/vue2-installation' },
@@ -127,9 +142,26 @@ const englishGuideSidebar = [
       { text: 'Migrating to 1.0', link: '/guide/migration-1-0' },
       { text: 'Why use it?', link: '/guide/why' },
       { text: 'Compared', link: '/guide/compared' },
+      { text: 'vs react-markdown', link: '/compare/react-markdown' },
+      { text: 'vs Streamdown', link: '/compare/streamdown' },
+      { text: 'vs marked/markdown-it', link: '/compare/marked-markdown-it' },
+      { text: 'Static vs streaming', link: '/compare/static-vs-streaming' },
+      { text: 'Compare overview', link: '/compare/' },
       { text: 'Monaco Internals', link: '/guide/monaco-internals' },
       { text: 'Legacy builds & iOS regex compatibility', link: '/guide/legacy-builds' },
       { text: 'Contributing', link: '/guide/contributing' },
+    ],
+  },
+  {
+    text: 'Use Cases',
+    collapsed: true,
+    items: [
+      { text: 'Use Cases overview', link: '/use-cases/' },
+      { text: 'AI Chat Streaming', link: '/use-cases/ai-chat-streaming' },
+      { text: 'SSE & WebSocket', link: '/use-cases/sse-websocket' },
+      { text: 'Mermaid & KaTeX', link: '/use-cases/streaming-mermaid-katex' },
+      { text: 'Long AI Responses', link: '/use-cases/long-ai-responses' },
+      { text: 'Mobile WebView', link: '/use-cases/mobile-webview' },
     ],
   },
 ]
@@ -187,9 +219,24 @@ const chineseGuideSidebar = [
     ],
   },
   {
+    text: '用例',
+    collapsed: true,
+    items: [
+      { text: 'AI 聊天流式 Markdown', link: '/use-cases/ai-chat-streaming' },
+      { text: 'SSE & WebSocket Markdown', link: '/use-cases/sse-websocket' },
+      { text: '移动端 WebView', link: '/use-cases/mobile-webview' },
+      { text: '流式 Mermaid & KaTeX', link: '/use-cases/streaming-mermaid-katex' },
+      { text: '长 AI 回复', link: '/use-cases/long-ai-responses' },
+    ],
+  },
+  {
     text: '框架与迁移',
     collapsed: true,
     items: [
+      { text: 'Vue & Nuxt（SEO 入口）', link: '/frameworks/vue' },
+      { text: 'React & Next.js（SEO 入口）', link: '/frameworks/react' },
+      { text: 'Svelte（SEO 入口）', link: '/frameworks/svelte' },
+      { text: 'Angular（SEO 入口）', link: '/frameworks/angular' },
       { text: 'Nuxt SSR', link: '/zh/nuxt-ssr' },
       { text: 'Vue 2 快速开始', link: '/zh/guide/vue2-quick-start' },
       { text: 'Vue 2 安装', link: '/zh/guide/vue2-installation' },
@@ -217,6 +264,11 @@ const chineseGuideSidebar = [
       { text: '迁移到 1.0', link: '/zh/guide/migration-1-0' },
       { text: '为什么使用？', link: '/zh/guide/why' },
       { text: '对比', link: '/zh/guide/compared' },
+      { text: '对比 react-markdown', link: '/compare/react-markdown' },
+      { text: '对比 Streamdown', link: '/compare/streamdown' },
+      { text: '对比 marked/markdown-it', link: '/compare/marked-markdown-it' },
+      { text: '静态 vs 流式 Markdown', link: '/compare/static-vs-streaming' },
+      { text: '对比总览', link: '/compare/' },
       { text: 'Monaco 内部', link: '/zh/guide/monaco-internals' },
       { text: 'Legacy 构建与 iOS 正则兼容', link: '/zh/guide/legacy-builds' },
       { text: '贡献指南', link: '/zh/guide/contributing' },
@@ -229,9 +281,9 @@ const siteHead = [
   ['meta', { name: 'theme-color', content: '#111827' }],
   ['meta', { name: 'robots', content: 'index,follow' }],
   ['meta', { property: 'og:type', content: 'website' }],
-  ['meta', { property: 'og:site_name', content: 'markstream-vue' }],
+  ['meta', { property: 'og:site_name', content: 'Markstream' }],
   ['meta', { property: 'og:image', content: docsOgImageUrl }],
-  ['meta', { property: 'og:image:alt', content: 'markstream-vue logo and documentation overview' }],
+  ['meta', { property: 'og:image:alt', content: 'Markstream logo and documentation overview' }],
   ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
   ['meta', { name: 'twitter:image', content: docsOgImageUrl }],
 ]
@@ -286,10 +338,10 @@ function normalizeDocsSeoPath(page: string) {
 }
 
 function createDocsSeoTitle(pageTitle?: string) {
-  if (!pageTitle || pageTitle === 'markstream-vue')
-    return 'markstream-vue'
+  if (!pageTitle || pageTitle === 'Markstream')
+    return 'Markstream'
 
-  return `${pageTitle} | markstream-vue`
+  return `${pageTitle} | Markstream`
 }
 
 function isDocsSeoExcluded(path: string) {
@@ -335,6 +387,20 @@ function collectDocsRoutePaths(rootDir: string) {
 const availableDocsRoutePaths = collectDocsRoutePaths(docsRootDir)
 
 const docsPrimaryLandingPaths = new Set([
+  '/frameworks/vue',
+  '/frameworks/react',
+  '/frameworks/svelte',
+  '/frameworks/angular',
+  '/frameworks/nuxt',
+  '/frameworks/next',
+  '/compare',
+  '/compare/react-markdown',
+  '/compare/streamdown',
+  '/compare/marked-markdown-it',
+  '/compare/static-vs-streaming',
+  '/use-cases/ai-chat-streaming',
+  '/use-cases/sse-websocket',
+  '/use-cases/streaming-mermaid-katex',
   '/guide',
   '/guide/installation',
   '/guide/quick-start',
@@ -355,6 +421,11 @@ const docsPrimaryLandingPaths = new Set([
 ])
 
 const docsSecondaryLandingPaths = new Set([
+  '/compare/react-markdown',
+  '/compare/streamdown',
+  '/compare/marked-markdown-it',
+  '/compare/vue-stream-markdown',
+  '/compare/static-vs-streaming',
   '/guide/parser',
   '/guide/parser-api',
   '/guide/features',
@@ -454,20 +525,20 @@ function createDocsStructuredData(path: string, title: string, description: stri
     graph.push({
       '@type': 'WebSite',
       '@id': `${docsSiteUrl}${homePath === '/' ? '/' : homePath}#website`,
-      'name': 'markstream-vue Docs',
+      'name': 'Markstream Docs',
       'url': `${docsSiteUrl}${homePath === '/' ? '/' : homePath}`,
       'inLanguage': isChinese ? 'zh-CN' : 'en-US',
       description,
       'publisher': {
         '@type': 'Organization',
-        'name': 'markstream-vue',
+        'name': 'Markstream',
         'url': githubRepoUrl,
       },
     })
 
     graph.push({
       '@type': 'SoftwareApplication',
-      'name': 'markstream-vue',
+      'name': 'Markstream',
       'applicationCategory': 'DeveloperApplication',
       'operatingSystem': 'Web',
       'url': `${docsSiteUrl}${homePath === '/' ? '/' : homePath}`,
@@ -507,7 +578,7 @@ function createDocsStructuredData(path: string, title: string, description: stri
 }
 
 export default defineConfig({
-  title: 'markstream-vue',
+  title: 'Markstream',
   description: docsDefaultDescription,
   base: process.env.VITEPRESS_BASE || '/',
   head: siteHead,
@@ -581,15 +652,15 @@ export default defineConfig({
     root: {
       label: 'English',
       lang: 'en-US',
-      title: 'markstream-vue',
+      title: 'Markstream',
       description: docsDefaultDescription,
       link: '/',
     },
     zh: {
       label: '简体中文',
       lang: 'zh-CN',
-      title: 'markstream-vue',
-      description: '适用于 Vue 3 的流式 Markdown 渲染器',
+      title: 'Markstream',
+      description: '适用于 AI 应用的多框架流式 Markdown 渲染器家族',
       link: '/zh/',
     },
   },
@@ -597,7 +668,7 @@ export default defineConfig({
     logo: {
       light: '/logo.svg',
       dark: '/logo-dark.svg',
-      alt: 'markstream-vue',
+      alt: 'Markstream',
     },
     search: {
       provider: 'local',
@@ -653,7 +724,7 @@ export default defineConfig({
     const structuredData = shouldIndex
       ? createDocsStructuredData(
           normalizedPath,
-          frontmatter.title || ctx.pageData.title || ctx.title || 'markstream-vue',
+          frontmatter.title || ctx.pageData.title || ctx.title || 'Markstream',
           description,
           isChinese,
         )

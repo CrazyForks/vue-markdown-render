@@ -1,6 +1,8 @@
-# markstream-vue
+# Markstream
 
-> 针对 Vue 3 的高性能、流式友好型 Markdown 渲染组件 — 支持渐进式 Mermaid、流式 diff 代码块以及为大文档优化的实时预览。
+> 面向 AI 应用的多框架流式 Markdown 渲染器家族 — 支持 Vue、React、Svelte、Angular、Nuxt 和 Next.js。
+
+Markstream 专为在用户眼前持续变化的 Markdown 场景而构建：LLM token 流、SSE/WebSocket 输出、AI 聊天消息、长文档、渐进式 Mermaid 图表、KaTeX 数学公式、流式代码块以及安全的组件化渲染。
 
 [![NPM version](https://img.shields.io/npm/v/markstream-vue?color=a1b858&label=)](https://www.npmjs.com/package/markstream-vue)
 [![English](https://img.shields.io/badge/docs-English-blue)](README.md)
@@ -17,12 +19,33 @@
 [![CI](https://github.com/Simon-He95/markstream-vue/actions/workflows/ci.yml/badge.svg)](https://github.com/Simon-He95/markstream-vue/actions/workflows/ci.yml)
 [![License](https://img.shields.io/npm/l/markstream-vue)](./license)
 
-需要其他框架/版本？
+## 包矩阵
 
-- Vue 2.6：请使用 [`markstream-vue2`](./packages/markstream-vue2/README.md)（基础移植版，功能更精简）
-- React：请参考 `packages/markstream-react` 的说明 [`packages/markstream-react/README.md`](./packages/markstream-react/README.md)（初步移植版）
+| 包 | 框架 | 安装 | 文档 |
+| --- | --- | --- | --- |
+| `markstream-vue` | Vue 3 / Nuxt / VitePress | `pnpm add markstream-vue` | [Vue 指南](https://markstream-vue-docs.simonhe.me/zh/guide/) |
+| `markstream-react` | React / Next.js / Remix | `pnpm add markstream-react` | [React 指南](https://markstream-vue-docs.simonhe.me/zh/guide/react-quick-start) |
+| `markstream-svelte` | Svelte 5 | `pnpm add markstream-svelte svelte@^5` | [Svelte 指南](https://markstream-vue-docs.simonhe.me/zh/guide/svelte) |
+| `markstream-angular` | Angular standalone | `pnpm add markstream-angular` | [Angular 指南](https://markstream-vue-docs.simonhe.me/zh/guide/angular-quick-start) |
+| `markstream-vue2` | Vue 2.6 / 2.7 | `pnpm add markstream-vue2` | [Vue 2 指南](https://markstream-vue-docs.simonhe.me/zh/guide/vue2-quick-start) |
+| `stream-markdown-parser` | 任意 JS/TS 应用 | `pnpm add stream-markdown-parser` | [解析器指南](https://markstream-vue-docs.simonhe.me/zh/guide/parser-api) |
+| `markstream-core` | 框架无关 | `pnpm add markstream-core` | [Core 包](./packages/markstream-core/README.md) |
 
-## 目录
+### 我该用哪个包？
+
+- **Vue 3 / Nuxt / VitePress** → `markstream-vue`
+- **React / Next.js / Remix** → `markstream-react`
+- **Svelte 5** → `markstream-svelte`
+- **Angular standalone** → `markstream-angular`
+- **Vue 2.6 / 2.7** → `markstream-vue2`
+- **仅需框架无关的解析** → `stream-markdown-parser`
+- **流式控制器工具** → `markstream-core`
+
+## 稳定性
+
+`markstream-vue@1.0` 是最成熟的渲染器，稳定面包括：`MarkdownRender`、流式内容渲染、预解析节点渲染、安全 HTML 策略、可选 Mermaid / KaTeX / Monaco / D2 / Infographic 集成、虚拟滚动协调、CSS 导出、worker client 子路径以及 Vite / Nuxt / VitePress 的 SSR 导入。
+
+跨框架渲染器（`markstream-react`、`markstream-svelte`、`markstream-angular`、`markstream-vue2`）已可用并积极开发中。请查看各包文档了解 API 成熟度、框架支持和已知限制。
 
 - [速览](#速览)
 - [按场景选择入口](#按场景选择入口)

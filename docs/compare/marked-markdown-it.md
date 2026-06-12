@@ -1,0 +1,91 @@
+---
+title: Markstream vs marked and markdown-it for AI streaming Markdown
+description: Compare Markstream with marked and markdown-it for streaming AI Markdown. Traditional parsers are best for static content — Markstream is designed for LLM token streams and progressive rendering.
+---
+# Markstream vs marked and markdown-it
+
+`marked` and `markdown-it` are excellent Markdown parsers. Markstream is a streaming Markdown **renderer** that uses `markdown-it-ts` internally. They serve different purposes.
+
+## Summary
+
+Use `marked` or `markdown-it` when:
+- You need a parser, not a framework renderer
+- Content is static or pre-rendered server-side
+- You want to output HTML strings only
+- You need the smallest possible Markdown dependency
+- You'll build your own streaming/renderer layer on top
+
+Use Markstream when:
+- You need a framework component renderer (Vue, React, Svelte, Angular)
+- Content streams from an LLM, SSE, or WebSocket
+- Incomplete Markdown states must not cause errors
+- You need progressive Mermaid, KaTeX, or code blocks
+- You want safe component-based rendering (no raw HTML dump)
+
+## Comparison table
+
+| | marked | markdown-it | Markstream |
+| --- | --- | --- | --- |
+| Type | Parser | Parser | Renderer family |
+| Output | HTML string | HTML string | Framework components |
+| Streaming | ❌ | ❌ | ✅ (incremental states) |
+| Incomplete Markdown | Errors | Errors | ✅ graceful handling |
+| Mermaid | ❌ | Via plugin (HTML) | ✅ progressive |
+| KaTeX | ❌ | Via plugin (HTML) | ✅ worker-based |
+| Code blocks | ❌ | Via plugin (HTML) | ✅ streaming diff |
+| Safe HTML | ❌ (raw output) | ❌ (raw output) | ✅ configurable policy |
+| Vue components | ❌ | ❌ | ✅ |
+| React components | ❌ | ❌ | ✅ |
+| Svelte components | ❌ | ❌ | ✅ |
+| Angular components | ❌ | ❌ | ✅ |
+| Virtualization | ❌ | ❌ | ✅ |
+| Bundle size | ~4 KB | ~40 KB | ~12 KB (core) + peers |
+
+## When Markstream uses markdown-it internally
+
+`markstream-vue` and `markstream-react` use `markdown-it-ts` (a TypeScript fork of `markdown-it`) internally through `stream-markdown-parser`. This means:
+
+- You get `markdown-it`'s parsing correctness
+- Plus streaming-specific handling for unclosed fences and partial blocks
+- Plus framework-specific component rendering
+- Plus optional heavy block support (Mermaid, KaTeX, Monaco)
+
+## Streaming: the key difference
+
+```js
+// marked / markdown-it: parse complete Markdown → HTML string
+const html = marked.parse('# Hello\n\n**World**')
+// → '<h1>Hello</h1>\n<p><strong>World</strong></p>\n'
+
+// Markstream: incremental parse during streaming
+// Chunk 1: "# Hel" → renders partial heading (no error)
+// Chunk 2: "# Hello\n\n**Wo" → updates heading, partial bold
+// Chunk 3: "# Hello\n\n**World**" → complete render
+```
+
+Traditional parsers cannot handle partial Markdown without errors. Markstream is designed for this scenario from the ground up.
+
+## When NOT to use Markstream
+
+- You only need `markdown → HTML` conversion (use `marked` or `markdown-it`)
+- You're building a static site generator that renders at build time
+- You need the absolute smallest Markdown dependency
+- You're rendering Markdown in a non-JS runtime
+
+## Using stream-markdown-parser alone
+
+If you want `markdown-it`-compatible parsing with streaming support but no framework UI:
+
+```bash
+pnpm add stream-markdown-parser
+```
+
+```ts
+import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+
+const md = getMarkdown()
+const nodes = parseMarkdownToStructure(content, md)
+// nodes is a structured AST you can render however you want
+```
+
+This gives you the streaming parser without any framework dependency.

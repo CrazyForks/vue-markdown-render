@@ -1,10 +1,10 @@
 ---
 layout: home
-description: 面向 Vue、React、Angular、Svelte 和 Nuxt 的流式 Markdown 渲染器，提供安装、VitePress、AI 聊天、组件覆盖与迁移的任务式文档入口。
+description: 面向 AI 应用的多框架流式 Markdown 渲染器家族，支持 Vue、React、Svelte、Angular、Nuxt 和 Next.js。处理 LLM token 流、SSE/WebSocket 输出、AI 聊天、长文档、渐进式 Mermaid、KaTeX 和流式代码块。
 hero:
-  name: markstream-vue
-  text: 面向流式输出的 Markdown 渲染器
-  tagline: Vue 3 • Vue 2 • React • Angular • Svelte • Nuxt
+  name: Markstream
+  text: 面向 AI 应用的流式 Markdown 渲染器
+  tagline: Vue • React • Svelte • Angular • Nuxt • Next.js
   actions:
     - theme: brand
       text: 按场景安装
@@ -39,11 +39,11 @@ features:
     link: /zh/guide/ai-workflows
 ---
 
-适用于 Vue 3 的流式 Markdown 渲染器，支持 Mermaid 图表、流式代码块对比和高性能大文档处理。
+适用于 AI 应用的多框架流式 Markdown 渲染器家族，支持 Mermaid 渐进渲染、流式代码块对比和高性能大文档处理 — 覆盖 Vue、React、Svelte、Angular、Nuxt 和 Next.js。
 
 <SupportQRCodes
-  title="支持 markstream-vue"
-  description="如果 markstream-vue 对你的工作有帮助，欢迎通过支付宝或微信支持项目的持续维护。"
+  title="支持 Markstream"
+  description="如果 Markstream 对你的工作有帮助，欢迎通过支付宝或微信支持项目的持续维护。"
   note="感谢你的支持，这会帮助文档、演示和包维护持续迭代。"
   alipay-label="支付宝"
   wechat-label="微信收款"

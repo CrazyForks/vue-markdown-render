@@ -1,0 +1,77 @@
+# Static Markdown rendering vs streaming Markdown rendering
+
+## The fundamental difference
+
+**Static Markdown rendering** assumes complete, well-formed Markdown at render time. The entire input is parsed once, and the output is stable.
+
+**Streaming Markdown rendering** handles Markdown that is still being written. The input grows over time, and the renderer must handle incomplete syntax without flickering or errors.
+
+## Why streaming is harder
+
+1. **Unclosed code fences**: ` ```js ` with no closing ` ``` ` — static parsers may consume the rest of the document as code block content
+2. **Partial tables**: `| col1 | col2 |\n| --- |` with no rows — can break table parsing
+3. **Half-written math**: `$$E = mc` without closing `$$` — KaTeX will error on incomplete input
+4. **Incomplete HTML**: `<details>` without `</details>` — can break the DOM
+5. **Growing Mermaid**: diagram syntax changes as the LLM writes — needs progressive re-rendering
+6. **Unclosed inline formatting**: `**bold text` without closing `**` — may consume subsequent content
+
+## How Markstream handles it
+
+### Parser mid-states
+Unclosed fences, partial math blocks, and incomplete tables are detected at the parser level. Instead of consuming the rest of the document or throwing errors, the parser marks these as "open" tokens. The renderer displays them as plain text until the closing delimiter arrives.
+
+### Batch rendering
+Instead of re-rendering on every token (which could be 20-50 times per second for fast LLMs), updates are collected and rendered in controlled batches. This prevents flicker and keeps the UI smooth.
+
+### Progressive heavy blocks
+Mermaid diagrams, KaTeX formulas, and code blocks don't render immediately on first appearance. They wait for their syntax to stabilize:
+
+- **Mermaid**: renders after the closing ` ``` ` and a short stabilization delay
+- **KaTeX**: renders after the closing `$$` or `$`
+- **Code blocks**: render incrementally with diff tracking (Monaco) or on close (Shiki)
+
+### Viewport priority
+Heavy blocks that are offscreen (below the visible area) stay idle until the user scrolls near them. This keeps the DOM and CPU load predictable even for very long responses.
+
+### Bounded live nodes
+For long documents (100KB+ Markdown), virtualization keeps only the visible portion in the DOM. Off-screen content is represented by placeholder elements. This prevents memory and performance degradation on very long AI responses.
+
+## Renderer modes
+
+Markstream renderers support different modes optimized for different surface types:
+
+| Mode | Best for | Behavior |
+| --- | --- | --- |
+| `chat` | AI chat, SSE output | Steady pacing, no opacity animation flicker |
+| `docs` | Documentation, static pages | Larger render batches, tooltips, fade enabled |
+| `minimal` | Lightweight non-chat surfaces | Same defaults as chat, neutral mode name |
+
+## When static rendering is sufficient
+
+Static Markdown rendering (marked, markdown-it, react-markdown, etc.) is the right choice when:
+
+- Content is fully formed before rendering
+- Content never changes after initial render
+- You render documentation pages, blog posts, or README files
+- Bundle size is critical and you don't need streaming features
+- You need the rich plugin ecosystem of remark/rehype
+
+## When streaming rendering is necessary
+
+Streaming Markdown rendering is necessary when:
+
+- Content arrives incrementally from an LLM, SSE endpoint, or WebSocket
+- Content is displayed to users while still being generated
+- Incomplete Markdown syntax exists during the streaming phase
+- Heavy blocks (diagrams, math, code) appear during streaming
+- Long responses need virtualization to stay performant
+- The renderer must handle content that grows from 0 to potentially 1MB+ over seconds or minutes
+
+## Migration from static to streaming
+
+If you currently use a static renderer and want to add streaming support:
+
+1. **Keep static for static content**: don't replace your blog renderer. Only add streaming for AI chat/SSE surfaces.
+2. **Parse before the component**: for high-frequency streaming, parse Markdown outside the component and pass `nodes` instead of `content`.
+3. **Add `final` prop**: tell the renderer when the stream is complete so it can finalize heavy blocks and clean up mid-states.
+4. **Test with real streaming patterns**: simulate 20-character chunks arriving at 30Hz to verify no flicker.
