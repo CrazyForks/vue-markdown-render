@@ -58,7 +58,49 @@ This is **markstream-angular**.`)
 bootstrapApplication(AppComponent)
 ```
 
-## Key capabilities
+## Streaming SSE example
+
+```ts
+import { Component, signal } from '@angular/core'
+import { MarkstreamAngularComponent } from 'markstream-angular'
+
+@Component({
+  selector: 'chat-message',
+  standalone: true,
+  imports: [MarkstreamAngularComponent],
+  template: `
+    <markstream-angular
+      [content]="content()"
+      [final]="final()"
+      [fade]="false"
+    />
+  `,
+})
+export class ChatMessageComponent {
+  readonly content = signal('')
+  readonly final = signal(false)
+}
+```
+
+## Optional peers and what they enable
+
+| Peer | Enables |
+| --- | --- |
+| `mermaid` | Mermaid diagrams |
+| `katex` | Inline and block math rendering |
+| `stream-monaco` | Monaco-powered code blocks |
+| `@terrastruct/d2` | D2 diagrams |
+| `@antv/infographic` | Infographic blocks |
+
+Shiki is not documented for `markstream-angular` unless you add a supported integration path.
+
+## When not to use this package
+
+- You are below Angular 20
+- You only render short static Markdown and do not need streaming mid-state handling
+- You need a fully stable API surface today
+
+## Known limitations / maturity
 
 - **Standalone component**: no NgModule required
 - **Signal-based**: works with Angular signals for reactive content
@@ -67,10 +109,7 @@ bootstrapApplication(AppComponent)
 - **KaTeX math**: with worker support
 - **Streaming code blocks**: with diff tracking
 - **Optional peers**: install only what you need
-
-## Package maturity
-
-`markstream-angular` is at `0.0.3` (alpha). Check the [Angular guide](/guide/angular-quick-start) for current API maturity and known limitations.
+- **Alpha status**: check npm and the [Angular guide](/guide/angular-quick-start) for the latest API maturity
 
 ## Try it
 

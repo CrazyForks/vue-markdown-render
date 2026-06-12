@@ -1,14 +1,15 @@
 ---
-description: Task-first guide for choosing the right markstream-vue path across installation, streaming usage, VitePress docs sites, component overrides, and migration.
+description: Task-first guide for choosing the right Markstream path across framework entry points, installation, streaming usage, component overrides, and migration.
 ---
 
 # Guide
 
-This guide is organized by task first, framework second. Start with the shortest path that matches what you are trying to do today.
+This guide keeps the Vue/Nuxt path as the most mature renderer documentation. For framework-specific entry points, start from the [framework landing pages](/frameworks/).
 
 ## I Want To Get Something Working Quickly
 
-- [Install by scenario](/guide/installation) for peer-dependency decisions and CSS order.
+- [Frameworks](/frameworks/) if you need to choose a package first.
+- [Vue / Nuxt installation](/guide/installation) for `markstream-vue` peer-dependency decisions and CSS order.
 - [Quick Start](/guide/quick-start) for the smallest Vue 3 example.
 - [Usage & Streaming](/guide/usage) if you need to choose between `content` and `nodes`.
 - [Docs Site & VitePress](/guide/vitepress-docs-integration) if you are wiring stable Markdown pages, theme CSS, and custom tags inside a docs site.
@@ -34,7 +35,7 @@ This guide is organized by task first, framework second. Start with the shortest
 
 ## Framework Entry Points
 
-### Vue 3 (markstream-vue) ⭐ Recommended
+### Vue 3 / Nuxt (markstream-vue) — most mature renderer
 
 | Page | Description |
 |------|-------------|

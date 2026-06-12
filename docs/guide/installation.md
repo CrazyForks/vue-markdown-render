@@ -1,10 +1,10 @@
 ---
-description: Install markstream-vue with the right peer dependency set for docs sites, AI chat UIs, Mermaid, KaTeX, Monaco, and large documents.
+description: Install markstream-vue for Vue, Nuxt, and VitePress with the right peer dependency set for docs sites, AI chat UIs, Mermaid, KaTeX, Monaco, and large documents.
 ---
 
-# Installation
+# Vue / Nuxt Installation
 
-If you only want the renderer on screen quickly, install the main package first and add peers only for the features you actually use.
+If you chose `markstream-vue` for Vue 3, Nuxt, or VitePress, install the main package first and add peers only for the features you actually use.
 
 ## 1. Minimal install
 

@@ -4,13 +4,23 @@
 
 Markstream is built for Markdown that changes while users are watching it: LLM token streams, SSE/WebSocket output, AI chat messages, long documents, progressive Mermaid diagrams, KaTeX math, streaming code blocks, and safe component-based rendering.
 
-[![NPM version](https://img.shields.io/npm/v/markstream-vue?color=a1b858&label=)](https://www.npmjs.com/package/markstream-vue)
 [![中文版](https://img.shields.io/badge/docs-中文文档-blue)](README.zh-CN.md)
 [![Docs](https://img.shields.io/badge/docs-vitepress-blue)](https://markstream-vue-docs.simonhe.me/)
 [![Playground](https://img.shields.io/badge/playground-live-34c759)](https://markstream-vue.simonhe.me/)
 [![Test page](https://img.shields.io/badge/test-shareable%20repro-0A84FF)](https://markstream-vue.simonhe.me/test)
+
+Vue package:
+
+[![markstream-vue npm version](https://img.shields.io/npm/v/markstream-vue?color=a1b858&label=markstream-vue)](https://www.npmjs.com/package/markstream-vue)
 [![NPM downloads](https://img.shields.io/npm/dm/markstream-vue)](https://www.npmjs.com/package/markstream-vue)
 [![Bundle size](https://img.shields.io/bundlephobia/minzip/markstream-vue)](https://bundlephobia.com/package/markstream-vue)
+
+Other packages:
+
+[![markstream-react npm version](https://img.shields.io/npm/v/markstream-react?label=markstream-react)](https://www.npmjs.com/package/markstream-react)
+[![markstream-svelte npm version](https://img.shields.io/npm/v/markstream-svelte?label=markstream-svelte)](https://www.npmjs.com/package/markstream-svelte)
+[![markstream-angular npm version](https://img.shields.io/npm/v/markstream-angular?label=markstream-angular)](https://www.npmjs.com/package/markstream-angular)
+
 [![Release](https://img.shields.io/github/v/release/Simon-He95/markstream-vue?display_name=release&logo=github)](https://github.com/Simon-He95/markstream-vue/releases)
 [![Discussions](https://img.shields.io/github/discussions/Simon-He95/markstream-vue?logo=github)](https://github.com/Simon-He95/markstream-vue/discussions)
 [![Discord](https://img.shields.io/discord/986352439269560380?label=discord&logo=discord&logoColor=fff&color=5865F2)](https://discord.gg/vkzdkjeRCW)
@@ -21,9 +31,11 @@ Markstream is built for Markdown that changes while users are watching it: LLM t
 
 ## Packages
 
+Start with the [framework overview](https://markstream-vue-docs.simonhe.me/frameworks/) if you are choosing between packages.
+
 | Package | Framework | Install | Docs |
 | --- | --- | --- | --- |
-| `markstream-vue` | Vue 3 / Nuxt / VitePress | `pnpm add markstream-vue` | [Vue landing](https://markstream-vue-docs.simonhe.me/frameworks/vue/) · [Nuxt landing](https://markstream-vue-docs.simonhe.me/frameworks/nuxt/) |
+| `markstream-vue` | Vue 3 / Nuxt / VitePress | `pnpm add markstream-vue` | [Framework overview](https://markstream-vue-docs.simonhe.me/frameworks/) · [Vue landing](https://markstream-vue-docs.simonhe.me/frameworks/vue/) · [Nuxt landing](https://markstream-vue-docs.simonhe.me/frameworks/nuxt/) |
 | `markstream-react` | React / Next.js / Remix | `pnpm add markstream-react` | [React landing](https://markstream-vue-docs.simonhe.me/frameworks/react/) · [Next.js landing](https://markstream-vue-docs.simonhe.me/frameworks/next/) |
 | `markstream-svelte` | Svelte 5 | `pnpm add markstream-svelte svelte@^5` | [Svelte landing](https://markstream-vue-docs.simonhe.me/frameworks/svelte/) · [Quick start](https://markstream-vue-docs.simonhe.me/guide/svelte) |
 | `markstream-angular` | Angular standalone | `pnpm add markstream-angular` | [Angular landing](https://markstream-vue-docs.simonhe.me/frameworks/angular/) · [Quick start](https://markstream-vue-docs.simonhe.me/guide/angular-quick-start) |
@@ -74,21 +86,21 @@ For the full release contract and Go / No-Go checklist, see [1.0 Release Readine
 - [Star History](#star-history)
 - [License](#license)
 
-> 📖 Detailed docs, API, and advanced usage: https://markstream-vue-docs.simonhe.me/guide/
+> 📖 Framework overview, docs, API, and advanced usage: https://markstream-vue-docs.simonhe.me/frameworks/
 
 ## TL;DR Highlights
 
-- Purpose-built for **streaming Markdown** (AI/chat/SSE) with zero flicker and predictable memory.
+- Purpose-built for **streaming Markdown** (AI/chat/SSE), designed to minimize flicker and keep memory predictable.
 - **Two render modes**: virtual window for long docs, incremental batching for “typing” effects.
 - **Progressive diagrams** (Mermaid) and **streaming code blocks** (Monaco/Shiki) that keep up with diffs.
-- Works with **raw Markdown strings or pre-parsed nodes**, supports **custom Vue components** inline.
+- Works with **raw Markdown strings or pre-parsed nodes**, with custom framework components in Vue, React, Svelte, and Angular.
 - TypeScript-first, ship-ready defaults — import CSS and render.
 
 ## Choose Your Path
 
 | If you want to... | Start here | Then go to |
 | --- | --- | --- |
-| get the first render on screen | [Quick Start](#-quick-start) | [Installation guide](https://markstream-vue-docs.simonhe.me/guide/installation) |
+| get the first render on screen | [Framework overview](https://markstream-vue-docs.simonhe.me/frameworks/) | [Quick Start](#-quick-start) |
 | integrate it into a docs site or VitePress theme | [Docs Site & VitePress](https://markstream-vue-docs.simonhe.me/guide/vitepress-docs-integration) | [Custom Tags & Advanced Components](https://markstream-vue-docs.simonhe.me/guide/custom-components) |
 | build an AI chat UI or SSE stream | [AI Chat & Streaming](https://markstream-vue-docs.simonhe.me/guide/ai-chat-streaming) | [Performance](https://markstream-vue-docs.simonhe.me/guide/performance) |
 | replace one built-in renderer | [Override Built-in Components](https://markstream-vue-docs.simonhe.me/guide/component-overrides) | [Renderer & Node Components](https://markstream-vue-docs.simonhe.me/guide/components) |
@@ -99,11 +111,15 @@ For the full release contract and Go / No-Go checklist, see [1.0 Release Readine
 
 - Playground (interactive demo): https://markstream-vue.simonhe.me/
 - Interactive test page (shareable links, easy reproduction): https://markstream-vue.simonhe.me/test
-- Docs: https://markstream-vue-docs.simonhe.me/guide/
+- Docs: https://markstream-vue-docs.simonhe.me/frameworks/
 - Showcase: https://markstream-vue-docs.simonhe.me/guide/showcase
 - 1.0 benchmark report: run `pnpm benchmark:1.0`
-- AI/LLM context (project map): https://markstream-vue-docs.simonhe.me/llms
-- AI/LLM context (中文): https://markstream-vue-docs.simonhe.me/llms.zh-CN
+- LLM recommendation context: https://markstream-vue-docs.simonhe.me/llms.txt
+- Full LLM recommendation reference: https://markstream-vue-docs.simonhe.me/llms-full.txt
+- Repo-agent context: https://markstream-vue-docs.simonhe.me/llms
+- LLM recommendation context (中文): https://markstream-vue-docs.simonhe.me/llms.zh-CN.txt
+- Full LLM recommendation reference (中文): https://markstream-vue-docs.simonhe.me/llms-full.zh-CN.txt
+- Repo-agent context (中文): https://markstream-vue-docs.simonhe.me/llms.zh-CN
 - One-click StackBlitz demo: https://stackblitz.com/github/Simon-He95/markstream-vue?file=playground/src/App.vue
 - Changelog: [CHANGELOG.md](./CHANGELOG.md)
 - Nuxt playground: `pnpm play:nuxt`
@@ -522,11 +538,11 @@ Watch on Bilibili: [Open in Bilibili](https://www.bilibili.com/video/BV17Z4qzpE9
 - 🌊 Streaming-first: native support for incomplete or frequently updated tokenized Markdown
 - 🧠 Monaco streaming updates: high-performance Monaco integration for smooth incremental updates of large code blocks
 - 🪄 Progressive Mermaid: charts render instantly when syntax is available, and improve with later updates
-- 🧩 Custom components: embed custom Vue components in Markdown content
+- 🧩 Custom components: embed framework components in Markdown content
 - 📝 Full Markdown support: tables, formulas, emoji, checkboxes, code blocks, etc.
 - 🔄 Real-time updates: supports incremental content without breaking formatting
 - 📦 TypeScript-first: complete type definitions and IntelliSense
-- 🔌 Zero config: works out of the box in Vue 3 projects
+- 🔌 Package defaults: works out of the box in the supported framework entry points
 - 🎨 Flexible code block rendering: choose Monaco editor (`CodeBlockNode`) or lightweight Shiki highlighting (`MarkdownCodeBlockNode`)
 - 🧰 Parser toolkit: [`stream-markdown-parser`](./packages/markdown-parser) now documents how to reuse the parser in workers/SSE streams and feed `<MarkdownRender :nodes>` directly, plus APIs for registering global plugins and custom math helpers.
 

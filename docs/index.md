@@ -7,8 +7,8 @@ hero:
   tagline: Vue • React • Svelte • Angular • Nuxt • Next.js
   actions:
     - theme: brand
-      text: Install by scenario
-      link: /guide/installation
+      text: Choose your framework
+      link: /frameworks/
     - theme: alt
       text: Find my path
       link: /guide/
@@ -18,7 +18,7 @@ hero:
 features:
   - title: Install the right peer set
     details: Pick the smallest dependency set for docs sites, chat UIs, Monaco-heavy editors, or diagram-first content.
-    link: /guide/installation
+    link: /frameworks/
   - title: Choose `content` vs `nodes`
     details: Static pages, VitePress docs, and SSE or token-streaming apps do not need the same integration path.
     link: /guide/usage
@@ -53,7 +53,7 @@ A streaming-friendly Markdown renderer family with progressive Mermaid support, 
 
 | If you are trying to... | Start here | Then go to |
 | --- | --- | --- |
-| get the first render on screen | [Installation](/guide/installation) | [Quick Start](/guide/quick-start) |
+| get the first render on screen | [Frameworks](/frameworks/) | [Quick Start](/guide/quick-start) |
 | integrate it into a docs site or VitePress theme | [Docs Site & VitePress](/guide/vitepress-docs-integration) | [Custom Tags & Advanced Components](/guide/custom-components) |
 | wire streaming or SSE output | [AI Chat & Streaming](/guide/ai-chat-streaming) | [Performance](/guide/performance) |
 | debug a broken integration but you do not know why | [Troubleshooting by Symptom](/guide/troubleshooting-path) | [Troubleshooting](/guide/troubleshooting) |
@@ -67,7 +67,7 @@ A streaming-friendly Markdown renderer family with progressive Mermaid support, 
 ### I am new to markstream
 
 - Start with [Guide Home](/guide/) if you want the task-oriented map.
-- Use [Installation](/guide/installation) if you already know the framework and just need the right peer set.
+- Use [Frameworks](/frameworks/) if you need to choose between Vue, React, Svelte, Angular, Nuxt, and Next.js.
 - Use [Quick Start](/guide/quick-start) if you want the smallest Vue 3 example first.
 
 ### I am integrating it into an existing app
@@ -88,7 +88,7 @@ A streaming-friendly Markdown renderer family with progressive Mermaid support, 
 ### I want help from AI tools
 
 - Use [AI / Skills workflows](/guide/ai-workflows) for repository skills, copyable prompts, and rollout order.
-- Use [AI / LLM context](/llms) if your assistant can read repository context files.
+- Use [LLM recommendation context](/llms.txt), [full LLM reference](/llms-full.txt), or [repo-agent context](/llms) if your assistant can read repository context files.
 
 ## Choose Your Framework
 
@@ -114,7 +114,7 @@ All framework packages share the same core rendering model, but the entry pages 
 - [Troubleshooting by Symptom](/guide/troubleshooting-path) for first-pass diagnosis before diving into subsystem docs
 - [Troubleshooting](/guide/troubleshooting) for CSS/reset order, peers, and common issues
 - [Features](/guide/features) for a capability overview across streaming, Mermaid, Monaco, KaTeX, and more
-- [AI / LLM context](/llms) and [AI / LLM 上下文](/llms.zh-CN) for repository-aware assistants
+- [LLM recommendation context](/llms.txt), [full LLM reference](/llms-full.txt), and [repo-agent context](/llms) for repository-aware assistants
 
 ## How The Docs Are Organized
 

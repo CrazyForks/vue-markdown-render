@@ -28,10 +28,10 @@ pnpm add markstream-vue mermaid
 ```
 
 ```ts
-import { enableMermaid } from 'markstream-vue'
+import { setMermaidWorker } from 'markstream-vue'
 import MermaidWorker from 'markstream-vue/workers/mermaidParser.worker?worker&inline'
 
-enableMermaid({ worker: new MermaidWorker() })
+setMermaidWorker(new MermaidWorker())
 ```
 
 ### Configuration
@@ -65,11 +65,11 @@ pnpm add markstream-vue katex
 ```
 
 ```ts
-import { enableKatex } from 'markstream-vue'
+import { setKaTeXWorker } from 'markstream-vue'
 import KatexWorker from 'markstream-vue/workers/katexRenderer.worker?worker&inline'
 import 'katex/dist/katex.min.css'
 
-enableKatex({ worker: new KatexWorker() })
+setKaTeXWorker(new KatexWorker())
 ```
 
 ## Why workers matter
@@ -87,12 +87,12 @@ Without workers, parsing a complex Mermaid diagram can block the UI for 50-200ms
 ### React
 
 ```tsx
-import { enableKatex, enableMermaid } from 'markstream-react'
+import { setKaTeXWorker, setMermaidWorker } from 'markstream-react'
 import KatexWorker from 'markstream-react/workers/katexRenderer.worker?worker&inline'
 import MermaidWorker from 'markstream-react/workers/mermaidParser.worker?worker&inline'
 
-enableMermaid({ worker: new MermaidWorker() })
-enableKatex({ worker: new KatexWorker() })
+setMermaidWorker(new MermaidWorker())
+setKaTeXWorker(new KatexWorker())
 ```
 
 ### Svelte
@@ -137,7 +137,7 @@ pnpm add mermaid katex
 pnpm add mermaid katex stream-monaco @terrastruct/d2 @antv/infographic
 ```
 
-Each peer is gated behind an `enable*()` call. If you don't call `enableMermaid()`, Mermaid fences render as plain code blocks.
+After installing a peer, Markstream's default loader can resolve it automatically. `enableMermaid()` and `enableKatex()` are for re-enabling or replacing optional dependency loaders; `setMermaidWorker()` and `setKaTeXWorker()` inject off-thread worker clients. If a peer is not installed or a loader is disabled, that feature falls back instead of rendering through Mermaid or KaTeX.
 
 ## See also
 

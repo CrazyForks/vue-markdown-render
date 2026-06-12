@@ -73,15 +73,17 @@ Mermaid and KaTeX use Web Workers. In Nuxt, import them client-side:
 
 ```ts
 // plugins/markstream.client.ts
-import { enableKatex, enableMermaid } from 'markstream-vue'
+import { setKaTeXWorker, setMermaidWorker } from 'markstream-vue'
 import KatexWorker from 'markstream-vue/workers/katexRenderer.worker?worker&inline'
 import MermaidWorker from 'markstream-vue/workers/mermaidParser.worker?worker&inline'
 
 export default defineNuxtPlugin(() => {
-  enableMermaid({ worker: new MermaidWorker() })
-  enableKatex({ worker: new KatexWorker() })
+  setMermaidWorker(new MermaidWorker())
+  setKaTeXWorker(new KatexWorker())
 })
 ```
+
+`enableMermaid()` and `enableKatex()` control optional dependency loaders. Use `setMermaidWorker()` and `setKaTeXWorker()` when you want Mermaid parsing or KaTeX rendering to run off the main thread.
 
 ## Key considerations
 

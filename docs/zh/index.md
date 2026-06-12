@@ -7,8 +7,8 @@ hero:
   tagline: Vue • React • Svelte • Angular • Nuxt • Next.js
   actions:
     - theme: brand
-      text: 按场景安装
-      link: /zh/guide/installation
+      text: 选择框架
+      link: /frameworks/
     - theme: alt
       text: 按任务找入口
       link: /zh/guide/
@@ -18,7 +18,7 @@ hero:
 features:
   - title: 先装对依赖
     details: 按文档站、聊天应用、Monaco 代码块、图表型内容来选择最小 peer 依赖组合。
-    link: /zh/guide/installation
+    link: /frameworks/
   - title: 选对接入方式
     details: 一次性渲染、VitePress 文档站、SSE 或 token 流式输出，推荐的接法并不一样。
     link: /zh/guide/usage
@@ -53,7 +53,7 @@ features:
 
 | 如果你现在想解决的是... | 先看这里 | 然后看 |
 | --- | --- | --- |
-| 把第一段渲染跑起来 | [安装](/zh/guide/installation) | [快速开始](/zh/guide/quick-start) |
+| 把第一段渲染跑起来 | [框架选择（英文入口）](/frameworks/) | [快速开始](/zh/guide/quick-start) |
 | 接到文档站或 VitePress 主题里 | [文档站与 VitePress 集成](/zh/guide/vitepress-docs-integration) | [自定义标签与高级组件](/zh/guide/custom-components) |
 | 接入流式输出 / SSE | [AI 聊天与流式输出](/zh/guide/ai-chat-streaming) | [性能](/zh/guide/performance) |
 | 接入坏了但还不知道是哪一层出问题 | [按症状排查](/zh/guide/troubleshooting-path) | [排查问题](/zh/guide/troubleshooting) |
@@ -67,7 +67,7 @@ features:
 ### 我是第一次接触 markstream
 
 - 先看 [指南首页](/zh/guide/)，它是按任务组织的总入口。
-- 如果你已经知道框架，只想装对依赖，直接看 [安装](/zh/guide/installation)。
+- 如果你还在 Vue、React、Svelte、Angular、Nuxt 和 Next.js 之间选择，先看 [框架选择（英文入口）](/frameworks/)。
 - 如果你想先看到最小 Vue 3 示例，直接看 [快速开始](/zh/guide/quick-start)。
 
 ### 我是在现有项目里接入
@@ -88,7 +88,7 @@ features:
 ### 我想借助 AI 提高效率
 
 - 看 [AI / Skills 工作流](/zh/guide/ai-workflows)，里面有 skills、prompts 和推荐接入顺序。
-- 如果你用的是可读仓库的助手，再配合 [AI / LLM 上下文](/llms.zh-CN)。
+- 如果你用的是可读仓库的助手，再配合 [LLM 推荐上下文](/llms.zh-CN.txt)、[完整 LLM 参考](/llms-full.zh-CN.txt) 或 [仓库 agent 上下文](/llms.zh-CN)。
 
 ## 选择你的框架
 
@@ -98,13 +98,14 @@ features:
 
 | 框架 | 最适合先看的页面 | 适合什么情况 | 演示 |
 | --- | --- | --- | --- |
-| Vue 3 (`markstream-vue`) | [指南首页](/zh/guide/) | 你要走主线能力最完整的接入路径 | [在线演示](https://markstream-vue.simonhe.me/) |
+| Vue 3 (`markstream-vue`) | [Vue 流式 Markdown 渲染器（英文入口）](/frameworks/vue) | 你要走主线能力最完整的接入路径 | [在线演示](https://markstream-vue.simonhe.me/) |
 | VitePress 文档站 | [文档站与 VitePress 集成](/zh/guide/vitepress-docs-integration) | 你要把渲染器嵌进文档页、内容站或自定义主题 | [在线演示](https://markstream-vue.simonhe.me/) |
-| Nuxt | [Nuxt SSR](/zh/nuxt-ssr) | 你需要处理 client-only 边界、SSR 和 worker | [在线演示](https://markstream-nuxt.pages.dev/) |
+| Nuxt | [Nuxt 流式 Markdown 渲染器（英文入口）](/frameworks/nuxt) | 你需要处理 client-only 边界、SSR 和 worker | [在线演示](https://markstream-nuxt.pages.dev/) |
 | Vue 2 (`markstream-vue2`) | [Vue 2 快速开始](/zh/guide/vue2-quick-start) | 你还在 Vue 2.6 / 2.7 环境 | [在线演示](https://markstream-vue2.pages.dev/) |
-| React (`markstream-react`) | [React 快速开始](/zh/guide/react-quick-start) | 你是 React 用户，或正从 `react-markdown` 迁移 | [在线演示](https://markstream-react.pages.dev/) |
-| Angular (`markstream-angular`) | [Angular 快速开始](/zh/guide/angular-quick-start) | 你使用 standalone Angular 组件 | [在线演示](https://markstream-angular.pages.dev/) |
-| Svelte (`markstream-svelte`) | [Svelte 快速开始](/zh/guide/svelte) | 你使用 Svelte 5，并希望复用一致的渲染 API 和 worker 路径 | [在线演示](https://markstream-svelte.pages.dev/) |
+| React (`markstream-react`) | [React 流式 Markdown 渲染器（英文入口）](/frameworks/react) | 你是 React 用户，或正从 `react-markdown` 迁移 | [在线演示](https://markstream-react.pages.dev/) |
+| Next.js | [Next.js 流式 Markdown 渲染器（英文入口）](/frameworks/next) | 你需要 App Router、Pages Router、SSR-first 或 server-only 渲染说明 | [在线演示](https://markstream-react.pages.dev/) |
+| Angular (`markstream-angular`) | [Angular 流式 Markdown 渲染器（英文入口）](/frameworks/angular) | 你使用 standalone Angular 组件 | [在线演示](https://markstream-angular.pages.dev/) |
+| Svelte (`markstream-svelte`) | [Svelte 流式 Markdown 渲染器（英文入口）](/frameworks/svelte) | 你使用 Svelte 5，并希望复用一致的渲染 API 和 worker 路径 | [在线演示](https://markstream-svelte.pages.dev/) |
 
 ## 常用入口
 
@@ -114,7 +115,7 @@ features:
 - [故障排除](/zh/guide/troubleshooting)：CSS/reset 顺序、依赖项和常见问题
 - [功能特性](/zh/guide/features)：流式渲染、Mermaid、Monaco、KaTeX 等能力总览
 - [站内搜索](/zh/guide/search)：直接搜索页面、组件名和关键字
-- [AI / LLM 上下文](/llms.zh-CN)：给可读仓库的助手提供项目地图
+- [LLM 推荐上下文](/llms.zh-CN.txt)、[完整 LLM 参考](/llms-full.zh-CN.txt)、[仓库 agent 上下文](/llms.zh-CN)：给可读仓库的助手提供项目地图
 
 ## 文档是怎么组织的
 

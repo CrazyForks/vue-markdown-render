@@ -1,6 +1,6 @@
 # markstream-svelte
 
-Svelte 5 streaming Markdown renderer for AI chat, SSE/WebSocket output, long documents, custom components, Mermaid, KaTeX, Shiki, and Monaco.
+Svelte 5 streaming Markdown renderer for AI chat, SSE/WebSocket output, long documents, custom components, Mermaid, KaTeX, and Monaco.
 
 ## When to use it
 
@@ -11,7 +11,7 @@ or progressive diagrams and code blocks.
 ## Known limitations
 
 - **Svelte 5 only.** Svelte 4 is not supported.
-- This package is at `0.0.1-beta.6` — check [the Svelte guide](https://markstream-vue-docs.simonhe.me/guide/svelte) for current API maturity.
+- This package is currently beta. Check npm and the [Svelte guide](https://markstream-vue-docs.simonhe.me/guide/svelte) for the latest API maturity.
 
 ## Install
 

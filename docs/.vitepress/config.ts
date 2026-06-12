@@ -27,7 +27,8 @@ const playgroundItems = [
 ]
 
 const rootNav = [
-  { text: 'Get started', link: '/guide/installation' },
+  { text: 'Frameworks', link: '/frameworks/' },
+  { text: 'Get started', link: '/guide/' },
   { text: 'Customization', link: '/guide/component-overrides' },
   { text: 'Migration / AI', link: '/guide/ai-workflows' },
   { text: 'API Reference', link: '/guide/api' },
@@ -36,7 +37,8 @@ const rootNav = [
 ]
 
 const zhNav = [
-  { text: '快速开始', link: '/zh/guide/installation' },
+  { text: '框架选择', link: '/frameworks/' },
+  { text: '快速开始', link: '/zh/guide/' },
   { text: '自定义', link: '/zh/guide/component-overrides' },
   { text: '接入与迁移', link: '/zh/guide/ai-workflows' },
   { text: 'API 参考', link: '/zh/guide/api' },
@@ -50,7 +52,7 @@ const englishGuideSidebar = [
     text: 'Start Here',
     items: [
       { text: 'Guide Home', link: '/guide/' },
-      { text: 'Installation', link: '/guide/installation' },
+      { text: 'Vue / Nuxt Installation', link: '/guide/installation' },
       { text: 'Quick Start', link: '/guide/quick-start' },
       { text: 'Usage & Streaming', link: '/guide/usage' },
       { text: 'Docs Site & VitePress', link: '/guide/vitepress-docs-integration' },
@@ -113,6 +115,7 @@ const englishGuideSidebar = [
     text: 'Frameworks & Migration',
     collapsed: true,
     items: [
+      { text: 'Frameworks overview', link: '/frameworks/' },
       { text: 'Vue (SEO landing)', link: '/frameworks/vue' },
       { text: 'Nuxt (SEO landing)', link: '/frameworks/nuxt' },
       { text: 'React (SEO landing)', link: '/frameworks/react' },
@@ -213,6 +216,7 @@ const chineseGuideSidebar = [
     text: '英文 SEO 入口',
     collapsed: true,
     items: [
+      { text: '框架总览（英文 SEO 入口）', link: '/frameworks/' },
       { text: 'Vue（英文 SEO 入口）', link: '/frameworks/vue' },
       { text: 'Nuxt（英文 SEO 入口）', link: '/frameworks/nuxt' },
       { text: 'React（英文 SEO 入口）', link: '/frameworks/react' },
@@ -378,6 +382,7 @@ const availableDocsRoutePaths = collectDocsRoutePaths(docsRootDir)
 
 const docsPrimaryLandingPaths = new Set([
   '/frameworks/vue',
+  '/frameworks',
   '/frameworks/react',
   '/frameworks/svelte',
   '/frameworks/angular',

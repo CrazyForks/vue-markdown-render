@@ -9,7 +9,7 @@ For short static Markdown, a simpler parser may be enough.
 
 ## Status
 
-This package is at `0.0.3` (alpha). The current direction is already aligned with `markstream-react` / `markstream-vue2` for node-component renderer structure, streaming code block behavior, shared fixtures, and cross-framework comparison. Check [the Angular guide](https://markstream-vue-docs.simonhe.me/guide/angular-quick-start) for current API maturity.
+This package is currently alpha. Check npm and the [Angular guide](https://markstream-vue-docs.simonhe.me/guide/angular-quick-start) for the latest API maturity.
 
 ## Install
 
@@ -105,9 +105,7 @@ In this monorepo:
 - Angular regression lab: `http://127.0.0.1:4175/test`
 - Angular version sandbox: `http://127.0.0.1:4175/test-sandbox`
 
-## Status
-
-This package is still tagged `alpha`, but the current direction is already aligned with `markstream-react` / `markstream-vue2` for:
+Current development is aligned with `markstream-react` / `markstream-vue2` for:
 
 - node-component renderer structure
 - streaming code block behavior

@@ -4,13 +4,23 @@
 
 Markstream 专为在用户眼前持续变化的 Markdown 场景而构建：LLM token 流、SSE/WebSocket 输出、AI 聊天消息、长文档、渐进式 Mermaid 图表、KaTeX 数学公式、流式代码块以及安全的组件化渲染。
 
-[![NPM version](https://img.shields.io/npm/v/markstream-vue?color=a1b858&label=)](https://www.npmjs.com/package/markstream-vue)
 [![English](https://img.shields.io/badge/docs-English-blue)](README.md)
 [![Docs](https://img.shields.io/badge/docs-中文文档-blue)](https://markstream-vue-docs.simonhe.me/zh/guide/)
 [![Playground](https://img.shields.io/badge/playground-在线体验-34c759)](https://markstream-vue.simonhe.me/)
 [![Test page](https://img.shields.io/badge/test-可分享复现-0A84FF)](https://markstream-vue.simonhe.me/test)
+
+Vue 包：
+
+[![markstream-vue npm version](https://img.shields.io/npm/v/markstream-vue?color=a1b858&label=markstream-vue)](https://www.npmjs.com/package/markstream-vue)
 [![NPM downloads](https://img.shields.io/npm/dm/markstream-vue)](https://www.npmjs.com/package/markstream-vue)
 [![Bundle size](https://img.shields.io/bundlephobia/minzip/markstream-vue)](https://bundlephobia.com/package/markstream-vue)
+
+其它框架包：
+
+[![markstream-react npm version](https://img.shields.io/npm/v/markstream-react?label=markstream-react)](https://www.npmjs.com/package/markstream-react)
+[![markstream-svelte npm version](https://img.shields.io/npm/v/markstream-svelte?label=markstream-svelte)](https://www.npmjs.com/package/markstream-svelte)
+[![markstream-angular npm version](https://img.shields.io/npm/v/markstream-angular?label=markstream-angular)](https://www.npmjs.com/package/markstream-angular)
+
 [![Release](https://img.shields.io/github/v/release/Simon-He95/markstream-vue?display_name=release&logo=github)](https://github.com/Simon-He95/markstream-vue/releases)
 [![Discussions](https://img.shields.io/github/discussions/Simon-He95/markstream-vue?logo=github)](https://github.com/Simon-He95/markstream-vue/discussions)
 [![Discord](https://img.shields.io/discord/986352439269560380?label=discord&logo=discord&logoColor=fff&color=5865F2)](https://discord.gg/vkzdkjeRCW)
@@ -21,12 +31,14 @@ Markstream 专为在用户眼前持续变化的 Markdown 场景而构建：LLM t
 
 ## 包矩阵
 
+如果你还在选择框架包，先看 [框架总览（英文）](https://markstream-vue-docs.simonhe.me/frameworks/)。
+
 | 包 | 框架 | 安装 | 文档 |
 | --- | --- | --- | --- |
-| `markstream-vue` | Vue 3 / Nuxt / VitePress | `pnpm add markstream-vue` | [Vue 指南](https://markstream-vue-docs.simonhe.me/zh/guide/) |
-| `markstream-react` | React / Next.js / Remix | `pnpm add markstream-react` | [React 指南](https://markstream-vue-docs.simonhe.me/zh/guide/react-quick-start) |
-| `markstream-svelte` | Svelte 5 | `pnpm add markstream-svelte svelte@^5` | [Svelte 指南](https://markstream-vue-docs.simonhe.me/zh/guide/svelte) |
-| `markstream-angular` | Angular standalone | `pnpm add markstream-angular` | [Angular 指南](https://markstream-vue-docs.simonhe.me/zh/guide/angular-quick-start) |
+| `markstream-vue` | Vue 3 / Nuxt / VitePress | `pnpm add markstream-vue` | [框架总览（英文）](https://markstream-vue-docs.simonhe.me/frameworks/) · [Vue 指南](https://markstream-vue-docs.simonhe.me/zh/guide/) |
+| `markstream-react` | React / Next.js / Remix | `pnpm add markstream-react` | [React landing（英文）](https://markstream-vue-docs.simonhe.me/frameworks/react/) · [Next.js landing（英文）](https://markstream-vue-docs.simonhe.me/frameworks/next/) |
+| `markstream-svelte` | Svelte 5 | `pnpm add markstream-svelte svelte@^5` | [Svelte landing（英文）](https://markstream-vue-docs.simonhe.me/frameworks/svelte/) |
+| `markstream-angular` | Angular standalone | `pnpm add markstream-angular` | [Angular landing（英文）](https://markstream-vue-docs.simonhe.me/frameworks/angular/) |
 | `markstream-vue2` | Vue 2.6 / 2.7 | `pnpm add markstream-vue2` | [Vue 2 指南](https://markstream-vue-docs.simonhe.me/zh/guide/vue2-quick-start) |
 | `stream-markdown-parser` | 任意 JS/TS 应用 | `pnpm add stream-markdown-parser` | [解析器指南](https://markstream-vue-docs.simonhe.me/zh/guide/parser-api) |
 | `markstream-core` | 框架无关 | `pnpm add markstream-core` | [Core 包](./packages/markstream-core/README.md) |
@@ -70,22 +82,22 @@ Markstream 专为在用户眼前持续变化的 Markdown 场景而构建：LLM t
 - [Star 历史](#star-历史)
 - [许可](#许可)
 
-> 📖 所有详细文档、API、示例和高级用法已迁移至 VitePress 中文文档站点：
-> https://markstream-vue-docs.simonhe.me/zh/guide/
+> 📖 框架总览、详细文档、API、示例和高级用法：
+> https://markstream-vue-docs.simonhe.me/frameworks/
 
 ## 速览
 
-- 为 **流式 Markdown**（AI/聊天/SSE）打造，避免闪烁，内存可预期。
+- 为 **流式 Markdown**（AI/聊天/SSE）打造，目标是减少闪烁并保持内存可预期。
 - **双渲染模式**：长文档虚拟化窗口，或“打字机”式增量批次。
 - **渐进式图表**（Mermaid）与 **流式代码块**（Monaco/Shiki），跟上 diff/增量输出。
-- 同时支持 **Markdown 字符串或预解析节点**，可在 Markdown 中嵌入 **自定义 Vue 组件**。
+- 同时支持 **Markdown 字符串或预解析节点**，可在 Vue、React、Svelte 和 Angular 中嵌入 **自定义框架组件**。
 - TypeScript 优先，开箱默认即可上线（导入 CSS 即用）。
 
 ## 按场景选择入口
 
 | 如果你现在想做的是... | 先看这里 | 然后看 |
 | --- | --- | --- |
-| 先把第一段渲染跑起来 | [快速上手](#-快速上手) | [安装指南](https://markstream-vue-docs.simonhe.me/zh/guide/installation) |
+| 先把第一段渲染跑起来 | [框架总览（英文）](https://markstream-vue-docs.simonhe.me/frameworks/) | [快速上手](#-快速上手) |
 | 接到文档站或 VitePress 主题里 | [文档站与 VitePress 集成](https://markstream-vue-docs.simonhe.me/zh/guide/vitepress-docs-integration) | [自定义标签与高级组件](https://markstream-vue-docs.simonhe.me/zh/guide/custom-components) |
 | 做 AI 聊天界面或 SSE 流式输出 | [AI 聊天与流式输出](https://markstream-vue-docs.simonhe.me/zh/guide/ai-chat-streaming) | [性能](https://markstream-vue-docs.simonhe.me/zh/guide/performance) |
 | 替换一个内置节点渲染器 | [覆盖内置组件](https://markstream-vue-docs.simonhe.me/zh/guide/component-overrides) | [渲染器与节点组件](https://markstream-vue-docs.simonhe.me/zh/guide/components) |
@@ -96,11 +108,15 @@ Markstream 专为在用户眼前持续变化的 Markdown 场景而构建：LLM t
 
 - Playground（交互演示）： https://markstream-vue.simonhe.me/
 - 交互测试页（可分享链接，便于复现）： https://markstream-vue.simonhe.me/test
-- 文档： https://markstream-vue-docs.simonhe.me/zh/guide/
+- 文档： https://markstream-vue-docs.simonhe.me/frameworks/
 - Showcase： https://markstream-vue-docs.simonhe.me/zh/guide/showcase
 - 1.0 benchmark 报告：`pnpm benchmark:1.0`
-- AI/LLM 项目索引（中文）： https://markstream-vue-docs.simonhe.me/llms.zh-CN
-- AI/LLM 项目索引（英文）： https://markstream-vue-docs.simonhe.me/llms
+- LLM 推荐上下文（中文）： https://markstream-vue-docs.simonhe.me/llms.zh-CN.txt
+- 完整 LLM 推荐参考（中文）： https://markstream-vue-docs.simonhe.me/llms-full.zh-CN.txt
+- 仓库 agent 上下文（中文）： https://markstream-vue-docs.simonhe.me/llms.zh-CN
+- LLM 推荐上下文（英文）： https://markstream-vue-docs.simonhe.me/llms.txt
+- 完整 LLM 推荐参考（英文）： https://markstream-vue-docs.simonhe.me/llms-full.txt
+- 仓库 agent 上下文（英文）： https://markstream-vue-docs.simonhe.me/llms
 - 一键 StackBlitz 体验： https://stackblitz.com/github/Simon-He95/markstream-vue?file=playground/src/App.vue
 - 更新日志： [CHANGELOG.md](./CHANGELOG.md)
 - Nuxt playground：`pnpm play:nuxt`
@@ -510,11 +526,11 @@ setCustomComponents('docs', {
 - 🌊 流式优先：原生支持不完整或频繁更新的 token 化 Markdown 内容
 - 🧠 Monaco 流式更新：高性能的 Monaco 集成，支持大代码块的平滑增量更新
 - 🪄 渐进式 Mermaid：图表在语法可用时即时渲染，并在后续更新中完善
-- 🧩 自定义组件：允许在 Markdown 内容中嵌入自定义 Vue 组件
+- 🧩 自定义组件：允许在 Markdown 内容中嵌入对应框架组件
 - 📝 完整 Markdown 支持：表格、公式、Emoji、复选框、代码块等
 - 🔄 实时更新：支持增量内容而不破坏格式
 - 📦 TypeScript 优先：提供完善的类型定义与智能提示
-- 🔌 零配置：开箱即可在 Vue 3 项目中使用
+- 🔌 默认配置：各框架入口开箱即可接入
 - 🎨 灵活的代码块渲染：可选 Monaco 编辑器 (`CodeBlockNode`) 或轻量的 Shiki 高亮 (`MarkdownCodeBlockNode`)
 - 🧰 解析工具集：[`stream-markdown-parser`](./packages/markdown-parser) 文档现已覆盖如何在 Worker/SSE 流中复用解析器、直接向 `<MarkdownRender :nodes>` 输送 AST、以及注册全局插件/数学辅助函数的方式。
 

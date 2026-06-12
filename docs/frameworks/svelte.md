@@ -1,6 +1,6 @@
 ---
 title: 'Svelte 5 streaming Markdown renderer for AI chat'
-description: Use markstream-svelte to render streamed Markdown in Svelte 5 AI chat, SSE, WebSocket, long documents, custom components, Mermaid, KaTeX, Shiki, and Monaco.
+description: Use markstream-svelte to render streamed Markdown in Svelte 5 AI chat, SSE, WebSocket, long documents, custom components, Mermaid, KaTeX, and Monaco.
 softwareName: markstream-svelte
 softwarePackage: markstream-svelte
 npmPackage: markstream-svelte
@@ -59,17 +59,32 @@ pnpm add markstream-svelte svelte@^5
 <MarkdownRender {content} {final} fade={false} />
 ```
 
-## Key capabilities
+## Optional peers and what they enable
+
+| Peer | Enables |
+| --- | --- |
+| `mermaid` | Mermaid diagrams |
+| `katex` | Inline and block math rendering |
+| `stream-monaco` | Monaco-powered code blocks |
+| `@terrastruct/d2` | D2 diagrams |
+| `@antv/infographic` | Infographic blocks |
+
+Shiki is not documented for `markstream-svelte` unless you add a supported integration path.
+
+## When not to use this package
+
+- You are on Svelte 4
+- You only render short static Markdown and do not need streaming mid-state handling
+- Your app already has a simpler static Markdown stack that covers all content types
+
+## Known limitations / maturity
 
 - **Svelte 5 runes**: uses `$props()`, `$state()`, `$derived()`
 - **Two render modes**: `content` and `nodes`
 - **Custom components**: slot Svelte components into Markdown
 - **Optional peers**: Mermaid, KaTeX, Monaco, D2, Infographic
 - **Worker parity**: same Katex/Mermaid worker setup as Vue/React
-
-## Package maturity
-
-`markstream-svelte` is at `0.0.1-beta.6`. Check the [Svelte guide](/guide/svelte) for current API maturity and known limitations.
+- **Beta status**: check npm and the [Svelte guide](/guide/svelte) for the latest API maturity
 
 ## Try it
 
