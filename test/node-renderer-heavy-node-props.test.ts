@@ -405,6 +405,37 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
     expect(wrapper.get('.answer-box .code-block-container').attributes('data-langs')).toBe('["typescript"]')
   })
 
+  it('inherits shiki code rendering for code blocks nested inside list items', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        mode: 'chat',
+        codeRenderer: 'shiki',
+        langs: ['typescript'],
+        codeBlockProps: {
+          langs: ['tsx'],
+        },
+        content: [
+          '1. **step one**',
+          '   - before:',
+          '     ```ts',
+          '     refreshSessionSidecars(sessionId)',
+          '     await syncSessionFromSnapshot(sessionId)',
+          '     ```',
+        ].join('\n'),
+        final: true,
+        batchRendering: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    for (let attempt = 0; attempt < 10 && !wrapper.find('li .code-block-container').exists(); attempt++)
+      await flushAll()
+
+    const nestedCodeBlock = wrapper.get('li .code-block-container')
+    expect(nestedCodeBlock.attributes('data-langs')).toBe('["tsx"]')
+    expect(wrapper.find('li [data-markstream-code-block="1"]').exists()).toBe(false)
+  })
+
   it('forwards top-level langs to custom code_block renderers without forcing codeRenderer="shiki"', async () => {
     setCustomComponents(customId, {
       code_block: GenericCodeBlockAttrsProbe as any,

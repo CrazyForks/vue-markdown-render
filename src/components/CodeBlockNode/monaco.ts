@@ -73,6 +73,15 @@ let mod: MonacoModule | null = null
 let importFailed = false
 let loadingPromise: Promise<MonacoModule | null> | null = null
 
+function normalizeMonacoModule(value: unknown): MonacoModule | null {
+  const moduleValue = value as MonacoModule | undefined
+  if (typeof moduleValue?.useMonaco === 'function')
+    return moduleValue
+
+  const defaultValue = (value as { default?: unknown } | undefined)?.default as MonacoModule | undefined
+  return typeof defaultValue?.useMonaco === 'function' ? defaultValue : null
+}
+
 export async function preloadCodeBlockRuntime() {
   const runtime = await getUseMonaco()
   return !!runtime
@@ -87,7 +96,11 @@ export async function getUseMonaco(): Promise<MonacoModule | null> {
       if (importFailed)
         return null
       try {
-        mod = await import('stream-monaco') as MonacoModule
+        mod = normalizeMonacoModule(await import('stream-monaco'))
+        if (!mod) {
+          importFailed = true
+          return null
+        }
       }
       catch {
         importFailed = true

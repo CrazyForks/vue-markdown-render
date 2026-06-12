@@ -17,7 +17,7 @@ import type {
   NodeRendererProps,
 } from '../../types/node-renderer-props'
 import { getHighlightRegistrationKey, normalizeShikiLanguage } from 'markstream-core'
-import { computed, defineAsyncComponent, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, getCurrentInstance, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
 import CheckboxNode from '../../components/CheckboxNode'
@@ -130,6 +130,30 @@ const emit = defineEmits<{
   (e: 'anchor-change', payload: MarkstreamVirtualAnchor): void
 }>()
 
+const instance = getCurrentInstance()
+const inheritedNestedRendererProps = inject<{ value?: Partial<NodeRendererProps> } | undefined>('markstreamNestedRendererProps', undefined)
+
+function toKebabCase(value: string) {
+  return value.replace(/[A-Z]/g, match => `-${match.toLowerCase()}`)
+}
+
+function hasOwnRendererProp(key: keyof NodeRendererProps) {
+  const vnodeProps = instance?.vnode.props as Record<string, unknown> | null | undefined
+  if (!vnodeProps)
+    return false
+
+  return Object.prototype.hasOwnProperty.call(vnodeProps, key)
+    || Object.prototype.hasOwnProperty.call(vnodeProps, toKebabCase(String(key)))
+}
+
+function resolveRendererProp<K extends keyof NodeRendererProps>(key: K): NodeRendererProps[K] {
+  const ownValue = props[key]
+  if (hasOwnRendererProp(key))
+    return ownValue
+
+  return (inheritedNestedRendererProps?.value?.[key] as NodeRendererProps[K] | undefined) ?? ownValue
+}
+
 const isDevEnv = isDevEnvironment()
 
 const RENDERER_MODE_DEFAULTS: Record<NodeRendererMode, Pick<
@@ -197,71 +221,74 @@ function normalizeRendererMode(value: unknown): NodeRendererMode {
     : 'docs'
 }
 
-const resolvedMode = computed<NodeRendererMode>(() => normalizeRendererMode(props.mode))
+const resolvedMode = computed<NodeRendererMode>(() => normalizeRendererMode(resolveRendererProp('mode')))
 const resolvedCodeRenderer = computed<NodeRendererCodeRenderer>(() => {
-  if (props.renderCodeBlocksAsPre === true)
+  const renderCodeBlocksAsPre = resolveRendererProp('renderCodeBlocksAsPre')
+  const codeRenderer = resolveRendererProp('codeRenderer')
+
+  if (renderCodeBlocksAsPre === true)
     return 'pre'
 
   if (
-    props.codeRenderer === 'pre'
-    || props.codeRenderer === 'shiki'
-    || props.codeRenderer === 'monaco'
+    codeRenderer === 'pre'
+    || codeRenderer === 'shiki'
+    || codeRenderer === 'monaco'
   ) {
-    return props.codeRenderer
+    return codeRenderer
   }
 
-  if (props.renderCodeBlocksAsPre === false)
+  if (renderCodeBlocksAsPre === false)
     return 'monaco'
 
   return resolvedMode.value === 'docs' ? 'monaco' : 'pre'
 })
 const resolvedModeDefaults = computed(() => RENDERER_MODE_DEFAULTS[resolvedMode.value])
-const resolvedShowTooltipsProp = computed(() => props.showTooltips ?? resolvedModeDefaults.value.showTooltips)
-const resolvedFade = computed(() => props.fade ?? resolvedModeDefaults.value.fade)
-const resolvedBatchRendering = computed(() => props.batchRendering ?? resolvedModeDefaults.value.batchRendering)
-const resolvedInitialRenderBatchSize = computed(() => props.initialRenderBatchSize ?? resolvedModeDefaults.value.initialRenderBatchSize)
-const resolvedRenderBatchSize = computed(() => props.renderBatchSize ?? resolvedModeDefaults.value.renderBatchSize)
-const resolvedRenderBatchDelay = computed(() => props.renderBatchDelay ?? resolvedModeDefaults.value.renderBatchDelay)
-const resolvedRenderBatchBudgetMs = computed(() => props.renderBatchBudgetMs ?? resolvedModeDefaults.value.renderBatchBudgetMs)
-const resolvedRenderBatchIdleTimeoutMs = computed(() => props.renderBatchIdleTimeoutMs ?? resolvedModeDefaults.value.renderBatchIdleTimeoutMs)
-const resolvedDeferNodesUntilVisible = computed(() => props.deferNodesUntilVisible ?? resolvedModeDefaults.value.deferNodesUntilVisible)
-const resolvedMaxLiveNodes = computed(() => props.maxLiveNodes ?? resolvedModeDefaults.value.maxLiveNodes)
-const resolvedLiveNodeBuffer = computed(() => props.liveNodeBuffer ?? resolvedModeDefaults.value.liveNodeBuffer)
-const resolvedNodeVirtual = computed(() => props.nodeVirtual ?? resolvedModeDefaults.value.nodeVirtual)
+const resolvedShowTooltipsProp = computed(() => resolveRendererProp('showTooltips') ?? resolvedModeDefaults.value.showTooltips)
+const resolvedFade = computed(() => resolveRendererProp('fade') ?? resolvedModeDefaults.value.fade)
+const resolvedBatchRendering = computed(() => resolveRendererProp('batchRendering') ?? resolvedModeDefaults.value.batchRendering)
+const resolvedInitialRenderBatchSize = computed(() => resolveRendererProp('initialRenderBatchSize') ?? resolvedModeDefaults.value.initialRenderBatchSize)
+const resolvedRenderBatchSize = computed(() => resolveRendererProp('renderBatchSize') ?? resolvedModeDefaults.value.renderBatchSize)
+const resolvedRenderBatchDelay = computed(() => resolveRendererProp('renderBatchDelay') ?? resolvedModeDefaults.value.renderBatchDelay)
+const resolvedRenderBatchBudgetMs = computed(() => resolveRendererProp('renderBatchBudgetMs') ?? resolvedModeDefaults.value.renderBatchBudgetMs)
+const resolvedRenderBatchIdleTimeoutMs = computed(() => resolveRendererProp('renderBatchIdleTimeoutMs') ?? resolvedModeDefaults.value.renderBatchIdleTimeoutMs)
+const resolvedDeferNodesUntilVisible = computed(() => resolveRendererProp('deferNodesUntilVisible') ?? resolvedModeDefaults.value.deferNodesUntilVisible)
+const resolvedMaxLiveNodes = computed(() => resolveRendererProp('maxLiveNodes') ?? resolvedModeDefaults.value.maxLiveNodes)
+const resolvedLiveNodeBuffer = computed(() => resolveRendererProp('liveNodeBuffer') ?? resolvedModeDefaults.value.liveNodeBuffer)
+const resolvedNodeVirtual = computed(() => resolveRendererProp('nodeVirtual') ?? resolvedModeDefaults.value.nodeVirtual)
 
 const rendererProps = {
   get content() { return props.content },
   get nodes() { return props.nodes },
   get final() { return props.final },
-  get parseOptions() { return props.parseOptions },
-  get customMarkdownIt() { return props.customMarkdownIt },
+  get parseOptions() { return resolveRendererProp('parseOptions') },
+  get customMarkdownIt() { return resolveRendererProp('customMarkdownIt') },
   get debugPerformance() { return props.debugPerformance },
-  get customHtmlTags() { return props.customHtmlTags },
-  get mode() { return props.mode },
-  get htmlPolicy() { return props.htmlPolicy },
-  get viewportPriority() { return props.viewportPriority },
-  get codeBlockStream() { return props.codeBlockStream },
-  get codeBlockDarkTheme() { return props.codeBlockDarkTheme },
-  get codeBlockLightTheme() { return props.codeBlockLightTheme },
-  get codeBlockMonacoOptions() { return props.codeBlockMonacoOptions },
-  get codeRenderer() { return props.codeRenderer },
-  get renderCodeBlocksAsPre() { return props.renderCodeBlocksAsPre },
-  get codeBlockMinWidth() { return props.codeBlockMinWidth },
-  get codeBlockMaxWidth() { return props.codeBlockMaxWidth },
-  get codeBlockProps() { return props.codeBlockProps },
-  get mermaidProps() { return props.mermaidProps },
-  get d2Props() { return props.d2Props },
-  get infographicProps() { return props.infographicProps },
+  get customHtmlTags() { return resolveRendererProp('customHtmlTags') },
+  get mode() { return resolveRendererProp('mode') },
+  get htmlPolicy() { return resolveRendererProp('htmlPolicy') },
+  get viewportPriority() { return resolveRendererProp('viewportPriority') },
+  get codeBlockStream() { return resolveRendererProp('codeBlockStream') },
+  get codeBlockDarkTheme() { return resolveRendererProp('codeBlockDarkTheme') },
+  get codeBlockLightTheme() { return resolveRendererProp('codeBlockLightTheme') },
+  get codeBlockMonacoOptions() { return resolveRendererProp('codeBlockMonacoOptions') },
+  get codeRenderer() { return resolveRendererProp('codeRenderer') },
+  get renderCodeBlocksAsPre() { return resolveRendererProp('renderCodeBlocksAsPre') },
+  get codeBlockMinWidth() { return resolveRendererProp('codeBlockMinWidth') },
+  get codeBlockMaxWidth() { return resolveRendererProp('codeBlockMaxWidth') },
+  get codeBlockProps() { return resolveRendererProp('codeBlockProps') },
+  get mermaidProps() { return resolveRendererProp('mermaidProps') },
+  get d2Props() { return resolveRendererProp('d2Props') },
+  get infographicProps() { return resolveRendererProp('infographicProps') },
   get showTooltips() { return resolvedShowTooltipsProp.value },
-  get themes() { return props.themes },
-  get langs() { return props.langs },
-  get isDark() { return props.isDark },
-  get customId() { return props.customId },
+  get themes() { return resolveRendererProp('themes') },
+  get langs() { return resolveRendererProp('langs') },
+  get isDark() { return resolveRendererProp('isDark') },
+  get customId() { return resolveRendererProp('customId') },
   get indexKey() { return props.indexKey },
-  get typewriter() { return props.typewriter },
+  get typewriter() { return resolveRendererProp('typewriter') },
   get smoothStreaming() { return props.smoothStreaming },
-  get smoothStreamingOptions() { return props.smoothStreamingOptions },
-  get parseCoalesceMs() { return props.parseCoalesceMs },
+  get smoothStreamingOptions() { return resolveRendererProp('smoothStreamingOptions') },
+  get parseCoalesceMs() { return resolveRendererProp('parseCoalesceMs') },
   get fade() { return resolvedFade.value },
   get batchRendering() { return resolvedBatchRendering.value },
   get initialRenderBatchSize() { return resolvedInitialRenderBatchSize.value },
@@ -372,13 +399,13 @@ const {
 })
 provide('markstreamShowTooltips', resolvedShowTooltips)
 provide('markstreamHtmlPolicy', resolvedHtmlPolicy)
-provide('markstreamTypewriter', computed(() => props.typewriter !== false))
+provide('markstreamTypewriter', computed(() => rendererProps.typewriter !== false))
 provide('markstreamFade', computed(() => rendererProps.fade !== false))
 provide('markstreamTypewriterCursor', computed(() => true))
 provide('markstreamTextStreamState', textStreamState)
 provide('markstreamStreamVersion', streamRenderVersion)
-provide('markstreamParseOptions', computed(() => props.parseOptions))
-provide('markstreamCustomMarkdownIt', computed(() => props.customMarkdownIt))
+provide('markstreamParseOptions', computed(() => rendererProps.parseOptions))
+provide('markstreamCustomMarkdownIt', computed(() => rendererProps.customMarkdownIt))
 
 const {
   smoothStreamingEnabled,
@@ -540,18 +567,18 @@ function takeLayoutReadStats() {
 
   return snapshot
 }
-const instanceMsgId = props.customId
-  ? `renderer-${props.customId}`
+const instanceMsgId = rendererProps.customId
+  ? `renderer-${rendererProps.customId}`
   : `renderer-${Date.now()}-${Math.random().toString(36).slice(2)}`
 const mathBlockMinHeightCache = createMathBlockMinHeightCache(instanceMsgId)
 const mathBlockCacheScope = computed(() => `${instanceMsgId}:${streamRenderVersion.value}`)
 provideMathBlockMinHeightCache(mathBlockMinHeightCache)
-const customComponentsMap = useCustomNodeComponents(() => props.customId)
+const customComponentsMap = useCustomNodeComponents(() => rendererProps.customId)
 const {
   effectiveCustomHtmlTagsSet,
   mergedParseOptions,
   parsedNodes,
-} = useMarkdownParsing(props, {
+} = useMarkdownParsing(rendererProps, {
   instanceMsgId,
   renderContent,
   effectiveFinal,
@@ -570,32 +597,32 @@ watch(
   { immediate: true },
 )
 const nestedRendererProps = computed<Partial<NodeRendererProps>>(() => ({
-  customId: props.customId,
+  customId: rendererProps.customId,
   customHtmlTags: mergedParseOptions.value.customHtmlTags,
-  parseOptions: props.parseOptions,
-  customMarkdownIt: props.customMarkdownIt,
+  parseOptions: rendererProps.parseOptions,
+  customMarkdownIt: rendererProps.customMarkdownIt,
   htmlPolicy: resolvedHtmlPolicy.value,
-  viewportPriority: props.viewportPriority,
+  viewportPriority: rendererProps.viewportPriority,
   mode: resolvedMode.value,
   codeRenderer: resolvedCodeRenderer.value,
   codeBlockStream: rendererProps.codeBlockStream,
-  codeBlockDarkTheme: props.codeBlockDarkTheme,
-  codeBlockLightTheme: props.codeBlockLightTheme,
-  codeBlockMonacoOptions: props.codeBlockMonacoOptions,
+  codeBlockDarkTheme: rendererProps.codeBlockDarkTheme,
+  codeBlockLightTheme: rendererProps.codeBlockLightTheme,
+  codeBlockMonacoOptions: rendererProps.codeBlockMonacoOptions,
   renderCodeBlocksAsPre: rendererProps.renderCodeBlocksAsPre,
-  codeBlockMinWidth: props.codeBlockMinWidth,
-  codeBlockMaxWidth: props.codeBlockMaxWidth,
-  codeBlockProps: props.codeBlockProps,
-  mermaidProps: props.mermaidProps,
-  d2Props: props.d2Props,
-  infographicProps: props.infographicProps,
+  codeBlockMinWidth: rendererProps.codeBlockMinWidth,
+  codeBlockMaxWidth: rendererProps.codeBlockMaxWidth,
+  codeBlockProps: rendererProps.codeBlockProps,
+  mermaidProps: rendererProps.mermaidProps,
+  d2Props: rendererProps.d2Props,
+  infographicProps: rendererProps.infographicProps,
   showTooltips: resolvedShowTooltips.value,
-  themes: props.themes,
-  langs: props.langs,
-  isDark: props.isDark,
-  typewriter: props.typewriter,
-  smoothStreamingOptions: props.smoothStreamingOptions,
-  parseCoalesceMs: props.parseCoalesceMs,
+  themes: rendererProps.themes,
+  langs: rendererProps.langs,
+  isDark: rendererProps.isDark,
+  typewriter: rendererProps.typewriter,
+  smoothStreamingOptions: rendererProps.smoothStreamingOptions,
+  parseCoalesceMs: rendererProps.parseCoalesceMs,
   fade: rendererProps.fade,
 }))
 provide('markstreamNestedRendererProps', nestedRendererProps)
@@ -606,19 +633,19 @@ const listItemProbeNode = ref<ParsedNode | null>(null)
 const listProbeNode = ref<ParsedNode | null>(null)
 const headingProbeNodes = ref<Record<number, ParsedNode | null> | null>(null)
 const isNestedListItemRenderer = props.indexKey != null && String(props.indexKey).startsWith('list-item-')
-const initialHeightExperimentConfig = (!isNestedListItemRenderer && props.customId)
-  ? getHeightEstimationExperiment(props.customId)
+const initialHeightExperimentConfig = (!isNestedListItemRenderer && rendererProps.customId)
+  ? getHeightEstimationExperiment(rendererProps.customId)
   : null
 const heightExperimentConfig = computed(() => {
   if (!initialHeightExperimentConfig)
     return null
   void heightEstimationExperimentRevision.value
-  return getHeightEstimationExperiment(props.customId)
+  return getHeightEstimationExperiment(rendererProps.customId)
 })
 const heightExperimentEnabled = computed(() => Boolean(
   isClient
   && !renderAsFragment.value
-  && props.customId
+  && rendererProps.customId
   && !isNestedListItemRenderer
   && heightExperimentConfig.value?.enabled,
 ))
@@ -682,7 +709,7 @@ const shouldMeasureNodeHeights = computed(() => virtualizationEnabled.value || h
 // nodes approach the viewport. Node-level deferral is controlled separately
 // via `deferNodes`.
 const viewportPriorityEnabled = computed(() => {
-  if (props.viewportPriority === false)
+  if (rendererProps.viewportPriority === false)
     return false
   if (viewportPriorityAutoDisabled.value)
     return false
@@ -1325,7 +1352,7 @@ function resolveCodeBlockRendererKind(node: ParsedNode) {
 }
 
 function resolveCodeBlockShowHeader() {
-  const showHeader = props.codeBlockProps?.showHeader
+  const showHeader = rendererProps.codeBlockProps?.showHeader
   return showHeader !== false
 }
 
@@ -1353,7 +1380,7 @@ const estimatedNodeHeights = computed(() => {
       if (rendererKind === 'monaco' || rendererKind === 'markdown' || rendererKind === 'pre') {
         return estimateCodeBlockHeight(node, {
           rendererKind,
-          monacoOptions: props.codeBlockMonacoOptions,
+          monacoOptions: rendererProps.codeBlockMonacoOptions,
           showHeader: resolveCodeBlockShowHeader(),
         })
       }
@@ -1749,7 +1776,7 @@ function getVirtualSessionKey() {
   if (explicit != null && explicit !== '')
     return String(explicit)
 
-  return String(props.indexKey ?? props.customId ?? instanceMsgId)
+  return String(props.indexKey ?? rendererProps.customId ?? instanceMsgId)
 }
 
 function getVirtualThreadKey() {
@@ -1768,24 +1795,24 @@ function getHostVirtualMeasurementKey() {
 
 function getVirtualRendererLayoutKey() {
   const renderer = resolvedCodeRenderer.value
-  const monaco = renderer === 'monaco' ? props.codeBlockMonacoOptions : undefined
-  const codeProps = props.codeBlockProps as Record<string, unknown> | undefined
+  const monaco = renderer === 'monaco' ? rendererProps.codeBlockMonacoOptions : undefined
+  const codeProps = rendererProps.codeBlockProps as Record<string, unknown> | undefined
   const includeShikiCodeOptions = renderer === 'shiki'
 
   return [
-    props.isDark ? 'dark' : 'light',
+    rendererProps.isDark ? 'dark' : 'light',
     renderer === 'monaco'
       ? 'code-rich'
       : renderer === 'pre'
         ? 'code-pre'
         : 'code-shiki',
     rendererProps.codeBlockStream === false ? 'code-static' : 'code-stream',
-    stringifyVirtualToken(props.codeBlockMinWidth),
-    stringifyVirtualToken(props.codeBlockMaxWidth),
+    stringifyVirtualToken(rendererProps.codeBlockMinWidth),
+    stringifyVirtualToken(rendererProps.codeBlockMaxWidth),
     ...(includeShikiCodeOptions
       ? [getHighlightRegistrationKey(
-          (codeProps?.themes ?? props.themes) as readonly unknown[] | undefined,
-          (codeProps?.langs ?? props.langs) as readonly unknown[] | undefined,
+          (codeProps?.themes ?? rendererProps.themes) as readonly unknown[] | undefined,
+          (codeProps?.langs ?? rendererProps.langs) as readonly unknown[] | undefined,
         )]
       : []),
     stringifyVirtualToken(monaco?.fontSize),
@@ -4503,7 +4530,7 @@ watch(
 )
 
 watch(
-  [() => props.viewportPriority, () => parsedNodes.value.length],
+  [() => rendererProps.viewportPriority, () => parsedNodes.value.length],
   ([enabled, length]) => {
     if (enabled === false) {
       viewportPriorityAutoDisabled.value = false
@@ -4993,7 +5020,7 @@ watch(
 )
 
 watch(
-  [() => props.customId],
+  [() => rendererProps.customId],
   ([customId], _prev, onCleanup) => {
     if (!customId || isNestedListItemRenderer)
       return
@@ -5123,27 +5150,27 @@ const nodeComponents: Partial<CustomComponents> = {
   // 例如:custom_node: CustomNode,
 }
 const indexPrefix = computed(() => getCurrentIndexPrefix())
-const codeBlockExtraProps = computed(() => getCodeBlockExtraProps(props.codeBlockProps))
+const codeBlockExtraProps = computed(() => getCodeBlockExtraProps(rendererProps.codeBlockProps))
 const builtinCodeBlockExtraProps = computed(() =>
-  getCodeBlockExtraProps(props.codeBlockProps, { omit: ['langs'] }),
+  getCodeBlockExtraProps(rendererProps.codeBlockProps, { omit: ['langs'] }),
 )
 const codeBlockBindings = computed(() => ({
   // streaming behavior control for CodeBlockNode / MarkdownCodeBlockNode
   stream: rendererProps.codeBlockStream,
-  darkTheme: props.codeBlockDarkTheme,
-  lightTheme: props.codeBlockLightTheme,
-  monacoOptions: props.codeBlockMonacoOptions,
-  themes: props.themes,
-  langs: resolvedCodeRenderer.value === 'shiki' ? props.langs : undefined,
-  minWidth: props.codeBlockMinWidth,
-  maxWidth: props.codeBlockMaxWidth,
+  darkTheme: rendererProps.codeBlockDarkTheme,
+  lightTheme: rendererProps.codeBlockLightTheme,
+  monacoOptions: rendererProps.codeBlockMonacoOptions,
+  themes: rendererProps.themes,
+  langs: resolvedCodeRenderer.value === 'shiki' ? rendererProps.langs : undefined,
+  minWidth: rendererProps.codeBlockMinWidth,
+  maxWidth: rendererProps.codeBlockMaxWidth,
   ...(typeof resolvedShowTooltips.value === 'boolean' ? { showTooltips: resolvedShowTooltips.value } : {}),
   ...builtinCodeBlockExtraProps.value,
 }))
 
 const customCodeBlockBindings = computed(() => ({
   ...codeBlockBindings.value,
-  langs: props.langs,
+  langs: rendererProps.langs,
   ...codeBlockExtraProps.value,
 }))
 
@@ -5157,7 +5184,7 @@ function pickPositiveNumber(value: unknown) {
 }
 
 const preCodeBlockBindings = computed(() => {
-  const source = (props.codeBlockProps || {}) as Record<string, unknown>
+  const source = (rendererProps.codeBlockProps || {}) as Record<string, unknown>
   const bindings: Record<string, unknown> = {}
 
   const showLineNumbers = pickBoolean(source.showLineNumbers)
@@ -5178,12 +5205,12 @@ const preCodeBlockBindings = computed(() => {
 const shikiCodeBlockBindings = computed(() => {
   return {
     stream: rendererProps.codeBlockStream,
-    darkTheme: props.codeBlockDarkTheme,
-    lightTheme: props.codeBlockLightTheme,
-    themes: props.themes,
-    langs: props.langs,
-    minWidth: props.codeBlockMinWidth,
-    maxWidth: props.codeBlockMaxWidth,
+    darkTheme: rendererProps.codeBlockDarkTheme,
+    lightTheme: rendererProps.codeBlockLightTheme,
+    themes: rendererProps.themes,
+    langs: rendererProps.langs,
+    minWidth: rendererProps.codeBlockMinWidth,
+    maxWidth: rendererProps.codeBlockMaxWidth,
     ...(typeof resolvedShowTooltips.value === 'boolean'
       ? { showTooltips: resolvedShowTooltips.value }
       : {}),
@@ -5192,16 +5219,16 @@ const shikiCodeBlockBindings = computed(() => {
 })
 
 const mermaidBindings = computed(() => ({
-  ...(props.mermaidProps || {}),
+  ...(rendererProps.mermaidProps || {}),
 }))
 const d2Bindings = computed(() => ({
-  ...(props.d2Props || {}),
+  ...(rendererProps.d2Props || {}),
 }))
 const infographicBindings = computed(() => ({
-  ...(props.infographicProps || {}),
+  ...(rendererProps.infographicProps || {}),
 }))
 const nonCodeBindings = computed(() => ({
-  typewriter: props.typewriter,
+  typewriter: rendererProps.typewriter,
   fade: rendererProps.fade,
   // Forward customHtmlTags for non-whitelisted tag detection in child components
   customHtmlTags: mergedParseOptions.value.customHtmlTags,
@@ -5809,7 +5836,7 @@ function scheduleTypewriterCursorPositionUpdate() {
 }
 
 watch(
-  [renderContent, () => props.content, () => props.nodes, () => props.typewriter, effectiveFinal],
+  [renderContent, () => props.content, () => props.nodes, () => rendererProps.typewriter, effectiveFinal],
   async () => {
     if (!isClient || renderAsFragment.value || !ownsTypewriterCursor.value)
       return
@@ -5839,8 +5866,8 @@ watch(
     const cursorAllowed = shouldShowTypewriterCursorForCurrentNodes()
     const sourceGrowing = nextLength > lastTypewriterContentLength
     const visibleGrowing = nextVisibleLength > lastTypewriterVisibleLength
-    if (props.typewriter === false || !cursorAllowed || (!sourceGrowing && !visibleGrowing)) {
-      if (props.typewriter === false || !cursorAllowed) {
+    if (rendererProps.typewriter === false || !cursorAllowed || (!sourceGrowing && !visibleGrowing)) {
+      if (rendererProps.typewriter === false || !cursorAllowed) {
         showTypewriterCursor.value = false
         hideTypewriterCursorElement()
       }
@@ -5910,8 +5937,8 @@ onBeforeUnmount(() => {
         :node="item.node"
         :loading="item.node.loading"
         :index-key="item.indexKey"
-        :custom-id="props.customId"
-        :is-dark="props.isDark"
+        :custom-id="rendererProps.customId"
+        :is-dark="rendererProps.isDark"
         @click="handleContainerClick"
         @mouseover="handleFragmentMouseover"
         @mouseout="handleFragmentMouseout"
@@ -5946,8 +5973,8 @@ onBeforeUnmount(() => {
         :loading="item.node.loading"
         :index-key="item.indexKey"
         v-bind="item.bindings"
-        :custom-id="props.customId"
-        :is-dark="props.isDark"
+        :custom-id="rendererProps.customId"
+        :is-dark="rendererProps.isDark"
         @click="handleContainerClick"
         @mouseover="handleFragmentMouseover"
         @mouseout="handleFragmentMouseout"
@@ -5961,11 +5988,11 @@ onBeforeUnmount(() => {
     ref="containerRef"
     class="markstream-vue markdown-renderer"
     :class="[
-      { dark: props.isDark },
+      { dark: rendererProps.isDark },
       { virtualized: virtualizationEnabled },
       { 'virtual-scroll-coordinated': virtualScrollDomEnabled },
     ]"
-    :data-custom-id="props.customId"
+    :data-custom-id="rendererProps.customId"
     @click="handleContainerClick"
     @mouseover="handleContainerMouseover"
     @mouseout="handleContainerMouseout"
@@ -6043,8 +6070,8 @@ onBeforeUnmount(() => {
               :node="item.node"
               :loading="item.node.loading"
               :index-key="item.indexKey"
-              :custom-id="props.customId"
-              :is-dark="props.isDark"
+              :custom-id="rendererProps.customId"
+              :is-dark="rendererProps.isDark"
               @copy="emit('copy', $event)"
               @handle-artifact-click="emit('handleArtifactClick', $event)"
             >
@@ -6076,8 +6103,8 @@ onBeforeUnmount(() => {
               :loading="item.node.loading"
               :index-key="item.indexKey"
               v-bind="item.bindings"
-              :custom-id="props.customId"
-              :is-dark="props.isDark"
+              :custom-id="rendererProps.customId"
+              :is-dark="rendererProps.isDark"
               @copy="emit('copy', $event)"
               @handle-artifact-click="emit('handleArtifactClick', $event)"
             />
@@ -6090,8 +6117,8 @@ onBeforeUnmount(() => {
             :node="item.node"
             :loading="item.node.loading"
             :index-key="item.indexKey"
-            :custom-id="props.customId"
-            :is-dark="props.isDark"
+            :custom-id="rendererProps.customId"
+            :is-dark="rendererProps.isDark"
             @copy="emit('copy', $event)"
             @handle-artifact-click="emit('handleArtifactClick', $event)"
           >
@@ -6123,8 +6150,8 @@ onBeforeUnmount(() => {
             :loading="item.node.loading"
             :index-key="item.indexKey"
             v-bind="item.bindings"
-            :custom-id="props.customId"
-            :is-dark="props.isDark"
+            :custom-id="rendererProps.customId"
+            :is-dark="rendererProps.isDark"
             @copy="emit('copy', $event)"
             @handle-artifact-click="emit('handleArtifactClick', $event)"
           />
