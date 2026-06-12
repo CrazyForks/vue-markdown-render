@@ -50,7 +50,7 @@ import 'markstream-vue/index.css'
 ## Key capabilities
 
 - **Two render modes**: `content` (raw Markdown strings) and `nodes` (pre-parsed AST)
-- **Safe HTML policy**: escape, allowlist, or custom — no `v-html` required
+- **Safe HTML policy**: `safe` by default, `escape` for literal text, `trusted` for trusted content only — no `v-html` required
 - **Progressive Mermaid**: diagrams render incrementally during streaming
 - **Streaming code blocks**: Monaco/Shiki with diff tracking
 - **Virtualized long documents**: bounded live nodes for 1MB+ content

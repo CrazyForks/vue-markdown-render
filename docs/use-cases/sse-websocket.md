@@ -115,8 +115,10 @@ ws.onmessage = (event) => {
 
 ```tsx
 // Parse once per batch, not per render
-const parser = useMemo(() => createMarkdownParser(), [])
-const nodes = useMemo(() => parseMarkdownToStructure(content, parser), [content])
+import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+
+const md = useMemo(() => getMarkdown(), [])
+const nodes = useMemo(() => parseMarkdownToStructure(content, md), [content])
 return <MarkdownRender nodes={nodes} final={isDone} />
 ```
 
@@ -151,7 +153,8 @@ When streaming from an LLM, the content may include HTML. Use the safe HTML poli
 <MarkdownRender
   content={content}
   htmlPolicy="escape" // escape all HTML (safest)
-  // or htmlPolicy="allowlist" with a custom allowlist
+  // or htmlPolicy="safe" (default: sanitized rendering)
+  // or htmlPolicy="trusted" for trusted content only
 />
 ```
 

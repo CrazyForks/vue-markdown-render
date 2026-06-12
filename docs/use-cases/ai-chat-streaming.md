@@ -37,13 +37,14 @@ For high-frequency updates (every token / every few tokens), parse outside the c
 
 ```tsx
 import MarkdownRender from 'markstream-react'
-// React — parse once, render many
-import { createMarkdownParser, parseMarkdownToStructure } from 'stream-markdown-parser'
+import { useMemo } from 'react'
+// React — parse once per batch, not per render
+import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 
-const parser = createMarkdownParser()
+const md = getMarkdown()
 
 function ChatMessage({ content, isDone }: { content: string, isDone: boolean }) {
-  const nodes = useMemo(() => parseMarkdownToStructure(content, parser), [content])
+  const nodes = useMemo(() => parseMarkdownToStructure(content, md), [content])
   return <MarkdownRender nodes={nodes} final={isDone} fade={false} />
 }
 ```
@@ -54,14 +55,21 @@ function ChatMessage({ content, isDone }: { content: string, isDone: boolean }) 
 <MarkdownRender
   content={content}
   final={isDone}
+  typewriter
   smoothStreaming="auto"
-  typewriter={50}
+  smoothStreamingOptions={{
+    maxCommitFps: 30,
+    minCharsPerSecond: 45,
+    maxCharsPerSecond: 1200,
+    targetLatencyMs: 900,
+  }}
   fade={false}
 />
 ```
 
+- `typewriter` shows a blinking cursor while streaming
 - `smooth-streaming="auto"` paces content insertion for a natural reading experience
-- `typewriter={50}` controls the character insertion speed (ms per chunk)
+- `smoothStreamingOptions` controls pacing speed — adjust `maxCharsPerSecond` for faster/slower display
 - `fade={false}` prevents opacity animation restarts on each update
 
 ## SSE integration

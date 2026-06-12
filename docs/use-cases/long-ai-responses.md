@@ -23,15 +23,17 @@ Markstream uses viewport-aware rendering to bound the number of live DOM nodes:
 <MarkdownRender
   :content="longResponse"
   :final="isDone"
-  virtual-scroll
+  node-virtual="auto"
   :max-live-nodes="200"
 />
 ```
 
-- `virtual-scroll`: enables virtualized rendering
+- `node-virtual`: enables node-level virtualization inside this document
 - `max-live-nodes`: maximum number of simultaneously rendered nodes (default depends on mode)
 - Nodes outside the viewport are replaced with lightweight placeholders
 - As the user scrolls, nodes enter and leave the viewport
+
+`virtual-scroll` is an advanced protocol for outer timeline virtualizers (e.g. chat message lists). Most users should use `node-virtual` and `max-live-nodes` instead of enabling `virtual-scroll` directly.
 
 ## Viewport-aware heavy blocks
 
@@ -68,7 +70,7 @@ For AI chat with potentially long responses, you can combine chat-mode pacing wi
   :final="isDone"
   smooth-streaming="auto"
   :fade="false"
-  virtual-scroll
+  node-virtual="auto"
   :max-live-nodes="300"
 />
 ```

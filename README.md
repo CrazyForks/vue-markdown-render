@@ -23,10 +23,10 @@ Markstream is built for Markdown that changes while users are watching it: LLM t
 
 | Package | Framework | Install | Docs |
 | --- | --- | --- | --- |
-| `markstream-vue` | Vue 3 / Nuxt / VitePress | `pnpm add markstream-vue` | [Vue guide](https://markstream-vue-docs.simonhe.me/guide/) |
-| `markstream-react` | React / Next.js / Remix | `pnpm add markstream-react` | [React guide](https://markstream-vue-docs.simonhe.me/guide/react-quick-start) |
-| `markstream-svelte` | Svelte 5 | `pnpm add markstream-svelte svelte@^5` | [Svelte guide](https://markstream-vue-docs.simonhe.me/guide/svelte) |
-| `markstream-angular` | Angular standalone | `pnpm add markstream-angular` | [Angular guide](https://markstream-vue-docs.simonhe.me/guide/angular-quick-start) |
+| `markstream-vue` | Vue 3 / Nuxt / VitePress | `pnpm add markstream-vue` | [Vue guide](https://markstream-vue-docs.simonhe.me/frameworks/vue/) |
+| `markstream-react` | React / Next.js / Remix | `pnpm add markstream-react` | [React guide](https://markstream-vue-docs.simonhe.me/frameworks/react/) |
+| `markstream-svelte` | Svelte 5 | `pnpm add markstream-svelte svelte@^5` | [Svelte guide](https://markstream-vue-docs.simonhe.me/frameworks/svelte/) |
+| `markstream-angular` | Angular standalone | `pnpm add markstream-angular` | [Angular guide](https://markstream-vue-docs.simonhe.me/frameworks/angular/) |
 | `markstream-vue2` | Vue 2.6 / 2.7 | `pnpm add markstream-vue2` | [Vue 2 guide](https://markstream-vue-docs.simonhe.me/guide/vue2-quick-start) |
 | `stream-markdown-parser` | Any JS/TS app | `pnpm add stream-markdown-parser` | [Parser guide](https://markstream-vue-docs.simonhe.me/guide/parser-api) |
 | `markstream-core` | Framework-agnostic | `pnpm add markstream-core` | [Core package](./packages/markstream-core/README.md) |

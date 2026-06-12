@@ -152,18 +152,6 @@ const englishGuideSidebar = [
       { text: 'Contributing', link: '/guide/contributing' },
     ],
   },
-  {
-    text: 'Use Cases',
-    collapsed: true,
-    items: [
-      { text: 'Use Cases overview', link: '/use-cases/' },
-      { text: 'AI Chat Streaming', link: '/use-cases/ai-chat-streaming' },
-      { text: 'SSE & WebSocket', link: '/use-cases/sse-websocket' },
-      { text: 'Mermaid & KaTeX', link: '/use-cases/streaming-mermaid-katex' },
-      { text: 'Long AI Responses', link: '/use-cases/long-ai-responses' },
-      { text: 'Mobile WebView', link: '/use-cases/mobile-webview' },
-    ],
-  },
 ]
 
 const chineseGuideSidebar = [
@@ -219,24 +207,9 @@ const chineseGuideSidebar = [
     ],
   },
   {
-    text: '用例',
-    collapsed: true,
-    items: [
-      { text: 'AI 聊天流式 Markdown', link: '/use-cases/ai-chat-streaming' },
-      { text: 'SSE & WebSocket Markdown', link: '/use-cases/sse-websocket' },
-      { text: '移动端 WebView', link: '/use-cases/mobile-webview' },
-      { text: '流式 Mermaid & KaTeX', link: '/use-cases/streaming-mermaid-katex' },
-      { text: '长 AI 回复', link: '/use-cases/long-ai-responses' },
-    ],
-  },
-  {
     text: '框架与迁移',
     collapsed: true,
     items: [
-      { text: 'Vue & Nuxt（SEO 入口）', link: '/frameworks/vue' },
-      { text: 'React & Next.js（SEO 入口）', link: '/frameworks/react' },
-      { text: 'Svelte（SEO 入口）', link: '/frameworks/svelte' },
-      { text: 'Angular（SEO 入口）', link: '/frameworks/angular' },
       { text: 'Nuxt SSR', link: '/zh/nuxt-ssr' },
       { text: 'Vue 2 快速开始', link: '/zh/guide/vue2-quick-start' },
       { text: 'Vue 2 安装', link: '/zh/guide/vue2-installation' },
@@ -264,11 +237,6 @@ const chineseGuideSidebar = [
       { text: '迁移到 1.0', link: '/zh/guide/migration-1-0' },
       { text: '为什么使用？', link: '/zh/guide/why' },
       { text: '对比', link: '/zh/guide/compared' },
-      { text: '对比 react-markdown', link: '/compare/react-markdown' },
-      { text: '对比 Streamdown', link: '/compare/streamdown' },
-      { text: '对比 marked/markdown-it', link: '/compare/marked-markdown-it' },
-      { text: '静态 vs 流式 Markdown', link: '/compare/static-vs-streaming' },
-      { text: '对比总览', link: '/compare/' },
       { text: 'Monaco 内部', link: '/zh/guide/monaco-internals' },
       { text: 'Legacy 构建与 iOS 正则兼容', link: '/zh/guide/legacy-builds' },
       { text: '贡献指南', link: '/zh/guide/contributing' },

@@ -1,9 +1,9 @@
 {
   "name": "markstream-vue",
   "type": "module",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "packageManager": "pnpm@10.33.4",
-  "description": "Streaming Markdown renderers for AI applications across Vue, React, Svelte, Angular, Nuxt, and Next.js.",
+  "description": "Vue/Nuxt streaming Markdown renderer for AI chat, SSE/WebSocket output, mobile WebView, docs sites, long documents, and optional Mermaid, KaTeX, Shiki, Monaco.",
   "author": "Simon He",
   "license": "MIT",
   "homepage": "https://markstream-vue-docs.simonhe.me/",

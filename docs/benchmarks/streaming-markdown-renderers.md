@@ -1,17 +1,23 @@
-# Streaming Markdown renderer benchmark
+---
+title: Streaming Markdown benchmark methodology
+description: Benchmark scenarios and methodology for measuring Markdown streaming renderer performance. Describes test fixtures, chunk patterns, and measurement approaches used or planned for Markstream benchmarks.
+---
+# Streaming Markdown benchmark methodology
 
-This benchmark compares streamed Markdown rendering under AI output scenarios. Results are reproducible using the project's benchmark scripts.
+This page describes the benchmark scenarios we use or plan to use for measuring streaming Markdown renderer performance. Run `pnpm benchmark:1.0` for current markstream-vue release-gate data.
 
-## Tested packages
+Cross-renderer comparison results are not published yet.
 
-| Package | Version | Framework | Notes |
-| --- | --- | --- | --- |
-| markstream-vue | 1.0.x | Vue 3 | content mode / nodes mode |
-| markstream-react | 0.0.x | React | content mode / nodes mode |
-| react-markdown | latest | React | baseline |
-| streamdown | 2.5.x | React | streaming-focused baseline |
-| markdown-it | latest | parser | parser-only baseline |
-| marked | latest | parser | parser-only baseline |
+## Tested packages (planned and current)
+
+| Package | Framework | Notes |
+| --- | --- | --- |
+| markstream-vue | Vue 3 | content mode / nodes mode |
+| markstream-react | React | content mode / nodes mode |
+| react-markdown | React | static baseline |
+| streamdown | React | streaming-focused baseline |
+| markdown-it | parser | parser-only baseline |
+| marked | parser | parser-only baseline |
 
 ## Scenarios
 
@@ -22,18 +28,6 @@ This benchmark compares streamed Markdown rendering under AI output scenarios. R
 | reasoning answer | 100 KB | paragraph chunks | code, tables |
 | technical doc | 1 MB | paragraph chunks | headings, tables, code |
 | diagram-heavy | 50 KB | block chunks | Mermaid, KaTeX |
-
-## Results
-
-| Scenario | Best fit | Why |
-| --- | --- | --- |
-| short static Markdown | marked / markdown-it / react-markdown | smallest dependency surface |
-| React AI chat | markstream-react / streamdown | streaming-specific UX |
-| Vue AI chat | markstream-vue | Vue component renderer + streaming behavior |
-| Svelte AI chat | markstream-svelte | Svelte 5 component renderer |
-| Angular AI chat | markstream-angular | Angular standalone renderer |
-| long transcript | Markstream with virtualization | bounded live nodes |
-| diagram-heavy output | Markstream with optional peers | progressive heavy block rendering |
 
 ## How to reproduce
 
@@ -50,7 +44,7 @@ The benchmark script:
 
 ## 1.0 Benchmark Report
 
-For detailed performance data, run:
+For detailed performance data for markstream-vue 1.0, run:
 
 ```bash
 pnpm benchmark:1.0
@@ -62,35 +56,9 @@ See the generated report at [1.0 Benchmark Report](/guide/benchmark-1-0) for:
 - Streaming split performance
 - Package versions and commit SHA
 
-## Performance characteristics
+## Performance characteristics (markstream-vue 1.0 only)
 
-### markstream-vue (Vue 3)
-
-- **Streaming overhead**: ~2-5ms per batch update (content mode)
-- **Nodes mode**: ~1-2ms per batch update (pre-parsed)
-- **Virtualization**: DOM nodes stay under 200 regardless of content size
-- **Mermaid**: first render ~50-200ms (worker), cached: <10ms
-- **KaTeX**: first render ~5-20ms (worker), cached: <1ms
-
-### markstream-react
-
-- **Streaming overhead**: ~2-5ms per batch update (comparable to Vue)
-- **Nodes mode**: ~1-2ms per batch update
-- Performance characteristics similar to markstream-vue with React-specific rendering
-
-### Static renderers (baseline)
-
-- **react-markdown**: ~5-20ms for 10KB, but re-renders on every content change
-- **marked**: ~1-5ms for 10KB, no streaming awareness
-- **markdown-it**: ~2-10ms for 10KB, no streaming awareness
-
-## Key findings
-
-1. **Static renderers are faster for one-shot rendering** but don't handle streaming well (re-renders, parse errors on incomplete Markdown)
-2. **Markstream's batch rendering** adds a small overhead per batch but eliminates per-token re-renders
-3. **Nodes mode** is significantly faster than content mode for high-frequency streaming (>30 updates/sec)
-4. **Virtualization** is essential for documents >100KB — without it, DOM size and memory grow linearly with content
-5. **Worker-based heavy blocks** (Mermaid, KaTeX) don't block the main thread during streaming
+For markstream-vue 1.0 release-gate data, refer to the [1.0 Benchmark Report](/guide/benchmark-1-0). Cross-framework and cross-renderer comparison numbers require additional benchmark fixtures and will be published separately.
 
 ## Methodology notes
 

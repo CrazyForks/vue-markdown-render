@@ -1,7 +1,7 @@
 {
   "name": "markstream-angular",
   "type": "module",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Angular standalone streaming Markdown renderer for AI chat, SSE/WebSocket output, long documents, Mermaid, KaTeX, Shiki, and Monaco.",
   "author": "Simon He",
   "license": "MIT",

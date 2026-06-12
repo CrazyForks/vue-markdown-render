@@ -58,7 +58,7 @@ Chat mode uses smaller render batches and disables animations that may be expens
 
 ### 2. Enable virtualization early
 ```vue
-<MarkdownRender :virtual="true" :content="content" />
+<MarkdownRender :content="content" node-virtual="auto" :max-live-nodes="200" />
 ```
 On mobile, enable virtualization for documents > 10KB (vs 100KB on desktop).
 
@@ -110,8 +110,11 @@ Monaco Editor is heavy for mobile WebViews. Use Shiki for syntax highlighting or
   mode="chat"
   :content="content"
   :final="isDone"
-  :virtual="true"
+  node-virtual="auto"
+  :max-live-nodes="300"
+  :live-node-buffer="60"
   :viewport-priority="true"
+  :defer-nodes-until-visible="true"
   :render-code-blocks-as-pre="true"
   :fade="false"
   smooth-streaming="auto"

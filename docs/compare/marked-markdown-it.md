@@ -29,7 +29,7 @@ Use Markstream when:
 | Type | Parser | Parser | Renderer family |
 | Output | HTML string | HTML string | Framework components |
 | Streaming | ❌ | ❌ | ✅ (incremental states) |
-| Incomplete Markdown | Errors | Errors | ✅ graceful handling |
+| Incomplete Markdown | May re-interpret or flicker | May re-interpret or flicker | ✅ graceful handling |
 | Mermaid | ❌ | Via plugin (HTML) | ✅ progressive |
 | KaTeX | ❌ | Via plugin (HTML) | ✅ worker-based |
 | Code blocks | ❌ | Via plugin (HTML) | ✅ streaming diff |
@@ -63,7 +63,7 @@ const html = marked.parse('# Hello\n\n**World**')
 // Chunk 3: "# Hello\n\n**World**" → complete render
 ```
 
-Traditional parsers cannot handle partial Markdown without errors. Markstream is designed for this scenario from the ground up.
+Traditional parsers can parse many partial Markdown strings, but they are not designed to preserve stable intermediate rendering states while the input is still growing. During streaming, unclosed fences, partial tables, math, and HTML can cause repeated reinterpretation, layout jumps, or plugin-level errors. Markstream is designed for this scenario from the ground up.
 
 ## When NOT to use Markstream
 

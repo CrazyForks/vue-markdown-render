@@ -40,7 +40,7 @@ enableMermaid({ worker: new MermaidWorker() })
 <MarkdownRender
   :content="streamingContent"
   :final="isDone"
-  :mermaid="{
+  :mermaid-props="{
     theme: isDark ? 'dark' : 'default',
   }"
 />

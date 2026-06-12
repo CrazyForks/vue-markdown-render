@@ -6,6 +6,8 @@ description: Compare markstream-react and Streamdown for streaming AI Markdown i
 
 Both `markstream-react` and [Streamdown](https://streamdown.ai) are designed for streaming Markdown in React. They target different trade-offs.
 
+> **Note:** Feature comparisons are based on Streamdown documentation as of the time of writing. Check [Streamdown's official docs](https://streamdown.ai) for the latest capabilities.
+
 ## Quick comparison
 
 | | markstream-react | Streamdown |
@@ -14,10 +16,10 @@ Both `markstream-react` and [Streamdown](https://streamdown.ai) are designed for
 | Streaming-first | ✅ | ✅ |
 | Incomplete Markdown | ✅ handles unclosed fences | ✅ |
 | react-markdown drop-in | ❌ (different API) | ✅ (drop-in replacement) |
-| Progressive Mermaid | ✅ | ❌ |
-| Streaming code blocks | ✅ with diff tracking | ❌ |
+| Progressive Mermaid | ✅ | Not documented |
+| Streaming code blocks | ✅ with diff tracking | Not documented |
 | KaTeX math | ✅ with worker | Via remark plugins |
-| Virtualized long docs | ✅ | ❌ |
+| Virtualized long docs | ✅ | Not documented |
 | Cross-framework parser | ✅ (stream-markdown-parser) | ❌ (React-only) |
 | Optional heavy peers | ✅ (install only what you need) | N/A |
 | Svelte / Angular / Vue | ✅ (same parser, different renderers) | ❌ |

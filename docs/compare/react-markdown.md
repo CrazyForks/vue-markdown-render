@@ -20,7 +20,7 @@ Use `markstream-react` when:
 | | markstream-react | react-markdown |
 | --- | --- | --- |
 | Streaming-first | ✅ | ❌ |
-| Incomplete Markdown | ✅ handles unclosed fences | ❌ may error or flicker |
+| Incomplete Markdown | ✅ handles unclosed fences | ⚠️ plugins may error or flicker on partial syntax |
 | Progressive Mermaid | ✅ | ❌ |
 | Streaming code blocks | ✅ with diff tracking | ❌ |
 | KaTeX math during stream | ✅ | ⚠️ needs manual handling |
@@ -36,7 +36,7 @@ Use `markstream-react` when:
 When `react-markdown` receives new content, it re-parses and re-renders the entire Markdown tree. For streaming AI output that updates 10-30 times per second, this causes:
 
 - **Flicker**: complete re-renders break CSS transitions and cause visual jumps
-- **Errors on incomplete syntax**: unclosed ` ``` ` fences, partial `$$` math, half-written tables can throw parse errors
+- **Plugin errors on incomplete syntax**: unclosed ` ``` ` fences, partial `$` math, half-written tables can cause plugin-level errors or flicker
 - **Performance degradation**: per-token re-renders compound on long responses
 
 `markstream-react` is designed around these problems:
