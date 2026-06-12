@@ -26,6 +26,171 @@ function collectByType(nodes: any, type: string, out: any[] = []) {
 }
 
 describe('math block same-line boundary regression', () => {
+  it('streaming reparses standalone $$ close line when same-line suffix arrives', () => {
+    const md = getMarkdown('stream-standalone-dollar-close-suffix-reset')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = [
+      '$$',
+      'E=mc^2',
+      '$$',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+    expect(collectByType(nodes, 'math_block')[0].content).toContain('E=mc^2')
+    expect(JSON.stringify(nodes)).not.toContain('where')
+    expect(resetCount).toBe(0)
+
+    source += ' where $x$ follows.'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(nodes.map((node: any) => node.type)).toEqual([
+      'math_block',
+      'paragraph',
+    ])
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('where')
+    expect(serialized).toContain('follows')
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].content).toContain('E=mc^2')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content)).toEqual(['x'])
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 6; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+      expect(resetCount).toBe(1)
+      expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+      expect(collectByType(nodes, 'math_inline')).toHaveLength(1)
+    }
+  })
+
+  it('streaming reparses standalone \\] close line when same-line suffix arrives', () => {
+    const md = getMarkdown('stream-standalone-bracket-close-suffix-reset')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = [
+      '\\[',
+      'x + y = z',
+      '\\]',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+    expect(collectByType(nodes, 'math_block')[0].content).toContain('x + y = z')
+    expect(resetCount).toBe(0)
+
+    source += ' where $z$ follows.'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(nodes.map((node: any) => node.type)).toEqual([
+      'math_block',
+      'paragraph',
+    ])
+    expect(JSON.stringify(nodes)).toContain('where')
+    expect(JSON.stringify(nodes)).toContain('follows')
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].content).toContain('x + y = z')
+
+    const inlineMath = collectByType(nodes, 'math_inline')
+    expect(inlineMath.map((node: any) => node.content)).toEqual(['z'])
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 6; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+      expect(resetCount).toBe(1)
+      expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+      expect(collectByType(nodes, 'math_inline')).toHaveLength(1)
+    }
+  })
+
+  it('does not reset normal bracket text when same-line prose is appended', () => {
+    const md = getMarkdown('stream-normal-bracket-text-no-suffix-reset')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = '[label]'
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(0)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+
+    source += ' suffix text'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(0)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(JSON.stringify(nodes)).toContain('[label] suffix text')
+  })
+
   it('resets stream cache for non-append replacements even when tolerant boundary key is unchanged', () => {
     const md = getMarkdown('stream-math-boundary-non-append-replacement-reset')
     ;(md as any).stream.reset()

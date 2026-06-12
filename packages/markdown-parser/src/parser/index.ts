@@ -692,6 +692,42 @@ function sliceFirstPhysicalLine(value: string) {
   return source
 }
 
+function getLastPhysicalLine(value: string) {
+  const source = String(value ?? '')
+  const lastLf = source.lastIndexOf('\n')
+  const line = source.slice(lastLf === -1 ? 0 : lastLf + 1)
+  return line.endsWith('\r') ? line.slice(0, -1) : line
+}
+
+function isStandaloneDisplayMathCloseLine(previousSource: string) {
+  const trimmed = getLastPhysicalLine(previousSource).trim()
+  if (trimmed === '$$' || trimmed === '\\]')
+    return true
+
+  return trimmed === ']' && hasUnclosedTolerantBracketBoundaryOpenerNearTail(previousSource)
+}
+
+function appendedChunkMayAddSameLineSuffixToStandaloneDisplayMathClose(
+  previousSource: string,
+  source: string,
+) {
+  if (!previousSource || !source.startsWith(previousSource))
+    return false
+
+  const appended = source.slice(previousSource.length)
+  if (!appended || previousSource.endsWith('\n') || previousSource.endsWith('\r'))
+    return false
+
+  const last = findLastNonSpaceOrTab(previousSource)
+  if (last !== '$' && last !== ']')
+    return false
+
+  if (!hasNonSpaceOrTab(sliceFirstPhysicalLine(appended)))
+    return false
+
+  return isStandaloneDisplayMathCloseLine(previousSource)
+}
+
 function appendedChunkMayAddSameLineSuffixToClosedBoundary(
   previousKey: string | null,
   previousSource: string,
@@ -885,6 +921,9 @@ function shouldRunTolerantMathBoundaryStreamSync(
     if (previous.source === source)
       return false
 
+    if (appendedChunkMayAddSameLineSuffixToStandaloneDisplayMathClose(previous.source, source))
+      return true
+
     if (
       source.startsWith(previous.source)
       && !appendedChunkMayCompleteTolerantMathBoundary(previous.source, source)
@@ -925,6 +964,17 @@ function syncTopLevelStreamCacheForActiveTolerantMathBoundary(
   // or first appears. Repeated full md.parse here is the performance trap.
   if (previous?.source === source)
     return 'stream'
+
+  if (
+    previous
+    && source.startsWith(previous.source)
+    && appendedChunkMayAddSameLineSuffixToStandaloneDisplayMathClose(previous.source, source)
+  ) {
+    stream.reset()
+    const boundaryKey = getActiveTolerantMathBlockBoundaryCacheKey(source)
+    setActiveTolerantMathBoundaryStreamState(cacheOwner, source, boundaryKey)
+    return 'stream'
+  }
 
   if (previous && source.startsWith(previous.source)) {
     if (
