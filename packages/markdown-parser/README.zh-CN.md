@@ -25,8 +25,8 @@
 
 完整的使用说明与集成教程见 markstream-vue 文档站：
 
-- English: https://markstream-vue-docs.simonhe.me/guide/api
-- 中文: https://markstream-vue-docs.simonhe.me/zh/guide/api
+- English: https://markstream.simonhe.me/guide/api
+- 中文: https://markstream.simonhe.me/zh/guide/api
 
 本 README 聚焦解析器 API；如需 VitePress/Vite/Nuxt 集成、Worker 流式解析、Tailwind/UnoCSS 配置等指南，请查阅上述文档。
 
@@ -80,7 +80,7 @@ async function handleChunk(chunk: string) {
 }
 ```
 
-在前端通过 `<MarkdownRender :nodes="nodes" />` 渲染即可避免重复解析。具体串联示例见[文档用法指南](https://markstream-vue-docs.simonhe.me/zh/guide/usage)。
+在前端通过 `<MarkdownRender :nodes="nodes" />` 渲染即可避免重复解析。具体串联示例见[文档用法指南](https://markstream.simonhe.me/zh/guide/usage)。
 
 ### 基础示例
 
@@ -347,7 +347,7 @@ const nodes = parseMarkdownToStructure(
 - **复用解析实例**：缓存 `getMarkdown()` 的结果，避免重复注册插件。
 - **服务端解析**：在服务端运行 `parseMarkdownToStructure` 后把 AST 下发给客户端，配合 `markstream-vue` 实现确定性输出。
 - **自定义 HTML 组件**：在解析前先把 `<MyWidget>` 这类片段替换为占位符，渲染时再注入，避免在 `html_block` 上进行脆弱的字符串操作。
-- **样式提示**：如果将节点交给 `markstream-vue`，务必按照文档的 [CSS 排查清单](https://markstream-vue-docs.simonhe.me/zh/guide/troubleshooting#css-looks-wrong-start-here) 调整 reset / layer，防止 Tailwind/UnoCSS 覆盖样式。
+- **样式提示**：如果将节点交给 `markstream-vue`，务必按照文档的 [CSS 排查清单](https://markstream.simonhe.me/zh/guide/troubleshooting#css-looks-wrong-start-here) 调整 reset / layer，防止 Tailwind/UnoCSS 覆盖样式。
 - **错误处理**：`apply` 钩子内部默认捕获异常后打印日志，如需在 CI/生产中抛出错误，可在传入前自行封装并 rethrow。
 
 #### `parseFenceToken(token)`
@@ -487,7 +487,7 @@ import { getMarkdown } from 'markstream-vue'
 import { getMarkdown } from 'stream-markdown-parser'
 ```
 
-所有 API 保持不变。详见[迁移指南](https://markstream-vue-docs.simonhe.me/zh/monorepo-migration)。
+所有 API 保持不变。详见[迁移指南](https://markstream.simonhe.me/zh/monorepo-migration)。
 
 ## 性能
 

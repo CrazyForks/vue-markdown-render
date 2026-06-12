@@ -70,6 +70,10 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: pnpm run test:smoke:core
 
+      - name: React package exports smoke (Ubuntu only)
+        if: matrix.os == 'ubuntu-latest'
+        run: pnpm run test:smoke:react
+
       - name: Run SSR check
         run: nr check:ssr
 

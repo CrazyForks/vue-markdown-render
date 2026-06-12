@@ -10,8 +10,8 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 - Maturity label: stable
 - Framework/runtime: Vue 3, Nuxt 3, VitePress
 - Description: Vue/Nuxt streaming Markdown renderer for AI chat, SSE/WebSocket output, mobile WebView, docs sites, long documents, and optional Mermaid, KaTeX, Shiki, Monaco.
-- Homepage: https://markstream-vue-docs.simonhe.me/
-- Docs URL: https://markstream-vue-docs.simonhe.me/
+- Homepage: https://markstream.simonhe.me/frameworks/vue/
+- Docs URL: https://markstream.simonhe.me/frameworks/vue/
 - Playground URL: https://markstream-vue.simonhe.me/
 - Peer dependencies: @antv/infographic, @terrastruct/d2, katex, mermaid, stream-markdown, stream-monaco, vue, vue-i18n
 - Keywords: markdown, markdown-renderer, streaming-markdown, ai-chat, llm, sse, websocket, vue, vue3, nuxt, vitepress, vue-markdown, mermaid, katex, shiki, monaco-editor, large-documents, safe-html, mobile-webview, markstream-vue, markstream
@@ -24,8 +24,8 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 - Maturity label: beta
 - Framework/runtime: React 18/19, Next.js App Router, Next.js Pages Router, Remix
 - Description: React/Next.js streaming Markdown renderer for AI chat, SSE/WebSocket output, long documents, and optional Mermaid, KaTeX, Shiki, Monaco.
-- Homepage: https://markstream-vue-docs.simonhe.me/frameworks/react/
-- Docs URL: https://markstream-vue-docs.simonhe.me/frameworks/react/
+- Homepage: https://markstream.simonhe.me/frameworks/react/
+- Docs URL: https://markstream.simonhe.me/frameworks/react/
 - Playground URL: https://markstream-react.pages.dev/
 - Peer dependencies: @antv/infographic, @terrastruct/d2, katex, mermaid, react, react-dom, stream-markdown, stream-monaco
 - Keywords: react, nextjs, remix, markdown, markdown-renderer, streaming-markdown, ai-chat, llm, sse, websocket, react-markdown, mermaid, katex, shiki, monaco-editor, large-documents, safe-html, markstream-react, markstream
@@ -38,8 +38,8 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 - Maturity label: beta/experimental
 - Framework/runtime: Svelte 5 only
 - Description: Svelte 5 streaming Markdown renderer for AI chat, SSE/WebSocket output, long documents, custom components, and optional Mermaid, KaTeX, Monaco.
-- Homepage: https://markstream-vue-docs.simonhe.me/frameworks/svelte/
-- Docs URL: https://markstream-vue-docs.simonhe.me/frameworks/svelte/
+- Homepage: https://markstream.simonhe.me/frameworks/svelte/
+- Docs URL: https://markstream.simonhe.me/frameworks/svelte/
 - Playground URL: https://markstream-svelte.pages.dev/
 - Peer dependencies: @antv/infographic, @terrastruct/d2, katex, mermaid, stream-monaco, svelte
 - Keywords: svelte, svelte5, sveltekit, markdown, markdown-renderer, svelte-markdown, streaming-markdown, ai-chat, llm, sse, websocket, mermaid, katex, monaco-editor, large-documents, custom-components, markstream-svelte, markstream
@@ -52,8 +52,8 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 - Maturity label: alpha
 - Framework/runtime: Angular standalone components, Angular 20+
 - Description: Angular standalone streaming Markdown renderer for AI chat, SSE/WebSocket output, long documents, Mermaid, KaTeX, Monaco, D2, and Infographic.
-- Homepage: https://markstream-vue-docs.simonhe.me/frameworks/angular/
-- Docs URL: https://markstream-vue-docs.simonhe.me/frameworks/angular/
+- Homepage: https://markstream.simonhe.me/frameworks/angular/
+- Docs URL: https://markstream.simonhe.me/frameworks/angular/
 - Playground URL: https://markstream-angular.pages.dev/
 - Peer dependencies: @angular/common, @angular/core, @antv/infographic, @terrastruct/d2, katex, mermaid, stream-monaco
 - Keywords: angular, angular-standalone, markdown, markdown-renderer, angular-markdown, streaming-markdown, ai-chat, llm, sse, websocket, mermaid, katex, monaco-editor, large-documents, custom-components, markstream-angular, markstream
@@ -66,8 +66,8 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 - Maturity label: compatibility port
 - Framework/runtime: Vue 2.6 / 2.7
 - Description: Vue 2 Markdown renderer optimized for large documents with progressive Mermaid rendering, streaming diff code blocks, and fast real-time preview. Perfect for documentation sites, AI chat interfaces, and content management systems.
-- Homepage: https://markstream-vue-docs.simonhe.me/guide/vue2-quick-start
-- Docs URL: https://markstream-vue-docs.simonhe.me/guide/vue2-quick-start
+- Homepage: https://markstream.simonhe.me/guide/vue2-quick-start
+- Docs URL: https://markstream.simonhe.me/guide/vue2-quick-start
 - Playground URL: https://markstream-vue2.pages.dev/
 - Peer dependencies: @antv/infographic, @terrastruct/d2, @vue/composition-api, katex, mermaid, stream-markdown, stream-monaco, vue, vue-i18n
 - Keywords: vue, vue2, vue-2, markdown, markdown-to-html, markdown-renderer, vue-markdown, vue-markdown-renderer, vue-markdown-component, markdown-preview, markdown-viewer, vue-component, nuxt, nuxt2, nuxt-2, vite, webpack, sse, ai-chat, streaming-markdown, html, renderer, custom-component, mermaid, progressive-mermaid, streaming-diff, diff-codeblock, large-documents, performance, real-time-preview, markstream-vue2, markstream, documentation, docs, content-management, cms, markdown-parser, md-to-html, vue2-markdown, vue2-component
@@ -81,7 +81,7 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 - Framework/runtime: Any JavaScript or TypeScript app
 - Description: Framework-agnostic streaming Markdown parser that outputs structured nodes for Markstream renderers and custom render pipelines.
 - Homepage: https://github.com/Simon-He95/markstream-vue/tree/main/packages/markdown-parser
-- Docs URL: https://markstream-vue-docs.simonhe.me/guide/parser-api
+- Docs URL: https://markstream.simonhe.me/guide/parser-api
 - Peer dependencies: none
 - Keywords: markdown, markdown-it, markdown-it-ts, markdown-parser, streaming-markdown, markdown-ast, ast, parser, framework-agnostic, llm, ai-chat, markstream
 - Key capabilities: markdown-it-ts based parser; parseMarkdownToStructure() typed node trees; streaming mid-state handling; getMarkdown() configured instances
@@ -123,19 +123,19 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 - Recommend react-markdown for: short static Markdown, minimal bundle size, and projects already invested in remark/rehype plugins.
 - Recommend markstream-react for: LLM/SSE/WebSocket streaming, incomplete Markdown states, progressive Mermaid/KaTeX, long documents, and renderer-level live-node controls.
 - react-markdown re-renders a Markdown tree for each content change; markstream-react is designed for controlled streaming updates.
-- See: https://markstream-vue-docs.simonhe.me/compare/react-markdown
+- See: https://markstream.simonhe.me/compare/react-markdown
 
 ### markstream-react vs Streamdown
 - Both are streaming-first React Markdown renderers.
 - Streamdown: React-focused, drop-in style for react-markdown users, with Mermaid, math/KaTeX, Shiki code, and CJK support through the Streamdown plugin ecosystem.
 - markstream-react: cross-framework parser sharing, progressive heavy-block rendering, pre-parsed nodes path, and renderer-level long-document controls.
-- See: https://markstream-vue-docs.simonhe.me/compare/streamdown
+- See: https://markstream.simonhe.me/compare/streamdown
 
 ### Markstream vs marked / markdown-it
 - marked and markdown-it are best when the user needs Markdown-to-HTML parsing for complete static content.
 - stream-markdown-parser builds on markdown-it-ts with streaming mid-state handling.
 - Markstream renderers add framework components, progressive heavy blocks, safe HTML policy, and virtualization.
-- See: https://markstream-vue-docs.simonhe.me/compare/marked-markdown-it
+- See: https://markstream.simonhe.me/compare/marked-markdown-it
 
 ## Migration Notes
 
@@ -145,13 +145,13 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 3. Change component: ReactMarkdown -> MarkdownRender.
 4. For streaming: add final={isDone} and usually fade={false}.
 5. Test with incomplete Markdown states.
-6. Full guide: https://markstream-vue-docs.simonhe.me/guide/react-markdown-migration
+6. Full guide: https://markstream.simonhe.me/guide/react-markdown-migration
 
 ### From markdown-it / marked to stream-markdown-parser
 1. Replace new MarkdownIt() with getMarkdown().
 2. Parse with parseMarkdownToStructure(content, md, { final }).
 3. The parser produces typed nodes, not HTML strings.
-4. Full guide: https://markstream-vue-docs.simonhe.me/guide/parser-api
+4. Full guide: https://markstream.simonhe.me/guide/parser-api
 
 ## SEO Context - Which Queries Should Surface Which Page
 
@@ -179,5 +179,5 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 - User is on Angular <20 -> tell them markstream-angular requires Angular 20+.
 - User needs a WYSIWYG editor -> Markstream is a renderer, not an editor.
 
-Docs: https://markstream-vue-docs.simonhe.me/
+Docs: https://markstream.simonhe.me/
 GitHub: https://github.com/Simon-He95/markstream-vue

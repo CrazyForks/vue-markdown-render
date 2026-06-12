@@ -1,14 +1,21 @@
 [build]
 # Default Netlify build: build the markdown docs
-command = "pnpm install --frozen-lockfile && pnpm run build:parser && pnpm run build && pnpm docs:build"
+command = "pnpm install --frozen-lockfile && pnpm run build:parser && pnpm run build && pnpm docs:seo:check"
 publish = "docs/.vitepress/dist"
 
 [build.environment]
 NODE_VERSION = "22"
 # The VitePress base should usually be '/' for Netlify; set this if you deploy under a subpath
 VITEPRESS_BASE = "/"
+VITEPRESS_SITE_URL = "https://markstream.simonhe.me"
 
-# Deploy the playground in preview builds (optional) so authors can preview the demo app
+[[redirects]]
+from = "https://markstream-vue-docs.simonhe.me/*"
+to = "https://markstream.simonhe.me/:splat"
+status = 301
+force = true
+
+# Deploy previews should show the docs changes reviewed in PRs.
 [context.deploy-preview]
-command = "pnpm run play:build"
-publish = "playground/dist"
+command = "pnpm run build:parser && pnpm run build && pnpm docs:seo:check"
+publish = "docs/.vitepress/dist"

@@ -11,6 +11,13 @@ softwareProgrammingLanguage:
 softwareRuntimePlatform:
   - Nuxt 3
   - Vue 3
+faq:
+  - question: Should every Nuxt Markstream page use ClientOnly?
+    answer: No. Standard Markdown can render during SSR. Use ClientOnly only around browser-only stream logic or optional peer setup.
+  - question: Does markstream-vue support AI chat in Nuxt?
+    answer: Yes. Use markstream-vue in client-side streaming surfaces and pass content, final, and streaming options.
+  - question: Where should Nuxt worker setup live?
+    answer: Configure Mermaid and KaTeX workers in a client plugin or other browser-only boundary.
 ---
 # Nuxt streaming Markdown renderer for AI chat
 

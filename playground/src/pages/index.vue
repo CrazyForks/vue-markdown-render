@@ -751,7 +751,7 @@ onBeforeUnmount(() => {
             </a>
 
             <a
-              href="https://markstream-vue-docs.simonhe.me/"
+              href="https://markstream.simonhe.me/"
               target="_blank"
               rel="noopener noreferrer"
               class="nav-btn nav-btn--docs"

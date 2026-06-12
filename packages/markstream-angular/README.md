@@ -9,7 +9,7 @@ For short static Markdown, a simpler parser may be enough.
 
 ## Status
 
-This package is currently alpha. Check npm and the [Angular guide](https://markstream-vue-docs.simonhe.me/guide/angular-quick-start) for the latest API maturity.
+This package is currently alpha. Check npm and the [Angular guide](https://markstream.simonhe.me/guide/angular-quick-start) for the latest API maturity.
 
 ## Install
 

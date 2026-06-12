@@ -11,6 +11,13 @@ softwareProgrammingLanguage:
 softwareRuntimePlatform:
   - Next.js
   - React
+faq:
+  - question: Does markstream-react require client-only rendering in Next.js?
+    answer: No. Live SSE and WebSocket streams belong in client components, but stable Markdown can use SSR-first rendering with markstream-react/next or server-only rendering with markstream-react/server.
+  - question: Where should I import markstream-react CSS in Next.js?
+    answer: Import markstream-react/index.css once from app/layout.tsx or pages/_app.tsx, or choose index.px.css or index.tailwind.css when those builds match your app.
+  - question: Which Next.js entry should I use?
+    answer: Use the root package for live client streaming, markstream-react/next for server HTML plus hydration, and markstream-react/server for server-only Markdown.
 ---
 # Next.js streaming Markdown renderer for AI chat
 

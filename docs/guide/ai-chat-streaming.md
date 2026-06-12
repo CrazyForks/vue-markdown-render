@@ -115,7 +115,8 @@ eventSource.addEventListener('done', () => {
 })
 
 // Parse only the visible portion; final parsing waits until caught up
-const md = getMarkdown('chat')
+declare const messageId: string
+const md = getMarkdown(`chat-${messageId}`)
 const nodes = ref([])
 
 watch([stream.visible, stream.final], () => {

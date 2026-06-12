@@ -177,7 +177,8 @@ dasdsad
 如果需要让自定义标签（例如 `<thinking>`）也享受相同的中间态吞并、自动补闭合和源码 payload 保留策略，可在创建实例时或 `ParseOptions` 中传入 `customHtmlTags`：
 
 ```ts
-const md = getMarkdown('chat', { customHtmlTags: ['thinking'] })
+declare const messageId: string
+const md = getMarkdown(`chat-${messageId}`, { customHtmlTags: ['thinking'] })
 ```
 
 输出自定义节点：
@@ -186,7 +187,8 @@ const md = getMarkdown('chat', { customHtmlTags: ['thinking'] })
 ```ts
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 
-const md = getMarkdown('chat', { customHtmlTags: ['thinking'] })
+declare const messageId: string
+const md = getMarkdown(`chat-${messageId}`, { customHtmlTags: ['thinking'] })
 const nodes = parseMarkdownToStructure(source, md, { customHtmlTags: ['thinking'] })
 ```
 

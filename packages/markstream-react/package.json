@@ -5,7 +5,7 @@
   "description": "React/Next.js streaming Markdown renderer for AI chat, SSE/WebSocket output, long documents, and optional Mermaid, KaTeX, Shiki, Monaco.",
   "author": "Simon He",
   "license": "MIT",
-  "homepage": "https://markstream-vue-docs.simonhe.me/frameworks/react/",
+  "homepage": "https://markstream.simonhe.me/frameworks/react/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Simon-He95/markstream-vue.git",
@@ -54,7 +54,11 @@
     "./index.css": "./dist/index.css",
     "./index.px.css": "./dist/index.px.css",
     "./index.tailwind.css": "./dist/index.tailwind.css",
-    "./tailwind": "./dist/tailwind.ts",
+    "./tailwind": {
+      "types": "./dist/tailwind.d.ts",
+      "import": "./dist/tailwind.js",
+      "require": "./dist/tailwind.cjs"
+    },
     "./workers/katexRenderer.worker": "./dist/workers/katexRenderer.worker.js",
     "./workers/mermaidParser.worker": "./dist/workers/mermaidParser.worker.js"
   },
@@ -66,9 +70,10 @@
   ],
   "scripts": {
     "dev": "vite dev",
-    "build": "pnpm --dir ../markstream-core build && vite build --mode npm && vite build -c vite.config.tailwind.ts --mode npm && node ./scripts/copy-tailwind-css.mjs && node ../../scripts/generate-px-css.mjs && pnpm run build:dts && node ./scripts/ensure-next-client-directive.mjs",
+    "build": "pnpm --dir ../markstream-core build && vite build --mode npm && node ../../scripts/cleanup-style-entry.mjs && node ./scripts/finalize-tailwind-export.mjs && vite build -c vite.config.tailwind.ts --mode npm && node ./scripts/copy-tailwind-css.mjs && node ../../scripts/generate-px-css.mjs && pnpm run build:dts && node ./scripts/ensure-next-client-directive.mjs",
     "build:analyze": "ANALYZE=true pnpm build",
     "build:dts": "rollup -c ./scripts/rollup.dts.config.mjs && node ./scripts/clean-dts.cjs",
+    "check:exports": "node ../../scripts/check-react-package-exports.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "size:check": "node ../../scripts/check-package-size.mjs",

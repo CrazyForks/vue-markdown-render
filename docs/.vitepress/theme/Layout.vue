@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import DefaultTheme from 'vitepress/theme'
 import { onMounted, ref } from 'vue'
+import FaqFromFrontmatter from './FaqFromFrontmatter.vue'
 
 const stars = ref<number | null>(null)
 const isLoading = ref(true)
@@ -31,6 +32,10 @@ function formatNumber(num: number): string {
 
 <template>
   <DefaultTheme.Layout>
+    <template #doc-after>
+      <FaqFromFrontmatter />
+    </template>
+
     <template #nav-bar-content-after>
       <a
         href="https://github.com/Simon-He95/markstream-vue"

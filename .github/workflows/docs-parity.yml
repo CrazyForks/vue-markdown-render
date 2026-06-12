@@ -28,4 +28,4 @@ jobs:
       - name: Check generated LLM docs
         run: pnpm docs:check-llms
       - name: Build docs
-        run: pnpm build:parser && pnpm build && pnpm docs:build
+        run: pnpm docs:build:ci

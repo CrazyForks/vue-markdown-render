@@ -10,6 +10,13 @@ softwareProgrammingLanguage:
   - Svelte
 softwareRuntimePlatform:
   - Svelte 5
+faq:
+  - question: markstream-svelte 支持 Svelte 4 吗？
+    answer: 不支持。markstream-svelte 要求 Svelte 5。
+  - question: 什么场景适合 markstream-svelte？
+    answer: Svelte 5 AI 聊天、SSE/WebSocket、长回答、自定义 Svelte 组件，以及需要渐进 Mermaid 或 KaTeX 的页面。
+  - question: markstream-svelte 和 markstream-vue 一样成熟吗？
+    answer: 不是。markstream-svelte 目前是 beta，比 Vue 渲染器更新。
 ---
 
 # Svelte 5 流式 Markdown 渲染器

@@ -22,7 +22,7 @@ function collectByType(nodes: any[], type: string) {
 
 describe('special link cases', () => {
   it('parses link with numeric brackets in link text: [[8]](url)', () => {
-    const markdown = '建议采用以下接口方案：[[8]](https://markstream-vue-docs.simonhe.me/)'
+    const markdown = '建议采用以下接口方案：[[8]](https://markstream.simonhe.me/)'
     const nodes = parseMarkdownToStructure(markdown, md)
 
     // Collect all link nodes
@@ -44,7 +44,7 @@ describe('special link cases', () => {
     const link = links[0]
 
     // Verify link properties
-    expect(link.href).toBe('https://markstream-vue-docs.simonhe.me/')
+    expect(link.href).toBe('https://markstream.simonhe.me/')
     expect(link.loading).toBe(false)
 
     // Verify link text contains [8]
@@ -102,7 +102,7 @@ describe('special link cases', () => {
   })
 
   it('parses multiple links with special characters in same paragraph', () => {
-    const markdown = '建议采用以下接口方案：[[8]](https://markstream-vue-docs.simonhe.me/)\n\n[DR **(Danmarks Radio)](https://www.dr.dk/nyheder)'
+    const markdown = '建议采用以下接口方案：[[8]](https://markstream.simonhe.me/)\n\n[DR **(Danmarks Radio)](https://www.dr.dk/nyheder)'
     const nodes = parseMarkdownToStructure(markdown, md)
 
     // Collect all link nodes
@@ -123,7 +123,7 @@ describe('special link cases', () => {
     expect(links.length).toBe(2)
 
     // First link: [[8]](url)
-    const firstLink = links.find(l => l.href === 'https://markstream-vue-docs.simonhe.me/')
+    const firstLink = links.find(l => l.href === 'https://markstream.simonhe.me/')
     expect(firstLink).toBeDefined()
     expect(firstLink?.loading).toBe(false)
     const firstLinkText = firstLink?.text || (firstLink?.children || []).map((c: any) => c.content || '').join('')

@@ -1,6 +1,5 @@
 import type { CustomComponentMap as MarkstreamCustomComponentMap } from './customComponents'
 import type { RenderContext as MarkstreamRenderContext, RenderNodeFn as MarkstreamRenderNodeFn } from './types'
-import './index.css'
 import './workers/katexRenderer.worker?worker'
 import './workers/mermaidParser.worker?worker'
 

@@ -12,6 +12,13 @@ softwareRuntimePlatform:
   - Vue 3
   - Nuxt
   - VitePress
+faq:
+  - question: Markstream 只是 Vue 库吗？
+    answer: 不是。Markstream 也包含 React、Svelte、Angular、Vue 2、parser 和 core 包，但 markstream-vue 是最成熟的渲染器。
+  - question: 短静态 Markdown 也应该用 markstream-vue 吗？
+    answer: 不一定。短静态 Markdown 可以用更轻的方案；当你需要流式体验、未闭合 Markdown 中间态、长内容或重型块时更适合 markstream-vue。
+  - question: markstream-vue 支持 Nuxt SSR 吗？
+    answer: 支持。普通 Markdown 可以在 Nuxt SSR 阶段输出，浏览器专属 peer 能力在 hydration 后增强。
 ---
 
 # Vue 流式 Markdown 渲染器

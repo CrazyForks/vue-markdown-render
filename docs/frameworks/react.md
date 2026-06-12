@@ -12,6 +12,13 @@ softwareRuntimePlatform:
   - React
   - Next.js
   - Remix
+faq:
+  - question: Is Markstream only for Vue?
+    answer: No. markstream-react is the React renderer in the Markstream family, alongside Vue, Svelte, Angular, Vue 2, parser, and core packages.
+  - question: Should I use markstream-react or react-markdown?
+    answer: Use react-markdown for short static Markdown or existing remark/rehype pipelines. Use markstream-react for LLM streaming, incomplete Markdown states, long outputs, or heavy blocks.
+  - question: Does markstream-react support Next.js SSR?
+    answer: Yes. Use markstream-react/next for SSR-first rendering, markstream-react/server for server-only rendering, and the root package in client components for live streams.
 ---
 # React streaming Markdown renderer for AI chat
 

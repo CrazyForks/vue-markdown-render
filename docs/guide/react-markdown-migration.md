@@ -253,7 +253,8 @@ You do not need to adopt streaming on day one. A practical migration path is:
 import MarkdownRender from 'markstream-react'
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 
-const md = getMarkdown('chat')
+declare const messageId: string
+const md = getMarkdown(`chat-${messageId}`)
 const nodes = parseMarkdownToStructure(buffer, md, { final: done })
 
 export function Message() {

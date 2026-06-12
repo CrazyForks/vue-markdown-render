@@ -11,6 +11,13 @@ softwareProgrammingLanguage:
 softwareRuntimePlatform:
   - Angular
   - Angular standalone components
+faq:
+  - question: Does markstream-angular require Angular 20?
+    answer: Yes. The package targets Angular 20+ standalone components.
+  - question: Is markstream-angular stable?
+    answer: No. markstream-angular is currently alpha, so check the package documentation before using it in production.
+  - question: Does markstream-angular use innerHTML for Markdown output?
+    answer: The renderer is component-based and is designed to avoid dumping untrusted Markdown as raw innerHTML.
 ---
 # Angular streaming Markdown renderer for AI chat
 

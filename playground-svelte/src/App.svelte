@@ -676,7 +676,7 @@
           </div>
           <nav class="chat-header__nav">
             <a href="https://github.com/Simon-He95/markstream-vue" target="_blank" rel="noreferrer" class="nav-btn nav-btn--github">Star</a>
-            <a href="https://markstream-vue-docs.simonhe.me/" target="_blank" rel="noreferrer" class="nav-btn nav-btn--docs">Docs</a>
+            <a href="https://markstream.simonhe.me/" target="_blank" rel="noreferrer" class="nav-btn nav-btn--docs">Docs</a>
             <button type="button" class="nav-btn nav-btn--stream" disabled={!isStreaming} onclick={togglePause}>{isPaused ? 'Resume' : 'Pause'}</button>
             <button type="button" class="nav-btn nav-btn--test" onclick={() => navigate('/test')}>Test</button>
             <button type="button" class="nav-btn nav-btn--cdn" onclick={startStream}>Replay</button>

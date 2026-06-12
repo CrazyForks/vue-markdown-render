@@ -11,6 +11,13 @@ softwareProgrammingLanguage:
 softwareRuntimePlatform:
   - Next.js
   - React
+faq:
+  - question: Next.js 里 markstream-react 必须 client-only 吗？
+    answer: 不必须。实时 SSE/WebSocket 区域放在 client component；稳定 Markdown 可以用 markstream-react/next 做 SSR-first，或用 markstream-react/server 做 server-only。
+  - question: Next.js 里 CSS 应该在哪里导入？
+    answer: 在 app/layout.tsx 或 pages/_app.tsx 导入一次 markstream-react/index.css；需要移动端 px 或 Tailwind 方案时换成对应 CSS 入口。
+  - question: Next.js 应该选哪个入口？
+    answer: 实时 client streaming 用 root package，SSR-first 用 markstream-react/next，server-only Markdown 用 markstream-react/server。
 ---
 
 # Next.js 流式 Markdown 渲染器
