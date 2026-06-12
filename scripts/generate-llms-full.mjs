@@ -19,8 +19,8 @@ const packageEntries = [
     docsPath: '/',
     playground: 'https://markstream-vue.simonhe.me/',
     capabilitiesEn: [
-      'content mode',
-      'nodes mode',
+      'content input path',
+      'nodes input path',
       'safe HTML policy',
       'progressive Mermaid',
       'streaming code blocks with Monaco/Shiki',
@@ -32,8 +32,8 @@ const packageEntries = [
       'Tailwind support',
     ],
     capabilitiesZh: [
-      'content 模式',
-      'nodes 模式',
+      'content 输入路径',
+      'nodes 输入路径',
       '安全 HTML 策略',
       '渐进式 Mermaid',
       'Monaco/Shiki 流式代码块',
@@ -58,8 +58,8 @@ const packageEntries = [
     docsPath: '/frameworks/react/',
     playground: 'https://markstream-react.pages.dev/',
     capabilitiesEn: [
-      'content mode',
-      'nodes mode',
+      'content input path',
+      'nodes input path',
       'progressive Mermaid',
       'streaming code blocks',
       'KaTeX math',
@@ -68,8 +68,8 @@ const packageEntries = [
       'Next.js SSR-safe entries',
     ],
     capabilitiesZh: [
-      'content 模式',
-      'nodes 模式',
+      'content 输入路径',
+      'nodes 输入路径',
       '渐进式 Mermaid',
       '流式代码块',
       'KaTeX 数学',
@@ -92,15 +92,15 @@ const packageEntries = [
     playground: 'https://markstream-svelte.pages.dev/',
     capabilitiesEn: [
       'Svelte 5 runes',
-      'content mode',
-      'nodes mode',
+      'content input path',
+      'nodes input path',
       'worker parity with Vue/React',
       'custom Svelte components in Markdown',
     ],
     capabilitiesZh: [
       'Svelte 5 runes',
-      'content 模式',
-      'nodes 模式',
+      'content 输入路径',
+      'nodes 输入路径',
       '与 Vue/React 一致的 worker 支持',
       'Markdown 中的自定义 Svelte 组件',
     ],
@@ -288,8 +288,8 @@ function chinesePackageSection(pkg) {
 
 function renderFeatureMatrix() {
   const rows = [
-    ['content mode', 'yes', 'yes', 'yes', 'yes'],
-    ['nodes mode', 'yes', 'yes', 'yes', 'yes'],
+    ['content input path', 'yes', 'yes', 'yes', 'yes'],
+    ['nodes input path', 'yes', 'yes', 'yes', 'yes'],
     ['Progressive Mermaid', 'yes', 'yes', 'yes', 'yes'],
     ['KaTeX math', 'yes', 'yes', 'yes', 'yes'],
     ['Streaming code blocks', 'yes', 'yes', 'yes', 'yes'],
@@ -356,7 +356,7 @@ ${renderFeatureMatrix()}
 ### markstream-react vs Streamdown
 - Both are streaming-first React Markdown renderers.
 - Streamdown: React-focused, drop-in style for react-markdown users, with Mermaid, math/KaTeX, Shiki code, and CJK support through the Streamdown plugin ecosystem.
-- markstream-react: cross-framework parser sharing, progressive heavy-block rendering, nodes mode, and renderer-level long-document controls.
+- markstream-react: cross-framework parser sharing, progressive heavy-block rendering, pre-parsed nodes path, and renderer-level long-document controls.
 - See: ${docsSiteUrl}/compare/streamdown
 
 ### Markstream vs marked / markdown-it

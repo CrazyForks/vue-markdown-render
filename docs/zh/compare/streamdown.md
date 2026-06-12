@@ -5,6 +5,8 @@ description: 对比 markstream-react 和 Streamdown 在 React 流式 Markdown、
 
 # markstream-react 与 Streamdown 对比
 
+> 最后核验：2026-06-12。竞品能力可能变化；本页聚焦架构和公开文档行为，不把能力差异写成永久结论。
+
 `markstream-react` 和 Streamdown 都面向 React 流式 Markdown。Streamdown 更像 `react-markdown` 的流式替代路径，并通过 `@streamdown/mermaid`、`@streamdown/math`、`@streamdown/code` 等插件覆盖 Mermaid、数学公式和 Shiki 代码能力。`markstream-react` 更强调 Markstream 家族共享解析行为、渐进式 heavy block、`content`/`nodes` 双输入和长回答 live node 控制。
 
 | 需求 | 推荐 |

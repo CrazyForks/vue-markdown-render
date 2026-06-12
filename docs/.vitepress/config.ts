@@ -621,6 +621,9 @@ export default defineConfig({
           compilerOptions: {
             baseUrl: workspaceRootDir,
             paths: {
+              'markstream-angular': ['docs/.vitepress/twoslash/markstream-angular.d.ts'],
+              'markstream-react': ['docs/.vitepress/twoslash/markstream-react.d.ts'],
+              'markstream-svelte': ['docs/.vitepress/twoslash/markstream-svelte.d.ts'],
               'markstream-vue': ['docs/.vitepress/twoslash/markstream-vue.d.ts'],
               'stream-markdown-parser': ['packages/markdown-parser/src/index.ts'],
             },

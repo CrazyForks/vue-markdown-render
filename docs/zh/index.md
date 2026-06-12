@@ -41,14 +41,6 @@ features:
 
 适用于 AI 应用的多框架流式 Markdown 渲染器家族，支持 Mermaid 渐进渲染、流式代码块对比和高性能大文档处理 — 覆盖 Vue、React、Svelte、Angular、Nuxt 和 Next.js。
 
-<SupportQRCodes
-  title="支持 Markstream"
-  description="如果 Markstream 对你的工作有帮助，欢迎通过支付宝或微信支持项目的持续维护。"
-  note="感谢你的支持，这会帮助文档、演示和包维护持续迭代。"
-  alipay-label="支付宝"
-  wechat-label="微信收款"
-/>
-
 ## 先走最短路径
 
 | 如果你现在想解决的是... | 先看这里 | 然后看 |
@@ -117,6 +109,14 @@ features:
 - [功能特性](/zh/guide/features)：流式渲染、Mermaid、Monaco、KaTeX 等能力总览
 - [站内搜索](/zh/guide/search)：直接搜索页面、组件名和关键字
 - [LLM 推荐上下文](/llms.zh-CN.txt)、[完整 LLM 参考](/llms-full.zh-CN.txt)、[仓库 agent 上下文](/llms.zh-CN)：给可读仓库的助手提供项目地图
+
+<SupportQRCodes
+  title="支持 Markstream"
+  description="如果 Markstream 对你的工作有帮助，欢迎通过支付宝或微信支持项目的持续维护。"
+  note="感谢你的支持，这会帮助文档、演示和包维护持续迭代。"
+  alipay-label="支付宝"
+  wechat-label="微信收款"
+/>
 
 ## 文档是怎么组织的
 

@@ -79,7 +79,7 @@ For SSR safety with optional peers, see the [React installation guide](/guide/re
 
 ## Key capabilities
 
-- **Two render modes**: `content` (raw Markdown strings) and `nodes` (pre-parsed AST)
+- **Two input paths**: raw `content` and pre-parsed `nodes`
 - **Streaming SSE/WebSocket**: parse outside and pass `nodes` for high-frequency token streams
 - **Progressive Mermaid**: diagrams render incrementally
 - **Streaming code blocks**: with diff tracking

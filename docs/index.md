@@ -41,14 +41,6 @@ features:
 
 A streaming-friendly Markdown renderer family with progressive Mermaid support, streaming diff code blocks, and high-performance handling of large documents — available for Vue, React, Svelte, Angular, Nuxt, and Next.js.
 
-<SupportQRCodes
-  title="Support Markstream"
-  description="If Markstream helps your work, you can support ongoing maintenance with Alipay or WeChat Pay."
-  note="Thank you for helping keep the docs, demos, and package maintenance moving."
-  alipay-label="Alipay"
-  wechat-label="WeChat Pay"
-/>
-
 ## Pick The Shortest Path
 
 | If you are trying to... | Start here | Then go to |
@@ -116,6 +108,14 @@ All framework packages share the same core rendering model, but the entry pages 
 - [Troubleshooting](/guide/troubleshooting) for CSS/reset order, peers, and common issues
 - [Features](/guide/features) for a capability overview across streaming, Mermaid, Monaco, KaTeX, and more
 - [LLM recommendation context](/llms.txt), [full LLM reference](/llms-full.txt), and [repo-agent context](/llms) for repository-aware assistants
+
+<SupportQRCodes
+  title="Support Markstream"
+  description="If Markstream helps your work, you can support ongoing maintenance with Alipay or WeChat Pay."
+  note="Thank you for helping keep the docs, demos, and package maintenance moving."
+  alipay-label="Alipay"
+  wechat-label="WeChat Pay"
+/>
 
 ## How The Docs Are Organized
 

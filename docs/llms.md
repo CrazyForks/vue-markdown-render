@@ -131,7 +131,7 @@ Use these as “answer skeletons”: quick steps + minimal repro questions + whe
   - Keep `fade=false` during active smooth streaming; use `fade=true` for completed history/static content
   - Enable/tune batching (`renderBatchSize` / `renderBatchDelay`) when virtualization is disabled
   - Keep heavy nodes deferred (`viewportPriority`, `deferNodesUntilVisible`)
-- Ask: “How often do you update `content/nodes` (per token? per chunk?) and what batch props are set?”
+- Ask: “How often do you update the `content` or `nodes` input path (per token? per chunk?) and what batch props are set?”
 - Docs: `docs/guide/ai-chat-streaming.md`, `docs/guide/performance.md`, `docs/guide/props.md`
 
 ### Large documents: perf/memory

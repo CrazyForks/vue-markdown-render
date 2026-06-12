@@ -1,5 +1,7 @@
 # markstream-react vs react-markdown for streaming AI Markdown
 
+> Last verified: 2026-06-12. Competitor capabilities may change. This page focuses on architecture and documented behavior rather than claiming permanent feature gaps.
+
 ## Summary
 
 Use `react-markdown` when:

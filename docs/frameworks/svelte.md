@@ -80,7 +80,7 @@ Shiki is not documented for `markstream-svelte` unless you add a supported integ
 ## Known limitations / maturity
 
 - **Svelte 5 runes**: uses `$props()`, `$state()`, `$derived()`
-- **Two render modes**: `content` and `nodes`
+- **Two input paths**: raw `content` and pre-parsed `nodes`
 - **Custom components**: slot Svelte components into Markdown
 - **Optional peers**: Mermaid, KaTeX, Monaco, D2, Infographic
 - **Worker parity**: same Katex/Mermaid worker setup as Vue/React

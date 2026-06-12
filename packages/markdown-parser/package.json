@@ -3,7 +3,7 @@
   "type": "module",
   "version": "1.0.5",
   "packageManager": "pnpm@10.33.4",
-  "description": "Pure markdown parser and renderer utilities with streaming support - framework agnostic",
+  "description": "Framework-agnostic streaming Markdown parser that outputs structured nodes for Markstream renderers and custom render pipelines.",
   "author": "Simon He",
   "license": "MIT",
   "homepage": "https://github.com/Simon-He95/markstream-vue/tree/main/packages/markdown-parser",
@@ -19,14 +19,15 @@
     "markdown",
     "markdown-it",
     "markdown-it-ts",
-    "parser",
     "markdown-parser",
-    "markdown-renderer",
-    "ast",
+    "streaming-markdown",
     "markdown-ast",
-    "streaming",
-    "progressive",
-    "framework-agnostic"
+    "ast",
+    "parser",
+    "framework-agnostic",
+    "llm",
+    "ai-chat",
+    "markstream"
   ],
   "exports": {
     ".": {

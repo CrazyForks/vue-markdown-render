@@ -32,9 +32,11 @@ markstream-react supports various features through optional peer dependencies. I
 | D2 Diagrams | `@terrastruct/d2` | `pnpm add @terrastruct/d2` |
 | Math Rendering (KaTeX) | `katex` | `pnpm add katex` |
 
-## Optional: off-thread workers (Mermaid / KaTeX)
+## Optional: off-thread workers in Vite / Vite-compatible bundlers
 
-Mermaid/KaTeX auto-load when installed. If you want off‑thread parsing/rendering, inject the workers:
+Mermaid/KaTeX auto-load when installed. The `?worker` import syntax is for Vite-compatible bundlers. In Next.js, use the [Next.js SSR guide](/frameworks/next) and keep browser-only worker setup behind client boundaries.
+
+If you want off-thread parsing/rendering in Vite-compatible apps, inject the workers:
 
 ```tsx
 import { setKaTeXWorker, setMermaidWorker } from 'markstream-react'

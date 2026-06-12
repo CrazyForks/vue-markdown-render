@@ -12,8 +12,8 @@ Cross-renderer comparison results are not published yet.
 
 | Package | Framework | Notes |
 | --- | --- | --- |
-| markstream-vue | Vue 3 | content mode / nodes mode |
-| markstream-react | React | content mode / nodes mode |
+| markstream-vue | Vue 3 | content input path / nodes input path |
+| markstream-react | React | content input path / nodes input path |
 | react-markdown | React | static baseline |
 | streamdown | React | streaming-focused baseline |
 | markdown-it | parser | parser-only baseline |

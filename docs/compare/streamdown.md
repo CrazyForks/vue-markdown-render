@@ -6,7 +6,7 @@ description: Compare markstream-react and Streamdown for streaming AI Markdown i
 
 Both `markstream-react` and [Streamdown](https://streamdown.ai) are designed for streaming Markdown in React. They target different trade-offs.
 
-> **Note:** Feature comparisons are based on Streamdown documentation as of the time of writing. Check [Streamdown's official docs](https://streamdown.ai) for the latest capabilities.
+> Last verified: 2026-06-12. Competitor capabilities may change. This page focuses on architecture and documented behavior rather than claiming permanent feature gaps. Check [Streamdown's official docs](https://streamdown.ai) for the latest capabilities.
 
 ## Quick comparison
 

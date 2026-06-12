@@ -111,7 +111,7 @@ ws.onmessage = (event) => {
 }
 ```
 
-### 2. Use nodes mode for high-frequency streams
+### 2. Use the nodes path for high-frequency streams
 
 ```tsx
 import MarkdownRender from 'markstream-react'

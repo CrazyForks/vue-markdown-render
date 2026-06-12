@@ -6,6 +6,8 @@ description: Compare Markstream with marked and markdown-it for streaming AI Mar
 
 `marked` and `markdown-it` are excellent Markdown parsers. Markstream is a streaming Markdown **renderer** that uses `markdown-it-ts` internally. They serve different purposes.
 
+> Last verified: 2026-06-12. Competitor capabilities may change. This page focuses on architecture and documented behavior rather than claiming permanent feature gaps.
+
 ## Summary
 
 Use `marked` or `markdown-it` when:

@@ -32,9 +32,11 @@ markstream-react 通过可选的对等依赖支持各种功能。只安装你需
 | D2 图表 | `@terrastruct/d2` | `pnpm add @terrastruct/d2` |
 | 数学公式渲染（KaTeX） | `katex` | `pnpm add katex` |
 
-## 可选：启用线程外 Worker（Mermaid / KaTeX）
+## 可选：在 Vite / Vite 兼容打包器中启用线程外 Worker
 
-安装后会自动加载 Mermaid/KaTeX。如需线程外解析/渲染，可在入口注入 Worker：
+安装后会自动加载 Mermaid/KaTeX。`?worker` import 语法适用于 Vite 兼容打包器。Next.js 项目请看 [Next.js SSR 指南](/zh/frameworks/next)，并把浏览器专属 worker 初始化放在 client boundary 后面。
+
+如果你在 Vite 兼容应用中需要线程外解析/渲染，可在入口注入 Worker：
 
 ```tsx
 import { setKaTeXWorker, setMermaidWorker } from 'markstream-react'

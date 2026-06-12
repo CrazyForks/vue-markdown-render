@@ -4,6 +4,8 @@ description: Compare markstream-vue and vue-stream-markdown for streaming Markdo
 ---
 # markstream-vue vs vue-stream-markdown
 
+> Last verified: 2026-06-12. Competitor capabilities may change. This page focuses on architecture and documented behavior rather than claiming permanent feature gaps.
+
 ## Summary
 
 Both render streaming Markdown in Vue 3. `vue-stream-markdown` focuses on the streaming experience. `markstream-vue` extends this with optional heavy blocks, virtualization, cross-framework parser sharing, and a safe HTML policy.
@@ -34,7 +36,7 @@ Use `markstream-vue` when:
 | --- | --- | --- |
 | Streaming content | ✅ | ✅ |
 | Incomplete Markdown | ✅ | ✅ |
-| `content` + `nodes` mode | ✅ both | content-focused |
+| `content` + `nodes` input paths | ✅ both | content-focused |
 | Progressive Mermaid | ✅ optional peer | ❌ |
 | KaTeX math | ✅ optional peer | ❌ |
 | Monaco code blocks | ✅ optional peer | ❌ |

@@ -15,7 +15,7 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 - Playground URL: https://markstream-vue.simonhe.me/
 - Peer dependencies: @antv/infographic, @terrastruct/d2, katex, mermaid, stream-markdown, stream-monaco, vue, vue-i18n
 - Keywords: markdown, markdown-renderer, streaming-markdown, ai-chat, llm, sse, websocket, vue, vue3, nuxt, vitepress, vue-markdown, mermaid, katex, shiki, monaco-editor, large-documents, safe-html, mobile-webview, markstream-vue, markstream
-- Key capabilities: content mode; nodes mode; safe HTML policy; progressive Mermaid; streaming code blocks with Monaco/Shiki; KaTeX math; virtualization for long documents; worker client subpaths; SSR imports; mobile px CSS; Tailwind support
+- Key capabilities: content input path; nodes input path; safe HTML policy; progressive Mermaid; streaming code blocks with Monaco/Shiki; KaTeX math; virtualization for long documents; worker client subpaths; SSR imports; mobile px CSS; Tailwind support
 - Known limitations: Vue package is the most mature path; optional peers are installed only when needed.
 
 ### markstream-react
@@ -29,7 +29,7 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 - Playground URL: https://markstream-react.pages.dev/
 - Peer dependencies: @antv/infographic, @terrastruct/d2, katex, mermaid, react, react-dom, stream-markdown, stream-monaco
 - Keywords: react, nextjs, remix, markdown, markdown-renderer, streaming-markdown, ai-chat, llm, sse, websocket, react-markdown, mermaid, katex, shiki, monaco-editor, large-documents, safe-html, markstream-react, markstream
-- Key capabilities: content mode; nodes mode; progressive Mermaid; streaming code blocks; KaTeX math; virtualization; worker support; Next.js SSR-safe entries
+- Key capabilities: content input path; nodes input path; progressive Mermaid; streaming code blocks; KaTeX math; virtualization; worker support; Next.js SSR-safe entries
 - Known limitations: Newer than the Vue package; API may evolve. Use /frameworks/next for SSR-first or server-only Next.js Markdown.
 
 ### markstream-svelte
@@ -43,7 +43,7 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 - Playground URL: https://markstream-svelte.pages.dev/
 - Peer dependencies: @antv/infographic, @terrastruct/d2, katex, mermaid, stream-monaco, svelte
 - Keywords: svelte, svelte5, sveltekit, markdown, markdown-renderer, svelte-markdown, streaming-markdown, ai-chat, llm, sse, websocket, mermaid, katex, monaco-editor, large-documents, custom-components, markstream-svelte, markstream
-- Key capabilities: Svelte 5 runes; content mode; nodes mode; worker parity with Vue/React; custom Svelte components in Markdown
+- Key capabilities: Svelte 5 runes; content input path; nodes input path; worker parity with Vue/React; custom Svelte components in Markdown
 - Known limitations: Requires Svelte 5; Svelte 4 is not supported. Beta API.
 
 ### markstream-angular
@@ -79,11 +79,11 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 - Version: 1.0.5
 - Maturity label: stable
 - Framework/runtime: Any JavaScript or TypeScript app
-- Description: Pure markdown parser and renderer utilities with streaming support - framework agnostic
+- Description: Framework-agnostic streaming Markdown parser that outputs structured nodes for Markstream renderers and custom render pipelines.
 - Homepage: https://github.com/Simon-He95/markstream-vue/tree/main/packages/markdown-parser
 - Docs URL: https://markstream-vue-docs.simonhe.me/guide/parser-api
 - Peer dependencies: none
-- Keywords: markdown, markdown-it, markdown-it-ts, parser, markdown-parser, markdown-renderer, ast, markdown-ast, streaming, progressive, framework-agnostic
+- Keywords: markdown, markdown-it, markdown-it-ts, markdown-parser, streaming-markdown, markdown-ast, ast, parser, framework-agnostic, llm, ai-chat, markstream
 - Key capabilities: markdown-it-ts based parser; parseMarkdownToStructure() typed node trees; streaming mid-state handling; getMarkdown() configured instances
 - Known limitations: Parser only; it does not render framework UI components.
 
@@ -104,8 +104,8 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 
 | Feature | markstream-vue | markstream-react | markstream-svelte | markstream-angular |
 | --- | --- | --- | --- | --- |
-| content mode | yes | yes | yes | yes |
-| nodes mode | yes | yes | yes | yes |
+| content input path | yes | yes | yes | yes |
+| nodes input path | yes | yes | yes | yes |
 | Progressive Mermaid | yes | yes | yes | yes |
 | KaTeX math | yes | yes | yes | yes |
 | Streaming code blocks | yes | yes | yes | yes |
@@ -128,7 +128,7 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 ### markstream-react vs Streamdown
 - Both are streaming-first React Markdown renderers.
 - Streamdown: React-focused, drop-in style for react-markdown users, with Mermaid, math/KaTeX, Shiki code, and CJK support through the Streamdown plugin ecosystem.
-- markstream-react: cross-framework parser sharing, progressive heavy-block rendering, nodes mode, and renderer-level long-document controls.
+- markstream-react: cross-framework parser sharing, progressive heavy-block rendering, pre-parsed nodes path, and renderer-level long-document controls.
 - See: https://markstream-vue-docs.simonhe.me/compare/streamdown
 
 ### Markstream vs marked / markdown-it

@@ -1,5 +1,5 @@
 ---
-description: Integrate markstream-vue into VitePress and docs sites with content mode, enhanceApp registration, trusted custom tags, and safe CSS ordering.
+description: Integrate markstream-vue into VitePress and docs sites with the content input path, enhanceApp registration, trusted custom tags, and safe CSS ordering.
 ---
 
 # Docs Site & VitePress

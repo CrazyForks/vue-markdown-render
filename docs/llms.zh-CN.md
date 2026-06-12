@@ -131,7 +131,7 @@
   - active smooth streaming 期间保持 `fade=false`；完整历史消息/静态内容再用 `fade=true`
   - 关闭虚拟化时再调整 batch（`renderBatchSize` / `renderBatchDelay`）
   - 保持重节点延迟（`viewportPriority`, `deferNodesUntilVisible`）
-- 最小追问： “你更新 `content/nodes` 的频率（每 token 还是每 chunk）？batch 参数是多少？”
+- 最小追问：“你更新 `content` 或 `nodes` 输入路径的频率（每 token 还是每 chunk）？batch 参数是多少？”
 - 文档：`docs/guide/ai-chat-streaming.md`, `docs/guide/performance.md`, `docs/guide/props.md`
 
 ### 长文档：性能/内存

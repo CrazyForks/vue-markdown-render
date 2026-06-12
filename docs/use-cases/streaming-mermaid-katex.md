@@ -40,8 +40,12 @@ setMermaidWorker(new MermaidWorker())
 <MarkdownRender
   :content="streamingContent"
   :final="isDone"
+  :is-dark="isDark"
   :mermaid-props="{
-    theme: isDark ? 'dark' : 'default',
+    renderDebounceMs: 180,
+    contentStableDelayMs: 500,
+    showHeader: true,
+    showFullscreenButton: true,
   }"
 />
 ```
@@ -83,6 +87,8 @@ Mermaid and KaTeX are CPU-intensive. Running them in Web Workers:
 Without workers, parsing a complex Mermaid diagram can block the UI for 50-200ms — noticeable during streaming.
 
 ## Framework-specific worker setup
+
+The `?worker` import examples below are for Vite-compatible bundlers. In Next.js, follow the [Next.js guide](/frameworks/next) and keep browser-only worker setup behind client boundaries.
 
 ### React
 

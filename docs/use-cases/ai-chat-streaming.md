@@ -10,7 +10,7 @@ When an LLM generates Markdown token-by-token, the content is **incomplete most 
 
 ## Key streaming patterns
 
-### 1. Raw content mode (simplest)
+### 1. Raw content path (simplest)
 
 Pass the accumulating Markdown string directly. Markstream handles the parsing and rendering.
 
@@ -31,7 +31,7 @@ function ChatMessage({ content, isDone }: { content: string, isDone: boolean }) 
 </template>
 ```
 
-### 2. Pre-parsed nodes mode (high-frequency)
+### 2. Pre-parsed nodes path (high-frequency)
 
 Parse outside the renderer when you want explicit control over parse frequency, batching, and parser instance reuse.
 
