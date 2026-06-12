@@ -30,4 +30,31 @@ console.log(1)
     expect(collect(nodes, 'reference').length).toBe(0)
     expect(textIncludes(nodes, '[14]')).toBe(true)
   })
+
+  it('keeps raw html tables out of structured markdown children', () => {
+    const markdown = `<table border="1" cellpadding="8" cellspacing="0">
+  <thead>
+    <tr>
+      <th>姓名</th>
+      <th>部门</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td rowspan="2">张三</td>
+      <td>技术部</td>
+    </tr>
+    <tr>
+      <td>前端重构</td>
+    </tr>
+  </tbody>
+</table>`
+
+    const nodes = parseMarkdownToStructure(markdown, md, { final: true }) as any[]
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0]?.type).toBe('html_block')
+    expect(nodes[0]?.tag).toBe('table')
+    expect(nodes[0]?.children).toBeUndefined()
+    expect(String(nodes[0]?.content ?? '')).toContain('rowspan="2"')
+  })
 })

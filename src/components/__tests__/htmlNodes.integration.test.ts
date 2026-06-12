@@ -654,6 +654,43 @@ describe('component Behavior', () => {
     expect(wrapper.text()).toContain('- alpha')
   })
 
+  it('renders raw html tables with row spans instead of markdown children', async () => {
+    const markdown = `<table border="1" cellpadding="8" cellspacing="0">
+  <thead>
+    <tr>
+      <th>姓名</th>
+      <th>部门</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td rowspan="2">张三</td>
+      <td>技术部</td>
+    </tr>
+    <tr>
+      <td>前端重构</td>
+    </tr>
+  </tbody>
+</table>`
+
+    const wrapper = mount(MarkdownRender, {
+      props: {
+        content: markdown,
+        final: true,
+        batchRendering: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    expect(wrapper.find('table').exists()).toBe(true)
+    expect(wrapper.find('td[rowspan="2"]').text()).toBe('张三')
+    expect(wrapper.findAll('pre')).toHaveLength(0)
+    expect(wrapper.text()).toContain('前端重构')
+  })
+
   it('renders details summary as the first direct child for issue #397 content', async () => {
     const markdown = `# Structural Stress
 
