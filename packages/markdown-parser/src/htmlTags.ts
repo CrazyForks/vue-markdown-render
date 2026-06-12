@@ -180,7 +180,14 @@ export const NON_STRUCTURING_HTML_TAG_NAMES = [
   'pre',
   'script',
   'style',
+  'table',
+  'tbody',
+  'td',
+  'tfoot',
+  'th',
+  'thead',
   'textarea',
+  'tr',
   'title',
 ] as const
 
