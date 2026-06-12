@@ -1365,8 +1365,13 @@ function getTolerantBoundaryCacheScanWindow(source: string, maxChars = MAX_TOLER
 
   let windowStart = value.length - maxChars
   const nextLineBreak = value.indexOf('\n', windowStart)
-  if (nextLineBreak !== -1)
-    windowStart = nextLineBreak + 1
+  if (nextLineBreak === -1) {
+    return {
+      source: '',
+      lineOffset: countLineBreaks(value),
+    }
+  }
+  windowStart = nextLineBreak + 1
 
   windowStart = findTolerantBoundaryProtectedContextStart(value, windowStart)
 

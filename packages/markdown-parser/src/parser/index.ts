@@ -404,6 +404,21 @@ function isPlainSentencePunctuationForTolerantBoundary(ch?: string) {
     || ch === '?'
     || ch === '。'
     || ch === '，'
+    || ch === '；'
+    || ch === '：'
+    || ch === '！'
+    || ch === '？'
+    || ch === '、'
+    || ch === ')'
+    || ch === ']'
+    || ch === '}'
+    || ch === '）'
+    || ch === '】'
+    || ch === '｝'
+    || ch === '"'
+    || ch === '\''
+    || ch === '”'
+    || ch === '’'
 }
 
 function isTolerantBoundaryHtmlNameChar(ch?: string) {
@@ -668,8 +683,13 @@ function appendedChunkMayTurnPendingTolerantBoundaryIntoPlainWord(previousSource
 
   const previousEndsLikeAtom = isTolerantBoundaryAsciiAlpha(previousLast)
     || isTolerantBoundaryAsciiDigit(previousLast)
-  const appendedContinuesWord = isTolerantBoundaryAsciiAlpha(previousLast)
+  const appendedContinuesWord = (
+    isTolerantBoundaryAsciiAlpha(previousLast)
+    && (isTolerantBoundaryAsciiAlpha(appendedFirst) || isTolerantBoundaryAsciiDigit(appendedFirst))
+  ) || (
+    isTolerantBoundaryAsciiDigit(previousLast)
     && isTolerantBoundaryAsciiAlpha(appendedFirst)
+  )
   const appendedEndsSentenceLikeProse = previousEndsLikeAtom
     && isPlainSentencePunctuationForTolerantBoundary(appendedFirst)
 
@@ -770,6 +790,13 @@ function mayContainTolerantBoundaryOpenerLineNearTail(source: string) {
     return false
 
   let lineStart = Math.max(0, value.length - TOLERANT_BOUNDARY_STREAM_LOOKBACK_CHARS)
+  if (lineStart > 0) {
+    const nextLineBreak = value.indexOf('\n', lineStart)
+    if (nextLineBreak === -1)
+      return false
+
+    lineStart = nextLineBreak + 1
+  }
 
   while (lineStart < value.length) {
     const newlineIndex = value.indexOf('\n', lineStart)

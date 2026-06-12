@@ -204,6 +204,112 @@ describe('math block same-line boundary regression', () => {
     expect(JSON.stringify(nodes)).toContain('without a formula')
   })
 
+  it('invalidates pending tolerant boundary when a single atom becomes closing-punctuation prose', () => {
+    for (const suffix of [')', '！']) {
+      const md = getMarkdown(`stream-math-boundary-pending-atom-to-closing-punctuation-reset-${suffix}`)
+      ;(md as any).stream.reset()
+      ;(md as any).stream.resetStats()
+
+      const stream = (md as any).stream
+      const originalReset = stream.reset.bind(stream)
+      let resetCount = 0
+
+      stream.reset = () => {
+        resetCount++
+        return originalReset()
+      }
+
+      let source = [
+        'Before display $$',
+        'x',
+      ].join('\n')
+
+      let nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(resetCount).toBe(1)
+      expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+      expect(collectByType(nodes, 'math_block')[0].loading).toBe(true)
+      expect(collectByType(nodes, 'math_block')[0].content).toBe('x')
+
+      source += suffix
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(resetCount).toBe(2)
+      expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+      expect(JSON.stringify(nodes)).toContain('Before display')
+      expect(JSON.stringify(nodes)).toContain(`x${suffix}`)
+
+      const stableSerialized = JSON.stringify(nodes)
+      for (let index = 0; index < 6; index++) {
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+
+        expect(JSON.stringify(nodes)).toBe(stableSerialized)
+        expect(resetCount).toBe(2)
+      }
+    }
+  })
+
+  it('invalidates pending tolerant boundary when a numeric atom becomes alphanumeric prose', () => {
+    const md = getMarkdown('stream-math-boundary-pending-digit-to-word-reset')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = [
+      'Before display $$',
+      '1',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+    expect(collectByType(nodes, 'math_block')[0].loading).toBe(true)
+    expect(collectByType(nodes, 'math_block')[0].content).toBe('1')
+
+    source += 'a'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(2)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(JSON.stringify(nodes)).toContain('Before display')
+    expect(JSON.stringify(nodes)).toContain('1a')
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 6; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+      expect(resetCount).toBe(2)
+    }
+  })
+
   it('does not enter a reset storm after pending tolerant boundary is invalidated into prose', () => {
     const md = getMarkdown('stream-math-boundary-pending-prose-no-reset-storm')
     ;(md as any).stream.reset()
@@ -1207,6 +1313,84 @@ describe('math block same-line boundary regression', () => {
     expect(collectByType(nodes, 'code_block')).toHaveLength(1)
     expect(stableSerialized).toContain('where this must stay fenced code')
     expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('x')
+  })
+
+  it('keeps tolerant same-line display repair stable inside list items while streaming', () => {
+    const md = getMarkdown('stream-math-boundary-list-item-stability')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    const partial = [
+      '- Before display $$',
+      '  a = 1',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(partial, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    let mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(true)
+    expect(mathBlocks[0].content).toContain('a = 1')
+
+    const complete = [
+      partial,
+      '  $$ after $a$.',
+    ].join('\n')
+
+    nodes = parseMarkdownToStructure(complete, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(2)
+    mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(false)
+    expect(mathBlocks[0].content).toContain('a = 1')
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('a')
+    expect(JSON.stringify(nodes)).toContain('Before display')
+    expect(JSON.stringify(nodes)).toContain('after')
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 8; index++) {
+      nodes = parseMarkdownToStructure(complete, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+      expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+      expect(resetCount).toBe(2)
+    }
+  })
+
+  it('does not create an active tolerant boundary key from a very long partial physical line', () => {
+    const longSingleLine = `${'plain text '.repeat(4000)}$$`
+
+    expect(getActiveTolerantMathBlockBoundaryCacheKey(longSingleLine)).toBe(null)
+    expect(mayContainPendingTolerantMathBlockBoundaryCandidate(longSingleLine)).toBe(false)
+
+    const md = getMarkdown('stream-math-boundary-long-single-line-tail')
+    const nodes = parseMarkdownToStructure(longSingleLine, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(JSON.stringify(nodes)).toContain('plain text')
   })
 
   it('does not duplicate or leave loading math_block when issue-492 tolerant boundary closes during streaming', () => {
