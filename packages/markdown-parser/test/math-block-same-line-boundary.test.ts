@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { getMarkdown, parseMarkdownToStructure } from '../src'
-import { getTolerantMathBlockBoundaryStreamKey } from '../src/plugins/math'
+import {
+  getTolerantMathBlockBoundaryStreamKey,
+  mayContainTolerantMathBlockBoundaryOpener,
+} from '../src/plugins/math'
 
 function collectByType(nodes: any, type: string, out: any[] = [], seen = new WeakSet<object>()) {
   if (!nodes)
@@ -266,5 +269,198 @@ $$ where $\\epsilon$ denotes the target accuracy, $n$ is the number of nodes, an
     expect(resetCount).toBe(0)
     expect(collectByType(nodes, 'math_block')).toHaveLength(0)
     expect(collectByType(nodes, 'math_inline').length).toBeGreaterThan(600)
+  })
+
+  it('marks a cached tolerant opener line as pending candidate before math content arrives', () => {
+    expect(mayContainTolerantMathBlockBoundaryOpener('Before display $$')).toBe(true)
+    expect(mayContainTolerantMathBlockBoundaryOpener('Before display $$\n')).toBe(true)
+    expect(mayContainTolerantMathBlockBoundaryOpener('Before display \\[')).toBe(true)
+
+    // Same-line inline display math ends with "$$", but the last "$$" is a close,
+    // not a tolerant opener.
+    expect(mayContainTolerantMathBlockBoundaryOpener('Inline display $$E=mc^2$$')).toBe(false)
+
+    // Escaped/code-span tails must not enter the tolerant path.
+    expect(mayContainTolerantMathBlockBoundaryOpener('Escaped marker \\$$')).toBe(false)
+    expect(mayContainTolerantMathBlockBoundaryOpener('Code marker `literal $$`')).toBe(false)
+  })
+
+  it('resets when math content arrives after a previously cached tolerant opener line', () => {
+    const md = getMarkdown('stream-cached-opener-then-math-content-reset')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats?.()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = 'Before $a$ display $'
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+
+    source += '$'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+
+    source += '\n'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+
+    source += '\\widetilde{\\mathcal O}(a+b)'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+    ])
+
+    let mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(true)
+    expect(mathBlocks[0].content).toContain('widetilde')
+
+    let paragraphs = nodes.filter((node: any) => node.type === 'paragraph')
+    expect(paragraphs).toHaveLength(1)
+    expect(paragraphs[0].raw).toContain('Before $a$ display')
+
+    source += '\n$'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(true)
+
+    source += '$ where $b$ follows.'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(2)
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(false)
+    expect(mathBlocks[0].content).toContain('widetilde')
+    expect(mathBlocks[0].content).not.toContain('where')
+
+    const inlineMath = collectByType(nodes, 'math_inline').map((node: any) => node.content)
+    expect(inlineMath).toEqual(['a', 'b'])
+
+    paragraphs = nodes.filter((node: any) => node.type === 'paragraph')
+    expect(paragraphs).toHaveLength(2)
+    expect(paragraphs[0].raw).toContain('Before $a$ display')
+    expect(paragraphs[1].raw).toContain('where $b$ follows.')
+
+    const completedSerialized = JSON.stringify(nodes)
+
+    for (let index = 0; index < 10; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(nodes)).toBe(completedSerialized)
+      expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+      expect(collectByType(nodes, 'math_block')[0].loading).toBe(false)
+      expect(resetCount).toBe(2)
+    }
+  })
+
+  it('does not duplicate issue-492 content or leave math loading during streaming', () => {
+    const md = getMarkdown('stream-issue-492-no-duplicate-no-loading')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats?.()
+
+    const chunks = [
+      'Decentralized stochastic optimization is a fundamental paradigm for large-scale learning over networks, where agents communicate only with their neighbors and no central coordinator is required. For strongly convex problems, communication efficiency is mainly determined by the condition number $\\kappa=L/\\mu$ and the network spectral gap $1-\\beta$. Although deterministic decentralized methods can simultaneously achieve accelerated $\\sqrt{\\kappa}$ and $1/\\sqrt{1-\\beta}$ dependences, no existing stochastic method attains both improvements at once. In this paper, we propose *Multi-Gossip Accelerated DSGD* (MG-ADSGD), a decentralized stochastic algorithm that combines Nesterov-type primal--dual extrapolation with multi-round fast gossip averaging. The key idea is to couple the gossip depth with the mini-batch size so that additional communication rounds simultaneously improve consensus accuracy and reduce gradient variance. We show that MG-ADSGD achieves the communication complexity $$\n',
+      '\\widetilde{\\mathcal O}\\!\\left( \\frac{\\sigma^2}{\\mu n\\epsilon}\\log\\frac{1}{\\epsilon} + \\sqrt{\\frac{\\kappa}{1-\\beta}}\\log\\frac{1}{\\epsilon} \\right),\n',
+      '$',
+      '$ where $\\epsilon$ denotes the target accuracy, $n$ is the number of nodes, and $\\sigma^2$ is the gradient variance.',
+      ' To the best of our knowledge, this bound yields the best currently available communication complexity for decentralized stochastic strongly convex optimization, up to logarithmic factors that are independent of $\\epsilon$.',
+    ]
+
+    let source = ''
+    let nodes: any[] = []
+
+    for (const chunk of chunks) {
+      source += chunk
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+    }
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(false)
+    expect(mathBlocks[0].content).toContain('widetilde')
+    expect(mathBlocks[0].content).toContain('sigma')
+    expect(mathBlocks[0].content).not.toContain('where')
+
+    const serialized = JSON.stringify(nodes)
+    expect(serialized).toContain('target accuracy')
+    expect(serialized).toContain('best currently available communication complexity')
+
+    const paragraphs = nodes.filter((node: any) => node.type === 'paragraph')
+    expect(paragraphs).toHaveLength(2)
+    expect(paragraphs[0].raw.match(/Decentralized stochastic optimization/g)?.length).toBe(1)
+    expect(paragraphs[0].raw).toContain('achieves the communication complexity')
+    expect(paragraphs[1].raw).toContain('where $\\epsilon$ denotes the target accuracy')
+    expect(paragraphs[1].raw).toContain('best currently available communication complexity')
+
+    const inlineContent = collectByType(nodes, 'math_inline')
+      .map((node: any) => node.content)
+      .join('\n')
+
+    expect(inlineContent).toContain('kappa')
+    expect(inlineContent).toContain('epsilon')
+    expect(inlineContent).toContain('sigma')
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (let index = 0; index < 10; index++) {
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(JSON.stringify(nodes)).toBe(stableSerialized)
+      expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+      expect(collectByType(nodes, 'math_block')[0].loading).toBe(false)
+    }
   })
 })

@@ -466,6 +466,88 @@ function findUnescapedDelimiter(src: string, delimiter: string, startIdx = 0) {
   return -1
 }
 
+function countUnescapedDelimiter(
+  src: string,
+  delimiter: string,
+  startIdx = 0,
+  endIdx = src.length,
+  excludedRanges: Array<[number, number]> = [],
+) {
+  let count = 0
+  let searchPos = Math.max(0, startIdx)
+  const end = Math.min(src.length, Math.max(0, endIdx))
+
+  while (searchPos < end) {
+    const index = src.indexOf(delimiter, searchPos)
+    if (index === -1 || index >= end)
+      break
+
+    const excluded = findRangeAt(excludedRanges, index)
+    if (excluded) {
+      searchPos = Math.max(index + Math.max(1, delimiter.length), excluded[1])
+      continue
+    }
+
+    if (!isEscapedAt(src, index))
+      count++
+
+    searchPos = index + Math.max(1, delimiter.length)
+  }
+
+  return count
+}
+
+function getTolerantBoundaryLineEndOpenIndex(
+  line: string,
+  openDelim: string,
+  closeDelim: string,
+) {
+  const source = trimRightSpaceOrTab(String(line ?? ''))
+  if (!source.endsWith(openDelim))
+    return -1
+
+  const openIndex = source.length - openDelim.length
+  if (openIndex <= 0)
+    return -1
+
+  const prefix = trimRightSpaceOrTab(source.slice(0, openIndex))
+  if (!prefix.trim())
+    return -1
+
+  if (isEscapedAt(source, openIndex))
+    return -1
+
+  const codeSpanRanges = buildCodeSpanRanges(source)
+  if (findRangeAt(codeSpanRanges, openIndex))
+    return -1
+
+  const previousOpenCount = countUnescapedDelimiter(
+    source,
+    openDelim,
+    0,
+    openIndex,
+    codeSpanRanges,
+  )
+
+  if (openDelim === '$$') {
+    if (previousOpenCount % 2 === 1)
+      return -1
+  }
+  else {
+    const previousCloseCount = countUnescapedDelimiter(
+      source,
+      closeDelim,
+      0,
+      openIndex,
+      codeSpanRanges,
+    )
+    if (previousOpenCount > previousCloseCount)
+      return -1
+  }
+
+  return openIndex
+}
+
 function isSpaceOrTab(ch?: string) {
   return ch === ' ' || ch === '\t'
 }
@@ -638,6 +720,36 @@ function getTolerantBoundaryScanWindow(source: string) {
   }
 }
 
+export function mayContainTolerantMathBlockBoundaryOpener(markdown: string) {
+  const fullSource = String(markdown ?? '')
+  if (!fullSource || (!fullSource.includes('$$') && !fullSource.includes('\\[')))
+    return false
+
+  const { source } = getTolerantBoundaryScanWindow(fullSource)
+  if (!source)
+    return false
+
+  const lines = source.split(/\r?\n/)
+  const startLine = Math.max(0, lines.length - TOLERANT_BOUNDARY_SCAN_MAX_LINES - 2)
+  const delimiters: Array<[string, string]> = [['$$', '$$'], ['\\[', '\\]']]
+
+  for (let line = startLine; line < lines.length; line++) {
+    const openingLine = trimRightSpaceOrTab(lines[line])
+    if (!openingLine)
+      continue
+
+    if (isTolerantBoundaryStopLine(openingLine))
+      continue
+
+    for (const [openDelim, closeDelim] of delimiters) {
+      if (getTolerantBoundaryLineEndOpenIndex(openingLine, openDelim, closeDelim) !== -1)
+        return true
+    }
+  }
+
+  return false
+}
+
 export function getTolerantMathBlockBoundaryStreamKey(markdown: string) {
   const fullSource = String(markdown ?? '')
   if (!fullSource || (!fullSource.includes('$$') && !fullSource.includes('\\[')))
@@ -655,19 +767,12 @@ export function getTolerantMathBlockBoundaryStreamKey(markdown: string) {
     const openingLine = trimRightSpaceOrTab(lines[line])
 
     for (const [openDelim, closeDelim] of delimiters) {
-      if (!openingLine.endsWith(openDelim))
-        continue
-
-      const openIndex = openingLine.length - openDelim.length
-      const prefix = trimRightSpaceOrTab(openingLine.slice(0, openIndex))
-      if (!prefix.trim())
-        continue
-
-      if (isEscapedAt(openingLine, openIndex))
-        continue
-
-      const codeSpanRanges = buildCodeSpanRanges(openingLine)
-      if (findRangeAt(codeSpanRanges, openIndex))
+      const openIndex = getTolerantBoundaryLineEndOpenIndex(
+        openingLine,
+        openDelim,
+        closeDelim,
+      )
+      if (openIndex === -1)
         continue
 
       let content = ''
@@ -689,7 +794,10 @@ export function getTolerantMathBlockBoundaryStreamKey(markdown: string) {
             break
           }
 
-          const suffix = current.slice(closeIndex + closeDelim.length).trim() ? 'suffix' : 'nosuffix'
+          const suffix = current.slice(closeIndex + closeDelim.length)
+          const suffixKey = suffix.trim()
+            ? `suffix:${hashTolerantBoundaryContent(suffix)}`
+            : 'nosuffix'
           return [
             'closed',
             openDelim,
@@ -698,7 +806,7 @@ export function getTolerantMathBlockBoundaryStreamKey(markdown: string) {
             lineOffset + currentLine,
             closeIndex,
             hashTolerantBoundaryContent(nextContent),
-            suffix,
+            suffixKey,
           ].join(':')
         }
 
@@ -1421,18 +1529,11 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       // 这里可能 ai 返回的格式有问题：`$$` 跟在文本的最后，而不是单独一行。
       // 仅对 `$$` / 显式 `\[` 启用该容错；对普通 `[` 启用会误伤 JSON/数组/链接。
       else if ((open === '$$' || open === '\\[') && lineText.endsWith(open) && startLine + 1 < endLine) {
-        const openIndex = lineText.length - open.length
-        if (isEscapedAt(lineText, openIndex))
+        const openIndex = getTolerantBoundaryLineEndOpenIndex(lineText, open, close)
+        if (openIndex === -1)
           continue
 
         const prefix = trimRightSpaceOrTab(lineText.slice(0, openIndex))
-        if (!prefix.trim())
-          continue
-
-        const codeSpanRanges = buildCodeSpanRanges(lineText)
-        if (findRangeAt(codeSpanRanges, openIndex))
-          continue
-
         prefixBeforeOpen = prefix
         tolerantBoundary = true
 

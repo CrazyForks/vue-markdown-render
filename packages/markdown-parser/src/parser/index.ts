@@ -3,7 +3,11 @@ import type { HtmlBlockNode, InternalParseOptions, MarkdownToken, ParsedNode, Pa
 import { normalizeCustomHtmlTags } from '../customHtmlTags'
 import { NON_STRUCTURING_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
 import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes, parseTagAttrs } from '../htmlTagUtils'
-import { getTolerantMathBlockBoundaryStreamKey, hasMarkstreamMathPlugin } from '../plugins/math'
+import {
+  getTolerantMathBlockBoundaryStreamKey,
+  hasMarkstreamMathPlugin,
+  mayContainTolerantMathBlockBoundaryOpener,
+} from '../plugins/math'
 import { parseInlineTokens } from './inline-parsers'
 import { createLinkifyDemotionContextTracker } from './linkifyHeuristics'
 import { parseCommonBlockToken } from './node-parsers/block-token-parser'
@@ -25,6 +29,7 @@ const streamParseEnvCache = new WeakMap<object, Map<string, Record<string, unkno
 const tolerantMathBoundaryStreamCache = new WeakMap<object, {
   source: string
   key: string | null
+  pendingCandidate: boolean
 }>()
 
 const TOLERANT_BOUNDARY_SPLIT_OPENERS = ['$$', '\\[']
@@ -305,6 +310,18 @@ function clearTolerantMathBoundaryStreamCache(md: MarkdownIt) {
   tolerantMathBoundaryStreamCache.delete(md as unknown as object)
 }
 
+function setTolerantMathBoundaryStreamCache(
+  md: MarkdownIt,
+  source: string,
+  key: string | null,
+) {
+  tolerantMathBoundaryStreamCache.set(md as unknown as object, {
+    source,
+    key,
+    pendingCandidate: key === null && mayContainTolerantMathBlockBoundaryOpener(source),
+  })
+}
+
 function sourceEndsWithSplitTolerantBoundaryPrefix(source: string) {
   return source.endsWith('$') || source.endsWith('\\')
 }
@@ -357,6 +374,7 @@ function syncTolerantMathBoundaryStreamCache(md: MarkdownIt, source: string) {
 
     if (
       previous.key === null
+      && previous.pendingCandidate === false
       && !appendedChunkMayAffectTolerantMathBoundary(previous.source, appended)
       && !sourceEndsWithSplitTolerantBoundaryPrefix(source)
     ) {
@@ -373,10 +391,7 @@ function syncTolerantMathBoundaryStreamCache(md: MarkdownIt, source: string) {
   else if (!previous && nextKey)
     stream.reset()
 
-  tolerantMathBoundaryStreamCache.set(owner, {
-    source,
-    key: nextKey,
-  })
+  setTolerantMathBoundaryStreamCache(md, source, nextKey)
 }
 
 function shouldCloneTopLevelStreamTokens(options: ParseOptions) {
