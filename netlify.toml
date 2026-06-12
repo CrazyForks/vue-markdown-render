@@ -15,7 +15,7 @@ to = "https://markstream.simonhe.me/:splat"
 status = 301
 force = true
 
-# Deploy the playground in preview builds (optional) so authors can preview the demo app
+# Deploy previews should show the docs changes reviewed in PRs.
 [context.deploy-preview]
-command = "pnpm run play:build"
-publish = "playground/dist"
+command = "pnpm run build:parser && pnpm run build && pnpm docs:seo:check"
+publish = "docs/.vitepress/dist"

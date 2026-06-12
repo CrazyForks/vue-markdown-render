@@ -242,7 +242,7 @@
     "test:smoke:minimal": "node scripts/smoke-minimal-install.mjs",
     "test:smoke:pack": "node scripts/smoke-packed-package.mjs",
     "test:smoke:pack:optional": "MARKSTREAM_SMOKE_WITH_OPTIONAL_PEERS=1 node scripts/smoke-packed-package.mjs",
-    "test:smoke:react": "pnpm --filter markstream-react build && pnpm --filter markstream-react check:exports",
+    "test:smoke:react": "pnpm run build:parser && pnpm --filter markstream-react build && pnpm --filter markstream-react check:exports && node scripts/smoke-react-packed-package.mjs",
     "test:smoke:vue2-cjs": "pnpm run -C packages/markdown-parser build && pnpm run -C packages/markstream-core build && pnpm run -C packages/markstream-vue2 build && node scripts/smoke-vue2-cjs.cjs",
     "test:e2e:vue2-cli-smoke": "node scripts/e2e-vue2-cli-smoke.mjs",
     "test:e2e:math-streaming-stability": "node scripts/e2e-math-streaming-stability.mjs",
