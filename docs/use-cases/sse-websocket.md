@@ -10,7 +10,7 @@ SSE (Server-Sent Events) and WebSocket deliver text incrementally. When that tex
 
 - Handles **unclosed syntax** (code fences, math blocks, HTML tags)
 - **Minimizes DOM thrash** during high-frequency updates
-- **Doesn't re-parse the entire document** on every chunk
+- Lets you control parse frequency through batching and `nodes` mode
 - Supports **progressive heavy blocks** (Mermaid, KaTeX, code)
 
 ## SSE example (Vue 3)
@@ -114,12 +114,19 @@ ws.onmessage = (event) => {
 ### 2. Use nodes mode for high-frequency streams
 
 ```tsx
-// Parse once per batch, not per render
+import MarkdownRender from 'markstream-react'
+import { useMemo } from 'react'
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 
-const md = useMemo(() => getMarkdown(), [])
-const nodes = useMemo(() => parseMarkdownToStructure(content, md), [content])
-return <MarkdownRender nodes={nodes} final={isDone} />
+function StreamedMarkdown({ content, isDone }: { content: string, isDone: boolean }) {
+  const md = useMemo(() => getMarkdown('sse-message'), [])
+  const nodes = useMemo(
+    () => parseMarkdownToStructure(content, md, { final: isDone }),
+    [content, isDone, md],
+  )
+
+  return <MarkdownRender nodes={nodes} final={isDone} />
+}
 ```
 
 ### 3. Control pacing

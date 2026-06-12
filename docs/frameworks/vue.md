@@ -1,6 +1,17 @@
 ---
 title: 'Vue and Nuxt streaming Markdown renderer for AI chat'
 description: Use markstream-vue to render streamed Markdown in Vue 3, Nuxt, VitePress, SSE, WebSocket, AI chat UIs, mobile WebView, and long documents with optional Mermaid, KaTeX, Shiki, and Monaco.
+softwareName: markstream-vue
+softwarePackage: markstream-vue
+npmPackage: markstream-vue
+softwareFramework: Vue
+softwareProgrammingLanguage:
+  - TypeScript
+  - Vue
+softwareRuntimePlatform:
+  - Vue 3
+  - Nuxt
+  - VitePress
 ---
 # Vue and Nuxt streaming Markdown renderer for AI chat
 

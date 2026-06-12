@@ -20,10 +20,12 @@ import 'markstream-vue/index.px.css'
 
 This prevents the renderer's internal sizing from being affected by root font size changes.
 
-All framework packages support `px` CSS:
+Vue, React, and Svelte currently publish `index.px.css`:
 - `markstream-vue/index.px.css`
 - `markstream-react/index.px.css`
 - `markstream-svelte/index.px.css`
+
+Angular does not currently expose a `px` CSS build; use the default CSS and test font scaling manually.
 
 ## Framework setup for mobile
 

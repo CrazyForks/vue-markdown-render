@@ -98,13 +98,14 @@ All framework packages share the same core rendering model, but the entry pages 
 
 | Framework | Best first page | Use when | Demo |
 | --- | --- | --- | --- |
-| Vue 3 (`markstream-vue`) | [Guide Home](/guide/) | You want the main, most fully documented integration path | [Live demo](https://markstream-vue.simonhe.me/) |
+| Vue 3 (`markstream-vue`) | [Vue streaming Markdown renderer](/frameworks/vue) | You want the main, most fully documented integration path | [Live demo](https://markstream-vue.simonhe.me/) |
 | VitePress docs site | [Docs Site & VitePress](/guide/vitepress-docs-integration) | You are embedding renderer output into documentation pages or a content-driven site | [Live demo](https://markstream-vue.simonhe.me/) |
-| Nuxt | [Nuxt SSR](/nuxt-ssr) | You need client-only guards, SSR notes, or worker setup | [Live demo](https://markstream-nuxt.pages.dev/) |
+| Nuxt | [Nuxt streaming Markdown renderer](/frameworks/nuxt) | You need SSR-first Markdown, client-only peer notes, or worker setup | [Live demo](https://markstream-nuxt.pages.dev/) |
 | Vue 2 (`markstream-vue2`) | [Vue 2 Quick Start](/guide/vue2-quick-start) | You are on Vue 2.6 / 2.7 and need the compatible package | [Live demo](https://markstream-vue2.pages.dev/) |
-| React (`markstream-react`) | [React Quick Start](/guide/react-quick-start) | You are adopting React directly or migrating from `react-markdown` | [Live demo](https://markstream-react.pages.dev/) |
-| Angular (`markstream-angular`) | [Angular Quick Start](/guide/angular-quick-start) | You are using standalone Angular components | [Live demo](https://markstream-angular.pages.dev/) |
-| Svelte (`markstream-svelte`) | [Svelte Quick Start](/guide/svelte) | You are using Svelte 5 and need the same renderer API and worker paths | [Live demo](https://markstream-svelte.pages.dev/) |
+| React (`markstream-react`) | [React streaming Markdown renderer](/frameworks/react) | You are adopting React directly or migrating from `react-markdown` | [Live demo](https://markstream-react.pages.dev/) |
+| Next.js | [Next.js streaming Markdown renderer](/frameworks/next) | You need App Router, Pages Router, SSR-first, or server-only rendering notes | [Live demo](https://markstream-react.pages.dev/) |
+| Angular (`markstream-angular`) | [Angular streaming Markdown renderer](/frameworks/angular) | You are using standalone Angular components | [Live demo](https://markstream-angular.pages.dev/) |
+| Svelte (`markstream-svelte`) | [Svelte streaming Markdown renderer](/frameworks/svelte) | You are using Svelte 5 and need the same renderer API and worker paths | [Live demo](https://markstream-svelte.pages.dev/) |
 
 ## Common Destinations
 

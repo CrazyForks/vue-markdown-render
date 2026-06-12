@@ -1,85 +1,111 @@
 ---
 title: 'Next.js streaming Markdown renderer for AI chat'
-description: Use markstream-react in Next.js App Router or Pages Router for AI chat streaming Markdown, SSE/WebSocket output, client-only peer guards, and SSR-safe rendering.
+description: Use markstream-react in Next.js App Router or Pages Router for AI chat streaming Markdown, SSE/WebSocket output, SSR-first rendering, and server-only Markdown rendering.
+softwareName: markstream-react
+softwarePackage: markstream-react
+npmPackage: markstream-react
+softwareFramework: Next.js
+softwareProgrammingLanguage:
+  - TypeScript
+  - React
+softwareRuntimePlatform:
+  - Next.js
+  - React
 ---
 # Next.js streaming Markdown renderer for AI chat
 
-`markstream-react` works with Next.js (App Router and Pages Router) for streaming Markdown in AI chat UIs, SSE/WebSocket output, and long documents. The key difference from pure React: browser-only optional peers (Mermaid, KaTeX, Monaco) must stay behind client boundaries.
+`markstream-react` works with Next.js App Router and Pages Router for AI chat UIs, SSE/WebSocket output, SSR-first pages, and server-only Markdown rendering. Choose the entrypoint based on where rendering happens.
 
 ## When to use markstream-react with Next.js
 
 Use `markstream-react` in Next.js when:
 
 - Your AI chat UI or streaming Markdown surface is in a Next.js app
-- You need SSR/SSG for the page shell but client-only rendering for optional peers
-- Web Workers (Mermaid/KaTeX) must work in the Next.js SSR context
-- You need `'use client'` directives for the renderer component
+- You want server HTML first and client enhancement after hydration
+- You need a pure server Markdown render path
+- You have live SSE/WebSocket content in a client component
+- Optional peers such as Mermaid, KaTeX, and Monaco need browser-only setup
 
-## Quick Start
+## Install
 
 ```bash
 pnpm add markstream-react
 ```
+
+Import styles once from your app shell:
+
+```tsx
+// app/layout.tsx or pages/_app.tsx
+import 'markstream-react/index.css'
+```
+
+## SSR-first render
+
+Use `markstream-react/next` when you want server HTML first and client enhancement after hydration.
+
+```tsx
+// app/page.tsx
+import MarkdownRender from 'markstream-react/next'
+
+const markdown = '# Hello Next.js'
+
+export default function Page() {
+  return <MarkdownRender content={markdown} final />
+}
+```
+
+## Pure server render
+
+Use `markstream-react/server` when you need server-only Markdown rendering.
+
+```tsx
+// app/server-preview/page.tsx
+import MarkdownRender from 'markstream-react/server'
+
+const markdown = '# Server-rendered Markdown'
+
+export default function Page() {
+  return <MarkdownRender content={markdown} final />
+}
+```
+
+## Client-only streaming surface
+
+Use the root `markstream-react` package inside a `'use client'` component for live SSE/WebSocket updates.
 
 ```tsx
 // app/components/ChatMessage.tsx
 'use client'
 
 import MarkdownRender from 'markstream-react'
-import 'markstream-react/index.css'
 
 export function ChatMessage({ content, isDone }: { content: string, isDone: boolean }) {
-  return (
-    <MarkdownRender
-      content={content}
-      final={isDone}
-      fade={false}
-    />
-  )
+  return <MarkdownRender content={content} final={isDone} fade={false} />
 }
 ```
 
-## Server Component pattern
-
-For Next.js App Router, keep `MarkdownRender` in a client component and pass content from server components:
+Server components can pass initial content into that client streaming surface:
 
 ```tsx
-// app/chat/page.tsx (Server Component)
+// app/chat/page.tsx
 import { ChatMessage } from './ChatMessage'
 
 export default async function ChatPage() {
-  // Fetch initial data server-side
+  const initialContent = '# Streaming starts here'
   return <ChatMessage content={initialContent} isDone={false} />
 }
 ```
 
-## Worker setup in Next.js
+## Optional peers and workers
 
-```tsx
-// app/components/MarkstreamProvider.tsx
-'use client'
-
-import { enableKatex, enableMermaid } from 'markstream-react'
-import { useEffect } from 'react'
-
-export function MarkstreamProvider({ children }: { children: React.ReactNode }) {
-  useEffect(() => {
-    import('markstream-react/workers/mermaidParser.worker?worker&inline').then(({ default: MermaidWorker }) => {
-      enableMermaid({ worker: new MermaidWorker() })
-    })
-    import('markstream-react/workers/katexRenderer.worker?worker&inline').then(({ default: KatexWorker }) => {
-      enableKatex({ worker: new KatexWorker() })
-    })
-  }, [])
-  return <>{children}</>
-}
-```
+Keep browser-only optional peers such as Mermaid, KaTeX, and Monaco in client components or client plugins. Use the [Next.js SSR guide](/guide/react-next-ssr) and [React installation guide](/guide/react-installation) for framework-specific setup instead of copying Vite worker import syntax into a Next.js page.
 
 ## Key considerations
 
-- **'use client'**: the renderer component must be a client component
-- **CSS order**: import `markstream-react/index.css` in your client component or layout
-- **Worker imports**: use dynamic `import()` or `?worker&inline` for worker setup
+- **SSR-first**: use `markstream-react/next` for server HTML plus client enhancement
+- **Server-only**: use `markstream-react/server` when no client component boundary is needed
+- **Live streaming**: use root `markstream-react` inside a `'use client'` component
+- **CSS order**: import `markstream-react/index.css` in your app layout or component entry
 - **Optional peers**: Mermaid, KaTeX, Monaco are optional — only install what your AI output needs
 
 ## Full guides

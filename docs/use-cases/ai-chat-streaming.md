@@ -33,18 +33,20 @@ function ChatMessage({ content, isDone }: { content: string, isDone: boolean }) 
 
 ### 2. Pre-parsed nodes mode (high-frequency)
 
-For high-frequency updates (every token / every few tokens), parse outside the component and pass `nodes` to avoid re-parsing on every render.
+Parse outside the renderer when you want explicit control over parse frequency, batching, and parser instance reuse.
 
 ```tsx
 import MarkdownRender from 'markstream-react'
 import { useMemo } from 'react'
-// React — parse once per batch, not per render
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 
-const md = getMarkdown()
-
 function ChatMessage({ content, isDone }: { content: string, isDone: boolean }) {
-  const nodes = useMemo(() => parseMarkdownToStructure(content, md), [content])
+  const md = useMemo(() => getMarkdown('chat-message'), [])
+  const nodes = useMemo(
+    () => parseMarkdownToStructure(content, md, { final: isDone }),
+    [content, isDone, md],
+  )
+
   return <MarkdownRender nodes={nodes} final={isDone} fade={false} />
 }
 ```

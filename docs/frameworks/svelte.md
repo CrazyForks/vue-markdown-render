@@ -1,6 +1,15 @@
 ---
 title: 'Svelte 5 streaming Markdown renderer for AI chat'
 description: Use markstream-svelte to render streamed Markdown in Svelte 5 AI chat, SSE, WebSocket, long documents, custom components, Mermaid, KaTeX, Shiki, and Monaco.
+softwareName: markstream-svelte
+softwarePackage: markstream-svelte
+npmPackage: markstream-svelte
+softwareFramework: Svelte
+softwareProgrammingLanguage:
+  - TypeScript
+  - Svelte
+softwareRuntimePlatform:
+  - Svelte 5
 ---
 # Svelte 5 streaming Markdown renderer for AI chat
 

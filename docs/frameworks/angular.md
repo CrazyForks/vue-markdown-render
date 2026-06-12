@@ -1,6 +1,16 @@
 ---
 title: 'Angular streaming Markdown renderer for AI chat'
 description: Use markstream-angular standalone component to render streamed Markdown in Angular AI chat, SSE, WebSocket, Mermaid, KaTeX, and long documents.
+softwareName: markstream-angular
+softwarePackage: markstream-angular
+npmPackage: markstream-angular
+softwareFramework: Angular
+softwareProgrammingLanguage:
+  - TypeScript
+  - Angular
+softwareRuntimePlatform:
+  - Angular
+  - Angular standalone components
 ---
 # Angular streaming Markdown renderer for AI chat
 

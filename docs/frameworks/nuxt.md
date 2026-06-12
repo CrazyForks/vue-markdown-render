@@ -1,38 +1,67 @@
 ---
 title: 'Nuxt streaming Markdown renderer for AI chat'
-description: Use markstream-vue in Nuxt 3 for AI chat streaming Markdown, SSE/WebSocket output, client-only peer guards, worker setup, and SSR-safe rendering.
+description: Use markstream-vue in Nuxt 3 for AI chat streaming Markdown, SSE/WebSocket output, SSR-first rendering, client-only peer setup, and worker setup.
+softwareName: markstream-vue
+softwarePackage: markstream-vue
+npmPackage: markstream-vue
+softwareFramework: Nuxt
+softwareProgrammingLanguage:
+  - TypeScript
+  - Vue
+softwareRuntimePlatform:
+  - Nuxt 3
+  - Vue 3
 ---
 # Nuxt streaming Markdown renderer for AI chat
 
-`markstream-vue` works with Nuxt 3 for streaming Markdown in AI chat UIs, SSE/WebSocket output, and long documents. The key difference from pure Vue: browser-only optional peers (Mermaid, KaTeX, Monaco) must stay behind client boundaries.
+`markstream-vue` works with Nuxt 3 for streaming Markdown in AI chat UIs, SSE/WebSocket output, SSR pages, and long documents. Standard Markdown can render during Nuxt SSR; browser-only optional peers upgrade after hydration.
 
 ## When to use markstream-vue with Nuxt
 
 Use `markstream-vue` in Nuxt when:
 
 - Your AI chat UI or streaming Markdown surface is in a Nuxt 3 app
-- You need SSR for the page shell but client-only rendering for optional peers
-- Web Workers (Mermaid/KaTeX) must work in SSR context
-- You need `ClientOnly` wrappers for heavy imports
+- You need SSR-first Markdown output for SEO or first paint
+- Browser-only optional peers need `.client` plugin setup
+- Web Workers for Mermaid or KaTeX need Nuxt/Vite configuration
+- Long AI responses need bounded live nodes
 
-## Quick Start
+## Install
 
 ```bash
 pnpm add markstream-vue
 ```
 
+## SSR-first default
+
+`markstream-vue` can render standard Markdown during Nuxt SSR. Heavy nodes such as Mermaid, D2, Infographic, Monaco-backed code blocks, and worker-backed enhancements upgrade after hydration.
+
 ```vue
 <!-- pages/index.vue -->
-<script setup>
+<script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
 import 'markstream-vue/index.css'
+
+const markdown = '# Hello Nuxt SSR'
 </script>
 
+<template>
+  <MarkdownRender :content="markdown" final />
+</template>
+```
+
+## When to use `<ClientOnly>`
+
+Use `<ClientOnly>` only when your surrounding page logic or optional peer setup is browser-only:
+
+```vue
 <template>
   <ClientOnly>
     <MarkdownRender
       mode="chat"
       :content="streamingContent"
       :final="isDone"
+      :fade="false"
     />
   </ClientOnly>
 </template>
@@ -56,9 +85,10 @@ export default defineNuxtPlugin(() => {
 
 ## Key considerations
 
-- **Client-only peers**: wrap `MarkdownRender` in `<ClientOnly>` or use `.client` plugins
+- **SSR-first rendering**: standard Markdown renders server-side
+- **Client-only peers**: use `.client` plugins or `<ClientOnly>` only when the surrounding logic is browser-only
 - **CSS order**: import `markstream-vue/index.css` after your reset/tailwind
-- **SSR rendering**: the component renders server-side but optional peers won't activate until hydration
+- **Hydration upgrades**: optional heavy peers activate after hydration
 - **Mobile px CSS**: use `markstream-vue/index.px.css` if your app scales root font size
 
 ## Full guide

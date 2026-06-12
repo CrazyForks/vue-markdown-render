@@ -77,14 +77,14 @@ For AI chat with potentially long responses, you can combine chat-mode pacing wi
 
 ## Performance benchmarks
 
+The numbers below are illustrative targets for planning. Run `pnpm benchmark:1.0` on your target devices before using performance numbers as release criteria, and use the [1.0 Benchmark Report](/guide/benchmark-1-0) for reproducible release-gate methodology.
+
 | Content size | Without virtualization | With virtualization |
 | --- | --- | --- |
 | 10 KB (short chat) | ~200 DOM nodes, smooth | ~200 DOM nodes, smooth |
 | 50 KB (long answer) | ~1000 DOM nodes, slight lag | ~300 live nodes, smooth |
 | 100 KB (reasoning) | ~2500 DOM nodes, noticeable lag | ~300 live nodes, smooth |
 | 1 MB (technical doc) | May freeze browser | ~500 live nodes, scrollable |
-
-Benchmarks measured on a MacBook Pro M1, Chrome 120. Your results may vary.
 
 ## When virtualization matters
 

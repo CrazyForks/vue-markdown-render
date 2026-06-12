@@ -10,7 +10,7 @@ Use `react-markdown` when:
 
 Use `markstream-react` when:
 - content streams from an LLM, SSE, or WebSocket
-- incomplete Markdown states must not flicker (unclosed fences, partial math)
+- incomplete Markdown states need stable mid-stream rendering
 - long responses or long transcripts matter
 - Mermaid/KaTeX/code blocks appear during streaming
 - you want Markstream's cross-framework parser behavior
@@ -20,7 +20,7 @@ Use `markstream-react` when:
 | | markstream-react | react-markdown |
 | --- | --- | --- |
 | Streaming-first | ✅ | ❌ |
-| Incomplete Markdown | ✅ handles unclosed fences | ⚠️ plugins may error or flicker on partial syntax |
+| Incomplete Markdown | Streaming-aware mid-state handling | General Markdown rendering; intermediate states may look unstable |
 | Progressive Mermaid | ✅ | ❌ |
 | Streaming code blocks | ✅ with diff tracking | ❌ |
 | KaTeX math during stream | ✅ | ⚠️ needs manual handling |
@@ -33,10 +33,10 @@ Use `markstream-react` when:
 
 ## Why streaming changes everything
 
-When `react-markdown` receives new content, it re-parses and re-renders the entire Markdown tree. For streaming AI output that updates 10-30 times per second, this causes:
+When `react-markdown` receives new content, it re-parses and re-renders the Markdown tree. For streaming AI output that updates 10-30 times per second, this can cause:
 
 - **Flicker**: complete re-renders break CSS transitions and cause visual jumps
-- **Plugin errors on incomplete syntax**: unclosed ` ``` ` fences, partial `$` math, half-written tables can cause plugin-level errors or flicker
+- **Unstable intermediate states**: unclosed fences, partial math, and half-written tables can require buffering, memoization, or plugin-specific handling
 - **Performance degradation**: per-token re-renders compound on long responses
 
 `markstream-react` is designed around these problems:
@@ -87,7 +87,7 @@ react-markdown is a great choice for:
 
 `react-markdown` is lighter for static use cases. `markstream-react` includes streaming-specific code (batch scheduler, mid-state parser, progressive renderers) that adds bundle weight. If you never stream content, that weight is unnecessary.
 
-However, for AI chat UIs and streaming surfaces, the streaming features replace what you would otherwise need to build yourself (debouncing, error boundaries for incomplete Markdown, progressive heavy block handling).
+However, for AI chat UIs and streaming surfaces, the streaming features replace what you would otherwise need to build yourself: batching, incomplete-state buffering, and progressive heavy block handling.
 
 ## Migration checklist
 

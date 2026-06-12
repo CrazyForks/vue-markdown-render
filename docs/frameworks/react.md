@@ -1,6 +1,17 @@
 ---
 title: 'React streaming Markdown renderer for AI chat'
 description: Use markstream-react to render token-by-token or chunked Markdown in React, Next.js, Remix, SSE, WebSocket, and AI chat UIs with optional Mermaid, KaTeX, Shiki, and Monaco.
+softwareName: markstream-react
+softwarePackage: markstream-react
+npmPackage: markstream-react
+softwareFramework: React
+softwareProgrammingLanguage:
+  - TypeScript
+  - React
+softwareRuntimePlatform:
+  - React
+  - Next.js
+  - Remix
 ---
 # React streaming Markdown renderer for AI chat
 
@@ -83,9 +94,9 @@ For SSR safety with optional peers, see the [React installation guide](/guide/re
 | | markstream-react | react-markdown | Streamdown |
 | --- | --- | --- | --- |
 | Streaming-first | ✅ | ❌ | ✅ |
-| Incomplete Markdown | ✅ handles unclosed fences | ❌ may error | ✅ |
-| Progressive Mermaid | ✅ | ❌ | ❌ |
-| Virtualized long docs | ✅ | ❌ | ❌ |
+| Incomplete Markdown | Streaming-aware mid-state handling | General renderer; intermediate states may look unstable | Streaming-optimized |
+| Mermaid | Built-in Markstream integration / optional peer | Via plugins | Via `@streamdown/mermaid` |
+| Virtualized long docs | Renderer-level live-node controls | App-level responsibility | App-level responsibility |
 | Cross-framework parser | ✅ | ❌ | ❌ |
 | Static Markdown | ✅ (overhead) | ✅ (best fit) | ✅ |
 

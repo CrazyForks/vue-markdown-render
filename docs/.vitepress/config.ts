@@ -101,6 +101,7 @@ const englishGuideSidebar = [
     text: 'Use Cases',
     collapsed: true,
     items: [
+      { text: 'Use Cases overview', link: '/use-cases/' },
       { text: 'AI Chat Streaming Markdown', link: '/use-cases/ai-chat-streaming' },
       { text: 'SSE & WebSocket Markdown', link: '/use-cases/sse-websocket' },
       { text: 'Mobile WebView', link: '/use-cases/mobile-webview' },
@@ -112,8 +113,10 @@ const englishGuideSidebar = [
     text: 'Frameworks & Migration',
     collapsed: true,
     items: [
-      { text: 'Vue & Nuxt (SEO landing)', link: '/frameworks/vue' },
-      { text: 'React & Next.js (SEO landing)', link: '/frameworks/react' },
+      { text: 'Vue (SEO landing)', link: '/frameworks/vue' },
+      { text: 'Nuxt (SEO landing)', link: '/frameworks/nuxt' },
+      { text: 'React (SEO landing)', link: '/frameworks/react' },
+      { text: 'Next.js (SEO landing)', link: '/frameworks/next' },
       { text: 'Svelte (SEO landing)', link: '/frameworks/svelte' },
       { text: 'Angular (SEO landing)', link: '/frameworks/angular' },
       { text: 'Nuxt SSR', link: '/nuxt-ssr' },
@@ -204,6 +207,25 @@ const chineseGuideSidebar = [
       { text: 'AntV Infographic', link: '/zh/guide/infographic' },
       { text: 'ECharts', link: '/zh/guide/echarts' },
       { text: 'Monaco', link: '/zh/guide/monaco' },
+    ],
+  },
+  {
+    text: '英文 SEO 入口',
+    collapsed: true,
+    items: [
+      { text: 'Vue（英文 SEO 入口）', link: '/frameworks/vue' },
+      { text: 'Nuxt（英文 SEO 入口）', link: '/frameworks/nuxt' },
+      { text: 'React（英文 SEO 入口）', link: '/frameworks/react' },
+      { text: 'Next.js（英文 SEO 入口）', link: '/frameworks/next' },
+      { text: 'Svelte（英文 SEO 入口）', link: '/frameworks/svelte' },
+      { text: 'Angular（英文 SEO 入口）', link: '/frameworks/angular' },
+      { text: 'AI 聊天流式 Markdown（英文 SEO 入口）', link: '/use-cases/ai-chat-streaming' },
+      { text: 'SSE 与 WebSocket（英文 SEO 入口）', link: '/use-cases/sse-websocket' },
+      { text: '移动 WebView（英文 SEO 入口）', link: '/use-cases/mobile-webview' },
+      { text: '长 AI 回复（英文 SEO 入口）', link: '/use-cases/long-ai-responses' },
+      { text: 'react-markdown 对比（英文 SEO 入口）', link: '/compare/react-markdown' },
+      { text: 'Streamdown 对比（英文 SEO 入口）', link: '/compare/streamdown' },
+      { text: 'marked / markdown-it 对比（英文 SEO 入口）', link: '/compare/marked-markdown-it' },
     ],
   },
   {
@@ -368,7 +390,9 @@ const docsPrimaryLandingPaths = new Set([
   '/compare/static-vs-streaming',
   '/use-cases/ai-chat-streaming',
   '/use-cases/sse-websocket',
+  '/use-cases/mobile-webview',
   '/use-cases/streaming-mermaid-katex',
+  '/use-cases/long-ai-responses',
   '/guide',
   '/guide/installation',
   '/guide/quick-start',
@@ -485,7 +509,14 @@ function createDocsBreadcrumbItems(path: string, title: string, isChinese: boole
   return items
 }
 
-function createDocsStructuredData(path: string, title: string, description: string, isChinese: boolean) {
+function frontmatterStringArray(value: unknown) {
+  if (Array.isArray(value))
+    return value.filter((item): item is string => typeof item === 'string' && item.length > 0)
+
+  return typeof value === 'string' && value.length > 0 ? [value] : []
+}
+
+function createDocsStructuredData(path: string, title: string, description: string, isChinese: boolean, frontmatter: Record<string, any>) {
   const graph: Record<string, any>[] = []
   const homePath = isChinese ? '/zh' : '/'
 
@@ -521,6 +552,30 @@ function createDocsStructuredData(path: string, title: string, description: stri
         docsSiteUrl,
         'https://markstream-vue.simonhe.me/',
       ],
+    })
+  }
+
+  if (typeof frontmatter.softwarePackage === 'string') {
+    const softwareName = typeof frontmatter.softwareName === 'string'
+      ? frontmatter.softwareName
+      : frontmatter.softwarePackage
+    const npmPackage = typeof frontmatter.npmPackage === 'string'
+      ? frontmatter.npmPackage
+      : frontmatter.softwarePackage
+    const programmingLanguage = frontmatterStringArray(frontmatter.softwareProgrammingLanguage)
+    const runtimePlatform = frontmatterStringArray(frontmatter.softwareRuntimePlatform)
+
+    graph.push({
+      '@type': 'SoftwareSourceCode',
+      'name': softwareName,
+      description,
+      'url': `${docsSiteUrl}${path}`,
+      'codeRepository': githubRepoUrl,
+      'license': 'https://opensource.org/licenses/MIT',
+      'applicationCategory': 'DeveloperApplication',
+      'programmingLanguage': programmingLanguage.length > 0 ? programmingLanguage : ['TypeScript'],
+      'runtimePlatform': runtimePlatform,
+      'sameAs': [`https://www.npmjs.com/package/${npmPackage}`],
     })
   }
 
@@ -695,6 +750,7 @@ export default defineConfig({
           frontmatter.title || ctx.pageData.title || ctx.title || 'Markstream',
           description,
           isChinese,
+          frontmatter,
         )
       : []
 
