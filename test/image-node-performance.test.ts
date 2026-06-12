@@ -29,6 +29,29 @@ describe('image node performance defaults', () => {
     expect(wrapper.get('img').classes()).not.toContain('transition-opacity')
   })
 
+  it('keeps the image size floor until the image actually loads', async () => {
+    const wrapper = mount(ImageNode, {
+      props: {
+        node: {
+          type: 'image',
+          src: 'https://example.com/badge.svg',
+          alt: 'Badge',
+          title: 'Badge',
+          raw: '![Badge](https://example.com/badge.svg)',
+        },
+      },
+    })
+
+    expect(wrapper.get('img').classes()).toContain('is-loaded')
+    expect(wrapper.get('img').classes()).not.toContain('is-loading')
+    expect(wrapper.get('img').classes()).not.toContain('has-natural-size')
+
+    await wrapper.get('img').trigger('load')
+    await nextTick()
+
+    expect(wrapper.get('img').classes()).toContain('has-natural-size')
+  })
+
   it('keeps the lower-priority async path for lazy images', () => {
     const wrapper = mount(ImageNode, {
       props: {
@@ -47,6 +70,7 @@ describe('image node performance defaults', () => {
     expect(wrapper.get('img').attributes('fetchpriority')).toBeUndefined()
     expect(wrapper.get('img').attributes('decoding')).toBe('async')
     expect(wrapper.get('img').classes()).toContain('is-loading')
+    expect(wrapper.get('img').classes()).not.toContain('has-natural-size')
   })
 
   it('reports image load lifecycle for virtual-scroll settling', async () => {

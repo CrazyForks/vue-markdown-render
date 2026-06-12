@@ -220,6 +220,7 @@ onBeforeUnmount(() => {
       :class="{
         'is-loading': !useEagerImagePath && !imageLoaded,
         'is-loaded': useEagerImagePath || imageLoaded,
+        'has-natural-size': imageLoaded,
         'cursor-pointer': imageLoaded,
       }"
       :loading="props.lazy ? 'lazy' : undefined"
@@ -295,6 +296,11 @@ onBeforeUnmount(() => {
 
 .image-node__img.is-loaded {
   opacity: 1;
+}
+
+.image-node__img.has-natural-size {
+  min-width: 0;
+  min-height: 0;
 }
 
 .image-placeholder {
