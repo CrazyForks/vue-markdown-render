@@ -82,6 +82,7 @@ export default defineConfig(({ mode }) => {
           index: resolve(__dirname, 'src/index.ts'),
           next: resolve(__dirname, 'src/next.ts'),
           server: resolve(__dirname, 'src/server.ts'),
+          styles: resolve(__dirname, 'src/tailwind-entry.ts'),
         },
         name,
         fileName: (_, entryName) => `${entryName}.js`,

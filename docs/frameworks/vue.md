@@ -12,6 +12,13 @@ softwareRuntimePlatform:
   - Vue 3
   - Nuxt
   - VitePress
+faq:
+  - question: Is Markstream only for Vue?
+    answer: No. Markstream includes Vue, React, Svelte, Angular, Vue 2, parser, and core packages, but markstream-vue is the most mature renderer.
+  - question: Should I use markstream-vue for short static Markdown?
+    answer: Use a simpler Markdown stack for short static Markdown. Use markstream-vue when streaming UX, incomplete Markdown states, long content, or heavy blocks matter.
+  - question: Does markstream-vue work with Nuxt SSR?
+    answer: Yes. Standard Markdown can render during Nuxt SSR, while browser-only optional peers upgrade after hydration.
 ---
 # Vue and Nuxt streaming Markdown renderer for AI chat
 

@@ -4,9 +4,9 @@ Need help with markstream-vue? Start here.
 
 ## Self-serve
 
-- Docs: https://markstream-vue-docs.simonhe.me/guide/
-- 中文文档: https://markstream-vue-docs.simonhe.me/zh/guide/
-- Troubleshooting: https://markstream-vue-docs.simonhe.me/guide/troubleshooting
+- Docs: https://markstream.simonhe.me/guide/
+- 中文文档: https://markstream.simonhe.me/zh/guide/
+- Troubleshooting: https://markstream.simonhe.me/guide/troubleshooting
 - Playground (interactive demo): https://markstream-vue.simonhe.me/
 - Test page (shareable repro): https://markstream-vue.simonhe.me/test
 

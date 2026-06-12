@@ -11,6 +11,13 @@ softwareProgrammingLanguage:
 softwareRuntimePlatform:
   - Nuxt
   - Vue 3
+faq:
+  - question: Nuxt 页面都需要包 ClientOnly 吗？
+    answer: 不需要。普通 Markdown 可以 SSR；只有浏览器专属的流式逻辑或可选 peer 初始化才需要 client boundary。
+  - question: markstream-vue 支持 Nuxt AI 聊天吗？
+    answer: 支持。在 client-side 流式区域传入 content、final 和流式渲染选项即可。
+  - question: Nuxt worker 初始化应该放在哪里？
+    answer: Mermaid 和 KaTeX worker 应放在 client plugin 或其它浏览器边界里配置。
 ---
 
 # Nuxt 流式 Markdown 渲染器

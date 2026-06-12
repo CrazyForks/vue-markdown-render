@@ -5,7 +5,7 @@
 Markstream 专为在用户眼前持续变化的 Markdown 场景而构建：LLM token 流、SSE/WebSocket 输出、AI 聊天消息、长文档、渐进式 Mermaid 图表、KaTeX 数学公式、流式代码块以及安全的组件化渲染。
 
 [![English](https://img.shields.io/badge/docs-English-blue)](README.md)
-[![Docs](https://img.shields.io/badge/docs-中文文档-blue)](https://markstream-vue-docs.simonhe.me/zh/guide/)
+[![Docs](https://img.shields.io/badge/docs-中文文档-blue)](https://markstream.simonhe.me/zh/guide/)
 [![Playground](https://img.shields.io/badge/playground-在线体验-34c759)](https://markstream-vue.simonhe.me/)
 [![Test page](https://img.shields.io/badge/test-可分享复现-0A84FF)](https://markstream-vue.simonhe.me/test)
 
@@ -31,16 +31,16 @@ Vue 包：
 
 ## 包矩阵
 
-如果你还在选择框架包，先看 [框架总览](https://markstream-vue-docs.simonhe.me/zh/frameworks/)。
+如果你还在选择框架包，先看 [框架总览](https://markstream.simonhe.me/zh/frameworks/)。
 
 | 包 | 框架 | 安装 | 文档 |
 | --- | --- | --- | --- |
-| `markstream-vue` | Vue 3 / Nuxt / VitePress | `pnpm add markstream-vue` | [框架总览](https://markstream-vue-docs.simonhe.me/zh/frameworks/) · [Vue 指南](https://markstream-vue-docs.simonhe.me/zh/frameworks/vue/) · [Nuxt 指南](https://markstream-vue-docs.simonhe.me/zh/frameworks/nuxt/) |
-| `markstream-react` | React / Next.js / Remix | `pnpm add markstream-react` | [React 指南](https://markstream-vue-docs.simonhe.me/zh/frameworks/react/) · [Next.js 指南](https://markstream-vue-docs.simonhe.me/zh/frameworks/next/) |
-| `markstream-svelte` | Svelte 5 | `pnpm add markstream-svelte svelte@^5` | [Svelte 指南](https://markstream-vue-docs.simonhe.me/zh/frameworks/svelte/) |
-| `markstream-angular` | Angular standalone | `pnpm add markstream-angular` | [Angular 指南](https://markstream-vue-docs.simonhe.me/zh/frameworks/angular/) |
-| `markstream-vue2` | Vue 2.6 / 2.7 | `pnpm add markstream-vue2` | [Vue 2 指南](https://markstream-vue-docs.simonhe.me/zh/guide/vue2-quick-start) |
-| `stream-markdown-parser` | 任意 JS/TS 应用 | `pnpm add stream-markdown-parser` | [解析器指南](https://markstream-vue-docs.simonhe.me/zh/guide/parser-api) |
+| `markstream-vue` | Vue 3 / Nuxt / VitePress | `pnpm add markstream-vue` | [框架总览](https://markstream.simonhe.me/zh/frameworks/) · [Vue 指南](https://markstream.simonhe.me/zh/frameworks/vue/) · [Nuxt 指南](https://markstream.simonhe.me/zh/frameworks/nuxt/) |
+| `markstream-react` | React / Next.js / Remix | `pnpm add markstream-react` | [React 指南](https://markstream.simonhe.me/zh/frameworks/react/) · [Next.js 指南](https://markstream.simonhe.me/zh/frameworks/next/) |
+| `markstream-svelte` | Svelte 5 | `pnpm add markstream-svelte svelte@^5` | [Svelte 指南](https://markstream.simonhe.me/zh/frameworks/svelte/) |
+| `markstream-angular` | Angular standalone | `pnpm add markstream-angular` | [Angular 指南](https://markstream.simonhe.me/zh/frameworks/angular/) |
+| `markstream-vue2` | Vue 2.6 / 2.7 | `pnpm add markstream-vue2` | [Vue 2 指南](https://markstream.simonhe.me/zh/guide/vue2-quick-start) |
+| `stream-markdown-parser` | 任意 JS/TS 应用 | `pnpm add stream-markdown-parser` | [解析器指南](https://markstream.simonhe.me/zh/guide/parser-api) |
 | `markstream-core` | 框架无关 | `pnpm add markstream-core` | [Core 包](./packages/markstream-core/README.md) |
 
 ### 我该用哪个包？
@@ -83,7 +83,7 @@ Vue 包：
 - [许可](#许可)
 
 > 📖 框架总览、详细文档、API、示例和高级用法：
-> https://markstream-vue-docs.simonhe.me/frameworks/
+> https://markstream.simonhe.me/frameworks/
 
 ## 速览
 
@@ -97,12 +97,12 @@ Vue 包：
 
 | 如果你现在想做的是... | 先看这里 | 然后看 |
 | --- | --- | --- |
-| 先把第一段渲染跑起来 | [框架总览](https://markstream-vue-docs.simonhe.me/zh/frameworks/) | [快速上手](#-快速上手) |
-| 接到文档站或 VitePress 主题里 | [文档站与 VitePress 集成](https://markstream-vue-docs.simonhe.me/zh/guide/vitepress-docs-integration) | [自定义标签与高级组件](https://markstream-vue-docs.simonhe.me/zh/guide/custom-components) |
-| 做 AI 聊天界面或 SSE 流式输出 | [AI 聊天与流式输出](https://markstream-vue-docs.simonhe.me/zh/guide/ai-chat-streaming) | [性能](https://markstream-vue-docs.simonhe.me/zh/guide/performance) |
-| 替换一个内置节点渲染器 | [覆盖内置组件](https://markstream-vue-docs.simonhe.me/zh/guide/component-overrides) | [渲染器与节点组件](https://markstream-vue-docs.simonhe.me/zh/guide/components) |
-| 增加 `thinking` 这类可信标签 | [自定义标签与高级组件](https://markstream-vue-docs.simonhe.me/zh/guide/custom-components) | [API 参考](https://markstream-vue-docs.simonhe.me/zh/guide/api) |
-| 接入坏了但还不知道原因 | [按症状排查](https://markstream-vue-docs.simonhe.me/zh/guide/troubleshooting-path) | [排查问题](https://markstream-vue-docs.simonhe.me/zh/guide/troubleshooting) |
+| 先把第一段渲染跑起来 | [框架总览](https://markstream.simonhe.me/zh/frameworks/) | [快速上手](#-快速上手) |
+| 接到文档站或 VitePress 主题里 | [文档站与 VitePress 集成](https://markstream.simonhe.me/zh/guide/vitepress-docs-integration) | [自定义标签与高级组件](https://markstream.simonhe.me/zh/guide/custom-components) |
+| 做 AI 聊天界面或 SSE 流式输出 | [AI 聊天与流式输出](https://markstream.simonhe.me/zh/guide/ai-chat-streaming) | [性能](https://markstream.simonhe.me/zh/guide/performance) |
+| 替换一个内置节点渲染器 | [覆盖内置组件](https://markstream.simonhe.me/zh/guide/component-overrides) | [渲染器与节点组件](https://markstream.simonhe.me/zh/guide/components) |
+| 增加 `thinking` 这类可信标签 | [自定义标签与高级组件](https://markstream.simonhe.me/zh/guide/custom-components) | [API 参考](https://markstream.simonhe.me/zh/guide/api) |
+| 接入坏了但还不知道原因 | [按症状排查](https://markstream.simonhe.me/zh/guide/troubleshooting-path) | [排查问题](https://markstream.simonhe.me/zh/guide/troubleshooting) |
 
 ## 🚀 立即试用
 
@@ -116,15 +116,15 @@ Vue 包：
 | Vue 2 | https://markstream-vue2.pages.dev/ |
 
 - Vue 3 交互测试页（可分享链接，便于复现）： https://markstream-vue.simonhe.me/test
-- 中文框架文档： https://markstream-vue-docs.simonhe.me/zh/frameworks/
-- Showcase： https://markstream-vue-docs.simonhe.me/zh/guide/showcase
+- 中文框架文档： https://markstream.simonhe.me/zh/frameworks/
+- Showcase： https://markstream.simonhe.me/zh/guide/showcase
 - 1.0 benchmark 报告：`pnpm benchmark:1.0`
-- LLM 推荐上下文（中文）： https://markstream-vue-docs.simonhe.me/llms.zh-CN.txt
-- 完整 LLM 推荐参考（中文）： https://markstream-vue-docs.simonhe.me/llms-full.zh-CN.txt
-- 仓库 agent 上下文（中文）： https://markstream-vue-docs.simonhe.me/llms.zh-CN
-- LLM 推荐上下文（英文）： https://markstream-vue-docs.simonhe.me/llms.txt
-- 完整 LLM 推荐参考（英文）： https://markstream-vue-docs.simonhe.me/llms-full.txt
-- 仓库 agent 上下文（英文）： https://markstream-vue-docs.simonhe.me/llms
+- LLM 推荐上下文（中文）： https://markstream.simonhe.me/llms.zh-CN.txt
+- 完整 LLM 推荐参考（中文）： https://markstream.simonhe.me/llms-full.zh-CN.txt
+- 仓库 agent 上下文（中文）： https://markstream.simonhe.me/llms.zh-CN
+- LLM 推荐上下文（英文）： https://markstream.simonhe.me/llms.txt
+- 完整 LLM 推荐参考（英文）： https://markstream.simonhe.me/llms-full.txt
+- 仓库 agent 上下文（英文）： https://markstream.simonhe.me/llms
 - Vue 3 StackBlitz 体验： https://stackblitz.com/github/Simon-He95/markstream-vue?file=playground/src/App.vue
 - 更新日志： [CHANGELOG.md](./CHANGELOG.md)
 - Discord： https://discord.gg/vkzdkjeRCW
@@ -206,7 +206,7 @@ export function Message({ content, isDone }: { content: string, isDone: boolean 
 }
 ```
 
-Next.js 的实时 SSE/WebSocket 区域用 root `markstream-react` 放在 `'use client'` 组件里；SSR-first 或 server-only Markdown 看 [Next.js 指南](https://markstream-vue-docs.simonhe.me/zh/frameworks/next/)。
+Next.js 的实时 SSE/WebSocket 区域用 root `markstream-react` 放在 `'use client'` 组件里；SSR-first 或 server-only Markdown 看 [Next.js 指南](https://markstream.simonhe.me/zh/frameworks/next/)。
 
 ### Svelte 5
 
@@ -641,7 +641,7 @@ setCustomComponents('docs', {
 ## 故障排查 & 常见问题
 
 详细故障排查与常见问题已迁移至文档站点：
-https://markstream-vue-docs.simonhe.me/zh/guide/troubleshooting
+https://markstream.simonhe.me/zh/guide/troubleshooting
 
 如需更多帮助，请到 GitHub Issues 创建问题：
 https://github.com/Simon-He95/markstream-vue/issues

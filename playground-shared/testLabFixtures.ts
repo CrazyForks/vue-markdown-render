@@ -172,7 +172,7 @@ export function ensureParity(name: string) {
   "description": "A Vue 3 component that renders Markdown string content as HTML, supporting custom components and advanced markdown features.",
   "author": "Simon He",
   "license": "MIT",
-  "homepage": "https://markstream-vue-docs.simonhe.me/guide/",
+  "homepage": "https://markstream.simonhe.me/guide/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Simon-He95/markstream-vue.git"

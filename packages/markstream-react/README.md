@@ -1,166 +1,196 @@
 # markstream-react
 
-React/Next.js renderer for streaming Markdown. It can render raw Markdown strings via `content` and can accept pre-parsed `nodes` for high-frequency token streams. This is the React counterpart to the Vue renderer that powers `markstream-vue`.
+React/Next.js streaming Markdown renderer for AI chat, SSE/WebSocket output, long AI responses, Mermaid, KaTeX, and code blocks.
 
-## Development
+`markstream-react` is the React renderer in the Markstream family. It renders raw Markdown strings with `content`, and it can also accept pre-parsed `nodes` when a worker or store already owns parsing.
 
-```bash
-pnpm --filter markstream-react dev
-```
-
-## Build
+## Install
 
 ```bash
-pnpm --filter markstream-react build
-pnpm --filter markstream-react build:analyze
-pnpm --filter markstream-react size:check
+pnpm add markstream-react
 ```
 
-## Usage
+Optional features are peer dependencies. Install only what your Markdown output needs.
+
+## Quick Start
+
+Import one Markstream CSS file explicitly. The JavaScript entry does not inject styles automatically.
 
 ```tsx
-import NodeRenderer from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 import 'markstream-react/index.css'
 
-export default function Article({ markdown }: { markdown: string }) {
-  return (
-    <NodeRenderer content={markdown} />
+export default function ChatMessage({
+  content,
+  isDone,
+}: {
+  content: string
+  isDone: boolean
+}) {
+  return <MarkdownRender content={content} final={isDone} fade={false} />
+}
+```
+
+Use `markstream-react/index.px.css` instead when your app scales the root font size on mobile and you want renderer sizing to stay pixel-based.
+
+## Streaming Example
+
+For most SSE/WebSocket chat surfaces, accumulate the Markdown string and pass `content` plus `final`:
+
+```tsx
+import MarkdownRender from 'markstream-react'
+import { useEffect, useState } from 'react'
+import 'markstream-react/index.css'
+
+export function ChatView() {
+  const [content, setContent] = useState('')
+  const [isDone, setIsDone] = useState(false)
+
+  useEffect(() => {
+    const eventSource = new EventSource('/api/chat/stream')
+    eventSource.onmessage = (event) => {
+      if (event.data === '[DONE]') {
+        setIsDone(true)
+        eventSource.close()
+        return
+      }
+
+      const data = JSON.parse(event.data) as { content?: string }
+      setContent(prev => prev + (data.content ?? ''))
+    }
+
+    return () => eventSource.close()
+  }, [])
+
+  return <MarkdownRender content={content} final={isDone} fade={false} />
+}
+```
+
+If parsing is already external, pass `nodes`. Use a per-message parser id so generated code-block DOM ids stay unique across chat lists.
+
+```tsx
+import MarkdownRender from 'markstream-react'
+import { useMemo } from 'react'
+import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+
+export function ParsedChatMessage({
+  messageId,
+  content,
+  isDone,
+}: {
+  messageId: string
+  content: string
+  isDone: boolean
+}) {
+  const md = useMemo(() => getMarkdown(`chat-${messageId}`), [messageId])
+  const nodes = useMemo(
+    () => parseMarkdownToStructure(content, md, { final: isDone }),
+    [content, isDone, md],
   )
+
+  return <MarkdownRender nodes={nodes} final={isDone} fade={false} />
 }
 ```
 
-If your app scales root font size on mobile (`html` / `body`), use `markstream-react/index.px.css` to prevent `rem`-based global scaling side effects.
+## Next.js SSR
 
-You can also pass a pre-parsed `nodes` array if you already have AST data.
-
-## Streaming best practices
-
-- For high-frequency SSE / token streaming, prefer parsing outside the component and pass `nodes` instead of reparsing the full `content` string every chunk.
-- Keep `viewportPriority` enabled unless you explicitly want eager rendering. Mermaid / Monaco / D2 blocks now stay idle while offscreen and resume when they approach the viewport.
+Import styles once from your app shell:
 
 ```tsx
-import NodeRenderer from 'markstream-react'
+// app/layout.tsx or pages/_app.tsx
+import 'markstream-react/index.css'
+```
 
-export default function StreamView({ nodes, final }: { nodes: any[], final: boolean }) {
-  return (
-    <NodeRenderer
-      nodes={nodes}
-      final={final}
-      viewportPriority
-      deferNodesUntilVisible
-    />
-  )
+Use the root package in client components for live SSE/WebSocket streams:
+
+```tsx
+'use client'
+
+import MarkdownRender from 'markstream-react'
+
+export function LiveMessage({ content, isDone }: { content: string, isDone: boolean }) {
+  return <MarkdownRender content={content} final={isDone} fade={false} />
 }
 ```
 
-## Heavy-node prop forwarding
-
-`NodeRenderer` can forward renderer-level props directly into Mermaid / D2 / Infographic blocks:
+Use `markstream-react/next` for SSR-first Markdown with client enhancement, or `markstream-react/server` for server-only rendering:
 
 ```tsx
-<NodeRenderer
-  content={markdown}
-  mermaidProps={{
-    showHeader: false,
-    renderDebounceMs: 180,
-    previewPollDelayMs: 500,
-  }}
-  d2Props={{ progressiveIntervalMs: 500 }}
-  infographicProps={{ showHeader: false }}
-/>
-```
+import MarkdownRender from 'markstream-react/next'
 
-Notes:
-- These props are forwarded to the built-in Mermaid / D2 / Infographic blocks and to custom `mermaid` / `d2` / `infographic` overrides registered with `setCustomComponents(...)`.
-- `viewportPriority` applies to those heavy nodes too, so offscreen graphs will not keep doing background work while the text stream is still updating.
-
-## Language-specific code block overrides
-
-You can register a custom component under a fenced language key without wrapping the generic `code_block` renderer:
-
-```tsx
-import type { NodeComponentProps } from 'markstream-react'
-import { setCustomComponents } from 'markstream-react'
-
-function EChartsBlockNode(props: NodeComponentProps<any>) {
-  return <div data-language={String(props.node?.language)}>{String(props.node?.code || '')}</div>
+export default function Page() {
+  return <MarkdownRender content="# Server HTML first" final />
 }
-
-setCustomComponents('docs', {
-  echarts: EChartsBlockNode,
-})
 ```
 
-Notes:
-- `echarts` only catches fences whose language is `echarts`.
-- Code block routing priority is exact language key -> built-in `mermaid` / `d2` / `infographic` routes -> `code_block`.
-- Custom `mermaid` / `d2` / `infographic` overrides keep their specialized top-level props; other custom language keys use the normal custom component contract (`node`, `ctx`, `renderNode`, and friends).
+## Optional Peers
 
-## Mermaid tuning
+| Feature | Package |
+| --- | --- |
+| Shiki code blocks | `stream-markdown` |
+| Monaco editor code blocks | `stream-monaco` |
+| Mermaid diagrams | `mermaid` |
+| KaTeX math | `katex` |
+| D2 diagrams | `@terrastruct/d2` |
+| Infographic blocks | `@antv/infographic` |
 
-Common `mermaidProps` keys for streaming scenarios:
-
-- `renderDebounceMs`: delay progressive work during rapid token bursts.
-- `contentStableDelayMs`: how long source mode waits before auto-switching back to preview when content stabilizes.
-- `previewPollDelayMs`: initial delay before preview polling tries to upgrade a partial preview into a full render.
-- `previewPollMaxDelayMs`: cap for preview polling backoff.
-- `previewPollMaxAttempts`: maximum retry count while the Mermaid source is still incomplete.
-
-## Bundle size notes
-
-- Optional peers are not bundled; install only what you use (`stream-monaco`, `stream-markdown`, `mermaid`, `katex`, etc.).
-- Infrequent language icons are split into an async chunk and loaded on demand.
-- To avoid first-hit fallback icons, preload once when the app is idle:
+KaTeX still needs its CSS in your app when math rendering is enabled:
 
 ```tsx
-import { preloadExtendedLanguageIcons } from 'markstream-react'
-
-if (typeof window !== 'undefined')
-  void preloadExtendedLanguageIcons()
+import 'katex/dist/katex.min.css'
 ```
 
 ## Tailwind
 
-- Non-Tailwind projects: keep importing `markstream-react/index.css` (includes precompiled utilities for the renderer).
-- Tailwind projects (avoid duplicate utilities): import `markstream-react/index.tailwind.css` and add `require('markstream-react/tailwind')` to your `tailwind.config.js` `content`.
+Non-Tailwind projects should import the precompiled CSS:
 
-## Custom components (e.g. `<thinking>`)
+```tsx
+import 'markstream-react/index.css'
+```
 
-Custom tag-like blocks are exposed as nodes with `type: 'thinking'` (the tag name, no angle brackets) when you register the tag in `customHtmlTags` or register a custom component mapping for it.
+Tailwind projects can import the Tailwind-ready CSS and include the extracted class list in `tailwind.config.js`:
+
+```tsx
+import 'markstream-react/index.tailwind.css'
+```
+
+```js
+module.exports = {
+  content: [
+    './src/**/*.{js,ts,jsx,tsx}',
+    require('markstream-react/tailwind'),
+  ],
+}
+```
+
+## Custom Components
+
+Register custom renderers with `setCustomComponents`. Custom tag-like blocks are exposed as nodes with `type` equal to the tag name when the parser is configured for that tag.
 
 ```tsx
 import type { NodeComponentProps } from 'markstream-react'
-import NodeRenderer, { setCustomComponents } from 'markstream-react'
+import MarkdownRender, { setCustomComponents } from 'markstream-react'
 
 function ThinkingNode(props: NodeComponentProps<{ type: 'thinking', content: string }>) {
-  const { node, ctx } = props
-  return (
-    <div className="thinking-node">
-      <div className="thinking-title">Thinking</div>
-      <NodeRenderer
-        content={node.content}
-        customId={ctx?.customId}
-        isDark={ctx?.isDark}
-        typewriter={false}
-        batchRendering={false}
-        deferNodesUntilVisible={false}
-        viewportPriority={false}
-        maxLiveNodes={0}
-      />
-    </div>
-  )
+  return <MarkdownRender content={props.node.content} fade={false} />
 }
 
 setCustomComponents('chat', { thinking: ThinkingNode })
 ```
 
-## Type exports
+## When Not to Use It
 
-`markstream-react` now exposes the core public types directly from the package root, including:
+Use `react-markdown`, `marked`, or `markdown-it` when you only render short static Markdown, need the smallest possible Markdown stack, or already have a complete remark/rehype pipeline and do not need streaming mid-state handling.
 
-- `NodeRendererProps`
-- `NodeComponentProps`
-- `RenderContext`
-- `RenderNodeFn`
-- `CustomComponentMap`
-- `CodeBlockMonacoOptions`
+## Type Exports
+
+The package root exports the public component and renderer types, including `NodeRendererProps`, `NodeComponentProps`, `RenderContext`, `RenderNodeFn`, `CustomComponentMap`, and code-block option types.
+
+## Development
+
+```bash
+pnpm --filter markstream-react dev
+pnpm --filter markstream-react build
+pnpm --filter markstream-react check:exports
+pnpm --filter markstream-react size:check
+```

@@ -40,8 +40,16 @@ import MarkdownRender from 'markstream-react'
 import { useMemo } from 'react'
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 
-function ChatMessage({ content, isDone }: { content: string, isDone: boolean }) {
-  const md = useMemo(() => getMarkdown('chat-message'), [])
+function ChatMessage({
+  messageId,
+  content,
+  isDone,
+}: {
+  messageId: string
+  content: string
+  isDone: boolean
+}) {
+  const md = useMemo(() => getMarkdown(`chat-message-${messageId}`), [messageId])
   const nodes = useMemo(
     () => parseMarkdownToStructure(content, md, { final: isDone }),
     [content, isDone, md],

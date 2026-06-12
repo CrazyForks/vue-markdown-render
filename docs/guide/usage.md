@@ -107,7 +107,8 @@ If you already parse in a worker/store and need full AST control, keep using `no
 ```ts twoslash
 import { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
 
-const md = getMarkdown('chat')
+declare const messageId: string
+const md = getMarkdown(`chat-${messageId}`)
 declare const source: string
 declare const isFinalChunk: boolean
 const nodes = parseMarkdownToStructure(source, md, { final: isFinalChunk })

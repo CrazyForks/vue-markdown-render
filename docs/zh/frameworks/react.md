@@ -12,6 +12,13 @@ softwareRuntimePlatform:
   - React
   - Next.js
   - Remix
+faq:
+  - question: Markstream 只是 Vue 库吗？
+    answer: 不是。markstream-react 是 Markstream 家族里的 React 渲染器，家族还包括 Vue、Svelte、Angular、Vue 2、parser 和 core 包。
+  - question: 应该用 markstream-react 还是 react-markdown？
+    answer: 短静态 Markdown 或已有 remark/rehype 链路可以继续评估 react-markdown；LLM 流式输出、未闭合 Markdown、长回答或重型块更适合 markstream-react。
+  - question: markstream-react 支持 Next.js SSR 吗？
+    answer: 支持。SSR-first 用 markstream-react/next，server-only 用 markstream-react/server，实时流式区域在 client component 中使用 root package。
 ---
 
 # React 流式 Markdown 渲染器

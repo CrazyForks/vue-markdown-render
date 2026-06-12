@@ -1,6 +1,13 @@
 ---
 title: Markstream 与 marked、markdown-it 对比
 description: 对比 Markstream、marked 和 markdown-it 在 AI 流式 Markdown、静态解析、HTML 输出、Mermaid、KaTeX 和框架组件渲染中的适用边界。
+faq:
+  - question: Markstream 能替代 marked 或 markdown-it 吗？
+    answer: 不是所有场景都应该替代。只需要 Markdown-to-HTML 时用 marked 或 markdown-it；需要框架组件和流式 UI 行为时用 Markstream。
+  - question: Markstream 使用 markdown-it 吗？
+    answer: Markstream 渲染器使用 stream-markdown-parser，它基于 markdown-it-ts 并增加流式中间态处理。
+  - question: 什么时候不应该用 Markstream？
+    answer: 只需要静态 HTML 输出、非 JavaScript 运行时，或首要目标是最小 Markdown parser 时，不应优先选 Markstream。
 ---
 
 # Markstream 与 marked、markdown-it 对比

@@ -18,23 +18,31 @@ SSE (Server-Sent Events) and WebSocket deliver text incrementally. When that tex
 ```vue
 <script setup lang="ts">
 import MarkdownRender from 'markstream-vue'
-import { ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import 'markstream-vue/index.css'
 
 const content = ref('')
 const isDone = ref(false)
 
-const eventSource = new EventSource('/api/chat/stream')
+let eventSource: EventSource | null = null
 
-eventSource.onmessage = (event) => {
-  if (event.data === '[DONE]') {
-    isDone.value = true
-    eventSource.close()
+onMounted(() => {
+  eventSource = new EventSource('/api/chat/stream')
+  eventSource.onmessage = (event) => {
+    if (event.data === '[DONE]') {
+      isDone.value = true
+      eventSource?.close()
+      return
+    }
+
+    const data = JSON.parse(event.data) as { content?: string }
+    content.value += data.content ?? ''
   }
-  else {
-    content.value += JSON.parse(event.data).content
-  }
-}
+})
+
+onBeforeUnmount(() => {
+  eventSource?.close()
+})
 </script>
 
 <template>
@@ -118,8 +126,16 @@ import MarkdownRender from 'markstream-react'
 import { useMemo } from 'react'
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 
-function StreamedMarkdown({ content, isDone }: { content: string, isDone: boolean }) {
-  const md = useMemo(() => getMarkdown('sse-message'), [])
+function StreamedMarkdown({
+  messageId,
+  content,
+  isDone,
+}: {
+  messageId: string
+  content: string
+  isDone: boolean
+}) {
+  const md = useMemo(() => getMarkdown(`sse-message-${messageId}`), [messageId])
   const nodes = useMemo(
     () => parseMarkdownToStructure(content, md, { final: isDone }),
     [content, isDone, md],

@@ -54,6 +54,8 @@ import 'markstream-react/index.css'
 import 'katex/dist/katex.min.css'
 ```
 
+`markstream-react` 不会从 JavaScript 入口自动注入渲染器样式。请在应用 shell 或组件入口显式导入一个 Markstream CSS 文件：`index.css`、`index.px.css` 或 `index.tailwind.css`。
+
 Monaco（`stream-monaco`）不需要单独导入 CSS。
 
 注意：`markstream-react/index.css` 的样式被限制在内部的 `.markstream-react` 容器下，以减少全局样式冲突。`MarkdownRender` 默认在该容器内渲染。如果你单独渲染节点组件，请用 `<div className="markstream-react">...</div>` 包裹它们。

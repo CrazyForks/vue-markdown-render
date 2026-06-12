@@ -10,6 +10,13 @@ softwareProgrammingLanguage:
   - Svelte
 softwareRuntimePlatform:
   - Svelte 5
+faq:
+  - question: Does markstream-svelte support Svelte 4?
+    answer: No. markstream-svelte requires Svelte 5.
+  - question: When should I use markstream-svelte?
+    answer: Use it for Svelte 5 AI chat, SSE/WebSocket output, long responses, custom Svelte components, or progressive Mermaid and KaTeX.
+  - question: Is markstream-svelte as mature as markstream-vue?
+    answer: No. markstream-svelte is beta and newer than the Vue renderer.
 ---
 # Svelte 5 streaming Markdown renderer for AI chat
 

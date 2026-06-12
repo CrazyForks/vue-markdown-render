@@ -5,7 +5,7 @@
 Markstream is built for Markdown that changes while users are watching it: LLM token streams, SSE/WebSocket output, AI chat messages, long documents, progressive Mermaid diagrams, KaTeX math, streaming code blocks, and safe component-based rendering.
 
 [![中文版](https://img.shields.io/badge/docs-中文文档-blue)](README.zh-CN.md)
-[![Docs](https://img.shields.io/badge/docs-vitepress-blue)](https://markstream-vue-docs.simonhe.me/)
+[![Docs](https://img.shields.io/badge/docs-vitepress-blue)](https://markstream.simonhe.me/)
 [![Playground](https://img.shields.io/badge/playground-live-34c759)](https://markstream-vue.simonhe.me/)
 [![Test page](https://img.shields.io/badge/test-shareable%20repro-0A84FF)](https://markstream-vue.simonhe.me/test)
 
@@ -31,16 +31,16 @@ Other packages:
 
 ## Packages
 
-Start with the [framework overview](https://markstream-vue-docs.simonhe.me/frameworks/) if you are choosing between packages.
+Start with the [framework overview](https://markstream.simonhe.me/frameworks/) if you are choosing between packages.
 
 | Package | Framework | Install | Docs |
 | --- | --- | --- | --- |
-| `markstream-vue` | Vue 3 / Nuxt / VitePress | `pnpm add markstream-vue` | [Framework overview](https://markstream-vue-docs.simonhe.me/frameworks/) · [Vue landing](https://markstream-vue-docs.simonhe.me/frameworks/vue/) · [Nuxt landing](https://markstream-vue-docs.simonhe.me/frameworks/nuxt/) |
-| `markstream-react` | React / Next.js / Remix | `pnpm add markstream-react` | [React landing](https://markstream-vue-docs.simonhe.me/frameworks/react/) · [Next.js landing](https://markstream-vue-docs.simonhe.me/frameworks/next/) |
-| `markstream-svelte` | Svelte 5 | `pnpm add markstream-svelte svelte@^5` | [Svelte landing](https://markstream-vue-docs.simonhe.me/frameworks/svelte/) · [Quick start](https://markstream-vue-docs.simonhe.me/guide/svelte) |
-| `markstream-angular` | Angular standalone | `pnpm add markstream-angular` | [Angular landing](https://markstream-vue-docs.simonhe.me/frameworks/angular/) · [Quick start](https://markstream-vue-docs.simonhe.me/guide/angular-quick-start) |
-| `markstream-vue2` | Vue 2.6 / 2.7 | `pnpm add markstream-vue2` | [Vue 2 guide](https://markstream-vue-docs.simonhe.me/guide/vue2-quick-start) |
-| `stream-markdown-parser` | Any JS/TS app | `pnpm add stream-markdown-parser` | [Parser guide](https://markstream-vue-docs.simonhe.me/guide/parser-api) |
+| `markstream-vue` | Vue 3 / Nuxt / VitePress | `pnpm add markstream-vue` | [Framework overview](https://markstream.simonhe.me/frameworks/) · [Vue landing](https://markstream.simonhe.me/frameworks/vue/) · [Nuxt landing](https://markstream.simonhe.me/frameworks/nuxt/) |
+| `markstream-react` | React / Next.js / Remix | `pnpm add markstream-react` | [React landing](https://markstream.simonhe.me/frameworks/react/) · [Next.js landing](https://markstream.simonhe.me/frameworks/next/) |
+| `markstream-svelte` | Svelte 5 | `pnpm add markstream-svelte svelte@^5` | [Svelte landing](https://markstream.simonhe.me/frameworks/svelte/) · [Quick start](https://markstream.simonhe.me/guide/svelte) |
+| `markstream-angular` | Angular standalone | `pnpm add markstream-angular` | [Angular landing](https://markstream.simonhe.me/frameworks/angular/) · [Quick start](https://markstream.simonhe.me/guide/angular-quick-start) |
+| `markstream-vue2` | Vue 2.6 / 2.7 | `pnpm add markstream-vue2` | [Vue 2 guide](https://markstream.simonhe.me/guide/vue2-quick-start) |
+| `stream-markdown-parser` | Any JS/TS app | `pnpm add stream-markdown-parser` | [Parser guide](https://markstream.simonhe.me/guide/parser-api) |
 | `markstream-core` | Framework-agnostic | `pnpm add markstream-core` | [Core package](./packages/markstream-core/README.md) |
 
 ### Which package should I use?
@@ -86,7 +86,7 @@ For the full release contract and Go / No-Go checklist, see [1.0 Release Readine
 - [Star History](#star-history)
 - [License](#license)
 
-> 📖 Framework overview, docs, API, and advanced usage: https://markstream-vue-docs.simonhe.me/frameworks/
+> 📖 Framework overview, docs, API, and advanced usage: https://markstream.simonhe.me/frameworks/
 
 ## TL;DR Highlights
 
@@ -100,12 +100,12 @@ For the full release contract and Go / No-Go checklist, see [1.0 Release Readine
 
 | If you want to... | Start here | Then go to |
 | --- | --- | --- |
-| get the first render on screen | [Framework overview](https://markstream-vue-docs.simonhe.me/frameworks/) | [Quick Starts](#-quick-starts) |
-| integrate it into a docs site or VitePress theme | [Docs Site & VitePress](https://markstream-vue-docs.simonhe.me/guide/vitepress-docs-integration) | [Custom Tags & Advanced Components](https://markstream-vue-docs.simonhe.me/guide/custom-components) |
-| build an AI chat UI or SSE stream | [AI Chat & Streaming](https://markstream-vue-docs.simonhe.me/guide/ai-chat-streaming) | [Performance](https://markstream-vue-docs.simonhe.me/guide/performance) |
-| replace one built-in renderer | [Override Built-in Components](https://markstream-vue-docs.simonhe.me/guide/component-overrides) | [Renderer & Node Components](https://markstream-vue-docs.simonhe.me/guide/components) |
-| add trusted tags such as `thinking` | [Custom Tags & Advanced Components](https://markstream-vue-docs.simonhe.me/guide/custom-components) | [API Reference](https://markstream-vue-docs.simonhe.me/guide/api) |
-| debug a broken integration but do not know why yet | [Troubleshooting by Symptom](https://markstream-vue-docs.simonhe.me/guide/troubleshooting-path) | [Troubleshooting](https://markstream-vue-docs.simonhe.me/guide/troubleshooting) |
+| get the first render on screen | [Framework overview](https://markstream.simonhe.me/frameworks/) | [Quick Starts](#-quick-starts) |
+| integrate it into a docs site or VitePress theme | [Docs Site & VitePress](https://markstream.simonhe.me/guide/vitepress-docs-integration) | [Custom Tags & Advanced Components](https://markstream.simonhe.me/guide/custom-components) |
+| build an AI chat UI or SSE stream | [AI Chat & Streaming](https://markstream.simonhe.me/guide/ai-chat-streaming) | [Performance](https://markstream.simonhe.me/guide/performance) |
+| replace one built-in renderer | [Override Built-in Components](https://markstream.simonhe.me/guide/component-overrides) | [Renderer & Node Components](https://markstream.simonhe.me/guide/components) |
+| add trusted tags such as `thinking` | [Custom Tags & Advanced Components](https://markstream.simonhe.me/guide/custom-components) | [API Reference](https://markstream.simonhe.me/guide/api) |
+| debug a broken integration but do not know why yet | [Troubleshooting by Symptom](https://markstream.simonhe.me/guide/troubleshooting-path) | [Troubleshooting](https://markstream.simonhe.me/guide/troubleshooting) |
 
 ## 🚀 Try It Now
 
@@ -119,15 +119,15 @@ For the full release contract and Go / No-Go checklist, see [1.0 Release Readine
 | Vue 2 | https://markstream-vue2.pages.dev/ |
 
 - Shareable Vue 3 test page: https://markstream-vue.simonhe.me/test
-- Framework docs: https://markstream-vue-docs.simonhe.me/frameworks/
-- Showcase: https://markstream-vue-docs.simonhe.me/guide/showcase
+- Framework docs: https://markstream.simonhe.me/frameworks/
+- Showcase: https://markstream.simonhe.me/guide/showcase
 - 1.0 benchmark report: run `pnpm benchmark:1.0`
-- LLM recommendation context: https://markstream-vue-docs.simonhe.me/llms.txt
-- Full LLM recommendation reference: https://markstream-vue-docs.simonhe.me/llms-full.txt
-- Repo-agent context: https://markstream-vue-docs.simonhe.me/llms
-- LLM recommendation context (中文): https://markstream-vue-docs.simonhe.me/llms.zh-CN.txt
-- Full LLM recommendation reference (中文): https://markstream-vue-docs.simonhe.me/llms-full.zh-CN.txt
-- Repo-agent context (中文): https://markstream-vue-docs.simonhe.me/llms.zh-CN
+- LLM recommendation context: https://markstream.simonhe.me/llms.txt
+- Full LLM recommendation reference: https://markstream.simonhe.me/llms-full.txt
+- Repo-agent context: https://markstream.simonhe.me/llms
+- LLM recommendation context (中文): https://markstream.simonhe.me/llms.zh-CN.txt
+- Full LLM recommendation reference (中文): https://markstream.simonhe.me/llms-full.zh-CN.txt
+- Repo-agent context (中文): https://markstream.simonhe.me/llms.zh-CN
 - Vue 3 StackBlitz demo: https://stackblitz.com/github/Simon-He95/markstream-vue?file=playground/src/App.vue
 - Changelog: [CHANGELOG.md](./CHANGELOG.md)
 - Discord: https://discord.gg/vkzdkjeRCW
@@ -209,7 +209,7 @@ export function Message({ content, isDone }: { content: string, isDone: boolean 
 }
 ```
 
-For live SSE/WebSocket surfaces in Next.js, use root `markstream-react` inside a `'use client'` component. For SSR-first or server-only Markdown, start from the [Next.js guide](https://markstream-vue-docs.simonhe.me/frameworks/next/).
+For live SSE/WebSocket surfaces in Next.js, use root `markstream-react` inside a `'use client'` component. For SSR-first or server-only Markdown, start from the [Next.js guide](https://markstream.simonhe.me/frameworks/next/).
 
 ### Svelte 5
 
@@ -607,7 +607,7 @@ Build something with markstream-vue? Open a PR to add it here (include a link + 
 
 - **FlowNote** — streaming Markdown note app demo (SSE + virtual window) — https://markstream-vue.simonhe.me/
 - **Diagnostic Studio** — shareable repro links, render-mode switching, diff/thinking/stress samples, annotations, PDF export — https://markstream-vue.simonhe.me/test
-- **1.0 Showcase guide** — launch-ready demo matrix for chat, long docs, code review, diagrams, custom components, and safe HTML — https://markstream-vue-docs.simonhe.me/guide/showcase
+- **1.0 Showcase guide** — launch-ready demo matrix for chat, long docs, code review, diagrams, custom components, and safe HTML — https://markstream.simonhe.me/guide/showcase
 
 ## 📺 Introduction Video
 
@@ -653,7 +653,7 @@ Watch on Bilibili: [Open in Bilibili](https://www.bilibili.com/video/BV17Z4qzpE9
 ## Troubleshooting & Common Issues
 
 Troubleshooting has moved into the docs:
-https://markstream-vue-docs.simonhe.me/guide/troubleshooting
+https://markstream.simonhe.me/guide/troubleshooting
 
 If you can't find a solution there, open a GitHub issue:
 https://github.com/Simon-He95/markstream-vue/issues

@@ -115,7 +115,8 @@ eventSource.addEventListener('done', () => {
 })
 
 // 只解析可见部分；最终解析等 caughtUp 后再触发
-const md = getMarkdown('chat')
+declare const messageId: string
+const md = getMarkdown(`chat-${messageId}`)
 const nodes = ref([])
 
 watch([stream.visible, stream.final], () => {

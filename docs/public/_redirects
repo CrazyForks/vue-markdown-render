@@ -3,3 +3,5 @@
 #
 # 根路径现在直接提供 docs landing page，
 # 不再重定向到 /guide/。
+
+https://markstream-vue-docs.simonhe.me/*  https://markstream.simonhe.me/:splat  301

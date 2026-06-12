@@ -54,6 +54,8 @@ import 'markstream-react/index.css'
 import 'katex/dist/katex.min.css'
 ```
 
+`markstream-react` does not inject renderer styles from its JavaScript entry. Import exactly one Markstream CSS file from your app shell or component entry: `index.css`, `index.px.css`, or `index.tailwind.css`.
+
 Monaco (`stream-monaco`) does not require a separate CSS import.
 
 Note: `markstream-react/index.css` is scoped under an internal `.markstream-react` container to reduce global style conflicts. `MarkdownRender` renders inside that container by default. If you render node components standalone, wrap them with `<div className="markstream-react">...</div>`.

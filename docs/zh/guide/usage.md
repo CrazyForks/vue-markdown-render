@@ -109,7 +109,8 @@ const oneShotNodes = parseMarkdownToStructure(source, md, { final: true })
 ```ts twoslash
 import { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
 
-const md = getMarkdown('chat-message')
+declare const messageId: string
+const md = getMarkdown(`chat-message-${messageId}`)
 declare const streamedText: string
 declare const final: boolean
 const nodes = parseMarkdownToStructure(streamedText, md, { final })

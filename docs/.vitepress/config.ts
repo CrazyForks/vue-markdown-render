@@ -523,9 +523,30 @@ function frontmatterStringArray(value: unknown) {
   return typeof value === 'string' && value.length > 0 ? [value] : []
 }
 
+function frontmatterFaqItems(value: unknown) {
+  if (!Array.isArray(value))
+    return []
+
+  return value
+    .map((item) => {
+      if (!item || typeof item !== 'object')
+        return null
+
+      const question = (item as Record<string, unknown>).question
+      const answer = (item as Record<string, unknown>).answer
+
+      if (typeof question !== 'string' || typeof answer !== 'string' || !question || !answer)
+        return null
+
+      return { question, answer }
+    })
+    .filter((item): item is { question: string, answer: string } => Boolean(item))
+}
+
 function createDocsStructuredData(path: string, title: string, description: string, isChinese: boolean, frontmatter: Record<string, any>) {
   const graph: Record<string, any>[] = []
   const homePath = isChinese ? '/zh' : '/'
+  const faqItems = frontmatterFaqItems(frontmatter.faq)
 
   if (path === homePath) {
     graph.push({
@@ -583,6 +604,42 @@ function createDocsStructuredData(path: string, title: string, description: stri
       'programmingLanguage': programmingLanguage.length > 0 ? programmingLanguage : ['TypeScript'],
       'runtimePlatform': runtimePlatform,
       'sameAs': [`https://www.npmjs.com/package/${npmPackage}`],
+    })
+  }
+
+  if (path.startsWith('/compare/') || path.startsWith('/zh/compare/')) {
+    graph.push({
+      '@type': 'Article',
+      'headline': title,
+      description,
+      'url': `${docsSiteUrl}${path}`,
+      'mainEntityOfPage': `${docsSiteUrl}${path}`,
+      'articleSection': isChinese ? 'Markdown 渲染器对比' : 'Markdown renderer comparison',
+      'inLanguage': isChinese ? 'zh-CN' : 'en-US',
+      'author': {
+        '@type': 'Organization',
+        'name': 'Markstream',
+        'url': githubRepoUrl,
+      },
+      'publisher': {
+        '@type': 'Organization',
+        'name': 'Markstream',
+        'url': githubRepoUrl,
+      },
+    })
+  }
+
+  if (faqItems.length > 0) {
+    graph.push({
+      '@type': 'FAQPage',
+      'mainEntity': faqItems.map(item => ({
+        '@type': 'Question',
+        'name': item.question,
+        'acceptedAnswer': {
+          '@type': 'Answer',
+          'text': item.answer,
+        },
+      })),
     })
   }
 

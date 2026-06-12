@@ -5,7 +5,7 @@
   "description": "Vue 2 Markdown renderer optimized for large documents with progressive Mermaid rendering, streaming diff code blocks, and fast real-time preview. Perfect for documentation sites, AI chat interfaces, and content management systems.",
   "author": "Simon He",
   "license": "MIT",
-  "homepage": "https://markstream-vue-docs.simonhe.me/guide/vue2-quick-start",
+  "homepage": "https://markstream.simonhe.me/guide/vue2-quick-start",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Simon-He95/markstream-vue.git",

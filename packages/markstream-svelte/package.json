@@ -5,7 +5,7 @@
   "description": "Svelte 5 streaming Markdown renderer for AI chat, SSE/WebSocket output, long documents, custom components, and optional Mermaid, KaTeX, Monaco.",
   "author": "Simon He",
   "license": "MIT",
-  "homepage": "https://markstream-vue-docs.simonhe.me/frameworks/svelte/",
+  "homepage": "https://markstream.simonhe.me/frameworks/svelte/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Simon-He95/markstream-vue.git",

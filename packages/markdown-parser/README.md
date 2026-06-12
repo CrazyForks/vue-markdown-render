@@ -25,8 +25,8 @@ This package contains the core markdown parsing logic extracted from `markstream
 
 The full usage guide lives alongside the markstream-vue docs:
 
-- English: https://markstream-vue-docs.simonhe.me/guide/api
-- 中文: https://markstream-vue-docs.simonhe.me/zh/guide/api
+- English: https://markstream.simonhe.me/guide/api
+- 中文: https://markstream.simonhe.me/zh/guide/api
 
 This README highlights the parser-specific APIs; visit the docs for end-to-end integration tutorials (VitePress, workers, Tailwind, troubleshooting, etc.).
 
@@ -80,7 +80,7 @@ async function handleChunk(chunk: string) {
 }
 ```
 
-In the UI layer, render `nodes` with `<MarkdownRender :nodes="nodes" />` to avoid re-parsing. See the [docs usage guide](https://markstream-vue-docs.simonhe.me/guide/usage) for end-to-end wiring.
+In the UI layer, render `nodes` with `<MarkdownRender :nodes="nodes" />` to avoid re-parsing. See the [docs usage guide](https://markstream.simonhe.me/guide/usage) for end-to-end wiring.
 
 ### Basic example
 
@@ -349,7 +349,7 @@ Find the matching closing delimiter in a string, handling nested pairs.
 - **Reuse parser instances**: cache `getMarkdown()` results per worker/request to avoid re-registering plugins.
 - **Server-side parsing**: run `parseMarkdownToStructure` on the server, ship the AST to the client, and hydrate with `markstream-vue` for deterministic output.
 - **Custom HTML widgets**: pre-extract `<MyWidget>` blocks before parsing (replace with placeholders) and reinject them during rendering instead of mutating `html_block` nodes post-parse.
-- **Styling**: when piping nodes into `markstream-vue`, follow the docs [CSS checklist](https://markstream-vue-docs.simonhe.me/guide/troubleshooting#css-looks-wrong-start-here) so Tailwind/UnoCSS don’t override library styles.
+- **Styling**: when piping nodes into `markstream-vue`, follow the docs [CSS checklist](https://markstream.simonhe.me/guide/troubleshooting#css-looks-wrong-start-here) so Tailwind/UnoCSS don’t override library styles.
 - **Error handling**: the `apply` hook swallows exceptions to maintain backwards compatibility. If you want strict mode, wrap your mutators before passing them in and rethrow/log as needed.
 
 #### `parseFenceToken(token)`
@@ -524,7 +524,7 @@ import { getMarkdown } from 'markstream-vue'
 import { getMarkdown } from 'stream-markdown-parser'
 ```
 
-All APIs remain the same. See the [migration guide](https://markstream-vue-docs.simonhe.me/monorepo-migration) for details.
+All APIs remain the same. See the [migration guide](https://markstream.simonhe.me/monorepo-migration) for details.
 
 ## Performance
 

@@ -185,7 +185,8 @@ Extending the allowlist:
 To apply mid‑state suppression and source payload preservation for custom tags (for example `<thinking>`), pass `customHtmlTags` either when creating the markdown instance or in `ParseOptions`:
 
 ```ts
-const md = getMarkdown('chat', { customHtmlTags: ['thinking'] })
+declare const messageId: string
+const md = getMarkdown(`chat-${messageId}`, { customHtmlTags: ['thinking'] })
 ```
 
 Emitting custom nodes:
@@ -194,7 +195,8 @@ If you want those tags to become custom node types (so `setCustomComponents` can
 ```ts
 import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
 
-const md = getMarkdown('chat', { customHtmlTags: ['thinking'] })
+declare const messageId: string
+const md = getMarkdown(`chat-${messageId}`, { customHtmlTags: ['thinking'] })
 const nodes = parseMarkdownToStructure(source, md, { customHtmlTags: ['thinking'] })
 ```
 

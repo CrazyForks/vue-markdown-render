@@ -8,6 +8,12 @@ NODE_VERSION = "22"
 # The VitePress base should usually be '/' for Netlify; set this if you deploy under a subpath
 VITEPRESS_BASE = "/"
 
+[[redirects]]
+from = "https://markstream-vue-docs.simonhe.me/*"
+to = "https://markstream.simonhe.me/:splat"
+status = 301
+force = true
+
 # Deploy the playground in preview builds (optional) so authors can preview the demo app
 [context.deploy-preview]
 command = "pnpm run play:build"
