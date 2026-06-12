@@ -6,6 +6,50 @@ import { nextTick } from 'vue'
 import PreCodeNode from '../src/components/PreCodeNode'
 
 describe('pre code node diff preview', () => {
+  it('does not render a terminal newline as an extra ordinary line', async () => {
+    const wrapper = mount(PreCodeNode, {
+      props: {
+        showLineNumbers: true,
+        node: {
+          type: 'code_block',
+          language: 'ts',
+          code: 'const a = 1\n',
+          raw: '```ts\nconst a = 1\n```',
+        },
+      },
+    })
+
+    expect(wrapper.findAll('.markstream-pre__line-number').map(node => node.text())).toEqual(['1'])
+    expect(wrapper.get('.markstream-pre__code').element.textContent).toBe('const a = 1')
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'ts',
+        code: 'const a = 1\n\n',
+        raw: '```ts\nconst a = 1\n\n```',
+      },
+    })
+
+    expect(wrapper.findAll('.markstream-pre__line-number').map(node => node.text())).toEqual(['1', '2'])
+    expect(wrapper.get('.markstream-pre__code').element.textContent).toBe('const a = 1\n')
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'ts',
+        code: 'const a = 1\n',
+        raw: '```ts\nconst a = 1\n',
+        loading: true,
+      },
+    })
+
+    expect(wrapper.findAll('.markstream-pre__line-number').map(node => node.text())).toEqual(['1', '2'])
+    expect(wrapper.get('.markstream-pre__code').element.textContent).toBe('const a = 1\n')
+
+    wrapper.unmount()
+  })
+
   it('does not paint blank diff preview rows as added or removed', () => {
     const wrapper = mount(PreCodeNode, {
       props: {

@@ -5,6 +5,11 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 const props = defineProps<PreCodeNodeProps>()
 
+function getDisplayCode(code: unknown, loading?: boolean) {
+  const value = String(code ?? '')
+  return loading ? value : value.replace(/\r\n$|\n$|\r$/, '')
+}
+
 // Normalize language to a safe, lowercase token (fallback to 'plaintext')
 const normalizedLanguage = computed(() => {
   const raw = String(props.node?.language ?? '')
@@ -14,9 +19,13 @@ const normalizedLanguage = computed(() => {
 })
 
 const languageClass = computed(() => `language-${normalizedLanguage.value}`)
+const displayCode = computed(() => {
+  if (props.node?.diff === true)
+    return String(props.node?.code ?? '')
+  return getDisplayCode(props.node?.code, props.node?.loading === true)
+})
 const codeLines = computed(() => {
-  const code = String(props.node?.code ?? '')
-  return code.split(/\r\n|\n|\r/)
+  return displayCode.value.split(/\r\n|\n|\r/)
 })
 const lineNumbers = computed(() => {
   return Array.from({ length: Math.max(1, codeLines.value.length) }, (_, index) => index + 1)
@@ -527,7 +536,7 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
     :data-markstream-line-numbers="props.showLineNumbers ? '1' : undefined"
     data-markstream-pre="1"
     tabindex="0"
-  ><code v-if="isDiffPreview" translate="no" class="markstream-pre__diff-code"><span v-for="pane in diffPreviewPanes" :key="pane.key" class="markstream-pre__diff-pane" :class="pane.className"><span v-for="(line, index) in pane.lines" :key="line.key" class="markstream-pre__diff-line" :class="[`markstream-pre__diff-line--${line.kind}`, { 'markstream-pre__diff-line--empty': line.empty }]" :style="getDiffLineStyle(index, pane.key as 'original' | 'modified')"><span class="markstream-pre__diff-rail" aria-hidden="true" /><span class="markstream-pre__diff-number" aria-hidden="true">{{ line.number }}</span><span class="markstream-pre__diff-content"><span class="markstream-pre__diff-content-inner">{{ line.code }}</span></span></span></span></code><template v-else><span v-if="props.showLineNumbers" class="markstream-pre__line-numbers" aria-hidden="true"><span v-for="line in lineNumbers" :key="line" class="markstream-pre__line-number">{{ line }}</span></span><code translate="no" class="markstream-pre__code" v-text="node.code" /></template></pre>
+  ><code v-if="isDiffPreview" translate="no" class="markstream-pre__diff-code"><span v-for="pane in diffPreviewPanes" :key="pane.key" class="markstream-pre__diff-pane" :class="pane.className"><span v-for="(line, index) in pane.lines" :key="line.key" class="markstream-pre__diff-line" :class="[`markstream-pre__diff-line--${line.kind}`, { 'markstream-pre__diff-line--empty': line.empty }]" :style="getDiffLineStyle(index, pane.key as 'original' | 'modified')"><span class="markstream-pre__diff-rail" aria-hidden="true" /><span class="markstream-pre__diff-number" aria-hidden="true">{{ line.number }}</span><span class="markstream-pre__diff-content"><span class="markstream-pre__diff-content-inner">{{ line.code }}</span></span></span></span></code><template v-else><span v-if="props.showLineNumbers" class="markstream-pre__line-numbers" aria-hidden="true"><span v-for="line in lineNumbers" :key="line" class="markstream-pre__line-number">{{ line }}</span></span><code translate="no" class="markstream-pre__code" v-text="displayCode" /></template></pre>
 </template>
 
 <style>

@@ -110,7 +110,7 @@ describe('codeBlockNode editor creation locking', () => {
           code: 'console.log(1)',
           raw: '```js\nconsole.log(1)\n```',
         },
-        loading: true,
+        loading: false,
         stream: true,
         showHeader: false,
       },
@@ -135,6 +135,71 @@ describe('codeBlockNode editor creation locking', () => {
       expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-pending')).toBeUndefined()
       expect(wrapper.find('.code-editor-container').classes()).not.toContain('is-hidden')
     })
+
+    wrapper.unmount()
+  })
+
+  it('does not pass a terminal newline to ordinary Monaco renders', async () => {
+    const helpers = getStreamMonacoHelpers()
+    helpers.createEditor.mockImplementation(async () => {})
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'js',
+          code: 'console.log(1)\n',
+          raw: '```js\nconsole.log(1)\n```',
+        },
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flushPendingMicrotasks()
+    await waitForCreateEditorCalls(1, helpers)
+
+    expect(helpers.createEditor.mock.calls[0]?.[1]).toBe('console.log(1)')
+
+    helpers.updateCode.mockClear()
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'js',
+        code: 'console.log(2)\n',
+        raw: '```js\nconsole.log(2)\n```',
+      },
+    })
+    await flushPendingMicrotasks()
+
+    expect(helpers.updateCode).toHaveBeenCalledWith('console.log(2)', 'javascript')
+
+    wrapper.unmount()
+  })
+
+  it('keeps a terminal newline while an ordinary Monaco code block is still loading', async () => {
+    const helpers = getStreamMonacoHelpers()
+    helpers.createEditor.mockImplementation(async () => {})
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'js',
+          code: 'console.log(1)\n',
+          raw: '```js\nconsole.log(1)\n',
+          loading: true,
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flushPendingMicrotasks()
+    await waitForCreateEditorCalls(1, helpers)
+
+    expect(helpers.createEditor.mock.calls[0]?.[1]).toBe('console.log(1)\n')
 
     wrapper.unmount()
   })

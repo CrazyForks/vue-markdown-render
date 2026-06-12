@@ -26,6 +26,7 @@ interface MarkdownCodeBlockNodeProps extends ShikiCodeBlockProps {
     language: string
     code: string
     raw: string
+    loading?: boolean
     diff?: boolean
     originalCode?: string
     updatedCode?: string
@@ -208,6 +209,13 @@ const contentStyle = computed(() => {
   }
 })
 const tooltipsEnabled = computed(() => props.showTooltips !== false)
+
+function getDisplayCode(code: unknown, loading?: boolean) {
+  const value = String(code ?? '')
+  return loading ? value : value.replace(/\r\n$|\n$|\r$/, '')
+}
+
+const displayCode = computed(() => getDisplayCode(props.node.code, props.node.loading === true))
 
 function getPreferredColorScheme() {
   return props.isDark ? props.darkTheme : props.lightTheme
@@ -583,8 +591,10 @@ async function initRenderer(epoch: number) {
   if (!isCurrentRenderEpoch(epoch))
     return
 
+  const renderedCode = displayCode.value
+
   if (!viewportReady.value) {
-    renderFallback(props.node.code)
+    renderFallback(renderedCode)
     return
   }
 
@@ -593,7 +603,7 @@ async function initRenderer(epoch: number) {
     return
 
   if (!codeBlockContent.value || !rendererTarget.value) {
-    renderFallback(props.node.code)
+    renderFallback(renderedCode)
     return
   }
 
@@ -612,7 +622,7 @@ async function initRenderer(epoch: number) {
 
   let needsRendererReconfigure = Boolean(renderer && rendererConfigKey !== nextRendererConfigKey)
   if (needsRendererReconfigure)
-    renderFallback(props.node.code)
+    renderFallback(renderedCode)
 
   let highlightStatus = await waitForCurrentHighlightRegistration(runtimeConfig.registerOptions, nextRendererConfigKey)
 
@@ -642,7 +652,7 @@ async function initRenderer(epoch: number) {
     if (needsRendererReconfigure && renderer && hasRendererContent())
       clearFallback()
     else
-      renderFallback(props.node.code)
+      renderFallback(renderedCode)
     return
   }
 
@@ -659,27 +669,27 @@ async function initRenderer(epoch: number) {
   }
 
   if (!renderer) {
-    renderFallback(props.node.code)
+    renderFallback(renderedCode)
     return
   }
 
   if (props.stream === false && props.loading) {
-    renderFallback(props.node.code)
+    renderFallback(renderedCode)
     return
   }
 
-  renderFallback(props.node.code)
+  renderFallback(renderedCode)
   const previousMutationVersion = rendererMutationVersion
   const previousRendererHtml = rendererTarget.value?.innerHTML
   startRendererReadyObserver(epoch, previousMutationVersion)
-  const renderedLang = await updateRendererWithFallback(props.node.code, props.node.language, epoch)
+  const renderedLang = await updateRendererWithFallback(renderedCode, props.node.language, epoch)
   if (!isCurrentRenderEpoch(epoch))
     return
   if (renderedLang) {
     await clearFallbackWhenRendererReady(
       epoch,
       previousMutationVersion,
-      getRenderSignature(nextRendererConfigKey, renderedLang, props.node.code),
+      getRenderSignature(nextRendererConfigKey, renderedLang, renderedCode),
       previousRendererHtml,
     )
   }
@@ -698,15 +708,15 @@ async function safeInitRenderer(epoch = nextRenderEpoch()) {
       return
     if (isDevEnv)
       console.warn('[MarkdownCodeBlockNode] Failed to initialize Shiki renderer.', err)
-    renderFallback(props.node.code)
+    renderFallback(displayCode.value)
   }
 }
 
-renderFallback(props.node.code)
+renderFallback(displayCode.value)
 
 onMounted(() => {
   if (!viewportReady.value) {
-    renderFallback(props.node.code)
+    renderFallback(displayCode.value)
     return
   }
   void safeInitRenderer()
@@ -733,7 +743,7 @@ watch(() => props.loading, (loading) => {
   if (loading)
     return
   if (!viewportReady.value) {
-    renderFallback(props.node.code)
+    renderFallback(displayCode.value)
     return
   }
   void safeInitRenderer()
@@ -756,15 +766,16 @@ watch(() => props.autoScrollInitial, (enabled) => {
 
 watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
   const epoch = nextRenderEpoch()
+  const renderedCode = getDisplayCode(code, props.node.loading === true)
   const normalizedLang = normalizeLanguageIdentifier(lang)
   if (normalizedLang !== codeLanguage.value)
     codeLanguage.value = normalizedLang
   if (!viewportReady.value) {
-    renderFallback(code)
+    renderFallback(renderedCode)
     return
   }
   if (!codeBlockContent.value || !rendererTarget.value) {
-    renderFallback(code)
+    renderFallback(renderedCode)
     return
   }
 
@@ -774,7 +785,7 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
   }
 
   if (!renderer || rendererNeedsReconfigure()) {
-    renderFallback(code)
+    renderFallback(renderedCode)
     await safeInitRenderer(epoch)
     return
   }
@@ -786,18 +797,18 @@ watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
   if (props.stream === false && props.loading)
     return
 
-  renderFallback(code)
+  renderFallback(renderedCode)
   const previousMutationVersion = rendererMutationVersion
   const previousRendererHtml = rendererTarget.value?.innerHTML
   startRendererReadyObserver(epoch, previousMutationVersion)
-  const renderedLang = await updateRendererWithFallback(code, lang, epoch)
+  const renderedLang = await updateRendererWithFallback(renderedCode, lang, epoch)
   if (!isCurrentRenderEpoch(epoch))
     return
   if (renderedLang) {
     await clearFallbackWhenRendererReady(
       epoch,
       previousMutationVersion,
-      getRenderSignature(rendererConfigKey ?? highlightRegistrationKey.value, renderedLang, code),
+      getRenderSignature(rendererConfigKey ?? highlightRegistrationKey.value, renderedLang, renderedCode),
       previousRendererHtml,
     )
   }

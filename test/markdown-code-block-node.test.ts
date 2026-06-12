@@ -31,6 +31,35 @@ async function flushCodeWatchers() {
 }
 
 describe('markdownCodeBlockNode props and features', () => {
+  it('does not render a terminal newline in the fallback code block', () => {
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode('console.log(1)\n'),
+      },
+    })
+
+    expect(wrapper.get('.code-fallback-plain code').element.textContent).toBe('console.log(1)')
+
+    wrapper.unmount()
+  })
+
+  it('keeps a terminal newline in the fallback while the code block is loading', () => {
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: true,
+        node: {
+          ...makeNode('console.log(1)\n'),
+          loading: true,
+        },
+      },
+    })
+
+    expect(wrapper.get('.code-fallback-plain code').element.textContent).toBe('console.log(1)\n')
+
+    wrapper.unmount()
+  })
+
   it('should support all header control props', () => {
     const expectedProps = [
       'showHeader',

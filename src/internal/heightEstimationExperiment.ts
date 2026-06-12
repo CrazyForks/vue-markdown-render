@@ -346,6 +346,11 @@ function countCodeLines(source: string) {
   return Math.max(1, lines.length)
 }
 
+function getDisplayCode(source: unknown, loading?: boolean) {
+  const value = String(source ?? '')
+  return loading ? value : value.replace(/\r\n$|\n$|\r$/, '')
+}
+
 function getCodeBlockVisibleLineCount(node: ParsedNode) {
   if ((node as any).diff) {
     return Math.max(
@@ -354,7 +359,7 @@ function getCodeBlockVisibleLineCount(node: ParsedNode) {
       countCodeLines(String((node as any).code ?? '')),
     )
   }
-  return countCodeLines(String((node as any).code ?? ''))
+  return countCodeLines(getDisplayCode((node as any).code, (node as any).loading === true))
 }
 
 function resolveMonacoLineHeight(monacoOptions: Record<string, any> | null | undefined, isDiff: boolean) {
