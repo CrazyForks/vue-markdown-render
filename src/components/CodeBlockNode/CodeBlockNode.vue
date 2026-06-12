@@ -318,6 +318,11 @@ function resolveDiffRenderPair(original: string, updated: string) {
   }
 }
 
+function getDisplayCode(code: unknown, loading?: boolean) {
+  const value = String(code ?? '')
+  return loading ? value : value.replace(/\r\n$|\n$|\r$/, '')
+}
+
 function isPendingDiffResultError(error: unknown) {
   return String((error as { message?: unknown } | null | undefined)?.message ?? error)
     .includes('no diff result available')
@@ -501,8 +506,17 @@ const restoreVisualPending = computed(() =>
   && (showPreWhileMonacoLoads.value || diffFallbackExitActive.value || diffFallbackFadingOut.value),
 )
 const showInlinePreview = ref(false)
+const displayCode = computed(() => getDisplayCode(props.node.code, props.node.loading === true))
 const preCodeNode = computed(() => {
-  if (!isDiff.value || props.node.diff === true)
+  if (!isDiff.value) {
+    if (displayCode.value === props.node.code)
+      return props.node
+    return {
+      ...props.node,
+      code: displayCode.value,
+    }
+  }
+  if (props.node.diff === true)
     return props.node
   return {
     ...props.node,
@@ -752,7 +766,7 @@ const preFallbackLocalMinHeight = computed(() => {
     return null
 
   return Math.ceil(
-    countLines(props.node.code) * (preFallbackLineHeight.value + LINE_EXTRA_PER_LINE)
+    countLines(displayCode.value) * (preFallbackLineHeight.value + LINE_EXTRA_PER_LINE)
     + PIXEL_EPSILON,
   )
 })
@@ -2411,7 +2425,7 @@ watch(
       catch {}
     }
 
-    updateCode(newCode, monacoLanguage.value)
+    updateCode(getDisplayCode(newCode, props.node.loading === true), monacoLanguage.value)
 
     if (isExpanded.value) {
       safeRaf(() => updateExpandedHeight())
@@ -2699,7 +2713,7 @@ async function runEditorCreation(el: HTMLElement) {
     }
   }
   else {
-    await createEditor(el as HTMLElement, props.node.code, monacoLanguage.value)
+    await createEditor(el as HTMLElement, displayCode.value, monacoLanguage.value)
   }
   if (isUnmounted)
     return
@@ -3197,7 +3211,7 @@ watch(
               scheduleEditorHeightSync()
             }
             else {
-              updateCode(String(props.node.code ?? ''), monacoLanguage.value)
+              updateCode(displayCode.value, monacoLanguage.value)
             }
           }
           syncEditorHostHeight(false)

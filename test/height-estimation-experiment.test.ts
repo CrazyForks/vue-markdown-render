@@ -70,6 +70,62 @@ describe('height estimation experiment internals', () => {
     expect(estimated?.height).toBeGreaterThan(estimated?.contentHeight ?? 0)
   })
 
+  it('does not count a terminal newline as an extra ordinary code line', () => {
+    const withoutTerminalNewline = estimateCodeBlockHeight(
+      {
+        type: 'code_block',
+        language: 'ts',
+        code: 'one',
+        raw: '```ts\none\n```',
+      } as any,
+      {
+        rendererKind: 'monaco',
+        showHeader: false,
+      },
+    )
+    const withTerminalNewline = estimateCodeBlockHeight(
+      {
+        type: 'code_block',
+        language: 'ts',
+        code: 'one\n',
+        raw: '```ts\none\n```',
+      } as any,
+      {
+        rendererKind: 'monaco',
+        showHeader: false,
+      },
+    )
+    const withBlankLine = estimateCodeBlockHeight(
+      {
+        type: 'code_block',
+        language: 'ts',
+        code: 'one\n\n',
+        raw: '```ts\none\n\n```',
+      } as any,
+      {
+        rendererKind: 'monaco',
+        showHeader: false,
+      },
+    )
+    const loadingWithTerminalNewline = estimateCodeBlockHeight(
+      {
+        type: 'code_block',
+        language: 'ts',
+        code: 'one\n',
+        raw: '```ts\none\n',
+        loading: true,
+      } as any,
+      {
+        rendererKind: 'monaco',
+        showHeader: false,
+      },
+    )
+
+    expect(withTerminalNewline?.contentHeight).toBe(withoutTerminalNewline?.contentHeight)
+    expect(withBlankLine?.contentHeight).toBeGreaterThan(withTerminalNewline?.contentHeight ?? 0)
+    expect(loadingWithTerminalNewline?.contentHeight).toBe(withBlankLine?.contentHeight)
+  })
+
   it('caps monaco estimate by max height', () => {
     const estimated = estimateCodeBlockHeight(
       {
