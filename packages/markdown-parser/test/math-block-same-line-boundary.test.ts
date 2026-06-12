@@ -350,6 +350,146 @@ describe('math block same-line boundary regression', () => {
     expect(resetCount).toBe(2)
   })
 
+  it('invalidates pending tolerant boundary when a new physical line becomes prose', () => {
+    const md = getMarkdown('stream-math-boundary-pending-newline-prose-reset')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = [
+      'Before display $$',
+      'x',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+    expect(collectByType(nodes, 'math_block')[0].loading).toBe(true)
+    expect(collectByType(nodes, 'math_block')[0].content).toBe('x')
+
+    source += '\nthis is prose, not formula content'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(2)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(JSON.stringify(nodes)).toContain('Before display')
+    expect(JSON.stringify(nodes)).toContain('this is prose')
+
+    for (const chunk of [' and keeps', ' streaming', ' as text']) {
+      source += chunk
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+      expect(JSON.stringify(nodes)).toContain(source.slice(source.lastIndexOf('\n') + 1))
+      expect(resetCount).toBe(2)
+    }
+  })
+
+  it('does not invalidate pending tolerant boundary for a new physical line that is math continuation', () => {
+    const md = getMarkdown('stream-math-boundary-pending-newline-math-continuation-no-reset')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = [
+      'Before display $$',
+      'x',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+
+    source += '\ny = x + 1'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+    expect(collectByType(nodes, 'math_block')[0].loading).toBe(true)
+    expect(collectByType(nodes, 'math_block')[0].content).toContain('y = x + 1')
+
+    source += '\n|z| = 2'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+    expect(collectByType(nodes, 'math_block')[0].content).toContain('|z| = 2')
+  })
+
+  it('invalidates pending tolerant boundary when a single ascii atom becomes unicode prose', () => {
+    const md = getMarkdown('stream-math-boundary-pending-atom-to-unicode-prose-reset')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = [
+      'Before display $$',
+      'x',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+
+    source += '变量'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(2)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(JSON.stringify(nodes)).toContain('x变量')
+  })
+
   it('does not reset pending tolerant boundary for absolute-value or angle-bracket math continuation lines', () => {
     const md = getMarkdown('stream-math-boundary-pending-absolute-angle-no-reset')
     ;(md as any).stream.reset()
@@ -874,6 +1014,35 @@ describe('math block same-line boundary regression', () => {
     mathBlocks = collectByType(nodes, 'math_block')
     expect(mathBlocks).toHaveLength(1)
     expect(mathBlocks[0].content).toContain('c = 3')
+  })
+
+  it('keeps tolerant boundary stream sync bounded on repeated large normal appends', () => {
+    const md = getMarkdown('stream-math-boundary-large-normal-append-bounded')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = Array.from({ length: 800 }, (_, index) => `normal paragraph line ${index}`).join('\n')
+
+    for (let index = 0; index < 20; index++) {
+      source += `\nmore normal prose ${index}`
+      const nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    }
+
+    expect(resetCount).toBe(0)
   })
 
   it('resets once when tolerant $$ close delimiter is split across stream chunks', () => {

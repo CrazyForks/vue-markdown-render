@@ -399,6 +399,22 @@ function isTolerantBoundaryAsciiDigit(ch?: string) {
   return code >= 48 && code <= 57
 }
 
+function isTolerantBoundaryUnicodeLetterOrNumber(ch?: string) {
+  return !!ch && /[\p{L}\p{N}]/u.test(ch)
+}
+
+function isTolerantBoundaryLetterLike(ch?: string) {
+  return !!ch && (isTolerantBoundaryAsciiAlpha(ch) || /\p{L}/u.test(ch))
+}
+
+function isTolerantBoundaryDigitLike(ch?: string) {
+  return !!ch && (isTolerantBoundaryAsciiDigit(ch) || /\p{N}/u.test(ch))
+}
+
+function isTolerantBoundaryWordLike(ch?: string) {
+  return isTolerantBoundaryUnicodeLetterOrNumber(ch)
+}
+
 function isPlainSentencePunctuationForTolerantBoundary(ch?: string) {
   return ch === '.'
     || ch === ','
@@ -596,17 +612,52 @@ function isLikelyTolerantBoundaryStopLine(line: string) {
   return false
 }
 
+function isLikelyTolerantBoundaryMathContinuationLine(line: string) {
+  const trimmed = String(line ?? '').trim()
+  if (!trimmed)
+    return false
+
+  if (/\\[a-z]+/i.test(trimmed))
+    return true
+
+  if (/(?:^|[^\p{L}\p{N}\\])(?:[a-z]|\d+(?:\.\d+)?|\\[a-z]+)\s*(?:[=+*/<>_^]|-(?!\s*\p{L}{2,}\b))\s*(?:[a-z({]|\d+(?:\.\d+)?|\\[a-z]+)/iu.test(trimmed))
+    return true
+
+  if (/^[+\-]\s*(?:\\[a-z]+|[\d({|]|[a-z](?:\s*[_^=+\-*/<>]|\s*$))/i.test(trimmed))
+    return true
+
+  if (/\|[^|\n]{1,160}\|\s*(?:[-=+*/<>]|\\(?:le|ge|neq|approx|sim)\b)/u.test(trimmed))
+    return true
+
+  if (isLikelyTolerantAngleBracketMathLine(trimmed))
+    return true
+
+  if (/^(?:[a-z]|pi|\d+(?:\.\d+)?)$/i.test(trimmed))
+    return true
+
+  return false
+}
+
 function appendedChunkMayEndPendingTolerantBoundary(appended: string) {
   if (!appended.includes('\n') && !appended.includes('\r'))
     return false
 
   const lines = appended.split(/\r?\n/)
   const startIndex = appended.startsWith('\n') || appended.startsWith('\r\n') ? 1 : 0
+  const endsWithLineBreak = /\r?\n$/.test(appended)
+
   for (let index = startIndex; index < lines.length; index++) {
     const line = lines[index]
+    if (endsWithLineBreak && index === lines.length - 1 && line === '')
+      continue
+
     if (isLikelyTolerantBoundaryStopLine(line))
       return true
+
+    if (line.trim() && !isLikelyTolerantBoundaryMathContinuationLine(line))
+      return true
   }
+
   return false
 }
 
@@ -685,14 +736,13 @@ function appendedChunkMayTurnPendingTolerantBoundaryIntoPlainWord(previousSource
   const previousLast = findLastNonSpaceOrTab(previousSource)
   const appendedFirst = findFirstNonSpaceOrTab(appended)
 
-  const previousEndsLikeAtom = isTolerantBoundaryAsciiAlpha(previousLast)
-    || isTolerantBoundaryAsciiDigit(previousLast)
+  const previousEndsLikeAtom = isTolerantBoundaryWordLike(previousLast)
   const appendedContinuesWord = (
-    isTolerantBoundaryAsciiAlpha(previousLast)
-    && (isTolerantBoundaryAsciiAlpha(appendedFirst) || isTolerantBoundaryAsciiDigit(appendedFirst))
+    isTolerantBoundaryLetterLike(previousLast)
+    && isTolerantBoundaryWordLike(appendedFirst)
   ) || (
-    isTolerantBoundaryAsciiDigit(previousLast)
-    && isTolerantBoundaryAsciiAlpha(appendedFirst)
+    isTolerantBoundaryDigitLike(previousLast)
+    && isTolerantBoundaryLetterLike(appendedFirst)
   )
   const appendedEndsSentenceLikeProse = previousEndsLikeAtom
     && isPlainSentencePunctuationForTolerantBoundary(appendedFirst)
