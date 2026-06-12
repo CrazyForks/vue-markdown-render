@@ -3,7 +3,7 @@ import path from 'node:path'
 import process from 'node:process'
 
 const distDir = path.resolve('dist')
-const sourcePath = path.join(distDir, 'tailwind.ts')
+const sourcePath = path.join(distDir, '.tailwind-source.ts')
 const esmPath = path.join(distDir, 'tailwind.js')
 const cjsPath = path.join(distDir, 'tailwind.cjs')
 const dtsPath = path.join(distDir, 'tailwind.d.ts')

@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => {
         tsconfigPath: './tsconfig.build.json',
       }),
       UnpluginClassExtractor({
-        output: 'dist/tailwind.ts',
+        output: 'dist/.tailwind-source.ts',
         include: [/\/src\/.*\.(?:ts|tsx)(\?.*)?$/],
       }) as any,
     )

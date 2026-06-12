@@ -1,6 +1,7 @@
 ---
 title: markstream-react vs Streamdown for React streaming Markdown
 description: Compare markstream-react and Streamdown for streaming AI Markdown in React. Both support streaming; choose based on API fit, heavy blocks, long documents, and cross-framework needs.
+lastVerified: '2026-06-12'
 faq:
   - question: Are markstream-react and Streamdown both streaming Markdown renderers?
     answer: Yes. Both target React streaming Markdown, but they make different API and architecture trade-offs.

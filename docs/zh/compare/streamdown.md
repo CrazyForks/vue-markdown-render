@@ -1,6 +1,7 @@
 ---
 title: markstream-react 与 Streamdown 对比
 description: 对比 markstream-react 和 Streamdown 在 React 流式 Markdown、AI 聊天、Mermaid、KaTeX、Shiki、长回答和跨框架一致性中的差异。
+lastVerified: '2026-06-12'
 faq:
   - question: markstream-react 和 Streamdown 都是流式 Markdown 渲染器吗？
     answer: 是。两者都面向 React 流式 Markdown，但 API 和架构取舍不同。

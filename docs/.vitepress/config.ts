@@ -547,6 +547,9 @@ function createDocsStructuredData(path: string, title: string, description: stri
   const graph: Record<string, any>[] = []
   const homePath = isChinese ? '/zh' : '/'
   const faqItems = frontmatterFaqItems(frontmatter.faq)
+  const lastVerified = typeof frontmatter.lastVerified === 'string' && frontmatter.lastVerified.length > 0
+    ? frontmatter.lastVerified
+    : null
 
   if (path === homePath) {
     graph.push({
@@ -616,6 +619,7 @@ function createDocsStructuredData(path: string, title: string, description: stri
       'mainEntityOfPage': `${docsSiteUrl}${path}`,
       'articleSection': isChinese ? 'Markdown 渲染器对比' : 'Markdown renderer comparison',
       'inLanguage': isChinese ? 'zh-CN' : 'en-US',
+      ...(lastVerified ? { dateModified: lastVerified } : {}),
       'author': {
         '@type': 'Organization',
         'name': 'Markstream',

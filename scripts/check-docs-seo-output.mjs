@@ -8,6 +8,7 @@ const publicDir = resolve(docsDir, 'public')
 const distDir = resolve(docsDir, '.vitepress/dist')
 const newHost = 'https://markstream.simonhe.me'
 const oldHost = 'https://markstream-vue-docs.simonhe.me'
+const oldHostRedirect = `${oldHost}/*  ${newHost}/:splat  301`
 
 const scannedExtensions = new Set(['.html', '.xml', '.txt'])
 const primaryLandingPaths = [
@@ -163,6 +164,10 @@ for (const relativePath of requiredNewHostFiles) {
     failures.push(`${relativePath} does not contain new docs host ${newHost}`)
 }
 
+const redirects = readDistFile('_redirects')
+if (redirects)
+  expectContains(redirects, '_redirects', oldHostRedirect, `is missing old docs host redirect ${oldHostRedirect}`)
+
 for (const routePath of primaryLandingPaths) {
   const relativePath = htmlFileForRoute(routePath)
   const content = readDistFile(relativePath)
@@ -182,6 +187,7 @@ for (const filePath of walkFiles(docsDir, new Set(['.vitepress', 'node_modules']
   const routePath = markdownRoutePath(filePath)
   const relativePath = htmlFileForMarkdown(filePath)
   const checks = []
+  const isArticle = routePath.startsWith('/compare/') || routePath.startsWith('/zh/compare/')
 
   if (hasFrontmatterKey(frontmatter, 'faq')) {
     checks.push(['FAQPage', 'structured data'])
@@ -191,7 +197,7 @@ for (const filePath of walkFiles(docsDir, new Set(['.vitepress', 'node_modules']
   if (hasFrontmatterKey(frontmatter, 'softwarePackage'))
     checks.push(['SoftwareSourceCode', 'structured data'])
 
-  if (routePath.startsWith('/compare/') || routePath.startsWith('/zh/compare/'))
+  if (isArticle)
     checks.push(['Article', 'structured data'])
 
   if (checks.length === 0)
@@ -209,6 +215,25 @@ for (const filePath of walkFiles(docsDir, new Set(['.vitepress', 'node_modules']
     if (!found)
       failures.push(`${relativePath} is missing ${marker} ${label}`)
   }
+
+  const lastVerifiedLine = frontmatter.split('\n').find(line => line.startsWith('lastVerified:'))
+  let lastVerified = lastVerifiedLine ? lastVerifiedLine.slice('lastVerified:'.length).trim() : null
+  if (
+    lastVerified
+    && (lastVerified.startsWith('\'') || lastVerified.startsWith('"'))
+    && lastVerified.endsWith(lastVerified[0])
+  ) {
+    lastVerified = lastVerified.slice(1, -1)
+  }
+  const dateModifiedMarker = `"dateModified":"${lastVerified}"`
+  if (
+    isArticle
+    && lastVerified
+    && !content.includes(dateModifiedMarker)
+    && !content.includes(dateModifiedMarker.replaceAll('"', '&quot;'))
+  ) {
+    failures.push(`${relativePath} is missing Article dateModified ${lastVerified}`)
+  }
 }
 
 if (failures.length > 0) {
@@ -218,4 +243,4 @@ if (failures.length > 0) {
   process.exit(1)
 }
 
-console.log('[docs-seo-output] Docs host output, canonical tags, LLM files, visible FAQ content, and JSON-LD types are valid.')
+console.log('[docs-seo-output] Docs host output, redirects, canonical tags, LLM files, visible FAQ content, and JSON-LD types are valid.')

@@ -1,6 +1,7 @@
 ---
 title: markstream-vue vs vue-stream-markdown for AI chat Markdown
 description: Compare markstream-vue and vue-stream-markdown for streaming Markdown in Vue 3 AI chat, SSE, and long documents.
+lastVerified: '2026-06-12'
 ---
 # markstream-vue vs vue-stream-markdown
 
