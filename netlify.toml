@@ -1,12 +1,13 @@
 [build]
 # Default Netlify build: build the markdown docs
-command = "pnpm install --frozen-lockfile && pnpm run build:parser && pnpm run build && pnpm docs:build"
+command = "pnpm install --frozen-lockfile && pnpm run build:parser && pnpm run build && pnpm docs:seo:check"
 publish = "docs/.vitepress/dist"
 
 [build.environment]
 NODE_VERSION = "22"
 # The VitePress base should usually be '/' for Netlify; set this if you deploy under a subpath
 VITEPRESS_BASE = "/"
+VITEPRESS_SITE_URL = "https://markstream.simonhe.me"
 
 [[redirects]]
 from = "https://markstream-vue-docs.simonhe.me/*"

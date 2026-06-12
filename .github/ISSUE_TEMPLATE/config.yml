@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: 📚 Documentation
-    url: https://markstream-vue-docs.simonhe.me/guide/
+    url: https://markstream.simonhe.me/guide/
     about: Full docs, troubleshooting, and API usage.
   - name: 🧪 Test page (shareable repro)
     url: https://markstream-vue.simonhe.me/test
