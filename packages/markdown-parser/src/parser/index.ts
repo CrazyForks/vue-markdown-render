@@ -3,6 +3,11 @@ import type { HtmlBlockNode, InternalParseOptions, MarkdownToken, ParsedNode, Pa
 import { normalizeCustomHtmlTags } from '../customHtmlTags'
 import { NON_STRUCTURING_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
 import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes, parseTagAttrs } from '../htmlTagUtils'
+import {
+  getTolerantMathBlockBoundaryStreamKey,
+  hasMarkstreamMathPlugin,
+  mayContainTolerantMathBlockBoundaryOpener,
+} from '../plugins/math'
 import { parseInlineTokens } from './inline-parsers'
 import { createLinkifyDemotionContextTracker } from './linkifyHeuristics'
 import { parseCommonBlockToken } from './node-parsers/block-token-parser'
@@ -21,6 +26,13 @@ type ParsedNodeWithFields = ParsedNode & {
 }
 
 const streamParseEnvCache = new WeakMap<object, Map<string, Record<string, unknown>>>()
+const tolerantMathBoundaryStreamCache = new WeakMap<object, {
+  source: string
+  key: string | null
+  pendingCandidate: boolean
+}>()
+
+const TOLERANT_BOUNDARY_SPLIT_OPENERS = ['$$', '\\[']
 
 interface ParseTimingMetrics {
   tokenCloneMs?: number
@@ -294,9 +306,159 @@ function shouldResetTopLevelStreamCacheForFinalAutoParse(md: MarkdownIt, options
     && typeof stream.reset === 'function'
 }
 
+function clearTolerantMathBoundaryStreamCache(md: MarkdownIt) {
+  tolerantMathBoundaryStreamCache.delete(md as unknown as object)
+}
+
+function setTolerantMathBoundaryStreamCache(
+  md: MarkdownIt,
+  source: string,
+  key: string | null,
+) {
+  tolerantMathBoundaryStreamCache.set(md as unknown as object, {
+    source,
+    key,
+    pendingCandidate: key === null && mayContainTolerantMathBlockBoundaryOpener(source),
+  })
+}
+
+function sourceEndsWithSplitTolerantBoundaryPrefix(source: string) {
+  return source.endsWith('$') || source.endsWith('\\')
+}
+
+function sourceEndsWithCompleteTolerantBoundaryOpener(source: string) {
+  const lastLineStart = Math.max(source.lastIndexOf('\n') + 1, 0)
+  const lastLine = source.slice(lastLineStart).replace(/[\t ]+$/, '')
+  return TOLERANT_BOUNDARY_SPLIT_OPENERS.some(open => lastLine.endsWith(open))
+}
+
+function appendedChunkMayAffectTolerantMathBoundary(previousSource: string, appended: string) {
+  if (!appended)
+    return false
+
+  if (appended.includes('$$') || appended.includes('\\[') || appended.includes('\\]'))
+    return true
+
+  if (previousSource.endsWith('$') && appended[0] === '$')
+    return true
+
+  if (previousSource.endsWith('\\') && (appended[0] === '[' || appended[0] === ']'))
+    return true
+
+  // The opener may have arrived in the previous chunk:
+  //
+  //   "prefix $$" + "\na = 1"
+  //   "prefix \\[" + "\nx + y = z"
+  if (sourceEndsWithCompleteTolerantBoundaryOpener(previousSource) && /[\r\n]/.test(appended))
+    return true
+
+  return false
+}
+
+function syncTolerantMathBoundaryStreamCache(md: MarkdownIt, source: string) {
+  if (!hasMarkstreamMathPlugin(md))
+    return
+
+  const stream = md.stream
+  if (typeof stream?.reset !== 'function')
+    return
+
+  const owner = md as unknown as object
+  const previous = tolerantMathBoundaryStreamCache.get(owner)
+
+  if (previous?.source === source)
+    return
+
+  if (previous && source.startsWith(previous.source)) {
+    const appended = source.slice(previous.source.length)
+
+    if (
+      previous.key === null
+      && previous.pendingCandidate === false
+      && !appendedChunkMayAffectTolerantMathBoundary(previous.source, appended)
+      && !sourceEndsWithSplitTolerantBoundaryPrefix(source)
+    ) {
+      previous.source = source
+      return
+    }
+  }
+
+  const nextKey = getTolerantMathBlockBoundaryStreamKey(source)
+  const sourceWasReplaced = previous ? !source.startsWith(previous.source) : false
+
+  if (previous && (sourceWasReplaced || previous.key !== nextKey))
+    stream.reset()
+  else if (!previous && nextKey)
+    stream.reset()
+
+  setTolerantMathBoundaryStreamCache(md, source, nextKey)
+}
+
 function shouldCloneTopLevelStreamTokens(options: ParseOptions) {
   return typeof options.preTransformTokens === 'function'
     || typeof options.postTransformTokens === 'function'
+}
+
+function sameTokenMap(left: Token | undefined, right: Token | undefined) {
+  const leftMap = left?.map
+  const rightMap = right?.map
+
+  if (leftMap === rightMap)
+    return true
+
+  if (!Array.isArray(leftMap) || !Array.isArray(rightMap))
+    return false
+
+  return leftMap.length === rightMap.length
+    && leftMap.every((value, index) => value === rightMap[index])
+}
+
+function isSameTokenShape(left: Token | undefined, right: Token | undefined) {
+  return !!left
+    && !!right
+    && left.type === right.type
+    && left.tag === right.tag
+    && left.nesting === right.nesting
+    && left.markup === right.markup
+    && left.content === right.content
+    && sameTokenMap(left, right)
+}
+
+function isParagraphTokenTriplet(tokens: Token[], index: number) {
+  return tokens[index]?.type === 'paragraph_open'
+    && tokens[index + 1]?.type === 'inline'
+    && tokens[index + 2]?.type === 'paragraph_close'
+}
+
+function hasAdjacentDuplicateParagraphTokenTriplet(tokens: Token[]) {
+  for (let index = 0; index + 5 < tokens.length; index++) {
+    if (
+      isParagraphTokenTriplet(tokens, index)
+      && isParagraphTokenTriplet(tokens, index + 3)
+      && isSameTokenShape(tokens[index], tokens[index + 3])
+      && isSameTokenShape(tokens[index + 1], tokens[index + 4])
+      && isSameTokenShape(tokens[index + 2], tokens[index + 5])
+    ) {
+      return true
+    }
+  }
+
+  return false
+}
+
+function shouldFallbackDuplicateTolerantMathStreamTokens(
+  md: MarkdownIt,
+  source: string,
+  tokens: Token[],
+) {
+  return hasMarkstreamMathPlugin(md)
+    && mayContainTolerantMathBlockBoundaryOpener(source)
+    && hasAdjacentDuplicateParagraphTokenTriplet(tokens)
+}
+
+function shouldUseSyncParseForPendingTolerantMathBoundary(md: MarkdownIt) {
+  const cache = tolerantMathBoundaryStreamCache.get(md as unknown as object)
+  return typeof cache?.key === 'string' && cache.key.startsWith('pending:')
 }
 
 function parseTopLevelTokens(
@@ -311,7 +473,16 @@ function parseTopLevelTokens(
   if (!shouldUseTopLevelStreamParse(md, options))
     return md.parse(source, env)
 
+  syncTolerantMathBoundaryStreamCache(md, source)
+  if (shouldUseSyncParseForPendingTolerantMathBoundary(md))
+    return md.parse(source, env)
+
   const tokens = md.stream!.parse!(source, getStableStreamEnv(md, env))
+  if (shouldFallbackDuplicateTolerantMathStreamTokens(md, source, tokens)) {
+    md.stream?.reset?.()
+    return md.parse(source, env)
+  }
+
   if (!shouldCloneTopLevelStreamTokens(options))
     return tokens
 
@@ -2154,8 +2325,10 @@ export function parseMarkdownToStructure(
   // todo: 下面的特殊 math 其实应该更精确匹配到() 或者 $$ $$ 或者 \[ \] 内部的内容
   let safeMarkdown = (markdown ?? '').toString().replace(/([^\\])\r(ight|ho)/g, '$1\\r$2').replace(/([^\\])\n(abla|eq|ot|exists)/g, '$1\\n$2')
 
-  if (shouldResetTopLevelStreamCacheForFinalAutoParse(md, options))
+  if (shouldResetTopLevelStreamCacheForFinalAutoParse(md, options)) {
     md.stream!.reset!()
+    clearTolerantMathBoundaryStreamCache(md)
+  }
 
   if (!isFinal) {
     if (safeMarkdown.endsWith('- *')) {
