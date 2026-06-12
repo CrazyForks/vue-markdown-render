@@ -147,6 +147,63 @@ describe('math block same-line boundary regression', () => {
     }
   })
 
+  it('invalidates pending tolerant boundary when streamed atom becomes prose punctuation', () => {
+    const md = getMarkdown('stream-math-boundary-pending-atom-to-punctuated-prose-reset')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = [
+      'Before display $$',
+      'x',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+    expect(collectByType(nodes, 'math_block')[0].loading).toBe(true)
+    expect(collectByType(nodes, 'math_block')[0].content).toBe('x')
+
+    source += '.'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(2)
+    expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+    expect(JSON.stringify(nodes)).toContain('Before display')
+    expect(JSON.stringify(nodes)).toContain('x.')
+
+    const stableSerialized = JSON.stringify(nodes)
+    for (const chunk of [' prose', ' continues', ' without', ' a formula']) {
+      source += chunk
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(collectByType(nodes, 'math_block')).toHaveLength(0)
+      expect(JSON.stringify(nodes)).toContain('x. prose')
+      expect(resetCount).toBe(2)
+    }
+
+    expect(JSON.stringify(nodes)).not.toBe(stableSerialized)
+    expect(JSON.stringify(nodes)).toContain('without a formula')
+  })
+
   it('does not enter a reset storm after pending tolerant boundary is invalidated into prose', () => {
     const md = getMarkdown('stream-math-boundary-pending-prose-no-reset-storm')
     ;(md as any).stream.reset()
@@ -1989,6 +2046,108 @@ describe('math block same-line boundary regression', () => {
         expect(resetCount, name).toBe(2)
       }
     }
+  })
+
+  it('does not treat newline appends after a no-suffix close as same-line suffix changes', () => {
+    const md = getMarkdown('pkg-stream-nosuffix-close-newline-append-no-extra-reset')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    const originalParse = stream.parse.bind(stream)
+    let resetCount = 0
+    let streamParseCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+    stream.parse = (...args: any[]) => {
+      streamParseCount++
+      return originalParse(...args)
+    }
+
+    let source = [
+      'Before display $$',
+      'a = 1',
+    ].join('\n')
+
+    parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    })
+
+    expect(resetCount).toBe(1)
+    expect(streamParseCount).toBe(1)
+
+    source += '\n$$'
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(2)
+    expect(streamParseCount).toBe(2)
+    expect(nodes.map((node: any) => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+    ])
+
+    for (let index = 0; index < 20; index++) {
+      source += `\nplain suffix line ${index} with inline $a$.`
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(resetCount).toBe(2)
+      expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+      expect(collectByType(nodes, 'math_block')[0].loading).toBe(false)
+      expect(JSON.stringify(nodes)).toContain(`plain suffix line ${index}`)
+    }
+
+    expect(streamParseCount).toBe(22)
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('a')
+  })
+
+  it('still resets once when text is appended on the same close line after a no-suffix close', () => {
+    const md = getMarkdown('pkg-stream-nosuffix-close-same-line-suffix-reset')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = [
+      'Before display $$',
+      'a = 1',
+      '$$',
+    ].join('\n')
+
+    let nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(1)
+    expect(nodes.map((node: any) => node.type)).toEqual(['paragraph', 'math_block'])
+
+    source += ' where $a$ follows.'
+    nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(resetCount).toBe(2)
+    expect(nodes.map((node: any) => node.type)).toEqual(['paragraph', 'math_block', 'paragraph'])
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toContain('a')
   })
 
   it('does not repeatedly reset stream cache for prose-only unresolved bracket tolerant tails', () => {

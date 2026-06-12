@@ -387,6 +387,25 @@ function isTolerantBoundaryAsciiAlpha(ch?: string) {
   return (code >= 65 && code <= 90) || (code >= 97 && code <= 122)
 }
 
+function isTolerantBoundaryAsciiDigit(ch?: string) {
+  if (!ch)
+    return false
+
+  const code = ch.charCodeAt(0)
+  return code >= 48 && code <= 57
+}
+
+function isPlainSentencePunctuationForTolerantBoundary(ch?: string) {
+  return ch === '.'
+    || ch === ','
+    || ch === ';'
+    || ch === ':'
+    || ch === '!'
+    || ch === '?'
+    || ch === '。'
+    || ch === '，'
+}
+
 function isTolerantBoundaryHtmlNameChar(ch?: string) {
   if (!ch)
     return false
@@ -593,6 +612,31 @@ function hasNonSpaceOrTab(value: string) {
   return false
 }
 
+function sliceFirstPhysicalLine(value: string) {
+  const source = String(value ?? '')
+  for (let index = 0; index < source.length; index++) {
+    const ch = source[index]
+    if (ch === '\n' || ch === '\r')
+      return source.slice(0, index)
+  }
+  return source
+}
+
+function appendedChunkMayAddSameLineSuffixToClosedBoundary(
+  previousKey: string | null,
+  previousSource: string,
+  appended: string,
+) {
+  if (!isClosedTolerantBoundaryWithoutSameLineSuffix(previousKey))
+    return false
+  if (!appended || previousSource.endsWith('\n') || previousSource.endsWith('\r'))
+    return false
+
+  // Only text appended before the next physical line break can become the
+  // same-line suffix of the existing close delimiter.
+  return hasNonSpaceOrTab(sliceFirstPhysicalLine(appended))
+}
+
 function findLastNonSpaceOrTab(value: string) {
   for (let index = value.length - 1; index >= 0; index--) {
     const ch = value[index]
@@ -621,7 +665,15 @@ function appendedChunkMayTurnPendingTolerantBoundaryIntoPlainWord(previousSource
 
   const previousLast = findLastNonSpaceOrTab(previousSource)
   const appendedFirst = findFirstNonSpaceOrTab(appended)
-  if (!isTolerantBoundaryAsciiAlpha(previousLast) || !isTolerantBoundaryAsciiAlpha(appendedFirst))
+
+  const previousEndsLikeAtom = isTolerantBoundaryAsciiAlpha(previousLast)
+    || isTolerantBoundaryAsciiDigit(previousLast)
+  const appendedContinuesWord = isTolerantBoundaryAsciiAlpha(previousLast)
+    && isTolerantBoundaryAsciiAlpha(appendedFirst)
+  const appendedEndsSentenceLikeProse = previousEndsLikeAtom
+    && isPlainSentencePunctuationForTolerantBoundary(appendedFirst)
+
+  if (!appendedContinuesWord && !appendedEndsSentenceLikeProse)
     return false
 
   const previousTail = previousSource.slice(Math.max(0, previousSource.length - 80))
@@ -658,7 +710,7 @@ function appendedChunkMayChangeActiveTolerantMathBoundary(
   if (previousSource.endsWith('\\') && (appended[0] === '[' || appended[0] === ']'))
     return true
 
-  if (isClosedTolerantBoundaryWithoutSameLineSuffix(previousKey) && hasNonSpaceOrTab(appended))
+  if (appendedChunkMayAddSameLineSuffixToClosedBoundary(previousKey, previousSource, appended))
     return true
 
   if (previousKey?.startsWith('pending:') && appendedChunkMayEndPendingTolerantBoundary(appended))
@@ -883,7 +935,24 @@ function isSyntheticTolerantBoundaryParagraphTriplet(tokens: Token[], index: num
     || !!tokens[index + 1]?.meta?.[TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META]
 }
 
-function restoreStaleCompletedTolerantMathTokens(tokens: Token[], source: string, boundaryKey: string) {
+function parseTolerantBoundarySuffixTokens(
+  md: MarkdownIt,
+  env: Record<string, unknown>,
+  source: string,
+) {
+  const suffixEnv = { ...env }
+  delete suffixEnv.__markstreamSource
+  delete suffixEnv[TOLERANT_BOUNDARY_STREAM_CACHE_KEY_ENV]
+  return md.parse(source, suffixEnv) as Token[]
+}
+
+function restoreStaleCompletedTolerantMathTokens(
+  tokens: Token[],
+  source: string,
+  boundaryKey: string,
+  md: MarkdownIt,
+  env: Record<string, unknown>,
+) {
   let restored = tokens
   const lines = source.split(/\r?\n/)
 
@@ -928,16 +997,24 @@ function restoreStaleCompletedTolerantMathTokens(tokens: Token[], source: string
         continue
 
       const paragraphMap = restored[paragraphIndex]?.map
-      if (!paragraphMap || paragraphMap[0] !== openLine + 1 || paragraphMap[1] !== closeLine + 1)
+      if (!paragraphMap || paragraphMap[0] !== openLine + 1 || paragraphMap[1] < closeLine + 1)
         continue
 
-      if (String(restored[paragraphIndex + 1]?.content ?? '') !== expectedParagraphContent)
+      const paragraphContent = String(restored[paragraphIndex + 1]?.content ?? '')
+      const suffixSource = paragraphMap[1] > closeLine + 1
+        ? lines.slice(closeLine + 1, paragraphMap[1]).join('\n')
+        : ''
+      const fullExpectedParagraphContent = suffixSource
+        ? `${expectedParagraphContent}\n${suffixSource}`
+        : expectedParagraphContent
+
+      if (paragraphContent !== fullExpectedParagraphContent)
         continue
 
       if (restored === tokens)
         restored = tokens.slice()
 
-      restored.splice(paragraphIndex, 3, {
+      const mathToken = {
         type: 'math_block',
         tag: 'math',
         nesting: 0,
@@ -948,7 +1025,12 @@ function restoreStaleCompletedTolerantMathTokens(tokens: Token[], source: string
         block: true,
         loading: false,
         tolerantBoundary: true,
-      } as unknown as Token)
+      } as unknown as Token
+      const suffixTokens = suffixSource
+        ? parseTolerantBoundarySuffixTokens(md, env, suffixSource)
+        : []
+
+      restored.splice(paragraphIndex, 3, mathToken, ...suffixTokens)
       break
     }
   }
@@ -956,8 +1038,14 @@ function restoreStaleCompletedTolerantMathTokens(tokens: Token[], source: string
   return restored
 }
 
-function compactDuplicateTolerantMathPrefixTokens(tokens: Token[], source: string, boundaryKey: string) {
-  let compacted = restoreStaleCompletedTolerantMathTokens(tokens, source, boundaryKey)
+function compactDuplicateTolerantMathPrefixTokens(
+  tokens: Token[],
+  source: string,
+  boundaryKey: string,
+  md: MarkdownIt,
+  env: Record<string, unknown>,
+) {
+  let compacted = restoreStaleCompletedTolerantMathTokens(tokens, source, boundaryKey, md, env)
 
   for (let mathIndex = compacted.length - 1; mathIndex >= 0; mathIndex--) {
     const token = compacted[mathIndex] as Token & { loading?: boolean, tolerantBoundary?: boolean }
@@ -1057,8 +1145,9 @@ function parseTopLevelTokens(
 
   const rawTokens = md.stream!.parse!(source, streamEnv)
   const activeTolerantBoundaryKey = activeTolerantBoundaryState?.key ?? ''
-  const tokens = activeTolerantBoundaryKey && needsTolerantBoundaryTokenRepair(rawTokens)
-    ? compactDuplicateTolerantMathPrefixTokens(rawTokens, source, activeTolerantBoundaryKey)
+  const tokens = activeTolerantBoundaryKey
+    && (needsTolerantBoundaryTokenRepair(rawTokens) || activeTolerantBoundaryKey.includes(':nosuffix'))
+    ? compactDuplicateTolerantMathPrefixTokens(rawTokens, source, activeTolerantBoundaryKey, md, streamEnv)
     : rawTokens
 
   if (!shouldCloneTopLevelStreamTokens(options))
