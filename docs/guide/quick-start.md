@@ -2,7 +2,7 @@
 description: Start rendering Markdown with markstream-vue in the smallest possible Vue example, including the explicit renderer CSS import and next steps.
 ---
 
-# Quick Start
+# Vue Quick Start
 
 Import the renderer CSS once from your app entry or CSS pipeline:
 

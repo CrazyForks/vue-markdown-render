@@ -77,8 +77,11 @@ function ChatMessage({ content, isDone }: { content: string, isDone: boolean }) 
 ## SSE integration
 
 ```tsx
-// React SSE example
-function ChatView() {
+import MarkdownRender from 'markstream-react'
+import { useEffect, useState } from 'react'
+import 'markstream-react/index.css'
+
+export function ChatView() {
   const [content, setContent] = useState('')
   const [isDone, setIsDone] = useState(false)
 
@@ -88,11 +91,13 @@ function ChatView() {
       if (event.data === '[DONE]') {
         setIsDone(true)
         eventSource.close()
+        return
       }
-      else {
-        setContent(prev => prev + JSON.parse(event.data).content)
-      }
+
+      const data = JSON.parse(event.data) as { content?: string }
+      setContent(prev => prev + (data.content ?? ''))
     }
+
     return () => eventSource.close()
   }, [])
 

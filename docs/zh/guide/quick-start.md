@@ -2,7 +2,7 @@
 description: 用最小 Vue 示例快速跑起 markstream-vue，并理解显式 CSS 引入与下一步该看哪些页面。
 ---
 
-# 快速开始
+# Vue 快速开始
 
 先在应用入口或 CSS 管线中引入一次渲染器样式：
 

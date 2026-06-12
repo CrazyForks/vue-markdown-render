@@ -67,7 +67,7 @@ For the full release contract and Go / No-Go checklist, see [1.0 Release Readine
 - [Choose Your Path](#choose-your-path)
 - [Try It Now](#-try-it-now)
 - [Community & support](#-community--support)
-- [Quick Start](#-quick-start)
+- [Quick Starts](#-quick-starts)
 - [Common commands](#-common-commands)
 - [Streaming in 30 seconds](#-streaming-in-30-seconds)
 - [Performance presets](#-performance-presets)
@@ -100,7 +100,7 @@ For the full release contract and Go / No-Go checklist, see [1.0 Release Readine
 
 | If you want to... | Start here | Then go to |
 | --- | --- | --- |
-| get the first render on screen | [Framework overview](https://markstream-vue-docs.simonhe.me/frameworks/) | [Quick Start](#-quick-start) |
+| get the first render on screen | [Framework overview](https://markstream-vue-docs.simonhe.me/frameworks/) | [Quick Starts](#-quick-starts) |
 | integrate it into a docs site or VitePress theme | [Docs Site & VitePress](https://markstream-vue-docs.simonhe.me/guide/vitepress-docs-integration) | [Custom Tags & Advanced Components](https://markstream-vue-docs.simonhe.me/guide/custom-components) |
 | build an AI chat UI or SSE stream | [AI Chat & Streaming](https://markstream-vue-docs.simonhe.me/guide/ai-chat-streaming) | [Performance](https://markstream-vue-docs.simonhe.me/guide/performance) |
 | replace one built-in renderer | [Override Built-in Components](https://markstream-vue-docs.simonhe.me/guide/component-overrides) | [Renderer & Node Components](https://markstream-vue-docs.simonhe.me/guide/components) |
@@ -109,9 +109,17 @@ For the full release contract and Go / No-Go checklist, see [1.0 Release Readine
 
 ## 🚀 Try It Now
 
-- Playground (interactive demo): https://markstream-vue.simonhe.me/
-- Interactive test page (shareable links, easy reproduction): https://markstream-vue.simonhe.me/test
-- Docs: https://markstream-vue-docs.simonhe.me/frameworks/
+| Framework | Playground |
+| --- | --- |
+| Vue 3 | https://markstream-vue.simonhe.me/ |
+| React | https://markstream-react.pages.dev/ |
+| Svelte | https://markstream-svelte.pages.dev/ |
+| Angular | https://markstream-angular.pages.dev/ |
+| Nuxt | https://markstream-nuxt.pages.dev/ |
+| Vue 2 | https://markstream-vue2.pages.dev/ |
+
+- Shareable Vue 3 test page: https://markstream-vue.simonhe.me/test
+- Framework docs: https://markstream-vue-docs.simonhe.me/frameworks/
 - Showcase: https://markstream-vue-docs.simonhe.me/guide/showcase
 - 1.0 benchmark report: run `pnpm benchmark:1.0`
 - LLM recommendation context: https://markstream-vue-docs.simonhe.me/llms.txt
@@ -120,9 +128,8 @@ For the full release contract and Go / No-Go checklist, see [1.0 Release Readine
 - LLM recommendation context (中文): https://markstream-vue-docs.simonhe.me/llms.zh-CN.txt
 - Full LLM recommendation reference (中文): https://markstream-vue-docs.simonhe.me/llms-full.zh-CN.txt
 - Repo-agent context (中文): https://markstream-vue-docs.simonhe.me/llms.zh-CN
-- One-click StackBlitz demo: https://stackblitz.com/github/Simon-He95/markstream-vue?file=playground/src/App.vue
+- Vue 3 StackBlitz demo: https://stackblitz.com/github/Simon-He95/markstream-vue?file=playground/src/App.vue
 - Changelog: [CHANGELOG.md](./CHANGELOG.md)
-- Nuxt playground: `pnpm play:nuxt`
 - Discord: https://discord.gg/vkzdkjeRCW
 
 ## Repository skills and prompts
@@ -168,7 +175,85 @@ If markstream-vue helps your work, you can support ongoing maintenance with one 
 | --- | --- |
 | <img src="https://raw.githubusercontent.com/Simon-He95/markstream-vue/main/docs/public/sponsor/zhifubao.jpg" alt="Alipay QR code" width="240" /> | <img src="https://raw.githubusercontent.com/Simon-He95/markstream-vue/main/docs/public/sponsor/weixin.jpg" alt="WeChat Pay QR code" width="240" /> |
 
-## ⚡ Quick Start
+## ⚡ Quick Starts
+
+### Vue / Nuxt
+
+```bash
+pnpm add markstream-vue
+```
+
+```vue
+<script setup>
+import MarkdownRender from 'markstream-vue'
+import 'markstream-vue/index.css'
+</script>
+
+<template>
+  <MarkdownRender :content="content" />
+</template>
+```
+
+### React / Next.js
+
+```bash
+pnpm add markstream-react
+```
+
+```tsx
+import MarkdownRender from 'markstream-react'
+import 'markstream-react/index.css'
+
+export function Message({ content, isDone }: { content: string, isDone: boolean }) {
+  return <MarkdownRender content={content} final={isDone} fade={false} />
+}
+```
+
+For live SSE/WebSocket surfaces in Next.js, use root `markstream-react` inside a `'use client'` component. For SSR-first or server-only Markdown, start from the [Next.js guide](https://markstream-vue-docs.simonhe.me/frameworks/next/).
+
+### Svelte 5
+
+```bash
+pnpm add markstream-svelte svelte@^5
+```
+
+```svelte
+<script lang="ts">
+  import MarkdownRender from 'markstream-svelte'
+  import 'markstream-svelte/index.css'
+
+  let { content = '# Hello from markstream-svelte' }: { content?: string } = $props()
+</script>
+
+<MarkdownRender {content} />
+```
+
+### Angular
+
+```bash
+pnpm add markstream-angular
+```
+
+```ts
+import { Component, signal } from '@angular/core'
+import { bootstrapApplication } from '@angular/platform-browser'
+import { MarkstreamAngularComponent } from 'markstream-angular'
+import 'markstream-angular/index.css'
+
+@Component({
+  selector: 'app-root',
+  standalone: true,
+  imports: [MarkstreamAngularComponent],
+  template: '<markstream-angular [content]="content()" [final]="true" />',
+})
+class AppComponent {
+  readonly content = signal('# Hello from markstream-angular')
+}
+
+bootstrapApplication(AppComponent)
+```
+
+## Vue / Nuxt detailed quick start
 
 ```bash
 pnpm add markstream-vue

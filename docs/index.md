@@ -53,7 +53,7 @@ A streaming-friendly Markdown renderer family with progressive Mermaid support, 
 
 | If you are trying to... | Start here | Then go to |
 | --- | --- | --- |
-| get the first render on screen | [Frameworks](/frameworks/) | [Quick Start](/guide/quick-start) |
+| get the first render on screen | [Frameworks](/frameworks/) | [Multi-framework Quick Start](/quick-start) |
 | integrate it into a docs site or VitePress theme | [Docs Site & VitePress](/guide/vitepress-docs-integration) | [Custom Tags & Advanced Components](/guide/custom-components) |
 | wire streaming or SSE output | [AI Chat & Streaming](/guide/ai-chat-streaming) | [Performance](/guide/performance) |
 | debug a broken integration but you do not know why | [Troubleshooting by Symptom](/guide/troubleshooting-path) | [Troubleshooting](/guide/troubleshooting) |
@@ -68,7 +68,8 @@ A streaming-friendly Markdown renderer family with progressive Mermaid support, 
 
 - Start with [Guide Home](/guide/) if you want the task-oriented map.
 - Use [Frameworks](/frameworks/) if you need to choose between Vue, React, Svelte, Angular, Nuxt, and Next.js.
-- Use [Quick Start](/guide/quick-start) if you want the smallest Vue 3 example first.
+- Use [Multi-framework Quick Start](/quick-start) if you want the smallest first render example for Vue, React, Svelte, or Angular.
+- Use [Vue Quick Start](/guide/quick-start) if you want the smallest Vue 3 example first.
 
 ### I am integrating it into an existing app
 

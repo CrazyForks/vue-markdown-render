@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
@@ -21,7 +22,38 @@ function readJson(path) {
   return JSON.parse(readFileSync(path, 'utf8'))
 }
 
-const rootPackageJson = readJson(resolve(root, 'package.json'))
+function parseArgs(argv) {
+  const args = {
+    packageJson: 'package.json',
+  }
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const token = argv[i]
+    if (token === '--package-json') {
+      args.packageJson = argv[i + 1] ?? args.packageJson
+      i += 1
+      continue
+    }
+    if (token === '--help' || token === '-h') {
+      console.log('Usage: node scripts/check-workspace-deps-local.mjs --package-json <path>')
+      process.exit(0)
+    }
+    throw new Error(`[check-workspace-deps-local] Unknown argument: ${token}`)
+  }
+
+  return args
+}
+
+function resolvePackageJsonPath(packageJson) {
+  const fromCwd = resolve(process.cwd(), packageJson)
+  if (existsSync(fromCwd))
+    return fromCwd
+  return resolve(root, packageJson)
+}
+
+const args = parseArgs(process.argv.slice(2))
+const packageJsonPath = resolvePackageJsonPath(args.packageJson)
+const rootPackageJson = readJson(packageJsonPath)
 
 for (const dep of workspaceDeps) {
   const dependencyVersion = rootPackageJson.dependencies?.[dep.name]

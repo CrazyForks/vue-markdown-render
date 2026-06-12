@@ -10,7 +10,8 @@ This guide keeps the Vue/Nuxt path as the most mature renderer documentation. Fo
 
 - [Frameworks](/frameworks/) if you need to choose a package first.
 - [Vue / Nuxt installation](/guide/installation) for `markstream-vue` peer-dependency decisions and CSS order.
-- [Quick Start](/guide/quick-start) for the smallest Vue 3 example.
+- [Multi-framework Quick Start](/quick-start) for the smallest first render example across packages.
+- [Vue Quick Start](/guide/quick-start) for the smallest Vue 3 example.
 - [Usage & Streaming](/guide/usage) if you need to choose between `content` and `nodes`.
 - [Docs Site & VitePress](/guide/vitepress-docs-integration) if you are wiring stable Markdown pages, theme CSS, and custom tags inside a docs site.
 - [AI Chat & Streaming](/guide/ai-chat-streaming) if the UI updates continuously and you need one guided path for peers, parsing, performance, and troubleshooting.
@@ -40,7 +41,7 @@ This guide keeps the Vue/Nuxt path as the most mature renderer documentation. Fo
 | Page | Description |
 |------|-------------|
 | [Installation](/guide/installation) | Install the package and only the peers you actually need |
-| [Quick Start](/guide/quick-start) | Render your first Markdown document |
+| [Vue Quick Start](/guide/quick-start) | Render your first Vue Markdown document |
 | [Usage & Streaming](/guide/usage) | Decide between `content` and `nodes` |
 | [Docs Site & VitePress](/guide/vitepress-docs-integration) | Guided path for docs pages, `enhanceApp`, trusted tags, and CSS order |
 | [AI Chat & Streaming](/guide/ai-chat-streaming) | Guided path for chat UIs, SSE, and token-by-token output |

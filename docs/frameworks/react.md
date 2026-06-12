@@ -58,13 +58,21 @@ export default function ChatMessage({ content, isDone }: { content: string, isDo
 }
 ```
 
-## Next.js setup
+## Next.js
+
+For live SSE/WebSocket surfaces, use root `markstream-react` in a `'use client'` component. For SSR-first or server-only Markdown, start from the [Next.js guide](/frameworks/next).
+
+Client streaming example:
 
 ```tsx
-// In Next.js App Router, mark the component with 'use client'
 'use client'
+
 import MarkdownRender from 'markstream-react'
 import 'markstream-react/index.css'
+
+export function ChatMessage({ content, isDone }: { content: string, isDone: boolean }) {
+  return <MarkdownRender content={content} final={isDone} fade={false} />
+}
 ```
 
 For SSR safety with optional peers, see the [React installation guide](/guide/react-installation).

@@ -25,5 +25,7 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Check docs parity
         run: pnpm docs:check-zh
+      - name: Check generated LLM docs
+        run: pnpm docs:check-llms
       - name: Build docs
         run: pnpm build:parser && pnpm build && pnpm docs:build

@@ -31,14 +31,14 @@ Vue 包：
 
 ## 包矩阵
 
-如果你还在选择框架包，先看 [框架总览（英文）](https://markstream-vue-docs.simonhe.me/frameworks/)。
+如果你还在选择框架包，先看 [框架总览](https://markstream-vue-docs.simonhe.me/zh/frameworks/)。
 
 | 包 | 框架 | 安装 | 文档 |
 | --- | --- | --- | --- |
-| `markstream-vue` | Vue 3 / Nuxt / VitePress | `pnpm add markstream-vue` | [框架总览（英文）](https://markstream-vue-docs.simonhe.me/frameworks/) · [Vue 指南](https://markstream-vue-docs.simonhe.me/zh/guide/) |
-| `markstream-react` | React / Next.js / Remix | `pnpm add markstream-react` | [React landing（英文）](https://markstream-vue-docs.simonhe.me/frameworks/react/) · [Next.js landing（英文）](https://markstream-vue-docs.simonhe.me/frameworks/next/) |
-| `markstream-svelte` | Svelte 5 | `pnpm add markstream-svelte svelte@^5` | [Svelte landing（英文）](https://markstream-vue-docs.simonhe.me/frameworks/svelte/) |
-| `markstream-angular` | Angular standalone | `pnpm add markstream-angular` | [Angular landing（英文）](https://markstream-vue-docs.simonhe.me/frameworks/angular/) |
+| `markstream-vue` | Vue 3 / Nuxt / VitePress | `pnpm add markstream-vue` | [框架总览](https://markstream-vue-docs.simonhe.me/zh/frameworks/) · [Vue 指南](https://markstream-vue-docs.simonhe.me/zh/frameworks/vue/) · [Nuxt 指南](https://markstream-vue-docs.simonhe.me/zh/frameworks/nuxt/) |
+| `markstream-react` | React / Next.js / Remix | `pnpm add markstream-react` | [React 指南](https://markstream-vue-docs.simonhe.me/zh/frameworks/react/) · [Next.js 指南](https://markstream-vue-docs.simonhe.me/zh/frameworks/next/) |
+| `markstream-svelte` | Svelte 5 | `pnpm add markstream-svelte svelte@^5` | [Svelte 指南](https://markstream-vue-docs.simonhe.me/zh/frameworks/svelte/) |
+| `markstream-angular` | Angular standalone | `pnpm add markstream-angular` | [Angular 指南](https://markstream-vue-docs.simonhe.me/zh/frameworks/angular/) |
 | `markstream-vue2` | Vue 2.6 / 2.7 | `pnpm add markstream-vue2` | [Vue 2 指南](https://markstream-vue-docs.simonhe.me/zh/guide/vue2-quick-start) |
 | `stream-markdown-parser` | 任意 JS/TS 应用 | `pnpm add stream-markdown-parser` | [解析器指南](https://markstream-vue-docs.simonhe.me/zh/guide/parser-api) |
 | `markstream-core` | 框架无关 | `pnpm add markstream-core` | [Core 包](./packages/markstream-core/README.md) |
@@ -97,7 +97,7 @@ Vue 包：
 
 | 如果你现在想做的是... | 先看这里 | 然后看 |
 | --- | --- | --- |
-| 先把第一段渲染跑起来 | [框架总览（英文）](https://markstream-vue-docs.simonhe.me/frameworks/) | [快速上手](#-快速上手) |
+| 先把第一段渲染跑起来 | [框架总览](https://markstream-vue-docs.simonhe.me/zh/frameworks/) | [快速上手](#-快速上手) |
 | 接到文档站或 VitePress 主题里 | [文档站与 VitePress 集成](https://markstream-vue-docs.simonhe.me/zh/guide/vitepress-docs-integration) | [自定义标签与高级组件](https://markstream-vue-docs.simonhe.me/zh/guide/custom-components) |
 | 做 AI 聊天界面或 SSE 流式输出 | [AI 聊天与流式输出](https://markstream-vue-docs.simonhe.me/zh/guide/ai-chat-streaming) | [性能](https://markstream-vue-docs.simonhe.me/zh/guide/performance) |
 | 替换一个内置节点渲染器 | [覆盖内置组件](https://markstream-vue-docs.simonhe.me/zh/guide/component-overrides) | [渲染器与节点组件](https://markstream-vue-docs.simonhe.me/zh/guide/components) |
@@ -106,9 +106,17 @@ Vue 包：
 
 ## 🚀 立即试用
 
-- Playground（交互演示）： https://markstream-vue.simonhe.me/
-- 交互测试页（可分享链接，便于复现）： https://markstream-vue.simonhe.me/test
-- 文档： https://markstream-vue-docs.simonhe.me/frameworks/
+| 框架 | Playground |
+| --- | --- |
+| Vue 3 | https://markstream-vue.simonhe.me/ |
+| React | https://markstream-react.pages.dev/ |
+| Svelte | https://markstream-svelte.pages.dev/ |
+| Angular | https://markstream-angular.pages.dev/ |
+| Nuxt | https://markstream-nuxt.pages.dev/ |
+| Vue 2 | https://markstream-vue2.pages.dev/ |
+
+- Vue 3 交互测试页（可分享链接，便于复现）： https://markstream-vue.simonhe.me/test
+- 中文框架文档： https://markstream-vue-docs.simonhe.me/zh/frameworks/
 - Showcase： https://markstream-vue-docs.simonhe.me/zh/guide/showcase
 - 1.0 benchmark 报告：`pnpm benchmark:1.0`
 - LLM 推荐上下文（中文）： https://markstream-vue-docs.simonhe.me/llms.zh-CN.txt
@@ -117,9 +125,8 @@ Vue 包：
 - LLM 推荐上下文（英文）： https://markstream-vue-docs.simonhe.me/llms.txt
 - 完整 LLM 推荐参考（英文）： https://markstream-vue-docs.simonhe.me/llms-full.txt
 - 仓库 agent 上下文（英文）： https://markstream-vue-docs.simonhe.me/llms
-- 一键 StackBlitz 体验： https://stackblitz.com/github/Simon-He95/markstream-vue?file=playground/src/App.vue
+- Vue 3 StackBlitz 体验： https://stackblitz.com/github/Simon-He95/markstream-vue?file=playground/src/App.vue
 - 更新日志： [CHANGELOG.md](./CHANGELOG.md)
-- Nuxt playground：`pnpm play:nuxt`
 - Discord： https://discord.gg/vkzdkjeRCW
 
 ## 仓库内的 skills 和 prompts
@@ -166,6 +173,84 @@ npx skills add git@github.com:Simon-He95/markstream-vue.git
 | <img src="https://raw.githubusercontent.com/Simon-He95/markstream-vue/main/docs/public/sponsor/zhifubao.jpg" alt="支付宝收款码" width="240" /> | <img src="https://raw.githubusercontent.com/Simon-He95/markstream-vue/main/docs/public/sponsor/weixin.jpg" alt="微信收款码" width="240" /> |
 
 ## ⚡ 快速上手
+
+### Vue / Nuxt
+
+```bash
+pnpm add markstream-vue
+```
+
+```vue
+<script setup>
+import MarkdownRender from 'markstream-vue'
+import 'markstream-vue/index.css'
+</script>
+
+<template>
+  <MarkdownRender :content="content" />
+</template>
+```
+
+### React / Next.js
+
+```bash
+pnpm add markstream-react
+```
+
+```tsx
+import MarkdownRender from 'markstream-react'
+import 'markstream-react/index.css'
+
+export function Message({ content, isDone }: { content: string, isDone: boolean }) {
+  return <MarkdownRender content={content} final={isDone} fade={false} />
+}
+```
+
+Next.js 的实时 SSE/WebSocket 区域用 root `markstream-react` 放在 `'use client'` 组件里；SSR-first 或 server-only Markdown 看 [Next.js 指南](https://markstream-vue-docs.simonhe.me/zh/frameworks/next/)。
+
+### Svelte 5
+
+```bash
+pnpm add markstream-svelte svelte@^5
+```
+
+```svelte
+<script lang="ts">
+  import MarkdownRender from 'markstream-svelte'
+  import 'markstream-svelte/index.css'
+
+  let { content = '# Hello from markstream-svelte' }: { content?: string } = $props()
+</script>
+
+<MarkdownRender {content} />
+```
+
+### Angular
+
+```bash
+pnpm add markstream-angular
+```
+
+```ts
+import { Component, signal } from '@angular/core'
+import { bootstrapApplication } from '@angular/platform-browser'
+import { MarkstreamAngularComponent } from 'markstream-angular'
+import 'markstream-angular/index.css'
+
+@Component({
+  selector: 'app-root',
+  standalone: true,
+  imports: [MarkstreamAngularComponent],
+  template: '<markstream-angular [content]="content()" [final]="true" />',
+})
+class AppComponent {
+  readonly content = signal('# Hello from markstream-angular')
+}
+
+bootstrapApplication(AppComponent)
+```
+
+## Vue / Nuxt 详细快速上手
 
 ```bash
 pnpm add markstream-vue

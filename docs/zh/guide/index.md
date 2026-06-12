@@ -4,12 +4,13 @@ description: 按任务组织的 markstream-vue 指南，帮助你在安装、流
 
 # 指南
 
-这份文档优先按“用户任务”组织，而不是默认要求你从第一页看到最后一页。先从和你当前问题最接近的入口开始。
+这份文档优先按“用户任务”组织，而不是默认要求你从第一页看到最后一页。框架选择先看 [中文框架入口](/zh/frameworks/)，只想跑通第一屏先看 [多框架快速开始](/zh/quick-start)。
 
 ## 我想先把它跑起来
 
 - [安装](/zh/guide/installation)：先按场景装对 peer 依赖，并理顺 CSS 顺序。
-- [快速开始](/zh/guide/quick-start)：最小 Vue 3 示例。
+- [多框架快速开始](/zh/quick-start)：Vue、React、Svelte、Angular 的最小示例。
+- [Vue 快速开始](/zh/guide/quick-start)：最小 Vue 3 示例。
 - [使用与流式渲染](/zh/guide/usage)：决定该用 `content` 还是 `nodes`。
 - [文档站与 VitePress 集成](/zh/guide/vitepress-docs-integration)：把文档页、`enhanceApp`、可信标签和 CSS 顺序串起来。
 - [AI 聊天与流式输出](/zh/guide/ai-chat-streaming)：当页面持续更新时，一次看完 peers、解析、性能和排障。
@@ -39,7 +40,7 @@ description: 按任务组织的 markstream-vue 指南，帮助你在安装、流
 | 页面 | 描述 |
 |------|------|
 | [安装](/zh/guide/installation) | 只安装你真正需要的依赖组合 |
-| [快速开始](/zh/guide/quick-start) | 渲染第一篇 Markdown |
+| [Vue 快速开始](/zh/guide/quick-start) | 渲染第一篇 Vue Markdown |
 | [使用与流式渲染](/zh/guide/usage) | 决定 `content` 与 `nodes` 的接入方式 |
 | [文档站与 VitePress 集成](/zh/guide/vitepress-docs-integration) | 文档页、`enhanceApp`、可信标签与 CSS 顺序的一站式路径 |
 | [AI 聊天与流式输出](/zh/guide/ai-chat-streaming) | 适合聊天 UI、SSE 与逐 token 输出的场景路径 |
