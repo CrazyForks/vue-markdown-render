@@ -3,14 +3,7 @@ import type { HtmlBlockNode, InternalParseOptions, MarkdownToken, ParsedNode, Pa
 import { normalizeCustomHtmlTags } from '../customHtmlTags'
 import { NON_STRUCTURING_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
 import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes, parseTagAttrs } from '../htmlTagUtils'
-import {
-  getActiveTolerantMathBlockBoundaryCacheKey,
-  hasMarkstreamMathPlugin,
-  isLikelyTolerantAngleBracketMathLine,
-  mayContainPendingTolerantMathBlockBoundaryCandidate,
-  TOLERANT_BOUNDARY_STREAM_CACHE_KEY_ENV,
-  TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META,
-} from '../plugins/math'
+import { getTolerantMathBlockBoundaryStreamKey, hasMarkstreamMathPlugin } from '../plugins/math'
 import { parseInlineTokens } from './inline-parsers'
 import { createLinkifyDemotionContextTracker } from './linkifyHeuristics'
 import { parseCommonBlockToken } from './node-parsers/block-token-parser'
@@ -29,6 +22,12 @@ type ParsedNodeWithFields = ParsedNode & {
 }
 
 const streamParseEnvCache = new WeakMap<object, Map<string, Record<string, unknown>>>()
+const tolerantMathBoundaryStreamCache = new WeakMap<object, {
+  source: string
+  key: string | null
+}>()
+
+const TOLERANT_BOUNDARY_SPLIT_OPENERS = ['$$', '\\[']
 
 interface ParseTimingMetrics {
   tokenCloneMs?: number
@@ -302,961 +301,87 @@ function shouldResetTopLevelStreamCacheForFinalAutoParse(md: MarkdownIt, options
     && typeof stream.reset === 'function'
 }
 
-interface ActiveTolerantMathBoundaryStreamState {
-  key: string | null
-  source: string
-  pendingCandidate: boolean
+function clearTolerantMathBoundaryStreamCache(md: MarkdownIt) {
+  tolerantMathBoundaryStreamCache.delete(md as unknown as object)
 }
 
-const activeTolerantMathBoundaryStreamStateCache = new WeakMap<object, ActiveTolerantMathBoundaryStreamState>()
-
-const TOLERANT_BOUNDARY_STREAM_LOOKBACK_CHARS = 30000
-
-function isPendingTolerantBoundaryKey(key: string | null) {
-  return typeof key === 'string' && key.startsWith('pending:')
+function sourceEndsWithSplitTolerantBoundaryPrefix(source: string) {
+  return source.endsWith('$') || source.endsWith('\\')
 }
 
-function setActiveTolerantMathBoundaryStreamState(
-  cacheOwner: object,
-  source: string,
-  key: string | null,
-  pendingCandidate?: boolean,
-) {
-  activeTolerantMathBoundaryStreamStateCache.set(cacheOwner, {
-    key,
-    source,
-    pendingCandidate: pendingCandidate ?? (
-      key === null
-        ? mayContainPendingTolerantMathBlockBoundaryCandidate(source)
-        : isPendingTolerantBoundaryKey(key)
-    ),
-  })
+function sourceEndsWithCompleteTolerantBoundaryOpener(source: string) {
+  const lastLineStart = Math.max(source.lastIndexOf('\n') + 1, 0)
+  const lastLine = source.slice(lastLineStart).replace(/[\t ]+$/, '')
+  return TOLERANT_BOUNDARY_SPLIT_OPENERS.some(open => lastLine.endsWith(open))
 }
 
-function clearActiveTolerantMathBoundaryStreamState(cacheOwner: object) {
-  activeTolerantMathBoundaryStreamStateCache.delete(cacheOwner)
-}
-
-function isSimpleThematicOrSetextLine(line: string) {
-  const trimmed = String(line ?? '').trim()
-  if (trimmed.length < 3)
-    return false
-
-  const marker = trimmed[0]
-  if (marker !== '-' && marker !== '*' && marker !== '_' && marker !== '=')
-    return false
-
-  let markerCount = 0
-  for (let index = 0; index < trimmed.length; index++) {
-    const ch = trimmed[index]
-    if (ch === marker) {
-      markerCount++
-      continue
-    }
-    if (ch === ' ' || ch === '\t')
-      continue
-    return false
-  }
-
-  return markerCount >= 3
-}
-
-function isIndentedCodeLineLike(line: string) {
-  const source = String(line ?? '')
-  if (!source.trim())
-    return false
-
-  let columns = 0
-  for (let index = 0; index < source.length; index++) {
-    const ch = source[index]
-    if (ch === ' ') {
-      columns++
-      if (columns >= 4)
-        return true
-      continue
-    }
-    if (ch === '\t')
-      return true
-    break
-  }
-
-  return false
-}
-
-function isTolerantBoundaryAsciiAlpha(ch?: string) {
-  if (!ch)
-    return false
-
-  const code = ch.charCodeAt(0)
-  return (code >= 65 && code <= 90) || (code >= 97 && code <= 122)
-}
-
-function isTolerantBoundaryAsciiDigit(ch?: string) {
-  if (!ch)
-    return false
-
-  const code = ch.charCodeAt(0)
-  return code >= 48 && code <= 57
-}
-
-function isTolerantBoundaryUnicodeLetterOrNumber(ch?: string) {
-  return !!ch && /[\p{L}\p{N}]/u.test(ch)
-}
-
-function isTolerantBoundaryLetterLike(ch?: string) {
-  return !!ch && (isTolerantBoundaryAsciiAlpha(ch) || /\p{L}/u.test(ch))
-}
-
-function isTolerantBoundaryDigitLike(ch?: string) {
-  return !!ch && (isTolerantBoundaryAsciiDigit(ch) || /\p{N}/u.test(ch))
-}
-
-function isTolerantBoundaryWordLike(ch?: string) {
-  return isTolerantBoundaryUnicodeLetterOrNumber(ch)
-}
-
-function isPlainSentencePunctuationForTolerantBoundary(ch?: string) {
-  return ch === '.'
-    || ch === ','
-    || ch === ';'
-    || ch === ':'
-    || ch === '!'
-    || ch === '?'
-    || ch === '。'
-    || ch === '，'
-    || ch === '；'
-    || ch === '：'
-    || ch === '！'
-    || ch === '？'
-    || ch === '、'
-    || ch === ')'
-    || ch === ']'
-    || ch === '}'
-    || ch === '）'
-    || ch === '】'
-    || ch === '｝'
-    || ch === '"'
-    || ch === '\''
-    || ch === '”'
-    || ch === '’'
-}
-
-function isTolerantBoundaryHtmlNameChar(ch?: string) {
-  if (!ch)
-    return false
-
-  const code = ch.charCodeAt(0)
-  return (code >= 65 && code <= 90)
-    || (code >= 97 && code <= 122)
-    || (code >= 48 && code <= 57)
-    || ch === '_'
-    || ch === ':'
-    || ch === '-'
-}
-
-function isSimpleHtmlBoundaryLineLike(line: string) {
-  const trimmed = String(line ?? '').trimStart()
-  if (trimmed[0] !== '<')
-    return false
-
-  if (isLikelyTolerantAngleBracketMathLine(trimmed))
-    return false
-
-  let index = 1
-  while (trimmed[index] === ' ' || trimmed[index] === '\t')
-    index++
-
-  if (trimmed[index] === '!' || trimmed[index] === '?')
-    return true
-
-  if (trimmed[index] === '/') {
-    index++
-    while (trimmed[index] === ' ' || trimmed[index] === '\t')
-      index++
-  }
-
-  if (!isTolerantBoundaryAsciiAlpha(trimmed[index]))
-    return false
-
-  index++
-  while (isTolerantBoundaryHtmlNameChar(trimmed[index]))
-    index++
-
-  const boundary = trimmed[index]
-  return boundary == null || boundary === ' ' || boundary === '\t' || boundary === '>' || boundary === '/'
-}
-
-function isSimpleMarkdownTableDelimiterCell(cell: string) {
-  const value = String(cell ?? '').trim()
-  if (!value)
-    return false
-
-  let index = 0
-  if (value[index] === ':')
-    index++
-
-  let dashCount = 0
-  while (value[index] === '-') {
-    dashCount++
-    index++
-  }
-
-  if (dashCount < 3)
-    return false
-
-  if (value[index] === ':')
-    index++
-
-  return index === value.length
-}
-
-function isSimpleMarkdownTableDelimiterLine(line: string) {
-  const value = String(line ?? '').trim()
-  if (!value || !value.includes('|'))
-    return false
-
-  const withoutLeadingPipe = value[0] === '|' ? value.slice(1) : value
-  const withoutEdgePipes = withoutLeadingPipe.endsWith('|')
-    ? withoutLeadingPipe.slice(0, -1)
-    : withoutLeadingPipe
-
-  return withoutEdgePipes.split('|').every(isSimpleMarkdownTableDelimiterCell)
-}
-
-function hasUnclosedTolerantBracketBoundaryOpenerNearTail(source: string) {
-  const value = String(source ?? '')
-  const tail = value.slice(Math.max(0, value.length - TOLERANT_BOUNDARY_STREAM_LOOKBACK_CHARS))
-  const openIndex = tail.lastIndexOf('\\[')
-  if (openIndex === -1)
-    return false
-
-  const closeIndex = tail.lastIndexOf('\\]')
-  return openIndex > closeIndex
-}
-
-function appendedChunkMayCompleteTolerantMathBoundary(previousSource: string, source: string) {
-  if (!previousSource || !source.startsWith(previousSource))
-    return true
-
-  const appended = source.slice(previousSource.length)
+function appendedChunkMayAffectTolerantMathBoundary(previousSource: string, appended: string) {
   if (!appended)
     return false
 
-  // Fast path for the common case: normal text is appended after a completed
-  // tolerant boundary. Do not full-scan the entire accumulated stream unless
-  // the new chunk can actually introduce or complete a tolerant display boundary.
   if (appended.includes('$$') || appended.includes('\\[') || appended.includes('\\]'))
     return true
 
-  // Tolerant display delimiters can be split across stream chunks:
+  if (previousSource.endsWith('$') && appended[0] === '$')
+    return true
+
+  if (previousSource.endsWith('\\') && (appended[0] === '[' || appended[0] === ']'))
+    return true
+
+  // The opener may have arrived in the previous chunk:
   //
-  //   "$" + "$ after ..."
-  //   "\\" + "[\n..."
-  //   "\\" + "] after ..."
-  if (previousSource.endsWith('$') && appended[0] === '$')
-    return true
-
-  if (previousSource.endsWith('\\') && (appended[0] === '[' || appended[0] === ']'))
-    return true
-
-  // Non-strict malformed `\\[` blocks may close with a plain `]`. Avoid scanning
-  // every appended `]` unless a recent `\\[` opener is still plausibly pending.
-  if (appended.includes(']') && hasUnclosedTolerantBracketBoundaryOpenerNearTail(previousSource))
+  //   "prefix $$" + "\na = 1"
+  //   "prefix \\[" + "\nx + y = z"
+  if (sourceEndsWithCompleteTolerantBoundaryOpener(previousSource) && /[\r\n]/.test(appended))
     return true
 
   return false
 }
 
-function isLikelyTolerantBoundaryStopLine(line: string) {
-  const source = String(line ?? '')
-  if (!source.trim())
-    return true
+function syncTolerantMathBoundaryStreamCache(md: MarkdownIt, source: string) {
+  if (!hasMarkstreamMathPlugin(md))
+    return
 
-  if (isIndentedCodeLineLike(source))
-    return true
-
-  const trimmed = source.trimStart()
-  const first = trimmed[0]
-  if (first === '>')
-    return true
-
-  if (isSimpleHtmlBoundaryLineLike(trimmed))
-    return true
-
-  if (first === '#') {
-    let level = 0
-    while (trimmed[level] === '#')
-      level++
-    if (level >= 1 && level <= 6 && (trimmed[level] === ' ' || trimmed[level] === '\t'))
-      return true
-  }
-
-  if (trimmed.startsWith('```') || trimmed.startsWith('~~~') || trimmed.startsWith(':::'))
-    return true
-
-  if ((trimmed[0] === '*' || trimmed[0] === '-' || trimmed[0] === '+') && (trimmed[1] === ' ' || trimmed[1] === '\t'))
-    return true
-
-  if (/^\d+[.)][\t ]+/.test(trimmed))
-    return true
-
-  if (isSimpleMarkdownTableDelimiterLine(trimmed))
-    return true
-
-  if (isSimpleThematicOrSetextLine(trimmed))
-    return true
-
-  if (/^\[[^\]]+\]:\s*\S/.test(trimmed))
-    return true
-
-  return false
-}
-
-function isLikelyTolerantBoundaryMathContinuationLine(line: string) {
-  const trimmed = String(line ?? '').trim()
-  if (!trimmed)
-    return false
-
-  if (/\\[a-z]+/i.test(trimmed))
-    return true
-
-  if (/(?:^|[^\p{L}\p{N}\\])(?:[a-z]|\d+(?:\.\d+)?|\\[a-z]+)\s*(?:[=+*/<>_^]|-(?!\s*\p{L}{2,}\b))\s*(?:[a-z({]|\d+(?:\.\d+)?|\\[a-z]+)/iu.test(trimmed))
-    return true
-
-  if (/^[+\-]\s*(?:\\[a-z]+|[\d({|]|[a-z](?:\s*[_^=+\-*/<>]|\s*$))/i.test(trimmed))
-    return true
-
-  if (/\|[^|\n]{1,160}\|\s*(?:[-=+*/<>]|\\(?:le|ge|neq|approx|sim)\b)/u.test(trimmed))
-    return true
-
-  if (isLikelyTolerantAngleBracketMathLine(trimmed))
-    return true
-
-  if (/^(?:[a-z]|pi|\d+(?:\.\d+)?)$/i.test(trimmed))
-    return true
-
-  return false
-}
-
-function appendedChunkMayEndPendingTolerantBoundary(appended: string) {
-  if (!appended.includes('\n') && !appended.includes('\r'))
-    return false
-
-  const lines = appended.split(/\r?\n/)
-  const startIndex = appended.startsWith('\n') || appended.startsWith('\r\n') ? 1 : 0
-  const endsWithLineBreak = /\r?\n$/.test(appended)
-
-  for (let index = startIndex; index < lines.length; index++) {
-    const line = lines[index]
-    if (endsWithLineBreak && index === lines.length - 1 && line === '')
-      continue
-
-    if (isLikelyTolerantBoundaryStopLine(line))
-      return true
-
-    if (line.trim() && !isLikelyTolerantBoundaryMathContinuationLine(line))
-      return true
-  }
-
-  return false
-}
-
-function isClosedTolerantBoundaryWithoutSameLineSuffix(key: string | null) {
-  if (!key)
-    return false
-
-  const parts = key.split('|')
-  const lastPart = parts[parts.length - 1]
-  if (!lastPart)
-    return false
-
-  const fields = lastPart.split(':')
-  return fields[0] === 'closed' && fields[7] === 'nosuffix'
-}
-
-function hasNonSpaceOrTab(value: string) {
-  for (let index = 0; index < value.length; index++) {
-    if (value[index] !== ' ' && value[index] !== '\t')
-      return true
-  }
-  return false
-}
-
-function sliceFirstPhysicalLine(value: string) {
-  const source = String(value ?? '')
-  for (let index = 0; index < source.length; index++) {
-    const ch = source[index]
-    if (ch === '\n' || ch === '\r')
-      return source.slice(0, index)
-  }
-  return source
-}
-
-function getLastPhysicalLine(value: string) {
-  const source = String(value ?? '')
-  const lastLf = source.lastIndexOf('\n')
-  const line = source.slice(lastLf === -1 ? 0 : lastLf + 1)
-  return line.endsWith('\r') ? line.slice(0, -1) : line
-}
-
-function isStandaloneDisplayMathCloseLine(previousSource: string) {
-  const trimmed = getLastPhysicalLine(previousSource).trim()
-  if (trimmed === '$$' || trimmed === '\\]')
-    return true
-
-  return trimmed === ']' && hasUnclosedTolerantBracketBoundaryOpenerNearTail(previousSource)
-}
-
-function appendedChunkMayAddSameLineSuffixToStandaloneDisplayMathClose(
-  previousSource: string,
-  source: string,
-) {
-  if (!previousSource || !source.startsWith(previousSource))
-    return false
-
-  const appended = source.slice(previousSource.length)
-  if (!appended || previousSource.endsWith('\n') || previousSource.endsWith('\r'))
-    return false
-
-  const last = findLastNonSpaceOrTab(previousSource)
-  if (last !== '$' && last !== ']')
-    return false
-
-  if (!hasNonSpaceOrTab(sliceFirstPhysicalLine(appended)))
-    return false
-
-  return isStandaloneDisplayMathCloseLine(previousSource)
-}
-
-function appendedChunkMayAddSameLineSuffixToClosedBoundary(
-  previousKey: string | null,
-  previousSource: string,
-  appended: string,
-) {
-  if (!isClosedTolerantBoundaryWithoutSameLineSuffix(previousKey))
-    return false
-  if (!appended || previousSource.endsWith('\n') || previousSource.endsWith('\r'))
-    return false
-
-  // Only text appended before the next physical line break can become the
-  // same-line suffix of the existing close delimiter.
-  return hasNonSpaceOrTab(sliceFirstPhysicalLine(appended))
-}
-
-function findLastNonSpaceOrTab(value: string) {
-  for (let index = value.length - 1; index >= 0; index--) {
-    const ch = value[index]
-    if (ch !== ' ' && ch !== '\t')
-      return ch
-  }
-  return ''
-}
-
-function findFirstNonSpaceOrTab(value: string) {
-  for (let index = 0; index < value.length; index++) {
-    const ch = value[index]
-    if (ch !== ' ' && ch !== '\t')
-      return ch
-  }
-  return ''
-}
-
-function appendedChunkMayTurnPendingTolerantBoundaryIntoPlainWord(previousSource: string, source: string) {
-  if (!previousSource || !source.startsWith(previousSource))
-    return false
-
-  const appended = source.slice(previousSource.length)
-  if (!appended)
-    return false
-
-  const previousLast = findLastNonSpaceOrTab(previousSource)
-  const appendedFirst = findFirstNonSpaceOrTab(appended)
-
-  const previousEndsLikeAtom = isTolerantBoundaryWordLike(previousLast)
-  const appendedContinuesWord = (
-    isTolerantBoundaryLetterLike(previousLast)
-    && isTolerantBoundaryWordLike(appendedFirst)
-  ) || (
-    isTolerantBoundaryDigitLike(previousLast)
-    && isTolerantBoundaryLetterLike(appendedFirst)
-  )
-  const appendedEndsSentenceLikeProse = previousEndsLikeAtom
-    && isPlainSentencePunctuationForTolerantBoundary(appendedFirst)
-
-  if (!appendedContinuesWord && !appendedEndsSentenceLikeProse)
-    return false
-
-  const previousTail = previousSource.slice(Math.max(0, previousSource.length - 80))
-  if (/\\[a-z]*$/i.test(previousTail))
-    return false
-
-  return true
-}
-
-function appendedChunkMayChangeActiveTolerantMathBoundary(
-  previousKey: string | null,
-  previousSource: string,
-  source: string,
-) {
-  if (!previousSource || !source.startsWith(previousSource))
-    return true
-
-  const appended = source.slice(previousSource.length)
-  if (!appended)
-    return false
-
-  if (appended.includes('$$') || appended.includes('\\[') || appended.includes('\\]'))
-    return true
-
-  if (isPendingTolerantBoundaryKey(previousKey) && appendedChunkMayTurnPendingTolerantBoundaryIntoPlainWord(previousSource, source))
-    return true
-
-  if (previousKey?.includes('\\[') && appended.includes(']'))
-    return true
-
-  if (previousSource.endsWith('$') && appended[0] === '$')
-    return true
-
-  if (previousSource.endsWith('\\') && (appended[0] === '[' || appended[0] === ']'))
-    return true
-
-  if (appendedChunkMayAddSameLineSuffixToClosedBoundary(previousKey, previousSource, appended))
-    return true
-
-  if (previousKey?.startsWith('pending:') && appendedChunkMayEndPendingTolerantBoundary(appended))
-    return true
-
-  return false
-}
-
-function stripSimpleBlockquotePrefixForTolerantBoundaryLookup(line: string) {
-  const source = String(line ?? '')
-  let cursor = 0
-  let contentStart = 0
-
-  while (cursor < source.length) {
-    const markerStart = cursor
-    let spaces = 0
-
-    while (spaces < 4 && (source[cursor] === ' ' || source[cursor] === '\t')) {
-      cursor++
-      spaces++
-    }
-
-    if (spaces >= 4 || source[cursor] !== '>') {
-      cursor = markerStart
-      break
-    }
-
-    cursor++
-    if (source[cursor] === ' ' || source[cursor] === '\t')
-      cursor++
-
-    contentStart = cursor
-  }
-
-  return source.slice(contentStart)
-}
-
-function isPotentialTolerantBoundaryOpenerLine(line: string) {
-  const content = stripSimpleBlockquotePrefixForTolerantBoundaryLookup(line)
-    .replace(/[\t ]+$/, '')
-
-  if (!content.trim())
-    return false
-
-  if (content.endsWith('$$'))
-    return !!content.slice(0, -2).trim()
-
-  if (content.endsWith('\\['))
-    return !!content.slice(0, -2).trim()
-
-  return false
-}
-
-function mayContainTolerantBoundaryOpenerLineNearTail(source: string) {
-  const value = String(source ?? '')
-  if (!value || (!value.includes('$$') && !value.includes('\\[')))
-    return false
-
-  let lineStart = Math.max(0, value.length - TOLERANT_BOUNDARY_STREAM_LOOKBACK_CHARS)
-  if (lineStart > 0) {
-    const nextLineBreak = value.indexOf('\n', lineStart)
-    if (nextLineBreak === -1)
-      return false
-
-    lineStart = nextLineBreak + 1
-  }
-
-  while (lineStart < value.length) {
-    const newlineIndex = value.indexOf('\n', lineStart)
-    const hasNewline = newlineIndex !== -1
-    const lineEnd = hasNewline
-      ? (newlineIndex > lineStart && value[newlineIndex - 1] === '\r' ? newlineIndex - 1 : newlineIndex)
-      : value.length
-    const line = value.slice(lineStart, lineEnd)
-    if (isPotentialTolerantBoundaryOpenerLine(line))
-      return true
-
-    if (!hasNewline)
-      break
-    lineStart = newlineIndex + 1
-  }
-
-  return false
-}
-
-function shouldRunTolerantMathBoundaryStreamSync(
-  source: string,
-  previous?: ActiveTolerantMathBoundaryStreamState,
-) {
-  if (previous?.key || previous?.pendingCandidate)
-    return true
-
-  const value = String(source ?? '')
-  if (!value)
-    return false
-
-  if (previous) {
-    if (previous.source === source)
-      return false
-
-    if (appendedChunkMayAddSameLineSuffixToStandaloneDisplayMathClose(previous.source, source))
-      return true
-
-    if (
-      source.startsWith(previous.source)
-      && !appendedChunkMayCompleteTolerantMathBoundary(previous.source, source)
-    ) {
-      previous.source = source
-      return false
-    }
-  }
-
-  if (value.endsWith('$') || value.endsWith('\\'))
-    return true
-
-  return mayContainTolerantBoundaryOpenerLineNearTail(value)
-}
-
-function syncTopLevelStreamCacheForActiveTolerantMathBoundary(
-  md: MarkdownIt,
-  source: string,
-): 'parse' | 'stream' {
   const stream = md.stream
   if (typeof stream?.reset !== 'function')
-    return 'parse'
+    return
 
-  const cacheOwner = md as unknown as object
-  const previous = activeTolerantMathBoundaryStreamStateCache.get(cacheOwner)
-  const previousKey = previous?.key ?? null
-  const previousPendingCandidate = previous?.pendingCandidate ?? false
+  const owner = md as unknown as object
+  const previous = tolerantMathBoundaryStreamCache.get(owner)
 
-  if (previous && previous.source !== source && !source.startsWith(previous.source)) {
-    stream.reset()
-    const boundaryKey = getActiveTolerantMathBlockBoundaryCacheKey(source)
-    setActiveTolerantMathBoundaryStreamState(cacheOwner, source, boundaryKey)
-    return 'stream'
-  }
-
-  // Exact same active source: reuse the stream cache. The stale-cache risk
-  // is handled by resetting exactly when the active tolerant-boundary key changes
-  // or first appears. Repeated full md.parse here is the performance trap.
   if (previous?.source === source)
-    return 'stream'
-
-  if (
-    previous
-    && source.startsWith(previous.source)
-    && appendedChunkMayAddSameLineSuffixToStandaloneDisplayMathClose(previous.source, source)
-  ) {
-    stream.reset()
-    const boundaryKey = getActiveTolerantMathBlockBoundaryCacheKey(source)
-    setActiveTolerantMathBoundaryStreamState(cacheOwner, source, boundaryKey)
-    return 'stream'
-  }
+    return
 
   if (previous && source.startsWith(previous.source)) {
-    if (
-      previousKey !== null
-      && !appendedChunkMayChangeActiveTolerantMathBoundary(previousKey, previous.source, source)
-    ) {
-      previous.source = source
-      return 'stream'
-    }
+    const appended = source.slice(previous.source.length)
 
     if (
-      previousKey === null
-      && !appendedChunkMayCompleteTolerantMathBoundary(previous.source, source)
-      && !previousPendingCandidate
+      previous.key === null
+      && !appendedChunkMayAffectTolerantMathBoundary(previous.source, appended)
+      && !sourceEndsWithSplitTolerantBoundaryPrefix(source)
     ) {
       previous.source = source
-      return 'stream'
+      return
     }
   }
 
-  if (previousKey === null && !mayContainTolerantBoundaryOpenerLineNearTail(source)) {
-    setActiveTolerantMathBoundaryStreamState(cacheOwner, source, null, false)
-    return 'stream'
-  }
+  const nextKey = getTolerantMathBlockBoundaryStreamKey(source)
+  const sourceWasReplaced = previous ? !source.startsWith(previous.source) : false
 
-  const boundaryKey = getActiveTolerantMathBlockBoundaryCacheKey(source)
-
-  const keepLoosePendingCandidate = boundaryKey === null
-    && (isPendingTolerantBoundaryKey(previousKey) || previousPendingCandidate)
-    && mayContainTolerantBoundaryOpenerLineNearTail(source)
-    && mayContainPendingTolerantMathBlockBoundaryCandidate(source)
-
-  if (boundaryKey !== null && boundaryKey === previousKey) {
-    setActiveTolerantMathBoundaryStreamState(cacheOwner, source, boundaryKey)
-    return 'stream'
-  }
-
-  // New pending/completed tolerant boundary, changed boundary set, or leaving
-  // a tolerant-boundary document. Invalidate stale incremental tokens once.
-  if (boundaryKey || previousKey)
+  if (previous && (sourceWasReplaced || previous.key !== nextKey))
+    stream.reset()
+  else if (!previous && nextKey)
     stream.reset()
 
-  const nextPendingCandidate = boundaryKey === null
-    && (isPendingTolerantBoundaryKey(previousKey) || previousPendingCandidate)
-    ? keepLoosePendingCandidate
-    : undefined
-
-  setActiveTolerantMathBoundaryStreamState(cacheOwner, source, boundaryKey, nextPendingCandidate)
-
-  // After reset, rebuild the stream cache from the full current source.
-  // Do not fall back to md.parse here; that hides stream-cache bugs and turns
-  // long active math streams into repeated full parses.
-  return 'stream'
+  tolerantMathBoundaryStreamCache.set(owner, {
+    source,
+    key: nextKey,
+  })
 }
 
 function shouldCloneTopLevelStreamTokens(options: ParseOptions) {
   return typeof options.preTransformTokens === 'function'
     || typeof options.postTransformTokens === 'function'
-}
-
-function sameTokenMap(left: Token | undefined, right: Token | undefined) {
-  const leftMap = left?.map
-  const rightMap = right?.map
-  if (!leftMap || !rightMap)
-    return leftMap === rightMap
-
-  return leftMap[0] === rightMap[0] && leftMap[1] === rightMap[1]
-}
-
-function isParagraphTokenTriplet(tokens: Token[], index: number) {
-  return tokens[index]?.type === 'paragraph_open'
-    && tokens[index + 1]?.type === 'inline'
-    && tokens[index + 2]?.type === 'paragraph_close'
-}
-
-function sameParagraphTokenTriplet(tokens: Token[], leftIndex: number, rightIndex: number) {
-  if (!isParagraphTokenTriplet(tokens, leftIndex) || !isParagraphTokenTriplet(tokens, rightIndex))
-    return false
-
-  return sameTokenMap(tokens[leftIndex], tokens[rightIndex])
-    && sameTokenMap(tokens[leftIndex + 1], tokens[rightIndex + 1])
-    && String(tokens[leftIndex + 1]?.content ?? '') === String(tokens[rightIndex + 1]?.content ?? '')
-}
-
-function isSyntheticTolerantBoundaryParagraphTriplet(tokens: Token[], index: number) {
-  if (!isParagraphTokenTriplet(tokens, index))
-    return false
-
-  return !!tokens[index]?.meta?.[TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META]
-    || !!tokens[index + 1]?.meta?.[TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META]
-}
-
-function parseTolerantBoundarySuffixTokens(
-  md: MarkdownIt,
-  env: Record<string, unknown>,
-  source: string,
-) {
-  const suffixEnv = { ...env }
-  delete suffixEnv.__markstreamSource
-  delete suffixEnv[TOLERANT_BOUNDARY_STREAM_CACHE_KEY_ENV]
-  return md.parse(source, suffixEnv) as Token[]
-}
-
-function shiftTokenMapInPlace(token: Token, lineOffset: number) {
-  if (!lineOffset)
-    return
-
-  const map = token.map
-  if (Array.isArray(map)) {
-    const start = Number(map[0])
-    const end = Number(map[1])
-    if (Number.isFinite(start) && Number.isFinite(end))
-      token.map = [start + lineOffset, end + lineOffset]
-  }
-
-  const children = token.children as Token[] | null | undefined
-  if (Array.isArray(children)) {
-    for (const child of children)
-      shiftTokenMapInPlace(child, lineOffset)
-  }
-}
-
-function shiftTokenMaps<T extends Token>(tokens: T[], lineOffset: number) {
-  if (!lineOffset)
-    return tokens
-
-  for (const token of tokens)
-    shiftTokenMapInPlace(token, lineOffset)
-  return tokens
-}
-
-function restoreStaleCompletedTolerantMathTokens(
-  tokens: Token[],
-  source: string,
-  boundaryKey: string,
-  md: MarkdownIt,
-  env: Record<string, unknown>,
-) {
-  let restored = tokens
-  const lines = source.split(/\r?\n/)
-
-  for (const part of boundaryKey.split('|')) {
-    const fields = part.split(':')
-    if (fields[0] !== 'closed' || fields[7] !== 'nosuffix')
-      continue
-
-    const openDelim = fields[1]
-    if (openDelim !== '$$' && openDelim !== '\\[')
-      continue
-
-    const openLine = Number(fields[2])
-    const closeLine = Number(fields[4])
-    const closeIndex = Number(fields[5])
-    if (!Number.isInteger(openLine) || !Number.isInteger(closeLine) || !Number.isInteger(closeIndex))
-      continue
-
-    const expectedParagraphContent = lines.slice(openLine + 1, closeLine + 1).join('\n')
-    const contentLines = lines.slice(openLine + 1, closeLine)
-    const closeLineBeforeDelimiter = String(lines[closeLine] ?? '').slice(0, closeIndex)
-    if (closeLineBeforeDelimiter)
-      contentLines.push(closeLineBeforeDelimiter)
-
-    const content = contentLines.join('\n')
-    const closeLineSource = String(lines[closeLine] ?? '')
-    const closeDelim = openDelim === '$$'
-      ? '$$'
-      : closeLineSource.slice(closeIndex, closeIndex + 2) === '\\]' ? '\\]' : ']'
-    const markup = openDelim === '$$' ? '$$' : '\\[\\]'
-
-    for (let prefixIndex = 0; prefixIndex <= restored.length - 6; prefixIndex++) {
-      if (!isSyntheticTolerantBoundaryParagraphTriplet(restored, prefixIndex))
-        continue
-
-      const prefixMap = restored[prefixIndex]?.map
-      if (!prefixMap || prefixMap[0] !== openLine || prefixMap[1] !== openLine + 1)
-        continue
-
-      const paragraphIndex = prefixIndex + 3
-      if (!isParagraphTokenTriplet(restored, paragraphIndex))
-        continue
-
-      const paragraphMap = restored[paragraphIndex]?.map
-      if (!paragraphMap || paragraphMap[0] !== openLine + 1 || paragraphMap[1] < closeLine + 1)
-        continue
-
-      const paragraphContent = String(restored[paragraphIndex + 1]?.content ?? '')
-      const suffixSource = paragraphMap[1] > closeLine + 1
-        ? lines.slice(closeLine + 1, paragraphMap[1]).join('\n')
-        : ''
-      const fullExpectedParagraphContent = suffixSource
-        ? `${expectedParagraphContent}\n${suffixSource}`
-        : expectedParagraphContent
-
-      if (paragraphContent !== fullExpectedParagraphContent)
-        continue
-
-      if (restored === tokens)
-        restored = tokens.slice()
-
-      const mathToken = {
-        type: 'math_block',
-        tag: 'math',
-        nesting: 0,
-        content,
-        markup,
-        raw: `${openDelim}${content}${content.startsWith('\n') ? '\n' : ''}${closeDelim}`,
-        map: [openLine + 1, closeLine + 1],
-        block: true,
-        loading: false,
-        tolerantBoundary: true,
-      } as unknown as Token
-
-      const suffixTokens = suffixSource
-        ? shiftTokenMaps(
-            parseTolerantBoundarySuffixTokens(md, env, suffixSource),
-            closeLine + 1,
-          )
-        : []
-
-      restored.splice(paragraphIndex, 3, mathToken, ...suffixTokens)
-      break
-    }
-  }
-
-  return restored
-}
-
-function compactDuplicateTolerantMathPrefixTokens(
-  tokens: Token[],
-  source: string,
-  boundaryKey: string,
-  md: MarkdownIt,
-  env: Record<string, unknown>,
-) {
-  let compacted = restoreStaleCompletedTolerantMathTokens(tokens, source, boundaryKey, md, env)
-
-  for (let mathIndex = compacted.length - 1; mathIndex >= 0; mathIndex--) {
-    const token = compacted[mathIndex] as Token & { loading?: boolean, tolerantBoundary?: boolean }
-    if (!token || token.type !== 'math_block' || token.tolerantBoundary !== true)
-      continue
-
-    let rightIndex = mathIndex - 3
-    let leftIndex = rightIndex - 3
-    while (
-      leftIndex >= 0
-      && sameParagraphTokenTriplet(compacted, leftIndex, rightIndex)
-      && isSyntheticTolerantBoundaryParagraphTriplet(compacted, leftIndex)
-      && isSyntheticTolerantBoundaryParagraphTriplet(compacted, rightIndex)
-    ) {
-      // The stream parser keeps private indexes into its token cache.
-      if (compacted === tokens)
-        compacted = tokens.slice()
-
-      compacted.splice(leftIndex, 3)
-      mathIndex -= 3
-      rightIndex -= 3
-      leftIndex -= 3
-    }
-  }
-
-  return compacted
-}
-
-function needsTolerantBoundaryTokenRepair(tokens: Token[]) {
-  for (const token of tokens) {
-    if (!token)
-      continue
-
-    const meta = token.meta
-    if (
-      meta
-      && typeof meta === 'object'
-      && Boolean((meta as Record<string, unknown>)[TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META])
-    ) {
-      return true
-    }
-
-    if ((token as Token & { tolerantBoundary?: boolean }).tolerantBoundary === true)
-      return true
-  }
-
-  return false
 }
 
 function parseTopLevelTokens(
@@ -1271,49 +396,8 @@ function parseTopLevelTokens(
   if (!shouldUseTopLevelStreamParse(md, options))
     return md.parse(source, env)
 
-  // Completing a tolerant same-line display-math boundary can rewrite a cached
-  // paragraph into:
-  //
-  //   paragraph + math_block + paragraph
-  //
-  // Key transitions (new pending, pending→closed, closed→none) invalidate stale
-  // stream tokens once. We then rebuild from the full current source through
-  // md.stream.parse so the incremental cache remains hot.
-  const previousTolerantBoundaryState = activeTolerantMathBoundaryStreamStateCache.get(md as unknown as object)
-  const mathPluginApplied = hasMarkstreamMathPlugin(md)
-  const useTolerantMathBoundarySync = mathPluginApplied
-    && shouldRunTolerantMathBoundaryStreamSync(source, previousTolerantBoundaryState)
-
-  if (useTolerantMathBoundarySync) {
-    const mode = syncTopLevelStreamCacheForActiveTolerantMathBoundary(md, source)
-    if (mode === 'parse')
-      return md.parse(source, env)
-  }
-  else if (
-    mathPluginApplied
-    && !previousTolerantBoundaryState
-    && source
-  ) {
-    setActiveTolerantMathBoundaryStreamState(md as unknown as object, source, null, false)
-  }
-
-  const streamEnv = getStableStreamEnv(md, env)
-  const activeTolerantBoundaryState = useTolerantMathBoundarySync
-    ? activeTolerantMathBoundaryStreamStateCache.get(md as unknown as object)
-    : undefined
-
-  if (activeTolerantBoundaryState?.key) {
-    streamEnv.__markstreamSource = source
-    streamEnv[TOLERANT_BOUNDARY_STREAM_CACHE_KEY_ENV] = activeTolerantBoundaryState.key
-  }
-
-  const rawTokens = md.stream!.parse!(source, streamEnv)
-  const activeTolerantBoundaryKey = activeTolerantBoundaryState?.key ?? ''
-  const tokens = activeTolerantBoundaryKey
-    && (needsTolerantBoundaryTokenRepair(rawTokens) || activeTolerantBoundaryKey.includes(':nosuffix'))
-    ? compactDuplicateTolerantMathPrefixTokens(rawTokens, source, activeTolerantBoundaryKey, md, streamEnv)
-    : rawTokens
-
+  syncTolerantMathBoundaryStreamCache(md, source)
+  const tokens = md.stream!.parse!(source, getStableStreamEnv(md, env))
   if (!shouldCloneTopLevelStreamTokens(options))
     return tokens
 
@@ -3158,7 +2242,7 @@ export function parseMarkdownToStructure(
 
   if (shouldResetTopLevelStreamCacheForFinalAutoParse(md, options)) {
     md.stream!.reset!()
-    clearActiveTolerantMathBoundaryStreamState(md as unknown as object)
+    clearTolerantMathBoundaryStreamCache(md)
   }
 
   if (!isFinal) {
@@ -3190,10 +2274,7 @@ export function parseMarkdownToStructure(
       // streaming 中间态：单独的 "*"/"+" 行会被识别成空的 list item，导致 UI 闪出一个圆点
       safeMarkdown = safeMarkdown.replace(/\n\s*[*+]\s*$/, '\n')
     }
-    else if (
-      /(?:^|\n)\s*\d+\s*$/.test(safeMarkdown)
-      && !(hasMarkstreamMathPlugin(md) && mayContainPendingTolerantMathBlockBoundaryCandidate(safeMarkdown))
-    ) {
+    else if (/(?:^|\n)\s*\d+\s*$/.test(safeMarkdown)) {
       // streaming 中间态：单独的 "2" / "10" 行常是有序列表 marker 的前缀（下一字符才到 "." / ")"）。
       // 在此状态下 markdown-it 会把它解析成 paragraph/text，导致先撑开一段空白再被下一次解析替换，形成抖动。
       // 只裁剪末尾这一行，等 marker 完整或有内容后再正常解析。

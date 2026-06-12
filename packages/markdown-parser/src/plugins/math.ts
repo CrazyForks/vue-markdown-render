@@ -24,11 +24,10 @@ interface MathBlockState {
   tokens: MarkdownToken[]
 }
 
-type TolerantMathToken = MarkdownToken & { tolerantBoundary?: boolean }
-
-export const TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META = '__markstreamTolerantBoundarySyntheticParagraph'
-export const TOLERANT_BOUNDARY_STREAM_CACHE_KEY_ENV = '__markstreamTolerantBoundaryStreamCacheKey'
 const MARKSTREAM_MATH_PLUGIN_APPLIED = '__markstreamMathPluginApplied'
+const TOLERANT_BOUNDARY_SCAN_MAX_LINES = 80
+const TOLERANT_BOUNDARY_SCAN_MAX_CHARS = 20000
+const TOLERANT_BOUNDARY_SCAN_TAIL_CHARS = TOLERANT_BOUNDARY_SCAN_MAX_CHARS + 4096
 
 export function hasMarkstreamMathPlugin(md: MarkdownIt) {
   return !!(md as unknown as Record<string, unknown>)[MARKSTREAM_MATH_PLUGIN_APPLIED]
@@ -450,24 +449,13 @@ function findSingleDollarClose(src: string, startIdx: number) {
   return -1
 }
 
-function findUnescapedDelimiter(
-  src: string,
-  delimiter: string,
-  startIdx = 0,
-  excludedRanges: Array<[number, number]> = [],
-) {
+function findUnescapedDelimiter(src: string, delimiter: string, startIdx = 0) {
   let searchPos = Math.max(0, startIdx)
 
   while (searchPos < src.length) {
     const index = src.indexOf(delimiter, searchPos)
     if (index === -1)
       return -1
-
-    const excludedRange = findRangeAt(excludedRanges, index)
-    if (excludedRange) {
-      searchPos = Math.max(index + Math.max(1, delimiter.length), excludedRange[1])
-      continue
-    }
 
     if (!isEscapedAt(src, index))
       return index
@@ -478,1217 +466,24 @@ function findUnescapedDelimiter(
   return -1
 }
 
-function countUnescapedDelimiter(
-  src: string,
-  delimiter: string,
-  startIdx = 0,
-  endIdx = src.length,
-  excludedRanges: Array<[number, number]> = [],
-) {
-  let count = 0
-  let searchPos = Math.max(0, startIdx)
-  const end = Math.min(src.length, Math.max(0, endIdx))
-
-  while (searchPos < end) {
-    const index = findUnescapedDelimiter(src, delimiter, searchPos, excludedRanges)
-    if (index === -1 || index >= end)
-      break
-
-    count++
-    searchPos = index + delimiter.length
-  }
-
-  return count
-}
-
-function isPlainBracketFallbackCloseMathContinuation(tail: string) {
-  const stripped = String(tail ?? '').trimStart()
-  if (!stripped)
-    return false
-
-  // Lines like `] + x = 0`, `] \cdot x`, or `]}` are likely still math
-  // content, so the leading `]` should not be treated as the malformed close
-  // for a non-strict `\[` block.
-  const first = stripped[0]
-  if (first === ']' || first === ')' || first === '}')
-    return true
-
-  if (/^\\[a-z]+/i.test(stripped))
-    return true
-
-  if (/^[+*/^_=<>]\s*(?:[a-z0-9\\({]|$)/i.test(stripped))
-    return true
-
-  // `] - x` can be math continuation, but `] - where ...` is normal suffix.
-  // Keep hyphen conservative: treat it as math only when the right side is a
-  // short variable/number/TeX command, not a prose word.
-  return /^-\s*(?:[a-z](?![a-z0-9])|[\d({]|\\[a-z]+|$)/i.test(stripped)
-}
-
-function findPlainBracketFallbackClose(src: string) {
-  let index = 0
-  while (index < src.length && (src[index] === ' ' || src[index] === '\t'))
-    index++
-
-  if (src[index] !== ']')
-    return -1
-
-  if (isEscapedAt(src, index))
-    return -1
-
-  const tail = src.slice(index + 1).trimStart()
-  if (!tail)
-    return index
-
-  // Non-strict `\[` accepts a plain `]` close for malformed LLM output:
-  //
-  //   \[
-  //   x + y
-  //   ] where ...
-  //
-  // But a math line may also legitimately start with `]` as content:
-  //
-  //   \[
-  //   ] + x = 0
-  //   \]
-  //
-  // Treat the plain `]` as a fallback close only when the tail does not look
-  // like a math continuation.
-  if (isPlainBracketFallbackCloseMathContinuation(tail))
-    return -1
-
-  return index
-}
-
-const TOLERANT_VALUE_ATOM = String.raw`(?:[a-z]|\d+(?:\.\d+)?|\\[a-z]+)`
-const TOLERANT_BOUNDARY_BEFORE = String.raw`(?:^|[^\p{L}\p{N}\\])`
-const TOLERANT_BOUNDARY_AFTER = String.raw`(?:$|[^\p{L}\p{N}])`
-const TOLERANT_OPERATOR = String.raw`(?:[=+*/<>]|-(?!\s*\p{L}{2,}\b))`
-const TOLERANT_FORMULA_OPERATOR_SIGNAL_RE = new RegExp(
-  String.raw`${TOLERANT_BOUNDARY_BEFORE}${TOLERANT_VALUE_ATOM}\s*${TOLERANT_OPERATOR}\s*${TOLERANT_VALUE_ATOM}${TOLERANT_BOUNDARY_AFTER}`,
-  'iu',
-)
-// eslint-disable-next-line regexp/no-useless-assertions
-const TOLERANT_ABSOLUTE_VALUE_SIGNAL_RE = /\|[^|\n]{1,160}\|\s*(?:[-=+*/<>]|\\(?:le|ge|neq|approx|sim)\b)|(?:[-=+*/<>]|\\(?:le|ge|neq|approx|sim)\b)\s*\|[^|\n]{1,160}\|/u
-
-function hasTolerantFormulaOperatorSignal(content: string) {
-  return TOLERANT_FORMULA_OPERATOR_SIGNAL_RE.test(content)
-}
-
-function hasTolerantAbsoluteValueSignal(content: string) {
-  return TOLERANT_ABSOLUTE_VALUE_SIGNAL_RE.test(content)
-}
-
-function isLikelyClosedTolerantSingleAtomMath(content: string) {
-  const stripped = String(content ?? '').trim()
-  if (!stripped || stripped.length > 80)
-    return false
-
-  // Tolerant same-line display repair should still accept closed blocks like:
-  //
-  //   prefix $
-  //   x
-  //   $ suffix
-  //
-  // But keep this deliberately narrower than `isMathLike()` so ordinary prose
-  // words such as "hello" do not become display math merely because a later
-  // unrelated line contains "$".
-  return /^(?:[a-z]|pi)$/i.test(stripped)
-    || /^\d+(?:\.\d+)?$/.test(stripped)
-    || /^(?:[A-Z][a-z]?(?:_\{?\d+\}?|\^\{?\d+\}?)?)+$/.test(stripped)
-}
-
-function isLikelySpacedSuperSubscriptMath(content: string) {
-  const stripped = String(content ?? '').trim()
-  if (!stripped || stripped.length > 400)
-    return false
-  return /(?:^|[^\p{L}\p{N}\\])(?:[a-z]|\\[a-z]+)\s*[_^]\s*(?:\{[^{}\n]{1,120}\}|[a-z0-9\\]+)(?:$|[^\p{L}\p{N}])/iu.test(stripped)
-}
-function isLikelyTolerantExplicitMathBlockContent(content: string, closed: boolean) {
-  const stripped = String(content ?? '').trim()
-  if (!stripped)
-    return false
-
-  // Tolerant same-line boundaries are weaker than real line-start `$` / `\[`.
-  // Require a concrete math signal so ordinary prose ending with `$` does not
-  // split into synthetic paragraph + math_block + paragraph.
-  return /\\[a-z]+/i.test(stripped)
-    || /[a-z0-9\\][_^][a-z0-9\\{]/i.test(stripped)
-    || /\\(?:times|pm|cdot|le|ge|neq)\b/.test(stripped)
-    || hasTolerantFormulaOperatorSignal(stripped)
-    || hasTolerantAbsoluteValueSignal(stripped)
-    || hasTolerantAngleBracketMathSignal(stripped)
-    || (closed && isLikelyClosedTolerantSingleAtomMath(stripped))
-    || (closed && isLikelySpacedSuperSubscriptMath(stripped))
-}
-
-function isInsideCodeSpanOrUnclosedTail(src: string, index: number) {
-  let cursor = 0
-
-  while (cursor < src.length) {
-    if (src[cursor] !== '`' || isEscapedAt(src, cursor)) {
-      cursor++
-      continue
-    }
-
-    const openStart = cursor
-    let openLen = 1
-    while (openStart + openLen < src.length && src[openStart + openLen] === '`')
-      openLen++
-
-    let search = openStart + openLen
-    let closeStart = -1
-
-    while (search < src.length) {
-      if (src[search] !== '`') {
-        search++
-        continue
-      }
-
-      const runStart = search
-      let runLen = 1
-      while (runStart + runLen < src.length && src[runStart + runLen] === '`')
-        runLen++
-
-      if (runLen === openLen) {
-        closeStart = runStart
-        break
-      }
-
-      search = runStart + runLen
-    }
-
-    if (closeStart === -1)
-      return index >= openStart
-
-    if (index >= openStart && index < closeStart + openLen)
-      return true
-
-    cursor = closeStart + openLen
-  }
-
-  return false
-}
-
-const MAX_TOLERANT_BOUNDARY_LINES = 80
-const MAX_TOLERANT_BOUNDARY_CHARS = 20000
-const MAX_TOLERANT_BOUNDARY_CACHE_SCAN_CHARS = MAX_TOLERANT_BOUNDARY_CHARS + 8192
-const MAX_TOLERANT_BOUNDARY_CACHE_SCAN_LINES = MAX_TOLERANT_BOUNDARY_LINES * 3 + 16
-
 function isSpaceOrTab(ch?: string) {
   return ch === ' ' || ch === '\t'
 }
 
-function splitTolerantBoundaryBlockquotePrefix(line: string) {
-  const source = String(line ?? '')
-  let cursor = 0
-  let contentStart = 0
-
-  while (cursor < source.length) {
-    const markerStart = cursor
-    let spaces = 0
-
-    // CommonMark allows up to 3 spaces before a blockquote marker.
-    while (spaces < 4 && isSpaceOrTab(source[cursor])) {
-      cursor++
-      spaces++
-    }
-
-    if (spaces >= 4 || source[cursor] !== '>') {
-      cursor = markerStart
-      break
-    }
-
-    cursor++
-
-    // The optional post-marker space belongs to the blockquote prefix.
-    if (isSpaceOrTab(source[cursor]))
-      cursor++
-
-    contentStart = cursor
-  }
-
-  return {
-    prefix: source.slice(0, contentStart),
-    content: source.slice(contentStart),
-  }
+function trimRightSpaceOrTab(value: string) {
+  let end = value.length
+  while (end > 0 && isSpaceOrTab(value[end - 1]))
+    end--
+  return value.slice(0, end)
 }
 
-interface TolerantBoundaryScanContext {
-  blockquotePrefix: string
-  listContinuationIndent: number
-}
-
-interface TolerantBoundaryScanLine {
-  matched: boolean
-  content: string
-  contentOffset: number
-}
-
-function parseTolerantBoundaryListContinuationIndent(line: string) {
-  const source = String(line ?? '')
-  let index = 0
-  let spaces = 0
-
-  while (spaces < 4 && isSpaceOrTab(source[index])) {
-    index++
-    spaces++
+function countLineBreaks(value: string) {
+  let count = 0
+  for (let index = 0; index < value.length; index++) {
+    if (value[index] === '\n')
+      count++
   }
-
-  if (spaces >= 4)
-    return 0
-
-  const markerStart = index
-  const first = source[index]
-
-  if (first === '-' || first === '+' || first === '*') {
-    index++
-    if (!isSpaceOrTab(source[index]))
-      return 0
-
-    while (isSpaceOrTab(source[index]))
-      index++
-
-    return index > markerStart + 1 ? index : 0
-  }
-
-  if (!isAsciiDigit(first))
-    return 0
-
-  while (isAsciiDigit(source[index]))
-    index++
-
-  if (source[index] !== '.' && source[index] !== ')')
-    return 0
-
-  index++
-  if (!isSpaceOrTab(source[index]))
-    return 0
-
-  while (isSpaceOrTab(source[index]))
-    index++
-
-  return index
-}
-
-function buildTolerantBoundaryScanContext(openingContentLine: string, blockquotePrefix: string): TolerantBoundaryScanContext {
-  return {
-    blockquotePrefix,
-    listContinuationIndent: parseTolerantBoundaryListContinuationIndent(openingContentLine),
-  }
-}
-
-function stripTolerantBoundaryListContinuationIndent(line: string, indent: number) {
-  const source = String(line ?? '')
-  if (indent <= 0) {
-    return {
-      matched: true,
-      content: source,
-      offset: 0,
-    }
-  }
-
-  let cursor = 0
-  while (cursor < source.length && cursor < indent && isSpaceOrTab(source[cursor]))
-    cursor++
-
-  if (cursor >= indent) {
-    return {
-      matched: true,
-      content: source.slice(cursor),
-      offset: cursor,
-    }
-  }
-
-  if (!source.trim()) {
-    return {
-      matched: true,
-      content: '',
-      offset: source.length,
-    }
-  }
-
-  return {
-    matched: false,
-    content: source,
-    offset: 0,
-  }
-}
-
-function getTolerantBoundaryScanLine(line: string, context: TolerantBoundaryScanContext): TolerantBoundaryScanLine {
-  const expectedBlockquotePrefix = context.blockquotePrefix
-
-  if (!expectedBlockquotePrefix) {
-    const list = stripTolerantBoundaryListContinuationIndent(line, context.listContinuationIndent)
-    return { matched: list.matched, content: list.content, contentOffset: list.offset }
-  }
-
-  const parsed = splitTolerantBoundaryBlockquotePrefix(line)
-  if (parsed.prefix !== expectedBlockquotePrefix)
-    return { matched: false, content: parsed.content, contentOffset: parsed.prefix.length }
-
-  const list = stripTolerantBoundaryListContinuationIndent(parsed.content, context.listContinuationIndent)
-  return {
-    matched: list.matched,
-    content: list.content,
-    contentOffset: parsed.prefix.length + list.offset,
-  }
-}
-
-function hashTolerantBoundaryCacheText(value: string) {
-  // Small deterministic hash for cache identity. The tolerant boundary scan is
-  // capped by MAX_TOLERANT_BOUNDARY_CHARS, so this stays bounded and avoids
-  // storing full math content in the stream reset cache key.
-  let hash = 0
-  for (let i = 0; i < value.length; i++)
-    hash = ((hash * 31) + value.charCodeAt(i)) | 0
-
-  return hash.toString(36)
-}
-
-function isOnlySpaceOrTabFrom(value: string, start = 0) {
-  for (let i = Math.max(0, start); i < value.length; i++) {
-    if (!isSpaceOrTab(value[i]))
-      return false
-  }
-  return true
-}
-
-function isIndentedCodeLineForTolerantBoundary(line: string) {
-  const source = String(line ?? '')
-  if (!source.trim())
-    return false
-
-  let columns = 0
-  for (let i = 0; i < source.length; i++) {
-    const ch = source[i]
-    if (ch === ' ') {
-      columns++
-      if (columns >= 4)
-        return true
-      continue
-    }
-    if (ch === '\t')
-      return true
-    break
-  }
-  return false
-}
-
-function parseTolerantBoundaryFenceMarker(line: string) {
-  const source = String(line ?? '')
-  let index = 0
-  let spaces = 0
-
-  while (spaces < 4 && isSpaceOrTab(source[index])) {
-    index++
-    spaces++
-  }
-
-  if (spaces >= 4)
-    return null
-
-  const marker = source[index]
-  if (marker !== '`' && marker !== '~')
-    return null
-
-  let markerLen = 0
-  while (source[index + markerLen] === marker)
-    markerLen++
-
-  if (markerLen < 3)
-    return null
-
-  return {
-    markerChar: marker as '`' | '~',
-    markerLen,
-    rest: source.slice(index + markerLen),
-  }
-}
-
-function skipTolerantAngleSpaces(source: string, index: number) {
-  let cursor = index
-  while (isSpaceOrTab(source[cursor]))
-    cursor++
-  return cursor
-}
-
-function readTolerantAngleCommandEnd(source: string, index: number) {
-  if (source[index] !== '\\')
-    return -1
-
-  let cursor = index + 1
-  const commandStart = cursor
-  while (isAsciiAlpha(source[cursor]))
-    cursor++
-
-  return cursor > commandStart ? cursor : -1
-}
-
-function readTolerantAngleScriptEnd(source: string, index: number) {
-  if (source[index] === '{') {
-    let cursor = index + 1
-    let sawContent = false
-    while (cursor < source.length && source[cursor] !== '}') {
-      const ch = source[cursor]
-      if (ch === '\n' || ch === '\r' || ch === '<' || ch === '>')
-        return -1
-      if (!isSpaceOrTab(ch))
-        sawContent = true
-      cursor++
-    }
-
-    return sawContent && source[cursor] === '}' ? cursor + 1 : -1
-  }
-
-  if (source[index] === '\\')
-    return readTolerantAngleCommandEnd(source, index)
-
-  if (isAsciiAlpha(source[index]) || isAsciiDigit(source[index])) {
-    let cursor = index
-    while (isAsciiAlpha(source[cursor]) || isAsciiDigit(source[cursor]))
-      cursor++
-
-    return cursor > index ? cursor : -1
-  }
-
-  return -1
-}
-
-function readTolerantAngleAtomEnd(source: string, index: number) {
-  let cursor = skipTolerantAngleSpaces(source, index)
-  if (source[cursor] === '\\') {
-    const commandEnd = readTolerantAngleCommandEnd(source, cursor)
-    if (commandEnd === -1)
-      return -1
-    cursor = commandEnd
-  }
-  else if (isAsciiAlpha(source[cursor])) {
-    const start = cursor
-    while (isAsciiAlpha(source[cursor]) || isAsciiDigit(source[cursor]))
-      cursor++
-
-    const word = source.slice(start, cursor)
-    // Avoid treating ordinary HTML tags like <span> or <table> as angle math.
-    // Short identifiers cover common variables: <x>, <x1>, <pi>.
-    if (word.length > 2 && word.toLowerCase() !== 'pi')
-      return -1
-  }
-  else if (isAsciiDigit(source[cursor])) {
-    const start = cursor
-    while (isAsciiDigit(source[cursor]))
-      cursor++
-
-    if (cursor === start)
-      return -1
-  }
-  else {
-    return -1
-  }
-
-  while (source[cursor] === '_' || source[cursor] === '^') {
-    const scriptEnd = readTolerantAngleScriptEnd(source, cursor + 1)
-    if (scriptEnd === -1)
-      return -1
-    cursor = scriptEnd
-  }
-
-  return cursor
-}
-
-function startsWithTolerantAngleRelationCommand(source: string, index: number) {
-  if (source[index] !== '\\')
-    return false
-
-  const commandEnd = readTolerantAngleCommandEnd(source, index)
-  if (commandEnd === -1)
-    return false
-
-  const command = source.slice(index + 1, commandEnd).toLowerCase()
-  switch (command) {
-    case 'le':
-    case 'ge':
-    case 'neq':
-    case 'approx':
-    case 'sim':
-    case 'lt':
-    case 'gt':
-    case 'in':
-    case 'notin':
-    case 'subset':
-    case 'supset':
-    case 'to':
-      return true
-    default:
-      return false
-  }
-}
-
-function isTolerantAngleMathOperatorAt(source: string, index: number) {
-  const ch = source[index]
-  return ch === '='
-    || ch === '+'
-    || ch === '-'
-    || ch === '*'
-    || ch === '/'
-    || ch === '^'
-    || ch === '_'
-    || ch === '<'
-    || ch === '>'
-    || ch === '|'
-    || startsWithTolerantAngleRelationCommand(source, index)
-}
-
-export function isLikelyTolerantAngleBracketMathLine(line: string) {
-  const source = String(line ?? '')
-  let cursor = skipTolerantAngleSpaces(source, 0)
-
-  if (source[cursor] !== '<')
-    return false
-
-  cursor++
-  let atomCount = 0
-  while (cursor < source.length) {
-    const atomEnd = readTolerantAngleAtomEnd(source, cursor)
-    if (atomEnd === -1)
-      return false
-
-    atomCount++
-    cursor = skipTolerantAngleSpaces(source, atomEnd)
-    if (source[cursor] !== ',')
-      break
-
-    cursor++
-  }
-
-  if (atomCount === 0)
-    return false
-
-  cursor = skipTolerantAngleSpaces(source, cursor)
-  if (source[cursor] !== '>')
-    return false
-
-  cursor = skipTolerantAngleSpaces(source, cursor + 1)
-  return cursor < source.length && isTolerantAngleMathOperatorAt(source, cursor)
-}
-
-function hasTolerantAngleBracketMathSignal(content: string) {
-  const lines = String(content ?? '').split(/\r?\n/)
-  for (const line of lines) {
-    if (isLikelyTolerantAngleBracketMathLine(line))
-      return true
-  }
-  return false
-}
-
-function parseTolerantBoundaryHtmlOpen(line: string) {
-  const source = String(line ?? '')
-  if (isLikelyTolerantAngleBracketMathLine(source))
-    return null
-
-  let index = 0
-  let spaces = 0
-
-  while (spaces < 4 && isSpaceOrTab(source[index])) {
-    index++
-    spaces++
-  }
-
-  if (spaces >= 4 || source[index] !== '<')
-    return null
-
-  index++
-  while (isSpaceOrTab(source[index]))
-    index++
-
-  if (source[index] === '/' || source[index] === '!' || source[index] === '?')
-    return null
-
-  if (!isAsciiAlpha(source[index]))
-    return null
-
-  const nameStart = index
-  index++
-  while (isHtmlNameChar(source[index]))
-    index++
-
-  const tag = source.slice(nameStart, index).toLowerCase()
-  const boundary = source[index]
-  if (boundary && !isSpaceOrTab(boundary) && boundary !== '>' && boundary !== '/')
-    return null
-
-  let tagEnd = index
-  while (tagEnd < source.length && source[tagEnd] !== '>')
-    tagEnd++
-
-  if (tagEnd >= source.length) {
-    return {
-      tag,
-      closed: false,
-    }
-  }
-
-  let beforeClose = tagEnd - 1
-  while (beforeClose >= 0 && isSpaceOrTab(source[beforeClose]))
-    beforeClose--
-
-  const selfClosing = source[beforeClose] === '/'
-  const sameLineClose = hasTolerantBoundaryHtmlClose(source.slice(tagEnd + 1), tag)
-
-  return {
-    tag,
-    closed: selfClosing || sameLineClose,
-  }
-}
-
-function hasTolerantBoundaryHtmlClose(line: string, tag: string) {
-  const lower = String(line ?? '').toLowerCase()
-  const lowerTag = String(tag ?? '').toLowerCase()
-  if (!lower || !lowerTag)
-    return false
-
-  let pos = lower.indexOf('</')
-  while (pos !== -1) {
-    let index = pos + 2
-    while (isSpaceOrTab(lower[index]))
-      index++
-
-    if (lower.slice(index, index + lowerTag.length) === lowerTag) {
-      const boundary = lower[index + lowerTag.length]
-      if (!boundary || isSpaceOrTab(boundary) || boundary === '>')
-        return true
-    }
-
-    pos = lower.indexOf('</', pos + 2)
-  }
-
-  return false
-}
-
-function getTolerantBoundaryProtectedLineContent(line: string, context?: TolerantBoundaryScanContext) {
-  if (context)
-    return getTolerantBoundaryScanLine(line, context).content
-
-  return splitTolerantBoundaryBlockquotePrefix(line).content
-}
-
-function buildTolerantBoundaryProtectedLineMask(lines: string[], context?: TolerantBoundaryScanContext) {
-  const protectedLines = new Array<boolean>(lines.length).fill(false)
-  let fenceMarker: '`' | '~' | '' = ''
-  let fenceLen = 0
-  let htmlTag = ''
-
-  for (let lineNumber = 0; lineNumber < lines.length; lineNumber++) {
-    const line = getTolerantBoundaryProtectedLineContent(lines[lineNumber], context)
-
-    if (htmlTag) {
-      protectedLines[lineNumber] = true
-      if (hasTolerantBoundaryHtmlClose(line, htmlTag))
-        htmlTag = ''
-      continue
-    }
-
-    if (fenceMarker) {
-      protectedLines[lineNumber] = true
-      const fence = parseTolerantBoundaryFenceMarker(line)
-      if (fence && fence.markerChar === fenceMarker && fence.markerLen >= fenceLen && isOnlySpaceOrTabFrom(fence.rest)) {
-        fenceMarker = ''
-        fenceLen = 0
-      }
-      continue
-    }
-
-    if (isIndentedCodeLineForTolerantBoundary(line)) {
-      protectedLines[lineNumber] = true
-      continue
-    }
-
-    const fence = parseTolerantBoundaryFenceMarker(line)
-    if (fence) {
-      protectedLines[lineNumber] = true
-      fenceMarker = fence.markerChar
-      fenceLen = fence.markerLen
-      continue
-    }
-
-    const html = parseTolerantBoundaryHtmlOpen(line)
-    if (html) {
-      protectedLines[lineNumber] = true
-      if (!html.closed)
-        htmlTag = html.tag
-    }
-  }
-
-  return protectedLines
-}
-
-const TOLERANT_MATH_BLOCK_BOUNDARY_DELIMITERS = [
-  ['\u0024\u0024', '\u0024\u0024'],
-  ['\\[', '\\]'],
-] as const
-
-function findLineStartAtOrBefore(source: string, index: number) {
-  const boundedIndex = Math.min(Math.max(0, index), source.length)
-  const previousNewline = source.lastIndexOf('\n', Math.max(0, boundedIndex - 1))
-  return previousNewline === -1 ? 0 : previousNewline + 1
-}
-
-function findTolerantBoundaryProtectedContextStart(source: string, targetIndex: number) {
-  const target = Math.min(Math.max(0, targetIndex), source.length)
-  let index = 0
-
-  let fenceMarker: '`' | '~' | '' = ''
-  let fenceLen = 0
-  let fenceStart = -1
-
-  let htmlTag = ''
-  let htmlStart = -1
-
-  while (index < source.length && index < target) {
-    const newlineIndex = source.indexOf('\n', index)
-    const hasNewline = newlineIndex !== -1
-    const rawLineEnd = hasNewline
-      ? (newlineIndex > index && source[newlineIndex - 1] === '\r' ? newlineIndex - 1 : newlineIndex)
-      : source.length
-    const rawLine = source.slice(index, rawLineEnd)
-    const line = splitTolerantBoundaryBlockquotePrefix(rawLine).content
-
-    if (htmlTag) {
-      if (hasTolerantBoundaryHtmlClose(line, htmlTag)) {
-        htmlTag = ''
-        htmlStart = -1
-      }
-    }
-    else if (fenceMarker) {
-      const fence = parseTolerantBoundaryFenceMarker(line)
-      if (
-        fence
-        && fence.markerChar === fenceMarker
-        && fence.markerLen >= fenceLen
-        && isOnlySpaceOrTabFrom(fence.rest)
-      ) {
-        fenceMarker = ''
-        fenceLen = 0
-        fenceStart = -1
-      }
-    }
-    else if (!isIndentedCodeLineForTolerantBoundary(line)) {
-      const fence = parseTolerantBoundaryFenceMarker(line)
-      if (fence) {
-        fenceMarker = fence.markerChar
-        fenceLen = fence.markerLen
-        fenceStart = index
-      }
-      else {
-        const html = parseTolerantBoundaryHtmlOpen(line)
-        if (html && !html.closed) {
-          htmlTag = html.tag
-          htmlStart = index
-        }
-      }
-    }
-
-    if (!hasNewline)
-      break
-
-    index = newlineIndex + 1
-  }
-
-  if (fenceMarker && fenceStart !== -1)
-    return fenceStart
-
-  if (htmlTag && htmlStart !== -1)
-    return htmlStart
-
-  return findLineStartAtOrBefore(source, target)
-}
-
-function mayContainTolerantBoundaryDelimiter(line: string) {
-  return line.includes('$') || line.includes('\\[') || line.includes('\\]')
-}
-
-function findTolerantBoundaryLineStart(source: string, lineNumber: number) {
-  if (lineNumber <= 0)
-    return 0
-
-  let currentLine = 0
-  for (let index = 0; index < source.length; index++) {
-    if (source[index] !== '\n')
-      continue
-
-    currentLine++
-    if (currentLine === lineNumber)
-      return index + 1
-  }
-
-  return source.length
-}
-
-function getTolerantBoundaryDelimiterLineClampStart(lines: string[]) {
-  let delimiterLines = 0
-  for (let index = lines.length - 1; index >= 0; index--) {
-    if (!mayContainTolerantBoundaryDelimiter(lines[index]))
-      continue
-
-    delimiterLines++
-    if (delimiterLines > MAX_TOLERANT_BOUNDARY_CACHE_SCAN_LINES)
-      return index + 1
-  }
-
-  return 0
-}
-
-function clampTolerantBoundaryCacheScanWindowLines(window: { source: string, lineOffset: number }) {
-  const lines = window.source.split(/\r?\n/)
-  const keepStart = getTolerantBoundaryDelimiterLineClampStart(lines)
-  if (keepStart <= 0)
-    return window
-
-  let windowStart = findTolerantBoundaryLineStart(window.source, keepStart)
-  windowStart = findTolerantBoundaryProtectedContextStart(window.source, windowStart)
-
-  const prefix = window.source.slice(0, windowStart)
-  return {
-    source: window.source.slice(windowStart),
-    lineOffset: window.lineOffset + countLineBreaks(prefix),
-  }
-}
-
-function getTolerantBoundaryCacheScanWindow(source: string, maxChars = MAX_TOLERANT_BOUNDARY_CACHE_SCAN_CHARS) {
-  const value = String(source ?? '')
-  if (value.length <= maxChars) {
-    return clampTolerantBoundaryCacheScanWindowLines({
-      source: value,
-      lineOffset: 0,
-    })
-  }
-
-  let windowStart = value.length - maxChars
-  const nextLineBreak = value.indexOf('\n', windowStart)
-  if (nextLineBreak === -1) {
-    return {
-      source: '',
-      lineOffset: countLineBreaks(value),
-    }
-  }
-  windowStart = nextLineBreak + 1
-
-  windowStart = findTolerantBoundaryProtectedContextStart(value, windowStart)
-
-  const prefix = value.slice(0, windowStart)
-  return clampTolerantBoundaryCacheScanWindowLines({
-    source: value.slice(windowStart),
-    lineOffset: countLineBreaks(prefix),
-  })
-}
-
-function getTolerantMathBlockBoundaryCacheKey(markdown: string, includePending: boolean) {
-  const fullSource = String(markdown ?? '')
-  if (!fullSource || (!fullSource.includes('$') && !fullSource.includes('\\[')))
-    return null
-
-  const {
-    source,
-    lineOffset,
-  } = getTolerantBoundaryCacheScanWindow(fullSource)
-
-  if (!source || (!source.includes('$') && !source.includes('\\[')))
-    return null
-
-  const keys: string[] = []
-  const lines = source.split(/\r?\n/)
-
-  const protectedLines = buildTolerantBoundaryProtectedLineMask(lines)
-  const protectedLinesByScanContext = new Map<string, boolean[]>()
-
-  const getProtectedLinesForScanContext = (context: TolerantBoundaryScanContext) => {
-    if (!context.listContinuationIndent)
-      return protectedLines
-
-    const key = `${context.blockquotePrefix}\u0000${context.listContinuationIndent}`
-    const cached = protectedLinesByScanContext.get(key)
-    if (cached)
-      return cached
-
-    const next = buildTolerantBoundaryProtectedLineMask(lines, context)
-    protectedLinesByScanContext.set(key, next)
-    return next
-  }
-
-  let skipUntilLine = -1
-
-  for (let startLine = 0; startLine < lines.length - 1; startLine++) {
-    if (startLine <= skipUntilLine)
-      continue
-
-    if (protectedLines[startLine])
-      continue
-
-    const line = lines[startLine]
-    const openingLine = splitTolerantBoundaryBlockquotePrefix(line)
-    const scanContext = buildTolerantBoundaryScanContext(
-      openingLine.content,
-      openingLine.prefix,
-    )
-    const scanProtectedLines = getProtectedLinesForScanContext(scanContext)
-    const lineWithoutTrailingWs = openingLine.content.replace(/[\t ]+$/, '')
-    if (!lineWithoutTrailingWs.trim())
-      continue
-
-    for (const [open, close] of TOLERANT_MATH_BLOCK_BOUNDARY_DELIMITERS) {
-      if (!lineWithoutTrailingWs.endsWith(open))
-        continue
-
-      const openIndex = lineWithoutTrailingWs.length - open.length
-      if (openIndex <= 0)
-        continue
-
-      if (isEscapedAt(lineWithoutTrailingWs, openIndex) || isInsideCodeSpanOrUnclosedTail(lineWithoutTrailingWs, openIndex))
-        continue
-
-      if (openIndex > 0 && lineWithoutTrailingWs[openIndex - 1] === open[0])
-        continue
-
-      const before = lineWithoutTrailingWs.slice(0, openIndex).replace(/[\t ]+$/, '')
-      if (!before.trim())
-        continue
-
-      const codeSpanRanges = buildCodeSpanRanges(lineWithoutTrailingWs)
-      const previousOpenCount = countUnescapedDelimiter(lineWithoutTrailingWs, open, 0, openIndex, codeSpanRanges)
-      const previousCloseCount = open === '\u0024\u0024'
-        ? 0
-        : countUnescapedDelimiter(lineWithoutTrailingWs, close, 0, openIndex, codeSpanRanges)
-
-      if (open === '\u0024\u0024' ? previousOpenCount % 2 === 1 : previousOpenCount > previousCloseCount)
-        continue
-
-      let content = ''
-      let stoppedBeforeTail = false
-      let closed = false
-      let currentLineNumber = startLine + 1
-
-      for (; currentLineNumber < lines.length; currentLineNumber++) {
-        const currentScanLine = getTolerantBoundaryScanLine(
-          lines[currentLineNumber],
-          scanContext,
-        )
-        if (!currentScanLine.matched) {
-          stoppedBeforeTail = true
-          break
-        }
-
-        if (scanProtectedLines[currentLineNumber]) {
-          stoppedBeforeTail = true
-          break
-        }
-
-        const currentLine = currentScanLine.content
-        const nextRawLine = lines[currentLineNumber + 1] ?? ''
-        const nextLine = getTolerantBoundaryScanLine(nextRawLine, scanContext).content
-
-        if (shouldAbortTolerantBoundaryScan(currentLine, startLine, currentLineNumber, content, nextLine)) {
-          stoppedBeforeTail = true
-          break
-        }
-
-        const closeIndex = findUnescapedDelimiter(currentLine, close)
-        const fallbackCloseIndex = open === '\\['
-          ? findPlainBracketFallbackClose(currentLine)
-          : -1
-        const endIndex = closeIndex !== -1 ? closeIndex : fallbackCloseIndex
-
-        if (endIndex !== -1) {
-          closed = true
-          const closeDelimiterLength = closeIndex !== -1 ? close.length : 1
-          const beforeClose = currentLine.slice(0, endIndex)
-          const trailingAfterClose = currentLine.slice(endIndex + closeDelimiterLength)
-          const suffixState = trailingAfterClose.trim() ? 'suffix' : 'nosuffix'
-          const candidateContent = appendTolerantBoundaryContent(content, beforeClose)
-          if (isLikelyTolerantExplicitMathBlockContent(candidateContent, true)) {
-            const contentHash = hashTolerantBoundaryCacheText(candidateContent)
-            const rawEndIndex = endIndex + currentScanLine.contentOffset
-            keys.push(`closed:${open}:${lineOffset + startLine}:${openIndex}:${lineOffset + currentLineNumber}:${rawEndIndex}:${contentHash}:${suffixState}`)
-            skipUntilLine = currentLineNumber
-          }
-          break
-        }
-
-        content = appendTolerantBoundaryContent(content, currentLine)
-      }
-
-      if (
-        includePending
-        && !closed
-        && !stoppedBeforeTail
-        && currentLineNumber >= lines.length
-        && isPotentialTolerantPendingMathContent(content)
-      ) {
-        // Pending key deliberately does not include content hash. While the user
-        // is still streaming math content, appending normal math text should not
-        // reset on every chunk. We only need one reset when entering this pending
-        // tolerant-boundary shape; completion will produce a different closed key.
-        keys.push(`pending:${open}:${lineOffset + startLine}:${openIndex}`)
-        skipUntilLine = lines.length - 1
-      }
-    }
-  }
-
-  return keys.length ? keys.join('|') : null
-}
-
-export function getCompletedTolerantMathBlockBoundaryCacheKey(markdown: string) {
-  return getTolerantMathBlockBoundaryCacheKey(markdown, false)
-}
-
-export function getActiveTolerantMathBlockBoundaryCacheKey(markdown: string) {
-  return getTolerantMathBlockBoundaryCacheKey(markdown, true)
-}
-
-function isPotentialTolerantPendingMathContent(content: string) {
-  const stripped = String(content ?? '').trim()
-  if (!stripped)
-    return false
-
-  if (stripped.length > MAX_TOLERANT_BOUNDARY_CHARS)
-    return true
-
-  if (isLikelyTolerantExplicitMathBlockContent(stripped, false))
-    return true
-
-  if (isLikelySpacedSuperSubscriptMath(stripped))
-    return true
-
-  if (/^(?:[a-z]|pi|\\[a-z]*|\d+(?:\.\d+)?)$/i.test(stripped))
-    return true
-
-  if (/[=+\-*/^_<>|\\({]\s*$/.test(stripped) || stripped.endsWith('['))
-    return true
-
-  return /(?:^|[^\p{L}\p{N}\\])(?:[a-z]|\\[a-z]+)\s*[-+*/=<>_^]\s*$/iu.test(stripped)
-}
-
-export function mayContainPendingTolerantMathBlockBoundaryCandidate(markdown: string) {
-  const source = String(markdown ?? '')
-  if (!source || (!source.includes('$') && !source.includes('\\[')))
-    return false
-
-  const { source: tail } = getTolerantBoundaryCacheScanWindow(source, MAX_TOLERANT_BOUNDARY_CHARS)
-  const lines = tail.split(/\r?\n/)
-  const protectedLines = buildTolerantBoundaryProtectedLineMask(lines)
-  const protectedLinesByScanContext = new Map<string, boolean[]>()
-
-  const getProtectedLinesForScanContext = (context: TolerantBoundaryScanContext) => {
-    if (!context.listContinuationIndent)
-      return protectedLines
-
-    const key = `${context.blockquotePrefix}\u0000${context.listContinuationIndent}`
-    const cached = protectedLinesByScanContext.get(key)
-    if (cached)
-      return cached
-
-    const next = buildTolerantBoundaryProtectedLineMask(lines, context)
-    protectedLinesByScanContext.set(key, next)
-    return next
-  }
-
-  const minStartLine = Math.max(0, lines.length - MAX_TOLERANT_BOUNDARY_LINES - 1)
-
-  for (let startLine = lines.length - 1; startLine >= minStartLine; startLine--) {
-    if (protectedLines[startLine])
-      continue
-
-    const openingLine = splitTolerantBoundaryBlockquotePrefix(lines[startLine])
-    const scanContext = buildTolerantBoundaryScanContext(
-      openingLine.content,
-      openingLine.prefix,
-    )
-    const scanProtectedLines = getProtectedLinesForScanContext(scanContext)
-    const lineWithoutTrailingWs = openingLine.content.replace(/[\t ]+$/, '')
-    if (!lineWithoutTrailingWs.trim())
-      continue
-
-    for (const [open, close] of TOLERANT_MATH_BLOCK_BOUNDARY_DELIMITERS) {
-      if (!lineWithoutTrailingWs.endsWith(open))
-        continue
-
-      const openIndex = lineWithoutTrailingWs.length - open.length
-      if (openIndex <= 0)
-        continue
-
-      if (isEscapedAt(lineWithoutTrailingWs, openIndex) || isInsideCodeSpanOrUnclosedTail(lineWithoutTrailingWs, openIndex))
-        continue
-
-      if (openIndex > 0 && lineWithoutTrailingWs[openIndex - 1] === open[0])
-        continue
-
-      const before = lineWithoutTrailingWs.slice(0, openIndex).replace(/[\t ]+$/, '')
-      if (!before.trim())
-        continue
-
-      const codeSpanRanges = buildCodeSpanRanges(lineWithoutTrailingWs)
-      const previousOpenCount = countUnescapedDelimiter(lineWithoutTrailingWs, open, 0, openIndex, codeSpanRanges)
-      const previousCloseCount = open === '\u0024\u0024'
-        ? 0
-        : countUnescapedDelimiter(lineWithoutTrailingWs, close, 0, openIndex, codeSpanRanges)
-
-      if (open === '\u0024\u0024' ? previousOpenCount % 2 === 1 : previousOpenCount > previousCloseCount)
-        continue
-
-      if (startLine === lines.length - 1)
-        return true
-
-      let content = ''
-
-      for (let currentLineNumber = startLine + 1; currentLineNumber < lines.length; currentLineNumber++) {
-        const currentScanLine = getTolerantBoundaryScanLine(
-          lines[currentLineNumber],
-          scanContext,
-        )
-        if (!currentScanLine.matched)
-          break
-
-        if (scanProtectedLines[currentLineNumber])
-          break
-
-        const currentLine = currentScanLine.content
-        const nextRawLine = lines[currentLineNumber + 1] ?? ''
-        const nextLine = getTolerantBoundaryScanLine(nextRawLine, scanContext).content
-
-        if (shouldAbortTolerantBoundaryScan(currentLine, startLine, currentLineNumber, content, nextLine))
-          break
-
-        const closeIndex = findUnescapedDelimiter(currentLine, close)
-        const fallbackCloseIndex = open === '\\['
-          ? findPlainBracketFallbackClose(currentLine)
-          : -1
-
-        if (closeIndex !== -1 || fallbackCloseIndex !== -1)
-          break
-
-        content = appendTolerantBoundaryContent(content, currentLine)
-
-        if (currentLineNumber === lines.length - 1)
-          return isPotentialTolerantPendingMathContent(content)
-      }
-    }
-  }
-
-  return false
-}
-
-function hasNonSpaceOrTabAfter(value: string, start: number) {
-  for (let i = Math.max(0, start); i < value.length; i++) {
-    if (!isSpaceOrTab(value[i]))
-      return true
-  }
-  return false
-}
-
-function isAsciiAlpha(ch?: string) {
-  if (!ch)
-    return false
-  const code = ch.charCodeAt(0)
-  return (code >= 65 && code <= 90) || (code >= 97 && code <= 122)
+  return count
 }
 
 function isAsciiDigit(ch?: string) {
@@ -1698,41 +493,17 @@ function isAsciiDigit(ch?: string) {
   return code >= 48 && code <= 57
 }
 
-function isHtmlNameChar(ch?: string) {
-  return isAsciiAlpha(ch) || isAsciiDigit(ch) || ch === '_' || ch === ':' || ch === '-'
-}
-
-function isThematicOrSetextBoundaryLine(line: string) {
-  // Tolerant math repair must not scan across horizontal rules or setext
-  // heading underlines. Otherwise ordinary text ending with "$" can consume
-  // a later unrelated "$" and swallow the block boundary in between.
-  // Covers: "---", "- - -", "***", "* * *", "___", "_ _ _", "===".
-  //
-  // Keep this as a deterministic scanner instead of a nested-quantifier regex.
-  // This function runs in the tolerant cross-line scan hot path. Regexes like
-  // `(?:-[\t ]*){3,}` are easy to make pathological with long near-matches,
-  // e.g. "- - - ... x".
-  const value = String(line ?? '').trim()
-  if (!value)
+function isThematicLikeLine(trimmed: string) {
+  if (trimmed.length < 3)
     return false
 
-  if (value[0] === '=') {
-    if (value.length < 3)
-      return false
-    for (let i = 0; i < value.length; i++) {
-      if (value[i] !== '=')
-        return false
-    }
-    return true
-  }
-
-  const marker = value[0]
-  if (marker !== '-' && marker !== '*' && marker !== '_')
+  const marker = trimmed[0]
+  if (marker !== '-' && marker !== '*' && marker !== '_' && marker !== '=')
     return false
 
   let markerCount = 0
-  for (let i = 0; i < value.length; i++) {
-    const ch = value[i]
+  for (let index = 0; index < trimmed.length; index++) {
+    const ch = trimmed[index]
     if (ch === marker) {
       markerCount++
       continue
@@ -1746,7 +517,7 @@ function isThematicOrSetextBoundaryLine(line: string) {
 }
 
 function isMarkdownTableDelimiterCell(cell: string) {
-  const value = String(cell ?? '').trim()
+  const value = cell.trim()
   if (!value)
     return false
 
@@ -1769,120 +540,23 @@ function isMarkdownTableDelimiterCell(cell: string) {
   return index === value.length
 }
 
-function isLikelyMarkdownTableBoundaryLine(trimmed: string) {
-  // Markdown table delimiter rows may omit leading/trailing pipes:
-  //
-  //   A | B
-  //   --- | ---
-  //
-  // If a tolerant math opener appears before such a table, scanning must abort
-  // on the delimiter row instead of treating the table as formula content.
-  //
-  // Important: do NOT treat normal pipe-containing data rows as hard scan
-  // boundaries here. A valid display formula may start with absolute values,
-  // including spaced absolute values, e.g.
-  //
-  //   |x| = y
-  //   | x | = y
-  //
-  // The previous implementation treated many pipe data rows as table
-  // boundaries, which made tolerant display math under-recognize valid absolute
-  // value expressions. Real markdown tables are still guarded by their delimiter
-  // rows:
-  //
-  //   --- | ---
-  const value = String(trimmed ?? '').trim()
-  if (!value || !value.includes('|'))
+function isMarkdownTableDelimiterLine(trimmed: string) {
+  if (!trimmed.includes('|'))
     return false
 
-  const withoutLeadingPipe = value[0] === '|' ? value.slice(1) : value
-  const withoutEdgePipes = withoutLeadingPipe.endsWith('|')
+  const withoutLeadingPipe = trimmed[0] === '|' ? trimmed.slice(1) : trimmed
+  const withoutEdgePipe = withoutLeadingPipe.endsWith('|')
     ? withoutLeadingPipe.slice(0, -1)
     : withoutLeadingPipe
-  const cells = withoutEdgePipes.split('|')
 
-  if (!cells.length)
-    return false
-
-  for (const cell of cells) {
-    if (!isMarkdownTableDelimiterCell(cell))
-      return false
-  }
-
-  return true
+  return withoutEdgePipe.split('|').every(isMarkdownTableDelimiterCell)
 }
 
-function isLikelyMarkdownTableHeaderBeforeDelimiter(trimmed: string, nextLine?: string) {
-  const value = String(trimmed ?? '').trim()
-  if (!value || !value.includes('|'))
-    return false
-
-  const next = String(nextLine ?? '').trim()
-  if (!isLikelyMarkdownTableBoundaryLine(next))
-    return false
-
-  // A table header row followed by a delimiter row is a hard boundary for the
-  // tolerant same-line math repair. Without this guard, a header like:
-  //
-  //   Name $ | Value
-  //   --- | ---
-  //
-  // can be mistaken for the closing `$` of an earlier malformed display block.
-  // Keep absolute-value formula rows safe: `|x| = y` is not followed by a table
-  // delimiter in valid math-block repair cases, so it still parses as math.
-  const withoutLeadingPipe = value[0] === '|' ? value.slice(1) : value
-  const withoutEdgePipes = withoutLeadingPipe.endsWith('|')
-    ? withoutLeadingPipe.slice(0, -1)
-    : withoutLeadingPipe
-  const cells = withoutEdgePipes.split('|')
-
-  if (!cells.length)
-    return false
-
-  return cells.some(cell => cell.trim())
-}
-
-function isHeadingBoundaryLine(trimmed: string) {
-  let level = 0
-  while (trimmed[level] === '#')
-    level++
-
-  if (level < 1 || level > 6)
-    return false
-
-  return isSpaceOrTab(trimmed[level]) && hasNonSpaceOrTabAfter(trimmed, level + 1)
-}
-
-function isFenceBoundaryLine(trimmed: string) {
-  const marker = trimmed[0]
-  if (marker !== '`' && marker !== '~')
-    return false
-
-  let count = 0
-  while (trimmed[count] === marker)
-    count++
-
-  return count >= 3
-}
-
-function isContainerBoundaryLine(trimmed: string) {
-  let count = 0
-  while (trimmed[count] === ':')
-    count++
-
-  return count >= 3
-}
-
-function isListBoundaryLine(trimmed: string) {
-  const first = trimmed[0]
-
-  if ((first === '*' || first === '+' || first === '-') && isSpaceOrTab(trimmed[1]))
-    return true
-
-  if (!isAsciiDigit(first))
-    return false
-
+function isOrderedListBoundaryLine(trimmed: string) {
   let index = 0
+  if (!isAsciiDigit(trimmed[index]))
+    return false
+
   while (isAsciiDigit(trimmed[index]))
     index++
 
@@ -1892,155 +566,38 @@ function isListBoundaryLine(trimmed: string) {
   return isSpaceOrTab(trimmed[index + 1])
 }
 
-function isHtmlBoundaryLine(trimmed: string) {
-  if (trimmed[0] !== '<')
-    return false
-
-  if (isLikelyTolerantAngleBracketMathLine(trimmed))
-    return false
-
-  let index = 1
-  while (isSpaceOrTab(trimmed[index]))
-    index++
-
-  if (trimmed[index] === '/') {
-    index++
-    while (isSpaceOrTab(trimmed[index]))
-      index++
-  }
-
-  if (!isAsciiAlpha(trimmed[index]))
-    return false
-
-  index++
-  while (isHtmlNameChar(trimmed[index]))
-    index++
-
-  const boundary = trimmed[index]
-  return boundary == null || isSpaceOrTab(boundary) || boundary === '>' || boundary === '/'
-}
-
-function isReferenceDefinitionBoundaryLine(trimmed: string) {
-  if (trimmed[0] !== '[')
-    return false
-
-  let index = 1
-  while (index < trimmed.length) {
-    const ch = trimmed[index]
-    if (ch === '\\') {
-      index += 2
-      continue
-    }
-    if (ch === ']')
-      break
-    index++
-  }
-
-  if (trimmed[index] !== ']')
-    return false
-
-  index++
-  if (trimmed[index] !== ':')
-    return false
-
-  index++
-  while (isSpaceOrTab(trimmed[index]))
-    index++
-
-  return hasNonSpaceOrTabAfter(trimmed, index)
-}
-
-function isMarkdownBlockBoundaryLine(trimmed: string) {
-  return isHeadingBoundaryLine(trimmed)
-    || trimmed[0] === '>'
-    || isListBoundaryLine(trimmed)
-    || isFenceBoundaryLine(trimmed)
-    || isContainerBoundaryLine(trimmed)
-    || isHtmlBoundaryLine(trimmed)
-}
-
-function isTolerantBoundaryScanStopLine(line: string, nextLine = '') {
-  if (isIndentedCodeLineForTolerantBoundary(line))
-    return true
-
-  const trimmed = String(line ?? '').trimStart()
-
+function isTolerantBoundaryStopLine(line: string) {
+  const trimmed = line.trimStart()
   if (!trimmed)
     return true
 
-  if (isThematicOrSetextBoundaryLine(trimmed))
+  if (trimmed.startsWith('```') || trimmed.startsWith('~~~') || trimmed.startsWith(':::'))
     return true
 
-  // Tolerant same-line math boundaries are an LLM-output repair path, not a
-  // general block parser. Do not scan across obvious markdown block boundaries;
-  // otherwise ordinary paragraphs ending with "$" can accidentally consume a
-  // later unrelated "$". Keep pipe/table detection separate so formulas like
-  // `|x| = y` can still be parsed as math.
-  if (isLikelyMarkdownTableHeaderBeforeDelimiter(trimmed, nextLine))
-    return true
-  if (isLikelyMarkdownTableBoundaryLine(trimmed))
-    return true
-  if (isMarkdownBlockBoundaryLine(trimmed))
+  if (trimmed[0] === '>' || trimmed[0] === '<')
     return true
 
-  // Reference/definition-style boundaries are not formula content.
-  if (isReferenceDefinitionBoundaryLine(trimmed))
+  if (trimmed[0] === '#') {
+    let level = 0
+    while (trimmed[level] === '#')
+      level++
+    if (level >= 1 && level <= 6 && isSpaceOrTab(trimmed[level]))
+      return true
+  }
+
+  if ((trimmed[0] === '-' || trimmed[0] === '+' || trimmed[0] === '*') && isSpaceOrTab(trimmed[1]))
+    return true
+
+  if (isOrderedListBoundaryLine(trimmed))
+    return true
+
+  if (isThematicLikeLine(trimmed))
+    return true
+
+  if (isMarkdownTableDelimiterLine(trimmed))
     return true
 
   return false
-}
-
-function isLikelyTolerantSignedMathContinuation(trimmed: string) {
-  const source = String(trimmed ?? '')
-  const sign = source[0]
-  if (sign !== '+' && sign !== '-')
-    return false
-
-  if (!isSpaceOrTab(source[1]))
-    return false
-
-  const rest = source.slice(1).trimStart()
-  if (!rest)
-    return false
-
-  if (/^\\[a-z]+/i.test(rest))
-    return true
-
-  if (/^[\d({|]/.test(rest))
-    return true
-
-  return /^[a-z](?:\s*[_^=+\-*/<>]|\s*$)/i.test(rest)
-}
-
-function shouldAbortTolerantBoundaryScan(
-  currentLine: string,
-  startLine: number,
-  currentLineNumber: number,
-  accumulatedContent: string,
-  nextLine = '',
-) {
-  if (currentLineNumber - startLine > MAX_TOLERANT_BOUNDARY_LINES)
-    return true
-
-  if (accumulatedContent.length + currentLine.length > MAX_TOLERANT_BOUNDARY_CHARS)
-    return true
-
-  const trimmed = String(currentLine ?? '').trimStart()
-  if (isLikelyTolerantSignedMathContinuation(trimmed)) {
-    const signedCandidateContent = appendTolerantBoundaryContent(
-      accumulatedContent,
-      trimmed,
-    )
-
-    if (
-      isLikelyTolerantExplicitMathBlockContent(signedCandidateContent, false)
-      || isPotentialTolerantPendingMathContent(signedCandidateContent)
-    ) {
-      return false
-    }
-  }
-
-  return isTolerantBoundaryScanStopLine(currentLine, nextLine)
 }
 
 function appendTolerantBoundaryContent(content: string, line: string) {
@@ -2051,44 +608,118 @@ function appendTolerantBoundaryContent(content: string, line: string) {
   return `${content}\n${line}`
 }
 
-export function hasClosedTolerantMathBlockBoundaryCandidate(markdown: string) {
-  return getCompletedTolerantMathBlockBoundaryCacheKey(markdown) !== null
-}
-
-function tolerantBoundaryKeyHasCloseAtLine(
-  key: string | null | undefined,
-  line: number,
-  closeIndex: number,
-  delimiter: string,
-) {
-  if (!key)
+function isTolerantMathBlockContent(content: string) {
+  const stripped = String(content ?? '').trim()
+  if (!stripped)
     return false
-
-  return key.split('|').some((part) => {
-    const fields = part.split(':')
-    return fields[0] === 'closed'
-      && fields[1] === delimiter
-      && Number(fields[4]) === line
-      && Number(fields[5]) === closeIndex
-  })
+  return isMathLike(stripped)
 }
 
-function hasTolerantBoundaryCloseAtLine(markdown: string, line: number, closeIndex: number, delimiter: string) {
-  return tolerantBoundaryKeyHasCloseAtLine(
-    getCompletedTolerantMathBlockBoundaryCacheKey(markdown),
-    line,
-    closeIndex,
-    delimiter,
-  )
+function hashTolerantBoundaryContent(content: string) {
+  let hash = 0
+  for (let index = 0; index < content.length; index++)
+    hash = ((hash * 31) + content.charCodeAt(index)) | 0
+  return hash.toString(36)
 }
 
-function countLineBreaks(value: string) {
-  let count = 0
-  for (let index = 0; index < value.length; index++) {
-    if (value.charCodeAt(index) === 10)
-      count++
+function getTolerantBoundaryScanWindow(source: string) {
+  if (source.length <= TOLERANT_BOUNDARY_SCAN_TAIL_CHARS)
+    return { source, lineOffset: 0 }
+
+  let start = source.length - TOLERANT_BOUNDARY_SCAN_TAIL_CHARS
+  const nextLineBreak = source.indexOf('\n', start)
+  if (nextLineBreak === -1)
+    return { source: '', lineOffset: countLineBreaks(source) }
+
+  start = nextLineBreak + 1
+  return {
+    source: source.slice(start),
+    lineOffset: countLineBreaks(source.slice(0, start)),
   }
-  return count
+}
+
+export function getTolerantMathBlockBoundaryStreamKey(markdown: string) {
+  const fullSource = String(markdown ?? '')
+  if (!fullSource || (!fullSource.includes('$$') && !fullSource.includes('\\[')))
+    return null
+
+  const { source, lineOffset } = getTolerantBoundaryScanWindow(fullSource)
+  if (!source)
+    return null
+
+  const lines = source.split(/\r?\n/)
+  const startLine = Math.max(0, lines.length - TOLERANT_BOUNDARY_SCAN_MAX_LINES - 2)
+  const delimiters: Array<[string, string]> = [['$$', '$$'], ['\\[', '\\]']]
+
+  for (let line = startLine; line < lines.length - 1; line++) {
+    const openingLine = trimRightSpaceOrTab(lines[line])
+
+    for (const [openDelim, closeDelim] of delimiters) {
+      if (!openingLine.endsWith(openDelim))
+        continue
+
+      const openIndex = openingLine.length - openDelim.length
+      const prefix = trimRightSpaceOrTab(openingLine.slice(0, openIndex))
+      if (!prefix.trim())
+        continue
+
+      if (isEscapedAt(openingLine, openIndex))
+        continue
+
+      const codeSpanRanges = buildCodeSpanRanges(openingLine)
+      if (findRangeAt(codeSpanRanges, openIndex))
+        continue
+
+      let content = ''
+      let stopped = false
+
+      for (let currentLine = line + 1; currentLine < lines.length; currentLine++) {
+        if (currentLine - line > TOLERANT_BOUNDARY_SCAN_MAX_LINES) {
+          stopped = true
+          break
+        }
+
+        const current = lines[currentLine]
+        const closeIndex = findUnescapedDelimiter(current, closeDelim)
+
+        if (closeIndex !== -1) {
+          const nextContent = appendTolerantBoundaryContent(content, current.slice(0, closeIndex))
+          if (!isTolerantMathBlockContent(nextContent)) {
+            stopped = true
+            break
+          }
+
+          const suffix = current.slice(closeIndex + closeDelim.length).trim() ? 'suffix' : 'nosuffix'
+          return [
+            'closed',
+            openDelim,
+            lineOffset + line,
+            openIndex,
+            lineOffset + currentLine,
+            closeIndex,
+            hashTolerantBoundaryContent(nextContent),
+            suffix,
+          ].join(':')
+        }
+
+        if (isTolerantBoundaryStopLine(current)) {
+          stopped = true
+          break
+        }
+
+        content = appendTolerantBoundaryContent(content, current)
+        if (content.length > TOLERANT_BOUNDARY_SCAN_MAX_CHARS) {
+          stopped = true
+          break
+        }
+      }
+
+      if (!stopped && isTolerantMathBlockContent(content))
+        return ['pending', openDelim, lineOffset + line, openIndex].join(':')
+    }
+  }
+
+  return null
 }
 
 function isLikelyCurrencyRangeDollar(content: string, nextChar?: string) {
@@ -2122,44 +753,27 @@ function isLikelyPlaceholderDollar(content: string) {
   return /^(?:\.{3,}|…+)$/.test(stripped)
 }
 
-function markSyntheticTolerantBoundaryParagraphToken(token: MarkdownToken) {
-  const previousMeta = token.meta && typeof token.meta === 'object'
-    ? token.meta
-    : {}
-
-  token.meta = {
-    ...previousMeta,
-    [TOLERANT_BOUNDARY_SYNTHETIC_PARAGRAPH_META]: true,
-  }
-}
-
-function pushSyntheticInlineParagraph(s: MathBlockState, content: string, line: number) {
-  const paragraphContent = String(content ?? '')
-    .replace(/^[\t ]+/, '')
-    .replace(/[\t ]+$/, '')
-  if (!paragraphContent)
-    return
-
-  const paragraphOpen = s.push('paragraph_open', 'p', 1)
-  paragraphOpen.map = [line, line + 1]
-  markSyntheticTolerantBoundaryParagraphToken(paragraphOpen)
-
-  const inlineToken = s.push('inline', '', 0)
-  inlineToken.content = paragraphContent
-  inlineToken.map = [line, line + 1]
-  markSyntheticTolerantBoundaryParagraphToken(inlineToken)
-  // Do not pre-parse children here. This helper runs during block parsing, and
-  // markdown-it's core inline rule will parse every `inline` token afterwards.
-  // Pre-filling children here makes the core rule append the same inline tokens
-  // again, which duplicates text/math_inline nodes in synthetic paragraphs.
-  inlineToken.children = []
-
-  const paragraphClose = s.push('paragraph_close', 'p', -1)
-  markSyntheticTolerantBoundaryParagraphToken(paragraphClose)
-}
-
 export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
   markMarkstreamMathPluginApplied(md)
+
+  const pushInlineParagraph = (s: MathBlockState, content: string, line: number) => {
+    const paragraphContent = String(content ?? '')
+      .replace(/^[\t ]+/, '')
+      .replace(/[\t ]+$/, '')
+
+    if (!paragraphContent)
+      return
+
+    const paragraphOpen = s.push('paragraph_open', 'p', 1)
+    paragraphOpen.map = [line, line + 1]
+
+    const inlineToken = s.push('inline', '', 0)
+    inlineToken.content = paragraphContent
+    inlineToken.map = [line, line + 1]
+    inlineToken.children = []
+
+    s.push('paragraph_close', 'p', -1)
+  }
 
   // Inline rule for `\\(...\\)` and `$$...$$` and `$...$`
   const mathInline = (state: unknown, silent?: boolean) => {
@@ -2729,7 +1343,6 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     const s = state as MathBlockState
     const allowLoading = !s?.env?.__markstreamFinal
     const strict = mathOpts?.strictDelimiters
-
     const delimiters: [string, string][] = strict
       ? [
           ['\\[', '\\]'],
@@ -2799,91 +1412,34 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           }
         }
         else {
-          // When the stream parser re-processes a changed line that starts
-          // with `$$`, the markdown-it block rule may be invoked for
-          // a line that was already consumed as the *close* delimiter of a
-          // tolerant same-line boundary on an earlier line. Without this guard,
-          // the stream parser creates a duplicate math_block for the close.
-          //
-          let closesExistingTolerantMath = false
-          const tolerantBoundaryStreamKey = typeof s.env?.[TOLERANT_BOUNDARY_STREAM_CACHE_KEY_ENV] === 'string'
-            ? String(s.env[TOLERANT_BOUNDARY_STREAM_CACHE_KEY_ENV])
-            : ''
-          const fullSource = typeof s.env?.__markstreamSource === 'string'
-            ? s.env.__markstreamSource
-            : ''
-          const hasStreamSource = fullSource.length > 0
-          const fullSourceTailOffset = fullSource && fullSource !== s.src && fullSource.endsWith(s.src)
-            ? fullSource.length - s.src.length
-            : -1
-          const fullSourceLineOffset = fullSourceTailOffset >= 0
-            ? countLineBreaks(fullSource.slice(0, fullSourceTailOffset))
-            : 0
-          const rawCurrentLine = s.src.slice(s.bMarks[startLine], s.eMarks[startLine])
-          const rawLineSearchStart = Math.max(0, startPos - s.bMarks[startLine])
-          const closeIndexInCurrentLine = rawCurrentLine.indexOf(open, rawLineSearchStart)
-          const absoluteStartLine = fullSourceLineOffset + startLine
-
-          if (absoluteStartLine > 0 && closeIndexInCurrentLine !== -1 && open === '$$') {
-            // map[1] is exclusive; a repaired close line can share it with the
-            // next real display opener, so close ownership must come from the
-            // boundary key or bounded source lookup.
-            closesExistingTolerantMath = tolerantBoundaryKeyHasCloseAtLine(
-              tolerantBoundaryStreamKey,
-              absoluteStartLine,
-              closeIndexInCurrentLine,
-              open,
-            )
-
-            if (!closesExistingTolerantMath && hasStreamSource) {
-              const sourceThroughDelimiter = fullSourceTailOffset >= 0
-                ? fullSource.slice(0, fullSourceTailOffset + startPos + open.length)
-                : s.src.slice(0, startPos + open.length)
-              closesExistingTolerantMath = hasTolerantBoundaryCloseAtLine(
-                sourceThroughDelimiter,
-                absoluteStartLine,
-                closeIndexInCurrentLine,
-                open,
-              )
-            }
-          }
-
-          if (!closesExistingTolerantMath) {
-            matched = true
-            openDelim = open
-            closeDelim = close
-            break
-          }
+          matched = true
+          openDelim = open
+          closeDelim = close
+          break
         }
       }
-      // AI/LLM 输出中常见的异常格式：
-      //   prefix text $
-      //   E = mc^2
-      //   $ suffix
-      // 在 markdown-it block rule 层修复，避免 prefix/suffix 被吞掉。
+      // 这里可能 ai 返回的格式有问题：`$$` 跟在文本的最后，而不是单独一行。
+      // 仅对 `$$` / 显式 `\[` 启用该容错；对普通 `[` 启用会误伤 JSON/数组/链接。
       else if ((open === '$$' || open === '\\[') && lineText.endsWith(open) && startLine + 1 < endLine) {
         const openIndex = lineText.length - open.length
-        if (isEscapedAt(lineText, openIndex) || isInsideCodeSpanOrUnclosedTail(lineText, openIndex))
+        if (isEscapedAt(lineText, openIndex))
           continue
 
-        const before = lineText.slice(0, openIndex).replace(/[\t ]+$/, '')
-        if (!before.trim())
+        const prefix = trimRightSpaceOrTab(lineText.slice(0, openIndex))
+        if (!prefix.trim())
           continue
 
         const codeSpanRanges = buildCodeSpanRanges(lineText)
-        const previousOpenCount = countUnescapedDelimiter(lineText, open, 0, openIndex, codeSpanRanges)
-        const previousCloseCount = open === '$$'
-          ? 0
-          : countUnescapedDelimiter(lineText, close, 0, openIndex, codeSpanRanges)
-
-        if (open === '$$' ? previousOpenCount % 2 === 1 : previousOpenCount > previousCloseCount)
+        if (findRangeAt(codeSpanRanges, openIndex))
           continue
 
-        prefixBeforeOpen = before
+        prefixBeforeOpen = prefix
         tolerantBoundary = true
 
         const nextLineStartPos = s.bMarks[startLine + 1] + s.tShift[startLine + 1]
-        lineText = s.src.slice(nextLineStartPos, s.eMarks[startLine + 1]).trim()
+        const nextLineText = s.src.slice(nextLineStartPos, s.eMarks[startLine + 1]).trim()
+        lineText = nextLineText
+        // 更新 endLine
         skipFirstLine = true
         matched = true
         openDelim = open
@@ -2895,21 +1451,13 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     if (!matched)
       return false
 
-    // Keep the old fast path for real line-start math blocks.
-    //
-    // For tolerant same-line boundaries (`prefix $$` / `prefix \[`), do not
-    // return true in silent mode until the candidate has passed the same checks
-    // as non-silent parsing. Otherwise markdown-it's paragraph rule can treat
-    // ordinary prose lines ending in `$$` or `\[` as block terminators, split the
-    // paragraph, and then the non-silent parse of that same line can still return
-    // false after `looksMath`.
     if (silent && !tolerantBoundary)
       return true
 
     const startDelimIndex = lineText.indexOf(openDelim)
     const closeSearchStart = startDelimIndex + openDelim.length
     const escapedPlainBracketCloseIndex = !strict && openDelim === '['
-      ? findUnescapedDelimiter(lineText, '\\]', closeSearchStart)
+      ? lineText.indexOf('\\]', closeSearchStart)
       : -1
     const sameLineCloseDelim = escapedPlainBracketCloseIndex >= 0 ? '\\]' : closeDelim
     const sameLineCloseIndex = escapedPlainBracketCloseIndex >= 0
@@ -2930,11 +1478,9 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       token.block = true
       token.loading = false
       s.line = startLine + 1
-
       const trailingAfterClose = lineText.slice(sameLineCloseIndex + sameLineCloseDelim.length)
       if (trailingAfterClose.trim())
-        pushSyntheticInlineParagraph(s, trailingAfterClose, startLine)
-
+        pushInlineParagraph(s, trailingAfterClose, startLine)
       return true
     }
 
@@ -2943,7 +1489,6 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     let found = false
     let trailingAfterClose = ''
     let trailingAfterCloseLine = startLine
-    let closeLineHasContentBeforeDelim = false
 
     const firstLineContent
       = skipFirstLine
@@ -2951,56 +1496,24 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
         : lineText === openDelim ? '' : lineText.slice(openDelim.length)
     const fallbackPlainBracketClose = !strict && openDelim === '\\[' ? ']' : ''
 
-    const getSourceLine = (line: number) => {
-      if (line < 0 || line >= endLine)
-        return ''
-      const lineStart = s.bMarks[line] + s.tShift[line]
-      const lineEnd = s.eMarks[line]
-      return s.src.slice(lineStart, lineEnd)
-    }
-
-    const firstLineNumber = skipFirstLine ? startLine + 1 : startLine
-    if (
-      tolerantBoundary
-      && shouldAbortTolerantBoundaryScan(getSourceLine(firstLineNumber), startLine, firstLineNumber, '', getSourceLine(firstLineNumber + 1))
-    ) {
-      return false
-    }
-
     const firstLineCloseIndex = findUnescapedDelimiter(firstLineContent, closeDelim)
-
     if (firstLineCloseIndex !== -1) {
       const endIndex = firstLineCloseIndex
-      const beforeClose = firstLineContent.slice(0, endIndex)
-      content = beforeClose
+      content = firstLineContent.slice(0, endIndex)
       trailingAfterClose = firstLineContent.slice(endIndex + closeDelim.length)
-      closeLineHasContentBeforeDelim = !!beforeClose.trim()
       trailingAfterCloseLine = skipFirstLine ? startLine + 1 : startLine
       found = true
-      nextLine = skipFirstLine ? startLine + 1 : startLine
+      nextLine = trailingAfterCloseLine
     }
     else {
       if (firstLineContent && !skipFirstLine)
         content = firstLineContent
 
       for (nextLine = startLine + 1; nextLine < endLine; nextLine++) {
-        const currentLine = getSourceLine(nextLine)
+        const lineStart = s.bMarks[nextLine] + s.tShift[nextLine]
+        const lineEnd = s.eMarks[nextLine]
+        const currentLine = s.src.slice(lineStart, lineEnd)
         const currentLineTrimmed = currentLine.trim()
-
-        if (
-          tolerantBoundary
-          && shouldAbortTolerantBoundaryScan(getSourceLine(nextLine), startLine, nextLine, content, getSourceLine(nextLine + 1))
-        ) {
-          return false
-        }
-
-        const escapedPlainBracketCloseInLine = !strict && openDelim === '['
-          ? findUnescapedDelimiter(currentLine, '\\]')
-          : -1
-        const closeIndexInLine = findUnescapedDelimiter(currentLine, closeDelim)
-        const fallbackPlainBracketCloseInLine = fallbackPlainBracketClose
-          ? findPlainBracketFallbackClose(currentLine)
-          : -1
         if (!strict && openDelim === '[' && currentLineTrimmed === '\\]') {
           closeDelim = '\\]'
           found = true
@@ -3011,48 +1524,31 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           found = true
           break
         }
-        if (fallbackPlainBracketCloseInLine !== -1) {
-          closeDelim = fallbackPlainBracketClose
-          found = true
-          const beforeClose = currentLine.slice(0, fallbackPlainBracketCloseInLine)
-          if (beforeClose.trim()) {
-            content += (content ? '\n' : '') + beforeClose
-            closeLineHasContentBeforeDelim = true
-          }
-          trailingAfterClose = currentLine.slice(fallbackPlainBracketCloseInLine + closeDelim.length)
-          trailingAfterCloseLine = nextLine
-          break
-        }
         if (currentLineTrimmed === closeDelim) {
           found = true
           break
         }
-        else if (escapedPlainBracketCloseInLine !== -1) {
+        else if (!strict && openDelim === '[' && currentLine.includes('\\]')) {
           found = true
-          const endIndex = escapedPlainBracketCloseInLine
-          const beforeClose = currentLine.slice(0, endIndex)
+          const endIndex = currentLine.indexOf('\\]')
           closeDelim = '\\]'
-          if (beforeClose) {
-            content += (content ? '\n' : '') + beforeClose
-            closeLineHasContentBeforeDelim = !!beforeClose.trim()
-          }
-          trailingAfterClose = currentLine.slice(endIndex + closeDelim.length)
-          trailingAfterCloseLine = nextLine
-          break
-        }
-        else if (closeIndexInLine !== -1) {
-          found = true
-          const endIndex = closeIndexInLine
           const beforeClose = currentLine.slice(0, endIndex)
-          if (beforeClose) {
+          if (beforeClose)
             content += (content ? '\n' : '') + beforeClose
-            closeLineHasContentBeforeDelim = !!beforeClose.trim()
-          }
           trailingAfterClose = currentLine.slice(endIndex + closeDelim.length)
           trailingAfterCloseLine = nextLine
           break
         }
-
+        else if (findUnescapedDelimiter(currentLine, closeDelim) !== -1) {
+          found = true
+          const endIndex = findUnescapedDelimiter(currentLine, closeDelim)
+          const beforeClose = currentLine.slice(0, endIndex)
+          if (beforeClose)
+            content += (content ? '\n' : '') + beforeClose
+          trailingAfterClose = currentLine.slice(endIndex + closeDelim.length)
+          trailingAfterCloseLine = nextLine
+          break
+        }
         content += (content ? '\n' : '') + currentLine
       }
     }
@@ -3060,38 +1556,15 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     // In strict mode or final mode, do not emit mid-state (unclosed) block math
     if ((!allowLoading || strict) && !found)
       return false
-
-    // Standalone line-start $$ / \[ is a strong display math delimiter.
-    // Only guard against empty-content ghost math_blocks (e.g. when an
-    // intervening table was consumed by another rule before the math rule
-    // reached the close delimiter). Real math content like "x" or "f _ { x }"
-    // always deserves a loading token during streaming.
-    if (allowLoading && !tolerantBoundary && !found && (openDelim === '$$' || openDelim === '\\[')) {
-      if (!String(content ?? '').trim())
-        return false
-    }
-
     // 追加检测内容是否是 math
     // For explicit $$ delimiters, skip the isMathLike check since $$ is already
     // a clear math marker. This allows spaced subscript formats like "f _ { x }"
     // to be correctly recognized as math.
-    // The same applies to explicit `\[` / `\]`: unlike non-strict plain `[`,
-    // this is an intentional TeX display delimiter and should not be rejected
-    // merely because the content has weak heuristic signals.
     // However, if the content starts with markdown special syntax like ![, skip.
     const hasMarkdownPrefix = /^\s*!\[/.test(content)
-    const looksTolerantBoundaryMath = !tolerantBoundary
-      || (found
-        ? isLikelyTolerantExplicitMathBlockContent(content, true)
-        : isPotentialTolerantPendingMathContent(content))
-
-    const looksMath = openDelim === '$$' || openDelim === '\\['
-      ? !hasMarkdownPrefix && looksTolerantBoundaryMath
-      : (
-          openDelim === '['
-            ? isPlainBracketMathLike(content)
-            : isMathLike(content)
-        )
+    const looksMath = tolerantBoundary
+      ? !hasMarkdownPrefix && isTolerantMathBlockContent(content)
+      : openDelim === '$$' ? !hasMarkdownPrefix : (openDelim === '[' ? isPlainBracketMathLike(content) : isMathLike(content))
     if (!looksMath)
       return false
 
@@ -3099,44 +1572,20 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       return true
 
     if (prefixBeforeOpen)
-      pushSyntheticInlineParagraph(s, prefixBeforeOpen, startLine)
+      pushInlineParagraph(s, prefixBeforeOpen, startLine)
 
     const token = s.push('math_block', 'math', 0)
     token.content = normalizeStandaloneBackslashT(content)
     token.markup
       = openDelim === '$$' ? '$$' : openDelim === '[' ? '[]' : '\\[\\]'
     token.raw = `${openDelim}${content}${content.startsWith('\n') ? '\n' : ''}${closeDelim}`
-
-    const consumedEndLine = found ? nextLine + 1 : endLine
-
-    // Completed tolerant repairs keep non-overlapping maps for prefix/math/suffix.
-    // Pending loading blocks include the opener line so stream tail reparse keeps
-    // the tolerant-boundary context while content is still appending.
-    const mapStartLine = tolerantBoundary
-      ? (found ? firstLineNumber : startLine)
-      : startLine
-
-    let mapEndLine = consumedEndLine
-    if (
-      tolerantBoundary
-      && found
-      && trailingAfterClose.trim()
-      && !closeLineHasContentBeforeDelim
-    ) {
-      mapEndLine = trailingAfterCloseLine
-    }
-
-    if (mapEndLine <= mapStartLine)
-      mapEndLine = mapStartLine + 1
-
-    token.map = [mapStartLine, mapEndLine]
+    token.map = [startLine, nextLine + 1]
     token.block = true
     token.loading = !found
-    ;(token as TolerantMathToken).tolerantBoundary = tolerantBoundary
-    s.line = consumedEndLine
+    s.line = nextLine + 1
 
     if (trailingAfterClose.trim())
-      pushSyntheticInlineParagraph(s, trailingAfterClose, trailingAfterCloseLine)
+      pushInlineParagraph(s, trailingAfterClose, trailingAfterCloseLine)
 
     return true
   }
