@@ -143,6 +143,10 @@ export default defineConfig(({ mode }) => {
       },
       rollupOptions: {
         external: (id: string) => {
+          if (id === 'stream-monaco' || id.startsWith('stream-monaco/'))
+            return true
+          if (/node_modules\/stream-monaco(?:\/|$)/.test(id))
+            return true
           if (id === '@terrastruct/d2' || id.startsWith('@terrastruct/d2/'))
             return true
           if (/node_modules\/@terrastruct\/d2(?:\/|$)/.test(id))

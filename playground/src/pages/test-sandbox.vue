@@ -11,12 +11,47 @@ import {
 import '../../../packages/markstream-angular/src/index.css'
 
 type SandboxStatus = 'idle' | 'loading' | 'ready' | 'error'
+type DiffLayoutMode = 'inline' | 'side-by-side'
 
 const canvasRef = ref<HTMLElement | null>(null)
 const status = ref<SandboxStatus>('idle')
 const selection = ref<SandboxSelection>(parseSandboxSelection(window.location.search, testSandboxFrameworks))
 const markdown = ref(decodeMarkdownHash(window.location.hash || '') ?? '')
 const errorMessage = ref('')
+
+const diffHideUnchangedRegions = {
+  enabled: true,
+  contextLineCount: 2,
+  minimumLineCount: 4,
+  revealLineCount: 0,
+} as const
+
+function resolveSandboxDarkMode(search: string) {
+  const value = new URLSearchParams(search).get('dark')
+  return value === '1' || value === 'true'
+}
+
+function resolveSandboxDiffLayoutMode(search: string): DiffLayoutMode {
+  return new URLSearchParams(search).get('diffLayout') === 'side-by-side'
+    ? 'side-by-side'
+    : 'inline'
+}
+
+const sandboxIsDark = ref(resolveSandboxDarkMode(window.location.search))
+const sandboxDiffLayoutMode = ref<DiffLayoutMode>(resolveSandboxDiffLayoutMode(window.location.search))
+const sandboxCodeBlockMonacoOptions = computed(() => {
+  const sideBySide = sandboxDiffLayoutMode.value === 'side-by-side'
+  return {
+    renderSideBySide: sideBySide,
+    useInlineViewWhenSpaceIsLimited: !sideBySide,
+    maxComputationTime: 0,
+    ignoreTrimWhitespace: false,
+    renderIndicators: true,
+    diffAlgorithm: 'legacy',
+    diffHideUnchangedRegions,
+    hideUnchangedRegions: diffHideUnchangedRegions,
+  } as const
+})
 
 const statusLabel = computed(() => {
   if (status.value === 'loading')
@@ -136,6 +171,55 @@ function setupCommonRendererRuntime(rendererModule: Record<string, any>) {
   }
 }
 
+function restoreEmptySvelteCodeBlocks(root: HTMLElement, content: string) {
+  const fenceBlocks: Array<{ code: string, info: string }> = []
+  const lines = content.split(/\r\n|\n|\r/)
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index].trimStart()
+    const marker = line[0]
+    if (marker !== '`' && marker !== '~')
+      continue
+
+    let minimumLength = 0
+    while (line[minimumLength] === marker)
+      minimumLength += 1
+    if (minimumLength < 3)
+      continue
+
+    const codeLines: string[] = []
+    let closed = false
+    index += 1
+    for (; index < lines.length; index += 1) {
+      const closing = lines[index].trim()
+      if (closing.length >= minimumLength && [...closing].every(char => char === marker)) {
+        closed = true
+        break
+      }
+      codeLines.push(lines[index])
+    }
+
+    fenceBlocks.push({
+      code: `${codeLines.join('\n')}${closed ? '\n' : ''}`,
+      info: line.slice(minimumLength).trim(),
+    })
+  }
+
+  if (!fenceBlocks.length)
+    return
+
+  const preNodes = Array.from(root.querySelectorAll<HTMLElement>('pre[data-markstream-code-block="1"]'))
+  preNodes.forEach((pre, index) => {
+    const code = pre.querySelector<HTMLElement>('code')
+    const block = fenceBlocks[index]
+    if (!code || !block || code.textContent?.trim())
+      return
+
+    code.textContent = block.code
+    if (!pre.dataset.markstreamLanguage && block.info)
+      pre.dataset.markstreamLanguage = block.info
+  })
+}
+
 async function mountVue3Sandbox(current: SandboxSelection, content: string, mountPoint: HTMLElement) {
   const rendererModule = current.source === 'workspace'
     ? await import('markstream-vue')
@@ -168,9 +252,13 @@ async function mountVue3Sandbox(current: SandboxSelection, content: string, moun
     render() {
       return h(MarkdownRender, {
         content,
+        isDark: sandboxIsDark.value,
         batchRendering: false,
         typewriter: false,
         viewportPriority: false,
+        codeBlockDarkTheme: 'vitesse-dark',
+        codeBlockLightTheme: 'vitesse-light',
+        codeBlockMonacoOptions: sandboxCodeBlockMonacoOptions.value,
       })
     },
   })
@@ -212,9 +300,14 @@ async function mountVue2Sandbox(current: SandboxSelection, content: string, moun
       return createElement(MarkdownRender, {
         props: {
           content,
+          isDark: sandboxIsDark.value,
           batchRendering: false,
           typewriter: false,
           viewportPriority: false,
+          codeBlockDarkTheme: 'vitesse-dark',
+          codeBlockLightTheme: 'vitesse-light',
+          codeBlockMonacoOptions: sandboxCodeBlockMonacoOptions.value,
+          langs: ['json', 'typescript', 'tsx', 'javascript'],
         },
       })
     },
@@ -260,9 +353,13 @@ async function mountReactSandbox(current: SandboxSelection, content: string, mou
   root.render(
     React.createElement(MarkdownRender, {
       content,
+      isDark: sandboxIsDark.value,
       batchRendering: false,
       typewriter: false,
       viewportPriority: false,
+      codeBlockDarkTheme: 'vitesse-dark',
+      codeBlockLightTheme: 'vitesse-light',
+      codeBlockMonacoOptions: sandboxCodeBlockMonacoOptions.value,
     }),
   )
 
@@ -273,13 +370,24 @@ async function mountReactSandbox(current: SandboxSelection, content: string, mou
 
 async function mountAngularSandbox(current: SandboxSelection, content: string, mountPoint: HTMLElement) {
   const runtimeVersion = current.framework.runtimeVersion
-  const rendererModule = current.source === 'workspace'
-    ? await import('markstream-angular')
-    : await importRemote<any>(createEsmPackageUrl(
-        current.framework.packageName,
-        current.version,
-        [`@angular/common@${runtimeVersion}`, `@angular/core@${runtimeVersion}`],
-      ))
+  let rendererModule: any
+  if (current.source === 'workspace') {
+    await importRemote(createEsmPackageUrl('@angular/compiler', runtimeVersion, [`@angular/core@${runtimeVersion}`]))
+    rendererModule = await import('markstream-angular')
+  }
+  else {
+    const angularDeps = [
+      `@angular/common@${runtimeVersion}`,
+      `@angular/compiler@${runtimeVersion}`,
+      `@angular/core@${runtimeVersion}`,
+    ]
+    await importRemote(createEsmPackageUrl('@angular/compiler', runtimeVersion, [`@angular/core@${runtimeVersion}`]))
+    rendererModule = await importRemote<any>(createEsmPackageUrl(
+      current.framework.packageName,
+      current.version,
+      angularDeps,
+    ))
+  }
 
   const renderMarkdownToHtml = rendererModule.renderMarkdownToHtml
   const enhanceRenderedHtml = rendererModule.enhanceRenderedHtml
@@ -298,6 +406,54 @@ async function mountAngularSandbox(current: SandboxSelection, content: string, m
   })
   const enhancementHandle = await enhanceRenderedHtml?.(shell, {
     final: true,
+    isDark: sandboxIsDark.value,
+    monacoOptions: sandboxCodeBlockMonacoOptions.value,
+  })
+
+  host.replaceChildren(shell)
+  mountPoint.replaceChildren(host)
+
+  return () => {
+    enhancementHandle?.dispose?.()
+    mountPoint.replaceChildren()
+  }
+}
+
+async function mountSvelteSandbox(current: SandboxSelection, content: string, mountPoint: HTMLElement) {
+  const [renderModule, enhanceModule] = await Promise.all([
+    importRemote<any>(createEsmPackageSubpathUrl(
+      current.framework.packageName,
+      current.version,
+      'dist/renderMarkdownHtml.js',
+    )),
+    importRemote<any>(createEsmPackageSubpathUrl(
+      current.framework.packageName,
+      current.version,
+      'dist/enhanceRenderedHtml.js',
+    )),
+  ])
+
+  const renderMarkdownToHtml = renderModule.renderMarkdownToHtml
+  const enhanceRenderedHtml = enhanceModule.enhanceRenderedHtml
+  if (typeof renderMarkdownToHtml !== 'function')
+    throw new Error('无法找到 Svelte 渲染器入口。')
+
+  const host = document.createElement('div')
+  host.className = 'sandbox-canvas__host'
+
+  const shell = document.createElement('div')
+  shell.className = 'markstream-svelte markdown-renderer'
+  shell.innerHTML = renderMarkdownToHtml({
+    content,
+    final: true,
+    allowHtml: true,
+  })
+  restoreEmptySvelteCodeBlocks(shell, content)
+  const enhancementHandle = await enhanceRenderedHtml?.(shell, {
+    final: true,
+    isDark: sandboxIsDark.value,
+    renderCodeBlocksAsPre: true,
+    monacoOptions: sandboxCodeBlockMonacoOptions.value,
   })
 
   host.replaceChildren(shell)
@@ -319,6 +475,9 @@ async function mountSandbox(current: SandboxSelection, content: string, mountPoi
   if (current.frameworkId === 'angular')
     return await mountAngularSandbox(current, content, mountPoint)
 
+  if (current.frameworkId === 'svelte')
+    return await mountSvelteSandbox(current, content, mountPoint)
+
   return await mountReactSandbox(current, content, mountPoint)
 }
 
@@ -332,6 +491,8 @@ async function renderSandbox() {
 
   cleanupRuntime()
   selection.value = parseSandboxSelection(window.location.search, testSandboxFrameworks)
+  sandboxIsDark.value = resolveSandboxDarkMode(window.location.search)
+  sandboxDiffLayoutMode.value = resolveSandboxDiffLayoutMode(window.location.search)
   markdown.value = decodeMarkdownHash(window.location.hash || '') ?? ''
   errorMessage.value = ''
   status.value = 'loading'

@@ -7,6 +7,7 @@ import { getKatex } from './optional/katex'
 import { getMermaid } from './optional/mermaid'
 import { getUseMonaco } from './optional/monaco'
 import { extractRenderedSvg, toSafeSvgMarkup } from './sanitizeSvg'
+import { resolveMonacoLanguageId } from './utils/languageIcon'
 import { normalizeKaTeXRenderInput } from './utils/normalizeKaTeXRenderInput'
 import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from './workers/katexWorkerClient'
 import { canParseOffthread, findPrefixOffthread } from './workers/mermaidWorkerClient'
@@ -34,24 +35,6 @@ const DARK_THEME_OVERRIDES: Record<string, string> = {
   AA5: '#0284C7',
   AB4: '#FBBF24',
   AB5: '#F59E0B',
-}
-
-const MONACO_LANGUAGE_ALIASES: Record<string, string> = {
-  cjs: 'javascript',
-  cts: 'typescript',
-  d2lang: 'plaintext',
-  js: 'javascript',
-  jsonc: 'json',
-  jsx: 'javascript',
-  md: 'markdown',
-  mjs: 'javascript',
-  sh: 'shell',
-  text: 'plaintext',
-  ts: 'typescript',
-  tsx: 'typescript',
-  txt: 'plaintext',
-  vue: 'html',
-  yml: 'yaml',
 }
 
 export interface EnhanceRenderedHtmlOptions {
@@ -628,12 +611,21 @@ async function renderMonaco(
 
     const source = codeNode.textContent || ''
     const diff = pre.dataset.markstreamDiff === '1'
+    const originalCode = decodeDataPayload(pre.dataset.markstreamOriginal)
     const updatedCode = decodeDataPayload(pre.dataset.markstreamUpdated)
     const monacoLanguage = resolveMonacoLanguage(rawLanguage)
-    const renderLanguage = diff ? 'plaintext' : monacoLanguage
+    const displayLanguage = rawLanguage.trim() || monacoLanguage
+    const preStyle = typeof window !== 'undefined' ? window.getComputedStyle(pre) : null
+    const codeStyle = typeof window !== 'undefined' ? window.getComputedStyle(codeNode) : null
+    const measuredPreHeight = pre.getBoundingClientRect().height
+    const fontSize = readCssPixels(codeStyle?.fontSize) ?? 13
+    const lineHeight = readCssPixels(codeStyle?.lineHeight) ?? readCssPixels(preStyle?.lineHeight)
+    const paddingTop = readCssPixels(preStyle?.paddingTop)
+    const paddingBottom = readCssPixels(preStyle?.paddingBottom)
+    const fontFamily = codeStyle?.fontFamily || preStyle?.fontFamily || undefined
     const shell = createEnhancedBlockShell(
       'code',
-      diff ? `Diff / ${monacoLanguage}` : `Code / ${monacoLanguage}`,
+      diff ? `Diff / ${displayLanguage}` : `Code / ${displayLanguage}`,
       source,
       false,
       options,
@@ -642,7 +634,13 @@ async function renderMonaco(
       },
     )
     shell.body.classList.add('markstream-angular-enhanced-block__body--code')
-    shell.body.style.minHeight = `${estimateCodeBlockHeight(diff ? updatedCode || source : source, diff)}px`
+    shell.body.style.minHeight = `${measuredPreHeight > 0 ? Math.ceil(measuredPreHeight) : estimateCodeBlockHeight(diff ? updatedCode || source : source, diff)}px`
+    if (preStyle) {
+      shell.wrapper.style.marginTop = preStyle.marginTop
+      shell.wrapper.style.marginRight = preStyle.marginRight
+      shell.wrapper.style.marginBottom = preStyle.marginBottom
+      shell.wrapper.style.marginLeft = preStyle.marginLeft
+    }
     const originalPre = pre.cloneNode(true) as HTMLElement
     pre.replaceWith(shell.wrapper)
 
@@ -655,21 +653,31 @@ async function renderMonaco(
       wordWrap: 'off',
       revealDebounceMs: 75,
       MAX_HEIGHT: 500,
-      fontSize: 13,
+      fontSize,
+      ...(lineHeight ? { lineHeight } : {}),
+      ...(fontFamily ? { fontFamily } : {}),
+      ...(paddingTop != null || paddingBottom != null
+        ? { padding: { top: paddingTop ?? 0, bottom: paddingBottom ?? 0 } }
+        : {}),
       ...(options.monacoOptions || {}),
     })
 
     try {
-      // Vue/React wire Monaco diff editors through dedicated components.
-      // Angular currently enhances static HTML after the fact, and the diff
-      // editor path in stream-monaco can leave an empty shell or raise
-      // "no diff result available" during worker setup. Prefer a stable
-      // single-editor fallback that still preserves the diff source text.
-      await helpers.createEditor(
-        shell.body,
-        source,
-        renderLanguage,
-      )
+      if (diff && typeof helpers.createDiffEditor === 'function') {
+        await helpers.createDiffEditor(
+          shell.body,
+          originalCode,
+          updatedCode || source,
+          monacoLanguage,
+        )
+      }
+      else {
+        await helpers.createEditor?.(
+          shell.body,
+          diff ? updatedCode || source : source,
+          monacoLanguage,
+        )
+      }
       if (!isActive())
         return
 
@@ -727,8 +735,7 @@ function resolveCodeLanguage(pre: HTMLElement, codeNode: HTMLElement) {
 }
 
 function resolveMonacoLanguage(language: string) {
-  const normalized = language.trim().toLowerCase()
-  return MONACO_LANGUAGE_ALIASES[normalized] || normalized || 'plaintext'
+  return resolveMonacoLanguageId(language)
 }
 
 function estimateCodeBlockHeight(source: string, diff: boolean) {
@@ -736,6 +743,14 @@ function estimateCodeBlockHeight(source: string, diff: boolean) {
   const perLine = diff ? 20 : 18
   const base = diff ? 180 : 96
   return Math.min(520, base + lineCount * perLine)
+}
+
+function readCssPixels(value: string | null | undefined) {
+  if (!value || value === 'normal')
+    return undefined
+
+  const parsed = Number.parseFloat(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
 }
 
 function decodeDataPayload(value: string | null | undefined) {

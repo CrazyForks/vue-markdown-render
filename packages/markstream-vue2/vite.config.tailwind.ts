@@ -46,6 +46,10 @@ export default defineConfig({
     },
     rollupOptions: {
       external: (id: string) => {
+        if (id === 'stream-monaco' || id.startsWith('stream-monaco/'))
+          return true
+        if (/node_modules\/stream-monaco(?:\/|$)/.test(id))
+          return true
         if (id === 'mermaid' || id.startsWith('mermaid/'))
           return true
         if (/node_modules\/mermaid(?:\/|$)/.test(id))

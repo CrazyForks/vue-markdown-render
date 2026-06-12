@@ -472,7 +472,16 @@ const activeSandbox = computed(() => resolveSandboxSelection(testSandboxFramewor
   version: sandboxVersion.value,
 }))
 const activeSandboxFramework = computed(() => activeSandbox.value.framework)
-const sandboxHref = computed(() => buildTestSandboxHref(activeSandbox.value, sandboxSnapshot.value))
+const sandboxHref = computed(() => {
+  const href = buildTestSandboxHref(activeSandbox.value, sandboxSnapshot.value)
+  if (typeof window === 'undefined')
+    return href
+
+  const url = new URL(href, window.location.origin)
+  url.searchParams.set('dark', isDark.value ? '1' : '0')
+  url.searchParams.set('diffLayout', diffLayoutMode.value)
+  return `${url.pathname}${url.search}${url.hash}`
+})
 const sandboxDirty = computed(() => sandboxSnapshot.value !== input.value)
 const sandboxQuickVersions = computed(() => Array.from(new Set([
   activeSandboxFramework.value.defaultVersion,

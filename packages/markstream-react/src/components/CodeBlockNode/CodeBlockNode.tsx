@@ -68,6 +68,68 @@ const defaultDiffHideUnchangedRegions = Object.freeze({
   minimumLineCount: 4,
   revealLineCount: 5,
 })
+const defaultPreFallbackFontSize = 12
+const defaultPreFallbackLineHeight = 18
+
+function readPositiveNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined
+}
+
+function readMonacoPadding(value: unknown) {
+  if (!value || typeof value !== 'object')
+    return { top: 0, bottom: 0 }
+
+  const raw = value as Record<string, unknown>
+  return {
+    top: readPositiveNumber(raw.top) ?? 0,
+    bottom: readPositiveNumber(raw.bottom) ?? 0,
+  }
+}
+
+function measureRenderedDiffHeight(container: HTMLElement): number | null {
+  if (typeof window === 'undefined')
+    return null
+
+  try {
+    const hostRect = container.getBoundingClientRect()
+    if (hostRect.width <= 0)
+      return null
+
+    const selectors = [
+      '.editor.original .view-lines .view-line',
+      '.editor.modified .view-lines .view-line',
+      '.editor.original .margin-view-overlays .line-numbers',
+      '.editor.modified .margin-view-overlays .line-numbers',
+      '.editor.original .view-zones > div',
+      '.editor.modified .view-zones > div',
+      '.editor.original .margin-view-zones > div',
+      '.editor.modified .margin-view-zones > div',
+      '.editor.original .diff-hidden-lines',
+      '.editor.modified .diff-hidden-lines',
+      '.stream-monaco-diff-unchanged-bridge',
+    ]
+
+    let bottom = 0
+    for (const node of Array.from(container.querySelectorAll(selectors.join(',')))) {
+      if (!(node instanceof HTMLElement))
+        continue
+      const style = window.getComputedStyle(node)
+      if (style.display === 'none' || style.visibility === 'hidden')
+        continue
+      if (Number.parseFloat(style.opacity || '1') <= 0.01)
+        continue
+      const rect = node.getBoundingClientRect()
+      if (rect.height <= 0 || rect.bottom <= hostRect.top)
+        continue
+      bottom = Math.max(bottom, rect.bottom - hostRect.top)
+    }
+
+    return bottom > 0 ? Math.ceil(bottom + 4) : null
+  }
+  catch {
+    return null
+  }
+}
 
 function resolveDiffHideUnchangedRegionsOption(value: unknown) {
   if (typeof value === 'boolean')
@@ -95,10 +157,6 @@ function resolveCodeBlockMonacoOptions(isDiff: boolean, monacoOptions: CodeBlock
     ? undefined
     : resolveDiffHideUnchangedRegionsOption(raw.hideUnchangedRegions)
   const diffUnchangedRegionStyle = raw.diffUnchangedRegionStyle ?? 'line-info'
-  const needsExtraBottomSpace
-    = diffUnchangedRegionStyle === 'line-info'
-      || diffUnchangedRegionStyle === 'line-info-basic'
-      || diffUnchangedRegionStyle === 'metadata'
   const diffDefaults = {
     maxComputationTime: 0,
     diffAlgorithm: 'legacy',
@@ -110,21 +168,20 @@ function resolveCodeBlockMonacoOptions(isDiff: boolean, monacoOptions: CodeBlock
     selectionHighlight: false,
     occurrencesHighlight: 'off',
     matchBrackets: 'never',
-    lineDecorationsWidth: 12,
+    lineDecorationsWidth: 4,
     lineNumbersMinChars: 2,
     glyphMargin: false,
-    fontSize: 13,
-    lineHeight: 30,
+    minimap: { enabled: false },
     renderOverviewRuler: false,
     overviewRulerBorder: false,
     hideCursorInOverviewRuler: true,
     scrollBeyondLastLine: false,
-    padding: { top: 10, bottom: needsExtraBottomSpace ? 22 : 14 },
     diffHideUnchangedRegions,
+    useInlineViewWhenSpaceIsLimited: raw.useInlineViewWhenSpaceIsLimited ?? false,
     diffLineStyle: 'background',
     diffAppearance: 'auto',
     diffUnchangedRegionStyle,
-    diffHunkActionsOnHover: true,
+    diffHunkActionsOnHover: false,
     diffHunkHoverHideDelayMs: 160,
   }
 
@@ -240,6 +297,9 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
   const monacoOptionsRef = useRef(monacoOptions)
   const runtimeMonacoOptionsRef = useRef<Record<string, any> | null>(null)
   const structuralSignatureRef = useRef<string | null>(null)
+  const editorHeightSyncDisposablesRef = useRef<any[]>([])
+  const diffDomHeightObserverRef = useRef<MutationObserver | null>(null)
+  const expandedRef = useRef(false)
 
   const [useFallback, setUseFallback] = useState(false)
   const [viewportReady, setViewportReady] = useState(() => typeof window === 'undefined')
@@ -256,6 +316,10 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
 
   const { t } = useSafeI18n()
 
+  useEffect(() => {
+    expandedRef.current = expanded
+  }, [expanded])
+
   const resolvedMonacoOptions = useMemo(
     () => resolveCodeBlockMonacoOptions(Boolean(node.diff), monacoOptions),
     [monacoOptions, node.diff],
@@ -263,7 +327,7 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
 
   const [defaultFontSize, setDefaultFontSize] = useState<number>(() => {
     const initial = Number((resolveCodeBlockMonacoOptions(Boolean(node.diff), monacoOptions) as any)?.fontSize)
-    return Number.isFinite(initial) && initial > 0 ? initial : 14
+    return Number.isFinite(initial) && initial > 0 ? initial : defaultPreFallbackFontSize
   })
   const [fontSize, setFontSize] = useState(defaultFontSize)
   const tooltipsEnabled = useMemo(() => showTooltips !== false, [showTooltips])
@@ -296,22 +360,30 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
     }
     catch {}
 
+    const isDiffEditor = editorKindRef.current === 'diff'
+    const heightPriority = isDiffEditor ? 'important' : ''
+
     if (nextExpanded) {
       host.style.minHeight = '0px'
-      host.style.maxHeight = 'none'
+      host.style.setProperty('max-height', 'none', heightPriority)
       host.style.overflow = 'visible'
     }
     else {
       host.style.minHeight = '0px'
-      host.style.maxHeight = `${Math.ceil(maxHeight)}px`
-      host.style.overflow = 'auto'
+      host.style.setProperty('max-height', `${Math.ceil(maxHeight)}px`, heightPriority)
+      host.style.overflow = isDiffEditor ? 'hidden' : 'auto'
     }
 
     try {
       const maybeGetContentHeight = () => {
+        if (isDiffEditor) {
+          const renderedHeight = measureRenderedDiffHeight(host)
+          if (renderedHeight != null)
+            return renderedHeight
+        }
         if (typeof view.getContentHeight === 'function')
           return view.getContentHeight()
-        if (editorKindRef.current === 'diff' && typeof view.getModifiedEditor === 'function') {
+        if (isDiffEditor && typeof view.getModifiedEditor === 'function') {
           const modified = view.getModifiedEditor()
           if (modified && typeof modified.getContentHeight === 'function')
             return modified.getContentHeight()
@@ -321,12 +393,89 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
       const contentHeight = Number(maybeGetContentHeight())
       if (Number.isFinite(contentHeight) && contentHeight > 0) {
         const height = nextExpanded ? contentHeight : Math.min(contentHeight, maxHeight)
-        host.style.height = `${Math.ceil(Math.max(1, height))}px`
+        host.style.setProperty('height', `${Math.ceil(Math.max(1, height))}px`, heightPriority)
       }
       view.layout?.()
     }
     catch {}
   }, [getMaxHeightValue, useFallback])
+
+  const scheduleEditorHeightSync = useCallback((nextExpanded: boolean) => {
+    applyEditorHeight(nextExpanded)
+    if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function')
+      return
+
+    const first = window.requestAnimationFrame(() => {
+      applyEditorHeight(nextExpanded)
+      window.requestAnimationFrame(() => applyEditorHeight(nextExpanded))
+    })
+    window.setTimeout(() => applyEditorHeight(nextExpanded), 180)
+    return () => window.cancelAnimationFrame(first)
+  }, [applyEditorHeight])
+
+  const clearEditorHeightSyncBindings = useCallback(() => {
+    for (const disposable of editorHeightSyncDisposablesRef.current) {
+      try {
+        if (typeof disposable === 'function')
+          disposable()
+        else
+          disposable?.dispose?.()
+      }
+      catch {}
+    }
+    editorHeightSyncDisposablesRef.current = []
+    diffDomHeightObserverRef.current?.disconnect()
+    diffDomHeightObserverRef.current = null
+  }, [])
+
+  const bindDiffEditorHeightSync = useCallback(() => {
+    clearEditorHeightSyncBindings()
+    const helpers = helpersRef.current
+    const host = editorHostRef.current
+    if (!helpers || !host || editorKindRef.current !== 'diff')
+      return
+
+    const syncHeight = () => scheduleEditorHeightSync(expandedRef.current)
+    const bind = (source: any, eventName: string) => {
+      try {
+        const subscribe = source?.[eventName]
+        if (typeof subscribe !== 'function')
+          return
+        const disposable = subscribe.call(source, syncHeight)
+        if (disposable)
+          editorHeightSyncDisposablesRef.current.push(disposable)
+      }
+      catch {}
+    }
+
+    const diffEditor = helpers.getDiffEditorView?.()
+    const originalEditor = diffEditor?.getOriginalEditor?.()
+    const modifiedEditor = diffEditor?.getModifiedEditor?.()
+    bind(diffEditor, 'onDidUpdateDiff')
+    bind(originalEditor, 'onDidContentSizeChange')
+    bind(modifiedEditor, 'onDidContentSizeChange')
+    bind(originalEditor, 'onDidLayoutChange')
+    bind(modifiedEditor, 'onDidLayoutChange')
+
+    if (typeof window !== 'undefined' && typeof window.MutationObserver === 'function') {
+      const observer = new window.MutationObserver((records) => {
+        if (!records.some(record =>
+          record.type === 'childList'
+          || (record.type === 'attributes' && record.target !== host),
+        )) {
+          return
+        }
+        syncHeight()
+      })
+      observer.observe(host, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['class'],
+      })
+      diffDomHeightObserverRef.current = observer
+    }
+  }, [clearEditorHeightSyncBindings, scheduleEditorHeightSync])
 
   useEffect(() => {
     return subscribeLanguageIconsRevision(() => {
@@ -347,12 +496,13 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
       cleanupRef.current?.()
     }
     catch {}
+    clearEditorHeightSyncBindings()
     createEditorPromiseRef.current = null
     editorKindRef.current = null
     editorMountElRef.current = null
     setEditorReady(false)
     setEditorCreated(false)
-  }, [])
+  }, [clearEditorHeightSyncBindings])
 
   const syncEditorCssVars = useCallback(() => {
     const editorEl = editorHostRef.current
@@ -438,8 +588,55 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
     [effectiveDiffAppearance, node.diff, resolvedChromeIsDark],
   )
 
-  const buildRuntimeMonacoOptions = useCallback(() => {
+  const preFallbackMetrics = useMemo(() => {
+    const raw = resolvedMonacoOptions as Record<string, unknown> | null | undefined
+    const resolvedFontSize = readPositiveNumber(raw?.fontSize) ?? fontSize ?? defaultPreFallbackFontSize
+    const resolvedLineHeight = readPositiveNumber(raw?.lineHeight)
+      ?? (resolvedFontSize === defaultPreFallbackFontSize
+        ? defaultPreFallbackLineHeight
+        : Math.max(12, Math.round(resolvedFontSize * 1.5)))
+    const fontFamily = typeof raw?.fontFamily === 'string' && raw.fontFamily.trim()
+      ? raw.fontFamily.trim()
+      : undefined
+    const padding = readMonacoPadding(raw?.padding)
+    const tabSize = readPositiveNumber(raw?.tabSize) ?? 4
+
     return {
+      fontFamily,
+      fontSize: resolvedFontSize,
+      lineHeight: resolvedLineHeight,
+      paddingBottom: padding.bottom,
+      paddingTop: padding.top,
+      tabSize,
+    }
+  }, [fontSize, resolvedMonacoOptions])
+
+  const preFallbackDiffInline = useMemo(() => {
+    if (!node.diff)
+      return false
+    return (resolvedMonacoOptions as any)?.renderSideBySide === false
+  }, [node.diff, resolvedMonacoOptions])
+
+  const preFallbackStyle = useMemo(() => {
+    const style: React.CSSProperties & Record<string, string | number> = {
+      '--markstream-code-padding-left': '62px',
+      '--markstream-pre-diff-line-height': `${preFallbackMetrics.lineHeight}px`,
+      '--markstream-pre-line-number-top': `${preFallbackMetrics.paddingTop}px`,
+      '--markstream-pre-line-number-width': '36px',
+      '--markstream-pre-line-number-gap': '0px',
+      'fontSize': `${preFallbackMetrics.fontSize}px`,
+      'lineHeight': `${preFallbackMetrics.lineHeight}px`,
+      'paddingBottom': `${preFallbackMetrics.paddingBottom}px`,
+      'paddingTop': `${preFallbackMetrics.paddingTop}px`,
+      'tabSize': preFallbackMetrics.tabSize,
+    }
+    if (preFallbackMetrics.fontFamily)
+      style.fontFamily = preFallbackMetrics.fontFamily
+    return style
+  }, [preFallbackMetrics])
+
+  const buildRuntimeMonacoOptions = useCallback(() => {
+    const nextOptions = {
       wordWrap: 'on',
       wrappingIndent: 'same',
       themes,
@@ -450,7 +647,18 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
         syncEditorCssVars()
       },
     } as Record<string, any>
-  }, [effectiveDiffAppearance, node.diff, requestedTheme, resolvedMonacoOptions, syncEditorCssVars, themes])
+
+    if (node.diff) {
+      nextOptions.fontSize ??= preFallbackMetrics.fontSize
+      nextOptions.lineHeight ??= preFallbackMetrics.lineHeight
+      nextOptions.padding ??= { top: preFallbackMetrics.paddingTop, bottom: preFallbackMetrics.paddingBottom }
+      nextOptions.tabSize ??= preFallbackMetrics.tabSize
+      if (preFallbackMetrics.fontFamily)
+        nextOptions.fontFamily ??= preFallbackMetrics.fontFamily
+    }
+
+    return nextOptions
+  }, [effectiveDiffAppearance, node.diff, preFallbackMetrics, requestedTheme, resolvedMonacoOptions, syncEditorCssVars, themes])
 
   const syncRuntimeMonacoOptions = useCallback(() => {
     const nextOptions = buildRuntimeMonacoOptions()
@@ -487,6 +695,7 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
     return () => {
       editorLifecycleIdRef.current += 1
       cleanupRef.current?.()
+      clearEditorHeightSyncBindings()
       cleanupRef.current = null
       createEditorPromiseRef.current = null
       editorKindRef.current = null
@@ -495,7 +704,7 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
       viewportHandleRef.current?.destroy?.()
       viewportHandleRef.current = null
     }
-  }, [])
+  }, [clearEditorHeightSyncBindings])
 
   useEffect(() => {
     if (typeof window === 'undefined')
@@ -665,10 +874,10 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
       if (collapsed)
         return
       const raf = typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function'
-        ? window.requestAnimationFrame(() => applyEditorHeight(expanded))
+        ? window.requestAnimationFrame(() => scheduleEditorHeightSync(expanded))
         : null
       if (raf == null)
-        applyEditorHeight(expanded)
+        scheduleEditorHeightSync(expanded)
     }
     if (!helpers?.setTheme || !requestedTheme) {
       syncPresentation()
@@ -678,7 +887,6 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
       .then(syncPresentation)
       .catch(() => {})
   }, [
-    applyEditorHeight,
     collapsed,
     editorCreated,
     effectiveDiffAppearance,
@@ -686,6 +894,7 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
     monacoReady,
     node.diff,
     requestedTheme,
+    scheduleEditorHeightSync,
     syncEditorCssVars,
     syncRuntimeMonacoOptions,
     useFallback,
@@ -776,9 +985,10 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
           catch {}
         }
 
+        bindDiffEditorHeightSync()
         syncEditorCssVars()
         if (!expanded && !collapsed)
-          applyEditorHeight(false)
+          scheduleEditorHeightSync(false)
         setEditorReady(true)
       }
       catch {
@@ -793,7 +1003,7 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
     })
     createEditorPromiseRef.current = tracked
     return tracked
-  }, [applyEditorHeight, collapsed, expanded, monacoLanguage, shouldDelayEditor, syncEditorCssVars, syncRuntimeMonacoOptions, useFallback, viewportReady])
+  }, [bindDiffEditorHeightSync, clearEditorHeightSyncBindings, collapsed, expanded, monacoLanguage, scheduleEditorHeightSync, shouldDelayEditor, syncEditorCssVars, syncRuntimeMonacoOptions, useFallback, viewportReady])
 
   useEffect(() => {
     syncRuntimeMonacoOptions()
@@ -905,12 +1115,10 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
       }
       catch {}
 
-      if (expanded)
-        applyEditorHeight(true)
+      scheduleEditorHeightSync(expanded)
     }
     void run()
   }, [
-    applyEditorHeight,
     canonicalLanguage,
     codeLanguage,
     collapsed,
@@ -922,6 +1130,7 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
     node.diff,
     node.originalCode,
     node.updatedCode,
+    scheduleEditorHeightSync,
     shouldDelayEditor,
     useFallback,
     viewportReady,
@@ -943,15 +1152,15 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
     if (!expanded && loading)
       return
     const raf = typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function'
-      ? window.requestAnimationFrame(() => applyEditorHeight(expanded))
+      ? window.requestAnimationFrame(() => scheduleEditorHeightSync(expanded))
       : null
     if (raf == null)
-      applyEditorHeight(expanded)
+      scheduleEditorHeightSync(expanded)
     return () => {
       if (raf != null && typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function')
         window.cancelAnimationFrame(raf)
     }
-  }, [applyEditorHeight, collapsed, expanded, loading, monacoReady, shouldDelayEditor, useFallback, viewportReady])
+  }, [collapsed, expanded, loading, monacoReady, scheduleEditorHeightSync, shouldDelayEditor, useFallback, viewportReady])
 
   useEffect(() => {
     if (!enableFontSizeControl)
@@ -968,8 +1177,8 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
       view?.updateOptions?.({ fontSize })
     }
     catch {}
-    applyEditorHeight(expanded)
-  }, [applyEditorHeight, enableFontSizeControl, expanded, fontSize, node.diff, useFallback])
+    scheduleEditorHeightSync(expanded)
+  }, [enableFontSizeControl, expanded, fontSize, node.diff, scheduleEditorHeightSync, useFallback])
 
   useEffect(() => {
     if (!tooltipsEnabled)
@@ -1025,8 +1234,17 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
       setInlinePreviewOpen(v => !v)
   }, [canonicalLanguage, isPreviewable, node, props, t])
 
-  if (useFallback)
-    return <PreCodeNode node={node as any} />
+  if (useFallback) {
+    return (
+      <PreCodeNode
+        className="code-fallback-plain m-0"
+        diffInline={preFallbackDiffInline}
+        node={node as any}
+        showLineNumbers={Boolean(node.diff)}
+        style={preFallbackStyle}
+      />
+    )
+  }
 
   return (
     <div
@@ -1290,14 +1508,13 @@ export function CodeBlockNode(rawProps: CodeBlockNodeProps & CodeBlockNodeReactE
                     <div
                       className="code-editor-fallback-surface"
                     >
-                      <pre
+                      <PreCodeNode
                         className="code-fallback-plain m-0"
-                        aria-busy={loading}
-                        aria-label={`Code block: ${displayLanguage}`}
-                        tabIndex={0}
-                      >
-                        <code translate="no">{String(resolvedCode)}</code>
-                      </pre>
+                        diffInline={preFallbackDiffInline}
+                        node={node as any}
+                        showLineNumbers={Boolean(node.diff)}
+                        style={preFallbackStyle}
+                      />
                     </div>
                   )}
                 </div>

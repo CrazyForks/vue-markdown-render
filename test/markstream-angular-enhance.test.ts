@@ -3,11 +3,21 @@ import { enhanceRenderedHtml } from '../packages/markstream-angular/src/enhanceR
 
 const {
   monacoCleanup,
+  monacoCreateDiffEditor,
+  monacoCreateEditor,
+  monacoUseMonacoOptions,
   canParseOffthread,
   findPrefixOffthread,
   mermaidState,
 } = vi.hoisted(() => ({
   monacoCleanup: vi.fn(),
+  monacoCreateEditor: vi.fn(async (container: HTMLElement, code: string, language: string) => {
+    container.innerHTML = `<div data-monaco="1" data-language="${language}">${code}</div>`
+  }),
+  monacoCreateDiffEditor: vi.fn(async (container: HTMLElement, original: string, modified: string, language: string) => {
+    container.innerHTML = `<div data-monaco-diff="1" data-language="${language}" data-original="${original}" data-modified="${modified}"></div>`
+  }),
+  monacoUseMonacoOptions: [] as Array<Record<string, unknown>>,
   canParseOffthread: vi.fn(async () => true),
   findPrefixOffthread: vi.fn(async () => null),
   mermaidState: { failOnBToC: false },
@@ -76,19 +86,24 @@ vi.mock('../packages/markstream-angular/src/optional/infographic', () => ({
 
 vi.mock('../packages/markstream-angular/src/optional/monaco', () => ({
   getUseMonaco: vi.fn(async () => ({
-    useMonaco: vi.fn(() => ({
-      async createEditor(container: HTMLElement, code: string, language: string) {
-        container.innerHTML = `<div data-monaco="1" data-language="${language}">${code}</div>`
-      },
-      async setTheme() {},
-      cleanupEditor: monacoCleanup,
-    })),
+    useMonaco: vi.fn((options: Record<string, unknown>) => {
+      monacoUseMonacoOptions.push(options)
+      return {
+        createEditor: monacoCreateEditor,
+        createDiffEditor: monacoCreateDiffEditor,
+        async setTheme() {},
+        cleanupEditor: monacoCleanup,
+      }
+    }),
   })),
 }))
 
 describe('markstream-angular enhanceRenderedHtml', () => {
   it('hydrates math, mermaid, monaco, infographic, and d2 blocks in place', async () => {
     monacoCleanup.mockReset()
+    monacoCreateEditor.mockClear()
+    monacoCreateDiffEditor.mockClear()
+    monacoUseMonacoOptions.length = 0
     canParseOffthread.mockReset()
     findPrefixOffthread.mockReset()
     canParseOffthread.mockImplementation(async () => true)
@@ -102,8 +117,8 @@ describe('markstream-angular enhanceRenderedHtml', () => {
         <div class="markstream-nested-math-block"><pre class="markstream-nested-math-block__source"><code>\\int_0^1 x^2 dx</code></pre><div class="markstream-nested-math-block__render"></div></div>
         <pre data-markstream-code-block="1" data-markstream-language="mermaid"><code class="language-mermaid">graph TD; A-->B;</code></pre>
         <pre data-markstream-code-block="1" data-markstream-language="ts"><code class="language-ts">const value = 1</code></pre>
-        <pre data-markstream-code-block="1" data-markstream-language="ts" data-markstream-diff="1" data-markstream-original="Y29uc3QgdmFsdWUgPSAx" data-markstream-updated="Y29uc3QgdmFsdWU6IG51bWJlciA9IDE="><code class="language-ts">-const value = 1
-+const value: number = 1</code></pre>
+        <pre data-markstream-code-block="1" data-markstream-language="json:package.json" data-markstream-diff="1" data-markstream-original="eyJ2ZXJzaW9uIjoiMC4wLjQ5In0=" data-markstream-updated="eyJ2ZXJzaW9uIjoiMC4wLjU0LWJldGEuMSJ9" style="margin: 2px 0; padding: 12px 14px;"><code class="language-json" style="font-size: 15px; line-height: 24px; font-family: Menlo;">-{"version":"0.0.49"}
++{"version":"0.0.54-beta.1"}</code></pre>
         <pre data-markstream-code-block="1" data-markstream-language="infographic"><code class="language-infographic">infographic list-row-simple-horizontal-arrow</code></pre>
         <pre data-markstream-code-block="1" data-markstream-language="d2"><code class="language-d2">a -> b</code></pre>
       </div>
@@ -117,10 +132,18 @@ describe('markstream-angular enhanceRenderedHtml', () => {
     expect(shell.innerHTML).toContain('data-mermaid="1"')
     expect(shell.innerHTML).toContain('markstream-angular-mermaid')
     expect(shell.innerHTML).toContain('data-monaco="1"')
+    expect(shell.innerHTML).toContain('data-monaco-diff="1"')
     expect(shell.innerHTML).toContain('data-markstream-monaco-diff="1"')
     expect(shell.innerHTML).toContain('data-infographic="1"')
     expect(shell.innerHTML).toContain('data-d2="1"')
     expect(shell.innerHTML).toContain('markstream-angular-enhanced-block__action')
+    expect(monacoCreateDiffEditor).toHaveBeenCalledWith(expect.any(HTMLElement), '{"version":"0.0.49"}', '{"version":"0.0.54-beta.1"}', 'json')
+    expect(monacoUseMonacoOptions[1]).toMatchObject({
+      fontSize: 15,
+      lineHeight: 24,
+      fontFamily: 'Menlo',
+      padding: { top: 12, bottom: 12 },
+    })
 
     const copyButton = shell.querySelector<HTMLButtonElement>('.markstream-angular-enhanced-block__action')
     copyButton?.click()

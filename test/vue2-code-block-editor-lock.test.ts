@@ -133,6 +133,34 @@ describe('markstream-vue2 codeBlockNode theme updates', () => {
     wrapper.unmount()
   })
 
+  it('passes active themes and syntax languages to stream-monaco legacy', async () => {
+    const helpers = getStreamMonacoHelpers()
+
+    const wrapper = mount(CodeBlockNode as any, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'tsx',
+          code: 'export function TestHarness() {\n  return <section />\n}',
+          raw: '```tsx\nexport function TestHarness() {\n  return <section />\n}\n```',
+        },
+        loading: false,
+        showHeader: false,
+        isDark: false,
+        darkTheme: 'vitesse-dark',
+        lightTheme: 'vitesse-light',
+      },
+    })
+
+    await waitForCreateEditorCalls(1, helpers)
+
+    const options = helpers.useMonaco.mock.calls[0]?.[0]
+    expect(options.themes).toEqual(['vitesse-dark', 'vitesse-light'])
+    expect(options.languages).toEqual(expect.arrayContaining(['tsx', 'typescript', 'plaintext']))
+
+    wrapper.unmount()
+  })
+
   it('updates diff themes without recreating the diff editor when isDark toggles', async () => {
     const helpers = getStreamMonacoHelpers()
 
@@ -231,6 +259,66 @@ describe('markstream-vue2 codeBlockNode theme updates', () => {
     ) as HTMLElement | null
 
     expect(revealIcon?.className).toBe('codicon codicon-chevron-down')
+
+    wrapper.unmount()
+  })
+
+  it('renders a two-pane diff fallback with Monaco-aligned metrics before the diff editor is ready', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let resolveCreateDiffEditor: (() => void) | undefined
+
+    helpers.createDiffEditor.mockImplementation(() => new Promise<void>((resolve) => {
+      resolveCreateDiffEditor = resolve
+    }))
+
+    const wrapper = mount(CodeBlockNode as any, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'json:package.json',
+          code: '{\n  "name": "markstream-vue",\n  "type": "module",\n  "version": "0.0.54-beta.1"\n}',
+          diff: true,
+          originalCode: '{\n  "name": "markstream-vue",\n  "type": "module",\n  "version": "0.0.49"\n}',
+          updatedCode: '{\n  "name": "markstream-vue",\n  "type": "module",\n  "version": "0.0.54-beta.1"\n}',
+          raw: '```diff / json:package.json\n```',
+        },
+        loading: false,
+        showHeader: false,
+        isDark: false,
+        monacoOptions: {
+          fontFamily: 'Menlo',
+          fontSize: 13,
+          lineHeight: 20,
+          padding: { top: 2, bottom: 6 },
+          renderSideBySide: true,
+          tabSize: 2,
+        },
+      },
+    })
+
+    await waitForCreateDiffEditorCalls(1, helpers)
+
+    const fallback = wrapper.element.querySelector('pre.code-pre-fallback.markstream-pre--diff-preview') as HTMLElement | null
+    expect(fallback).not.toBeNull()
+    expect(fallback?.dataset.language).toBe('json')
+    expect(fallback?.style.fontFamily).toBe('Menlo')
+    expect(fallback?.style.fontSize).toBe('13px')
+    expect(fallback?.style.lineHeight).toBe('20px')
+    expect(fallback?.style.paddingTop).toBe('2px')
+    expect(fallback?.style.paddingBottom).toBe('6px')
+    expect(fallback?.style.tabSize).toBe('2')
+
+    const panes = wrapper.element.querySelectorAll('.markstream-pre__diff-pane')
+    expect(panes).toHaveLength(2)
+    const options = helpers.useMonaco.mock.calls[0]?.[0]
+    expect(options.languages).toEqual(expect.arrayContaining(['json', 'plaintext']))
+    expect(wrapper.element.querySelector('.markstream-pre__diff-pane--original')?.textContent).toContain('"version": "0.0.49"')
+    expect(wrapper.element.querySelector('.markstream-pre__diff-pane--modified')?.textContent).toContain('"version": "0.0.54-beta.1"')
+    expect(wrapper.element.querySelector('.markstream-pre__diff-pane--original .markstream-pre__diff-line--removed')?.textContent).toContain('"version": "0.0.49"')
+    expect(wrapper.element.querySelector('.markstream-pre__diff-pane--modified .markstream-pre__diff-line--added')?.textContent).toContain('"version": "0.0.54-beta.1"')
+
+    resolveCreateDiffEditor?.()
+    await flushPendingMicrotasks()
 
     wrapper.unmount()
   })

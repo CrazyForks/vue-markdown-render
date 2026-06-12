@@ -156,6 +156,8 @@ export interface LinkNodeProps {
 
 export interface PreCodeNodeProps {
   node: CodeBlockNode
+  showLineNumbers?: boolean
+  diffInline?: boolean
 }
 
 export interface MermaidBlockNodeProps {

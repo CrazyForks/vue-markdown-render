@@ -128,6 +128,7 @@ const isPlainTextLanguage = computed(() => monacoLanguage.value === 'plaintext')
 const isExpanded = ref(false)
 const isCollapsed = ref(false)
 const editorCreated = ref(false)
+const editorReady = ref(false)
 const monacoReady = ref(false)
 let expandRafId: number | null = null
 const heightBeforeCollapse = ref<number | null>(null)
@@ -186,6 +187,23 @@ const defaultDiffHideUnchangedRegions = Object.freeze({
   minimumLineCount: 4,
   revealLineCount: 5,
 })
+const defaultPreFallbackFontSize = 12
+const defaultPreFallbackLineHeight = 18
+
+function readPositiveNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined
+}
+
+function readMonacoPadding(value: unknown) {
+  if (!value || typeof value !== 'object')
+    return { top: 0, bottom: 0 }
+
+  const raw = value as Record<string, unknown>
+  return {
+    top: readPositiveNumber(raw.top) ?? 0,
+    bottom: readPositiveNumber(raw.bottom) ?? 0,
+  }
+}
 
 function resolveDiffHideUnchangedRegionsOption(value: unknown) {
   if (typeof value === 'boolean')
@@ -213,10 +231,6 @@ const resolvedMonacoOptions = computed(() => {
     ? undefined
     : resolveDiffHideUnchangedRegionsOption(raw.hideUnchangedRegions)
   const diffUnchangedRegionStyle = raw.diffUnchangedRegionStyle ?? 'line-info'
-  const needsExtraBottomSpace
-    = diffUnchangedRegionStyle === 'line-info'
-      || diffUnchangedRegionStyle === 'line-info-basic'
-      || diffUnchangedRegionStyle === 'metadata'
   const diffDefaults = {
     maxComputationTime: 0,
     diffAlgorithm: 'legacy',
@@ -228,21 +242,20 @@ const resolvedMonacoOptions = computed(() => {
     selectionHighlight: false,
     occurrencesHighlight: 'off',
     matchBrackets: 'never',
-    lineDecorationsWidth: 12,
+    lineDecorationsWidth: 4,
     lineNumbersMinChars: 2,
     glyphMargin: false,
-    fontSize: 13,
-    lineHeight: 30,
+    minimap: { enabled: false },
     renderOverviewRuler: false,
     overviewRulerBorder: false,
     hideCursorInOverviewRuler: true,
     scrollBeyondLastLine: false,
-    padding: { top: 10, bottom: needsExtraBottomSpace ? 22 : 14 },
     diffHideUnchangedRegions,
+    useInlineViewWhenSpaceIsLimited: raw.useInlineViewWhenSpaceIsLimited ?? false,
     diffLineStyle: 'background',
     diffAppearance: 'auto',
     diffUnchangedRegionStyle,
-    diffHunkActionsOnHover: true,
+    diffHunkActionsOnHover: false,
     diffHunkHoverHideDelayMs: 160,
   }
 
@@ -321,7 +334,7 @@ const codeFontMin = 10
 const codeFontMax = 36
 const codeFontStep = 1
 const defaultCodeFontSize = ref<number>(
-  typeof resolvedMonacoOptions.value?.fontSize === 'number' ? resolvedMonacoOptions.value.fontSize : Number.NaN,
+  typeof resolvedMonacoOptions.value?.fontSize === 'number' ? resolvedMonacoOptions.value.fontSize : defaultPreFallbackFontSize,
 )
 const codeFontSize = ref<number>(defaultCodeFontSize.value)
 const fontBaselineReady = computed(() => {
@@ -1165,6 +1178,7 @@ async function runEditorCreation(el: HTMLElement) {
       scheduleEditorVisualSync()
     })
   }
+  editorReady.value = true
 }
 
 function ensureEditorCreation(el: HTMLElement) {
@@ -1174,6 +1188,7 @@ function ensureEditorCreation(el: HTMLElement) {
     return createEditorPromise
 
   editorCreated.value = true
+  editorReady.value = false
   const pending = (async () => {
     await runEditorCreation(el)
   })()
@@ -1254,11 +1269,52 @@ function getThemeName(theme: any) {
   return null
 }
 
+function hasTheme(themes: any[], theme: any) {
+  const name = getThemeName(theme)
+  return themes.some(item => item === theme || (name && getThemeName(item) === name))
+}
+
+function addRuntimeLanguage(languages: string[], language: unknown) {
+  if (typeof language !== 'string')
+    return
+
+  const canonical = normalizeLanguageIdentifier(language)
+  const monacoId = resolveMonacoLanguageId(canonical)
+  for (const value of [canonical, monacoId]) {
+    if (value && !languages.includes(value))
+      languages.push(value)
+  }
+}
+
+const runtimeMonacoThemes = computed(() => {
+  const themes = Array.isArray(props.themes) ? [...props.themes] : []
+  for (const theme of [props.darkTheme, props.lightTheme]) {
+    if (theme != null && !hasTheme(themes, theme))
+      themes.push(theme)
+  }
+  return themes.length ? themes : undefined
+})
+
+const runtimeMonacoLanguages = computed(() => {
+  const languages: string[] = []
+  const configured = resolvedMonacoOptions.value?.languages
+  if (Array.isArray(configured)) {
+    for (const language of configured)
+      addRuntimeLanguage(languages, language)
+  }
+
+  addRuntimeLanguage(languages, props.node.language)
+  addRuntimeLanguage(languages, codeLanguage.value)
+  addRuntimeLanguage(languages, monacoLanguage.value)
+  addRuntimeLanguage(languages, 'plaintext')
+  return languages
+})
+
 function resolveRequestedTheme() {
   const preferred = getPreferredColorScheme()
   const explicit = resolvedMonacoOptions.value?.theme
   const requested = preferred ?? explicit
-  const availableThemes = Array.isArray(props.themes) ? props.themes : []
+  const availableThemes = runtimeMonacoThemes.value ?? []
   if (!availableThemes.length || requested == null)
     return requested
 
@@ -1350,18 +1406,82 @@ const resolvedSurfaceIsDark = computed(() =>
   isDiff.value ? effectiveDiffAppearance.value === 'dark' : resolvedChromeIsDark.value,
 )
 
-function buildRuntimeMonacoOptions() {
+const preFallbackMetrics = computed(() => {
+  const raw = resolvedMonacoOptions.value as Record<string, unknown> | null | undefined
+  const fallbackFontSize = Number.isFinite(codeFontSize.value) && (codeFontSize.value as number) > 0
+    ? (codeFontSize.value as number)
+    : defaultPreFallbackFontSize
+  const resolvedFontSize = readPositiveNumber(raw?.fontSize) ?? fallbackFontSize
+  const resolvedLineHeight = readPositiveNumber(raw?.lineHeight)
+    ?? (resolvedFontSize === defaultPreFallbackFontSize
+      ? defaultPreFallbackLineHeight
+      : Math.max(12, Math.round(resolvedFontSize * 1.5)))
+  const fontFamily = typeof raw?.fontFamily === 'string' && raw.fontFamily.trim()
+    ? raw.fontFamily.trim()
+    : undefined
+  const padding = readMonacoPadding(raw?.padding)
+  const tabSize = readPositiveNumber(raw?.tabSize) ?? 4
+
   return {
+    fontFamily,
+    fontSize: resolvedFontSize,
+    lineHeight: resolvedLineHeight,
+    paddingBottom: padding.bottom,
+    paddingTop: padding.top,
+    tabSize,
+  }
+})
+
+const preFallbackDiffInline = computed(() => {
+  if (!isDiff.value)
+    return false
+  return resolvedMonacoOptions.value?.renderSideBySide === false
+})
+
+const preFallbackStyle = computed(() => {
+  const metrics = preFallbackMetrics.value
+  const style: Record<string, string | number> = {
+    '--markstream-code-padding-left': '62px',
+    '--markstream-pre-diff-line-height': `${metrics.lineHeight}px`,
+    '--markstream-pre-line-number-top': `${metrics.paddingTop}px`,
+    '--markstream-pre-line-number-width': '36px',
+    '--markstream-pre-line-number-gap': '0px',
+    'fontSize': `${metrics.fontSize}px`,
+    'lineHeight': `${metrics.lineHeight}px`,
+    'paddingBottom': `${metrics.paddingBottom}px`,
+    'paddingTop': `${metrics.paddingTop}px`,
+    'tabSize': metrics.tabSize,
+  }
+  if (metrics.fontFamily)
+    style.fontFamily = metrics.fontFamily
+  return style
+})
+
+function buildRuntimeMonacoOptions() {
+  const nextOptions = {
     wordWrap: 'on',
     wrappingIndent: 'same',
-    themes: props.themes,
     ...(resolvedMonacoOptions.value || {}),
+    themes: runtimeMonacoThemes.value,
+    languages: runtimeMonacoLanguages.value,
     theme: resolveRequestedTheme(),
     ...(isDiff.value ? { diffAppearance: effectiveDiffAppearance.value } : {}),
     onThemeChange() {
       syncEditorCssVars()
     },
   } as Record<string, any>
+
+  if (isDiff.value) {
+    const metrics = preFallbackMetrics.value
+    nextOptions.fontSize ??= metrics.fontSize
+    nextOptions.lineHeight ??= metrics.lineHeight
+    nextOptions.padding ??= { top: metrics.paddingTop, bottom: metrics.paddingBottom }
+    nextOptions.tabSize ??= metrics.tabSize
+    if (metrics.fontFamily)
+      nextOptions.fontFamily ??= metrics.fontFamily
+  }
+
+  return nextOptions
 }
 
 function syncRuntimeMonacoOptions() {
@@ -1515,7 +1635,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <PreCodeNode v-if="usePreCodeRender" :node="node" :loading="props.loading" />
+  <PreCodeNode
+    v-if="usePreCodeRender"
+    class="code-pre-fallback"
+    :node="node"
+    :show-line-numbers="isDiff"
+    :diff-inline="preFallbackDiffInline"
+    :style="preFallbackStyle"
+  />
   <div
     v-else
     ref="container"
@@ -1642,7 +1769,22 @@ onUnmounted(() => {
       </slot>
     </div>
     <div v-show="!isCollapsed && (stream ? true : !loading)" class="code-editor-layer">
-      <div ref="codeEditor" class="code-editor-container" :class="[stream ? '' : 'code-height-placeholder']" />
+      <div
+        ref="codeEditor"
+        class="code-editor-container"
+        :class="[stream ? '' : 'code-height-placeholder']"
+        :style="{ visibility: editorReady ? 'visible' : 'hidden' }"
+        :aria-hidden="editorReady ? undefined : 'true'"
+      />
+      <div v-if="!editorReady" class="code-editor-fallback-surface">
+        <PreCodeNode
+          class="code-pre-fallback"
+          :node="node"
+          :show-line-numbers="isDiff"
+          :diff-inline="preFallbackDiffInline"
+          :style="preFallbackStyle"
+        />
+      </div>
     </div>
     <HtmlPreviewFrame
       v-if="showInlinePreview && !hasPreviewListener && isPreviewable && codeLanguage === 'html'"
@@ -1822,8 +1964,46 @@ onUnmounted(() => {
   min-width: 0;
 }
 
-.code-editor-layer > .code-editor-container {
+.code-editor-layer > .code-editor-container,
+.code-editor-layer > .code-editor-fallback-surface {
   grid-area: 1 / 1;
+}
+
+.code-editor-fallback-surface {
+  overflow: auto;
+  padding: 1rem;
+}
+
+.code-block-container.is-diff .code-editor-fallback-surface {
+  padding: 0;
+  background: var(--markstream-diff-editor-bg);
+}
+
+.code-block-container ::v-deep pre.code-pre-fallback {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  white-space: pre;
+  overflow: auto;
+  background: var(--vscode-editor-background, var(--markstream-code-fallback-bg));
+  color: var(--vscode-editor-foreground, var(--markstream-code-fallback-fg));
+  font-size: inherit;
+  line-height: inherit;
+  font-family: var(
+    --markstream-code-font-family,
+    Menlo,
+    Monaco,
+    Courier New,
+    monospace
+  );
+  font-weight: var(--vscode-editor-font-weight, 400);
+}
+
+.code-block-container ::v-deep pre.code-pre-fallback.markstream-pre--diff-preview {
+  padding-left: 0;
+  padding-right: 0;
+  background: var(--markstream-diff-editor-bg);
+  color: var(--markstream-diff-editor-fg);
 }
 
 .code-block-container.is-plain-text:not(.is-diff) :deep(.monaco-editor),

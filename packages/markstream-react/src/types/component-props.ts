@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type { CodeBlockNode } from 'stream-markdown-parser'
 
 export interface CodeBlockMonacoThemeObject {
@@ -155,6 +156,10 @@ export interface LinkNodeProps {
 
 export interface PreCodeNodeProps {
   node: CodeBlockNode
+  className?: string
+  style?: CSSProperties
+  showLineNumbers?: boolean
+  diffInline?: boolean
 }
 
 export interface MermaidBlockNodeProps {

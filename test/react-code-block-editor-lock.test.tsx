@@ -62,6 +62,23 @@ async function waitForCallCount(fn: ReturnType<typeof vi.fn>, expected: number, 
   }
 }
 
+function setElementRect(element: Element, rect: { top: number, bottom: number, height: number, width?: number }) {
+  Object.defineProperty(element, 'getBoundingClientRect', {
+    configurable: true,
+    value: () => ({
+      x: 0,
+      y: rect.top,
+      top: rect.top,
+      bottom: rect.bottom,
+      left: 0,
+      right: rect.width ?? 1000,
+      width: rect.width ?? 1000,
+      height: rect.height,
+      toJSON: () => ({}),
+    }) as DOMRect,
+  })
+}
+
 afterEach(() => {
   document.body.innerHTML = ''
   ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = false
@@ -213,6 +230,168 @@ describe('markstream-react codeBlockNode theme updates', () => {
       minimumLineCount: 4,
       revealLineCount: 5,
     })
+    expect(options?.fontSize).toBe(12)
+    expect(options?.lineHeight).toBe(18)
+    expect(options?.padding).toEqual({ top: 0, bottom: 0 })
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('resyncs diff height after unchanged-region DOM settles', async () => {
+    const helpers = getStreamMonacoHelpers()
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    let editorHost: HTMLElement | null = null
+    let updateDiffListener: (() => void) | null = null
+
+    const diffView = {
+      getContentHeight: vi.fn(() => 1200),
+      updateOptions: vi.fn(),
+      layout: vi.fn(),
+      onDidUpdateDiff: vi.fn((callback: () => void) => {
+        updateDiffListener = callback
+        return { dispose: vi.fn() }
+      }),
+      getOriginalEditor: vi.fn(() => ({
+        onDidContentSizeChange: vi.fn(() => ({ dispose: vi.fn() })),
+        onDidLayoutChange: vi.fn(() => ({ dispose: vi.fn() })),
+      })),
+      getModifiedEditor: vi.fn(() => ({
+        onDidContentSizeChange: vi.fn(() => ({ dispose: vi.fn() })),
+        onDidLayoutChange: vi.fn(() => ({ dispose: vi.fn() })),
+      })),
+    }
+    helpers.getDiffEditorView.mockReturnValue(diffView)
+    helpers.createDiffEditor.mockImplementation(async (el: HTMLElement) => {
+      editorHost = el
+      setElementRect(el, { top: 0, bottom: 500, height: 500 })
+      const monacoRoot = document.createElement('div')
+      monacoRoot.className = 'monaco-diff-editor'
+      setElementRect(monacoRoot, { top: 0, bottom: 500, height: 500 })
+      el.appendChild(monacoRoot)
+    })
+
+    await act(async () => {
+      root.render(React.createElement(CodeBlockNode as any, {
+        node: {
+          type: 'code_block',
+          language: 'json:package.json',
+          code: '{\n  "version": "0.0.54-beta.1"\n}',
+          diff: true,
+          originalCode: '{\n  "version": "0.0.49"\n}',
+          updatedCode: '{\n  "version": "0.0.54-beta.1"\n}',
+          raw: '```diff / json:package.json\n```',
+        },
+        loading: false,
+        showHeader: false,
+        isDark: false,
+      }))
+    })
+    await waitForCallCount(helpers.createDiffEditor, 1)
+    await flushReact()
+
+    expect(editorHost?.style.height).toBe('500px')
+
+    const monacoRoot = editorHost?.querySelector('.monaco-diff-editor')
+    expect(monacoRoot).not.toBeNull()
+
+    const original = document.createElement('div')
+    original.className = 'editor original'
+    const originalLines = document.createElement('div')
+    originalLines.className = 'view-lines'
+    const line = document.createElement('div')
+    line.className = 'view-line'
+    line.textContent = '"version": "0.0.49",'
+    setElementRect(line, { top: 40, bottom: 70, height: 30 })
+    const hidden = document.createElement('div')
+    hidden.className = 'diff-hidden-lines'
+    hidden.textContent = '48 unmodified lines'
+    setElementRect(hidden, { top: 250, bottom: 282, height: 32 })
+    originalLines.appendChild(line)
+    original.append(originalLines, hidden)
+
+    const bridge = document.createElement('div')
+    bridge.className = 'stream-monaco-diff-unchanged-bridge'
+    bridge.textContent = '48 unmodified lines'
+    setElementRect(bridge, { top: 250, bottom: 282, height: 32 })
+
+    await act(async () => {
+      monacoRoot?.append(original, bridge)
+      updateDiffListener?.()
+      await Promise.resolve()
+    })
+    await flushReact()
+
+    const syncedHeight = Number.parseInt(editorHost?.style.height || '0', 10)
+    expect(syncedHeight).toBeGreaterThanOrEqual(286)
+    expect(syncedHeight).toBeLessThan(500)
+
+    await act(async () => {
+      root.unmount()
+    })
+  })
+
+  it('renders a two-pane diff fallback with Monaco-aligned metrics before the diff editor is ready', async () => {
+    const helpers = getStreamMonacoHelpers()
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    let resolveCreateDiffEditor: (() => void) | undefined
+
+    helpers.createDiffEditor.mockImplementation(() => new Promise<void>((resolve) => {
+      resolveCreateDiffEditor = resolve
+    }))
+
+    await act(async () => {
+      root.render(React.createElement(CodeBlockNode as any, {
+        node: {
+          type: 'code_block',
+          language: 'json:package.json',
+          code: '{\n  "name": "markstream-vue",\n  "type": "module",\n  "version": "0.0.54-beta.1"\n}',
+          diff: true,
+          originalCode: '{\n  "name": "markstream-vue",\n  "type": "module",\n  "version": "0.0.49"\n}',
+          updatedCode: '{\n  "name": "markstream-vue",\n  "type": "module",\n  "version": "0.0.54-beta.1"\n}',
+          raw: '```diff / json:package.json\n```',
+        },
+        loading: false,
+        showHeader: false,
+        isDark: false,
+        monacoOptions: {
+          fontFamily: 'Menlo',
+          fontSize: 13,
+          lineHeight: 20,
+          padding: { top: 2, bottom: 6 },
+          renderSideBySide: true,
+          tabSize: 2,
+        },
+      }))
+    })
+    await waitForCallCount(helpers.createDiffEditor, 1)
+
+    const fallback = host.querySelector('pre.code-fallback-plain.markstream-pre--diff-preview') as HTMLElement | null
+    expect(fallback).not.toBeNull()
+    expect(fallback?.dataset.language).toBe('json')
+    expect(fallback?.style.fontFamily).toBe('Menlo')
+    expect(fallback?.style.fontSize).toBe('13px')
+    expect(fallback?.style.lineHeight).toBe('20px')
+    expect(fallback?.style.paddingTop).toBe('2px')
+    expect(fallback?.style.paddingBottom).toBe('6px')
+    expect(fallback?.style.tabSize).toBe('2')
+
+    const panes = host.querySelectorAll('.markstream-pre__diff-pane')
+    expect(panes).toHaveLength(2)
+    expect(host.querySelector('.markstream-pre__diff-pane--original')?.textContent).toContain('"version": "0.0.49"')
+    expect(host.querySelector('.markstream-pre__diff-pane--modified')?.textContent).toContain('"version": "0.0.54-beta.1"')
+    expect(host.querySelector('.markstream-pre__diff-pane--original .markstream-pre__diff-line--removed')?.textContent).toContain('"version": "0.0.49"')
+    expect(host.querySelector('.markstream-pre__diff-pane--modified .markstream-pre__diff-line--added')?.textContent).toContain('"version": "0.0.54-beta.1"')
+
+    await act(async () => {
+      resolveCreateDiffEditor?.()
+    })
+    await flushReact()
 
     await act(async () => {
       root.unmount()
