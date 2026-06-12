@@ -399,6 +399,68 @@ function shouldCloneTopLevelStreamTokens(options: ParseOptions) {
     || typeof options.postTransformTokens === 'function'
 }
 
+function sameTokenMap(left: Token | undefined, right: Token | undefined) {
+  const leftMap = left?.map
+  const rightMap = right?.map
+
+  if (leftMap === rightMap)
+    return true
+
+  if (!Array.isArray(leftMap) || !Array.isArray(rightMap))
+    return false
+
+  return leftMap.length === rightMap.length
+    && leftMap.every((value, index) => value === rightMap[index])
+}
+
+function isSameTokenShape(left: Token | undefined, right: Token | undefined) {
+  return !!left
+    && !!right
+    && left.type === right.type
+    && left.tag === right.tag
+    && left.nesting === right.nesting
+    && left.markup === right.markup
+    && left.content === right.content
+    && sameTokenMap(left, right)
+}
+
+function isParagraphTokenTriplet(tokens: Token[], index: number) {
+  return tokens[index]?.type === 'paragraph_open'
+    && tokens[index + 1]?.type === 'inline'
+    && tokens[index + 2]?.type === 'paragraph_close'
+}
+
+function hasAdjacentDuplicateParagraphTokenTriplet(tokens: Token[]) {
+  for (let index = 0; index + 5 < tokens.length; index++) {
+    if (
+      isParagraphTokenTriplet(tokens, index)
+      && isParagraphTokenTriplet(tokens, index + 3)
+      && isSameTokenShape(tokens[index], tokens[index + 3])
+      && isSameTokenShape(tokens[index + 1], tokens[index + 4])
+      && isSameTokenShape(tokens[index + 2], tokens[index + 5])
+    ) {
+      return true
+    }
+  }
+
+  return false
+}
+
+function shouldFallbackDuplicateTolerantMathStreamTokens(
+  md: MarkdownIt,
+  source: string,
+  tokens: Token[],
+) {
+  return hasMarkstreamMathPlugin(md)
+    && mayContainTolerantMathBlockBoundaryOpener(source)
+    && hasAdjacentDuplicateParagraphTokenTriplet(tokens)
+}
+
+function shouldUseSyncParseForPendingTolerantMathBoundary(md: MarkdownIt) {
+  const cache = tolerantMathBoundaryStreamCache.get(md as unknown as object)
+  return typeof cache?.key === 'string' && cache.key.startsWith('pending:')
+}
+
 function parseTopLevelTokens(
   md: MarkdownIt,
   source: string,
@@ -412,7 +474,15 @@ function parseTopLevelTokens(
     return md.parse(source, env)
 
   syncTolerantMathBoundaryStreamCache(md, source)
+  if (shouldUseSyncParseForPendingTolerantMathBoundary(md))
+    return md.parse(source, env)
+
   const tokens = md.stream!.parse!(source, getStableStreamEnv(md, env))
+  if (shouldFallbackDuplicateTolerantMathStreamTokens(md, source, tokens)) {
+    md.stream?.reset?.()
+    return md.parse(source, env)
+  }
+
   if (!shouldCloneTopLevelStreamTokens(options))
     return tokens
 

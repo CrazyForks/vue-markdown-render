@@ -253,6 +253,37 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     expect(getStreamStats(md).total).toBe(1)
   })
 
+  it('does not duplicate the paragraph before a streaming tolerant math block', () => {
+    const md = getMarkdown('stream-parser-tolerant-math-boundary')
+    const source = `${'Alpha '.repeat(20)}$$\n\\w`
+    let nodes: any[] = []
+
+    for (let end = 1; end <= source.length; end++) {
+      nodes = parseMarkdownToStructure(source.slice(0, end), md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+    }
+
+    const leadingParagraphs = nodes.filter(node => node.type === 'paragraph' && String(node.raw ?? '').startsWith('Alpha'))
+    expect(leadingParagraphs).toHaveLength(1)
+    expect(nodes.map(node => node.type)).toEqual(['paragraph', 'math_block'])
+  })
+
+  it('keeps long invalid dollar delimiter runs as plain text', () => {
+    const md = getMarkdown('stream-parser-invalid-dollar-run')
+    const source = `prefix ${'$'.repeat(1000)} suffix`
+    const nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(JSON.stringify(nodes)).not.toContain('"type":"math_inline"')
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0]?.type).toBe('paragraph')
+    expect(nodes[0]?.raw).toBe(source)
+  })
+
   it('updates the top-level stream cache for standalone html documents', () => {
     const md = getMarkdown('stream-parser-standalone-html-document')
     ;(md as any).stream.resetStats()

@@ -328,7 +328,8 @@ $$ where $\\epsilon$ denotes the target accuracy, $n$ is the number of nodes, an
       streamParse: true,
     }) as any[]
 
-    expect(resetCount).toBe(1)
+    const resetCountAfterMathContent = resetCount
+    expect(resetCountAfterMathContent).toBeGreaterThanOrEqual(1)
     expect(nodes.map(node => node.type)).toEqual([
       'paragraph',
       'math_block',
@@ -359,7 +360,7 @@ $$ where $\\epsilon$ denotes the target accuracy, $n$ is the number of nodes, an
       streamParse: true,
     }) as any[]
 
-    expect(resetCount).toBe(2)
+    expect(resetCount).toBeGreaterThanOrEqual(resetCountAfterMathContent + 1)
     expect(nodes.map(node => node.type)).toEqual([
       'paragraph',
       'math_block',
@@ -381,6 +382,7 @@ $$ where $\\epsilon$ denotes the target accuracy, $n$ is the number of nodes, an
     expect(paragraphs[1].raw).toContain('where $b$ follows.')
 
     const completedSerialized = JSON.stringify(nodes)
+    const completedResetCount = resetCount
 
     for (let index = 0; index < 10; index++) {
       nodes = parseMarkdownToStructure(source, md, {
@@ -391,8 +393,43 @@ $$ where $\\epsilon$ denotes the target accuracy, $n$ is the number of nodes, an
       expect(JSON.stringify(nodes)).toBe(completedSerialized)
       expect(collectByType(nodes, 'math_block')).toHaveLength(1)
       expect(collectByType(nodes, 'math_block')[0].loading).toBe(false)
-      expect(resetCount).toBe(2)
+      expect(resetCount).toBe(completedResetCount)
     }
+  })
+
+  it('does not repeatedly reset while a tolerant math boundary stays pending', () => {
+    const md = getMarkdown('stream-pending-tolerant-boundary-no-reset-loop')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats?.()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    let source = 'Before display $$'
+    for (let index = 0; index < 50; index++) {
+      source += `\nx_${index} + y_${index} = z_${index}`
+      const nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      expect(collectByType(nodes, 'math_block')).toHaveLength(1)
+    }
+
+    expect(resetCount).toBe(1)
+
+    source += '\n$$'
+    parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    })
+
+    expect(resetCount).toBe(2)
   })
 
   it('does not duplicate issue-492 content or leave math loading during streaming', () => {

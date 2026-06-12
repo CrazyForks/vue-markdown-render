@@ -910,6 +910,22 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
     if (/^\*[^*]+/.test(s.src)) {
       return false
     }
+
+    if (s.src[s.pos] === '$') {
+      let dollarRunEnd = s.pos + 1
+      while (s.src[dollarRunEnd] === '$')
+        dollarRunEnd++
+
+      const dollarRunLength = dollarRunEnd - s.pos
+      const nextChar = s.src[dollarRunEnd]
+      if (dollarRunLength >= 3 && (!nextChar || /\s/.test(nextChar))) {
+        const token = s.push('text', '', 0)
+        token.content = s.src.slice(s.pos, dollarRunEnd)
+        s.pos = dollarRunEnd
+        return true
+      }
+    }
+
     const delimiters: [string, string][] = [
       ['$$', '$$'],
       ['$', '$'],

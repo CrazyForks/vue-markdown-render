@@ -3,7 +3,7 @@
  */
 
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import InlineCodeNode from '../src/components/InlineCodeNode'
 import NodeRenderer from '../src/components/NodeRenderer'
@@ -11,6 +11,106 @@ import TextNode from '../src/components/TextNode'
 import { flushAll } from './setup/flush-all'
 
 describe('text node streaming consistency', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  async function assertSingleStreamingMathParagraph(wrapper: any, content: string) {
+    const probe = 'Decentralized stochastic optimization is a fundamental paradigm'
+    const checkpoints = [
+      content.indexOf('communication complexity $$') + 'communication complexity $$'.length,
+      content.indexOf('\n\\widetilde') + '\n\\widetilde'.length + 24,
+      content.indexOf('$$ where') + '$$ where'.length,
+      content.length,
+    ].filter(index => index > 0)
+
+    for (const checkpoint of checkpoints) {
+      await wrapper.setProps({ content: content.slice(0, checkpoint) })
+      await flushAll()
+
+      const renderedText = wrapper.text()
+      const occurrences = renderedText.split(probe).length - 1
+      expect(occurrences).toBe(1)
+    }
+  }
+
+  it('does not duplicate paragraph text while streaming into a display math block', async () => {
+    const content = String.raw`Decentralized stochastic optimization is a fundamental paradigm for large-scale learning over networks, where agents communicate only with their neighbors and no central coordinator is required. For strongly convex problems, communication efficiency is mainly determined by the condition number $\kappa=L/\mu$ and the network spectral gap $1-\beta$. Although deterministic decentralized methods can simultaneously achieve accelerated $\sqrt{\kappa}$ and $1/\sqrt{1-\beta}$ dependences, no existing stochastic method attains both improvements at once. In this paper, we propose *Multi-Gossip Accelerated DSGD* (MG-ADSGD), a decentralized stochastic algorithm that combines Nesterov-type primal--dual extrapolation with multi-round fast gossip averaging. The key idea is to couple the gossip depth with the mini-batch size so that additional communication rounds simultaneously improve consensus accuracy and reduce gradient variance. We show that MG-ADSGD achieves the communication complexity $$
+\widetilde{\mathcal O}\!\left( \frac{\sigma^2}{\mu n\epsilon}\log\frac{1}{\epsilon} + \sqrt{\frac{\kappa}{1-\beta}}\log\frac{1}{\epsilon} \right),
+$$ where $\epsilon$ denotes the target accuracy, $n$ is the number of nodes, and $\sigma^2$ is the gradient variance. To the best of our knowledge, this bound yields the best currently available communication complexity for decentralized stochastic strongly convex optimization, up to logarithmic factors that are independent of $\epsilon$.`
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        batchRendering: false,
+        smoothStreaming: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+        maxLiveNodes: 0,
+      },
+    })
+
+    try {
+      await assertSingleStreamingMathParagraph(wrapper, content)
+    }
+    finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('does not duplicate paragraph text when smooth streaming reaches a display math block', async () => {
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    const content = String.raw`Decentralized stochastic optimization is a fundamental paradigm for large-scale learning over networks, where agents communicate only with their neighbors and no central coordinator is required. For strongly convex problems, communication efficiency is mainly determined by the condition number $\kappa=L/\mu$ and the network spectral gap $1-\beta$. Although deterministic decentralized methods can simultaneously achieve accelerated $\sqrt{\kappa}$ and $1/\sqrt{1-\beta}$ dependences, no existing stochastic method attains both improvements at once. In this paper, we propose *Multi-Gossip Accelerated DSGD* (MG-ADSGD), a decentralized stochastic algorithm that combines Nesterov-type primal--dual extrapolation with multi-round fast gossip averaging. The key idea is to couple the gossip depth with the mini-batch size so that additional communication rounds simultaneously improve consensus accuracy and reduce gradient variance. We show that MG-ADSGD achieves the communication complexity $$
+\widetilde{\mathcal O}\!\left( \frac{\sigma^2}{\mu n\epsilon}\log\frac{1}{\epsilon} + \sqrt{\frac{\kappa}{1-\beta}}\log\frac{1}{\epsilon} \right),
+$$ where $\epsilon$ denotes the target accuracy, $n$ is the number of nodes, and $\sigma^2$ is the gradient variance. To the best of our knowledge, this bound yields the best currently available communication complexity for decentralized stochastic strongly convex optimization, up to logarithmic factors that are independent of $\epsilon$.`
+    const probe = 'Decentralized stochastic optimization is a fundamental paradigm'
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        typewriter: true,
+        smoothStreaming: true,
+        smoothStreamingOptions: {
+          startDelayMs: 0,
+          minCharsPerSecond: 1200,
+          maxCharsPerSecond: 1200,
+          maxCharsPerCommit: 12,
+        },
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+        maxLiveNodes: 0,
+        parseCoalesceMs: 0,
+      },
+    })
+
+    try {
+      await wrapper.setProps({ content })
+      await flushAll()
+
+      const baseline = performance.now()
+      for (let step = 1; step <= 140 && queuedFrames.length > 0; step++) {
+        queuedFrames.shift()?.(baseline + step * 120)
+        await flushAll()
+
+        const renderedText = wrapper.text()
+        const occurrences = renderedText.split(probe).length - 1
+        expect(occurrences).toBeLessThanOrEqual(1)
+      }
+
+      expect(wrapper.text()).toContain(probe)
+    }
+    finally {
+      wrapper.unmount()
+    }
+  })
+
   it('settles a finished strong-node delta when following sibling text keeps streaming', async () => {
     const wrapper = mount(NodeRenderer, {
       props: {
