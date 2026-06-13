@@ -6,7 +6,7 @@
   "description": "Vue/Nuxt streaming Markdown renderer for AI chat, SSE/WebSocket output, mobile WebView, docs sites, long documents, and optional Mermaid, KaTeX, Shiki, Monaco.",
   "author": "Simon He",
   "license": "MIT",
-  "homepage": "https://markstream.simonhe.me/frameworks/vue/",
+  "homepage": "https://markstream.simonhe.me/frameworks/vue",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Simon-He95/markstream-vue.git"
@@ -172,6 +172,7 @@
     "docs:check-llms": "pnpm run docs:llms:check",
     "docs:build": "vitepress build docs",
     "docs:seo:check": "pnpm docs:build && node scripts/check-docs-seo-output.mjs",
+    "docs:smoke:production": "node scripts/smoke-docs-production.mjs",
     "docs:build:ci": "pnpm run build:parser && pnpm run build && pnpm docs:seo:check",
     "docs:build:netlify": "VITEPRESS_BASE=/ pnpm docs:build",
     "docs:build:gh": "VITEPRESS_BASE=/markstream-vue/ pnpm docs:build",

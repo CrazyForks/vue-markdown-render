@@ -5,7 +5,7 @@
   "description": "React/Next.js streaming Markdown renderer for AI chat, SSE/WebSocket output, long documents, and optional Mermaid, KaTeX, Shiki, Monaco.",
   "author": "Simon He",
   "license": "MIT",
-  "homepage": "https://markstream.simonhe.me/frameworks/react/",
+  "homepage": "https://markstream.simonhe.me/frameworks/react",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Simon-He95/markstream-vue.git",

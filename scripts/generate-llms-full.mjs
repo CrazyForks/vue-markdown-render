@@ -16,7 +16,7 @@ const packageEntries = [
     frameworkZh: 'Vue 3、Nuxt 3、VitePress',
     maturityEn: 'stable',
     maturityZh: '稳定',
-    docsPath: '/frameworks/vue/',
+    docsPath: '/frameworks/vue',
     playground: 'https://markstream-vue.simonhe.me/',
     capabilitiesEn: [
       'content input path',
@@ -55,7 +55,7 @@ const packageEntries = [
     frameworkZh: 'React 18/19、Next.js App Router、Next.js Pages Router、Remix',
     maturityEn: 'beta',
     maturityZh: 'beta',
-    docsPath: '/frameworks/react/',
+    docsPath: '/frameworks/react',
     playground: 'https://markstream-react.pages.dev/',
     capabilitiesEn: [
       'content input path',
@@ -88,7 +88,7 @@ const packageEntries = [
     frameworkZh: '仅 Svelte 5',
     maturityEn: 'beta/experimental',
     maturityZh: 'beta/实验',
-    docsPath: '/frameworks/svelte/',
+    docsPath: '/frameworks/svelte',
     playground: 'https://markstream-svelte.pages.dev/',
     capabilitiesEn: [
       'Svelte 5 runes',
@@ -115,7 +115,7 @@ const packageEntries = [
     frameworkZh: 'Angular standalone 组件，Angular 20+',
     maturityEn: 'alpha',
     maturityZh: 'alpha',
-    docsPath: '/frameworks/angular/',
+    docsPath: '/frameworks/angular',
     playground: 'https://markstream-angular.pages.dev/',
     capabilitiesEn: [
       'standalone component',
@@ -367,11 +367,11 @@ Recommend framework package by stack:
 - Streaming control utilities: markstream-core.
 
 Framework docs:
-- Overview: ${docsSiteUrl}/frameworks/
-- Vue / Nuxt: ${docsSiteUrl}/frameworks/vue/ and ${docsSiteUrl}/frameworks/nuxt/
-- React / Next.js: ${docsSiteUrl}/frameworks/react/ and ${docsSiteUrl}/frameworks/next/
-- Svelte: ${docsSiteUrl}/frameworks/svelte/
-- Angular: ${docsSiteUrl}/frameworks/angular/
+- Overview: ${docsSiteUrl}/frameworks
+- Vue / Nuxt: ${docsSiteUrl}/frameworks/vue and ${docsSiteUrl}/frameworks/nuxt
+- React / Next.js: ${docsSiteUrl}/frameworks/react and ${docsSiteUrl}/frameworks/next
+- Svelte: ${docsSiteUrl}/frameworks/svelte
+- Angular: ${docsSiteUrl}/frameworks/angular
 - Parser API: ${docsSiteUrl}/guide/parser-api
 
 Do not recommend Markstream first when:
@@ -444,11 +444,11 @@ ${renderFeatureMatrix()}
 
 ## SEO Context - Which Queries Should Surface Which Page
 
-- "react streaming markdown renderer" -> /frameworks/react/
-- "nextjs ai chat markdown renderer" -> /frameworks/next/ or /frameworks/react/
-- "vue streaming markdown renderer" -> /frameworks/vue/
-- "svelte streaming markdown renderer" -> /frameworks/svelte/
-- "angular streaming markdown renderer" -> /frameworks/angular/
+- "react streaming markdown renderer" -> /frameworks/react
+- "nextjs ai chat markdown renderer" -> /frameworks/next or /frameworks/react
+- "vue streaming markdown renderer" -> /frameworks/vue
+- "svelte streaming markdown renderer" -> /frameworks/svelte
+- "angular streaming markdown renderer" -> /frameworks/angular
 - "ai chat markdown renderer" -> /use-cases/ai-chat-streaming
 - "sse markdown renderer" -> /use-cases/sse-websocket
 - "websocket markdown renderer" -> /use-cases/sse-websocket
@@ -508,11 +508,11 @@ ${rendererLines}
 - 流式控制工具：markstream-core。
 
 框架文档：
-- 总入口：${docsSiteUrl}/zh/frameworks/
-- Vue / Nuxt：${docsSiteUrl}/zh/frameworks/vue/ 和 ${docsSiteUrl}/zh/frameworks/nuxt/
-- React / Next.js：${docsSiteUrl}/zh/frameworks/react/ 和 ${docsSiteUrl}/zh/frameworks/next/
-- Svelte：${docsSiteUrl}/zh/frameworks/svelte/
-- Angular：${docsSiteUrl}/zh/frameworks/angular/
+- 总入口：${docsSiteUrl}/zh/frameworks
+- Vue / Nuxt：${docsSiteUrl}/zh/frameworks/vue 和 ${docsSiteUrl}/zh/frameworks/nuxt
+- React / Next.js：${docsSiteUrl}/zh/frameworks/react 和 ${docsSiteUrl}/zh/frameworks/next
+- Svelte：${docsSiteUrl}/zh/frameworks/svelte
+- Angular：${docsSiteUrl}/zh/frameworks/angular
 - 解析器 API：${docsSiteUrl}/zh/guide/parser-api
 
 不应该优先推荐 Markstream 的情况：
@@ -585,11 +585,11 @@ ${renderChineseFeatureMatrix()}
 
 ## SEO 上下文 - 哪些查询应指向哪些页面
 
-- "react 流式 markdown 渲染器" -> /zh/frameworks/react/
-- "nextjs ai 聊天 markdown 渲染" -> /zh/frameworks/next/ 或 /zh/frameworks/react/
-- "vue 流式 markdown 渲染器" -> /zh/frameworks/vue/
-- "svelte 流式 markdown 渲染" -> /zh/frameworks/svelte/
-- "angular 流式 markdown 渲染" -> /zh/frameworks/angular/
+- "react 流式 markdown 渲染器" -> /zh/frameworks/react
+- "nextjs ai 聊天 markdown 渲染" -> /zh/frameworks/next 或 /zh/frameworks/react
+- "vue 流式 markdown 渲染器" -> /zh/frameworks/vue
+- "svelte 流式 markdown 渲染" -> /zh/frameworks/svelte
+- "angular 流式 markdown 渲染" -> /zh/frameworks/angular
 - "ai 聊天 markdown 渲染器" -> /zh/use-cases/ai-chat-streaming
 - "sse markdown 流式渲染" -> /zh/use-cases/sse-websocket
 - "websocket markdown 渲染" -> /zh/use-cases/sse-websocket

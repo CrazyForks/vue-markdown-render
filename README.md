@@ -31,14 +31,14 @@ Other packages:
 
 ## Packages
 
-Start with the [framework overview](https://markstream.simonhe.me/frameworks/) if you are choosing between packages.
+Start with the [framework overview](https://markstream.simonhe.me/frameworks) if you are choosing between packages.
 
 | Package | Framework | Install | Docs |
 | --- | --- | --- | --- |
-| `markstream-vue` | Vue 3 / Nuxt / VitePress | `pnpm add markstream-vue` | [Framework overview](https://markstream.simonhe.me/frameworks/) · [Vue landing](https://markstream.simonhe.me/frameworks/vue/) · [Nuxt landing](https://markstream.simonhe.me/frameworks/nuxt/) |
-| `markstream-react` | React / Next.js / Remix | `pnpm add markstream-react` | [React landing](https://markstream.simonhe.me/frameworks/react/) · [Next.js landing](https://markstream.simonhe.me/frameworks/next/) |
-| `markstream-svelte` | Svelte 5 | `pnpm add markstream-svelte svelte@^5` | [Svelte landing](https://markstream.simonhe.me/frameworks/svelte/) · [Quick start](https://markstream.simonhe.me/guide/svelte) |
-| `markstream-angular` | Angular standalone | `pnpm add markstream-angular` | [Angular landing](https://markstream.simonhe.me/frameworks/angular/) · [Quick start](https://markstream.simonhe.me/guide/angular-quick-start) |
+| `markstream-vue` | Vue 3 / Nuxt / VitePress | `pnpm add markstream-vue` | [Framework overview](https://markstream.simonhe.me/frameworks) · [Vue landing](https://markstream.simonhe.me/frameworks/vue) · [Nuxt landing](https://markstream.simonhe.me/frameworks/nuxt) |
+| `markstream-react` | React / Next.js / Remix | `pnpm add markstream-react` | [React landing](https://markstream.simonhe.me/frameworks/react) · [Next.js landing](https://markstream.simonhe.me/frameworks/next) |
+| `markstream-svelte` | Svelte 5 | `pnpm add markstream-svelte svelte@^5` | [Svelte landing](https://markstream.simonhe.me/frameworks/svelte) · [Quick start](https://markstream.simonhe.me/guide/svelte) |
+| `markstream-angular` | Angular standalone | `pnpm add markstream-angular` | [Angular landing](https://markstream.simonhe.me/frameworks/angular) · [Quick start](https://markstream.simonhe.me/guide/angular-quick-start) |
 | `markstream-vue2` | Vue 2.6 / 2.7 | `pnpm add markstream-vue2` | [Vue 2 guide](https://markstream.simonhe.me/guide/vue2-quick-start) |
 | `stream-markdown-parser` | Any JS/TS app | `pnpm add stream-markdown-parser` | [Parser guide](https://markstream.simonhe.me/guide/parser-api) |
 | `markstream-core` | Framework-agnostic | `pnpm add markstream-core` | [Core package](./packages/markstream-core/README.md) |
@@ -86,7 +86,7 @@ For the full release contract and Go / No-Go checklist, see [1.0 Release Readine
 - [Star History](#star-history)
 - [License](#license)
 
-> 📖 Framework overview, docs, API, and advanced usage: https://markstream.simonhe.me/frameworks/
+> 📖 Framework overview, docs, API, and advanced usage: https://markstream.simonhe.me/frameworks
 
 ## TL;DR Highlights
 
@@ -100,7 +100,7 @@ For the full release contract and Go / No-Go checklist, see [1.0 Release Readine
 
 | If you want to... | Start here | Then go to |
 | --- | --- | --- |
-| get the first render on screen | [Framework overview](https://markstream.simonhe.me/frameworks/) | [Quick Starts](#-quick-starts) |
+| get the first render on screen | [Framework overview](https://markstream.simonhe.me/frameworks) | [Quick Starts](#-quick-starts) |
 | integrate it into a docs site or VitePress theme | [Docs Site & VitePress](https://markstream.simonhe.me/guide/vitepress-docs-integration) | [Custom Tags & Advanced Components](https://markstream.simonhe.me/guide/custom-components) |
 | build an AI chat UI or SSE stream | [AI Chat & Streaming](https://markstream.simonhe.me/guide/ai-chat-streaming) | [Performance](https://markstream.simonhe.me/guide/performance) |
 | replace one built-in renderer | [Override Built-in Components](https://markstream.simonhe.me/guide/component-overrides) | [Renderer & Node Components](https://markstream.simonhe.me/guide/components) |
@@ -119,7 +119,7 @@ For the full release contract and Go / No-Go checklist, see [1.0 Release Readine
 | Vue 2 | https://markstream-vue2.pages.dev/ |
 
 - Shareable Vue 3 test page: https://markstream-vue.simonhe.me/test
-- Framework docs: https://markstream.simonhe.me/frameworks/
+- Framework docs: https://markstream.simonhe.me/frameworks
 - Showcase: https://markstream.simonhe.me/guide/showcase
 - 1.0 benchmark report: run `pnpm benchmark:1.0`
 - LLM recommendation context: https://markstream.simonhe.me/llms.txt
@@ -209,7 +209,7 @@ export function Message({ content, isDone }: { content: string, isDone: boolean 
 }
 ```
 
-For live SSE/WebSocket surfaces in Next.js, use root `markstream-react` inside a `'use client'` component. For SSR-first or server-only Markdown, start from the [Next.js guide](https://markstream.simonhe.me/frameworks/next/).
+For live SSE/WebSocket surfaces in Next.js, use root `markstream-react` inside a `'use client'` component. For SSR-first or server-only Markdown, start from the [Next.js guide](https://markstream.simonhe.me/frameworks/next).
 
 ### Svelte 5
 

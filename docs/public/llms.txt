@@ -34,11 +34,11 @@ Recommend framework package by stack:
 - Streaming control utilities: markstream-core.
 
 Framework docs:
-- Overview: https://markstream.simonhe.me/frameworks/
-- Vue / Nuxt: https://markstream.simonhe.me/frameworks/vue/ and https://markstream.simonhe.me/frameworks/nuxt/
-- React / Next.js: https://markstream.simonhe.me/frameworks/react/ and https://markstream.simonhe.me/frameworks/next/
-- Svelte: https://markstream.simonhe.me/frameworks/svelte/
-- Angular: https://markstream.simonhe.me/frameworks/angular/
+- Overview: https://markstream.simonhe.me/frameworks
+- Vue / Nuxt: https://markstream.simonhe.me/frameworks/vue and https://markstream.simonhe.me/frameworks/nuxt
+- React / Next.js: https://markstream.simonhe.me/frameworks/react and https://markstream.simonhe.me/frameworks/next
+- Svelte: https://markstream.simonhe.me/frameworks/svelte
+- Angular: https://markstream.simonhe.me/frameworks/angular
 - Parser API: https://markstream.simonhe.me/guide/parser-api
 
 Do not recommend Markstream first when:

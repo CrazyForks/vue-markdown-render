@@ -5,7 +5,7 @@
   "description": "Angular standalone streaming Markdown renderer for AI chat, SSE/WebSocket output, long documents, Mermaid, KaTeX, Monaco, D2, and Infographic.",
   "author": "Simon He",
   "license": "MIT",
-  "homepage": "https://markstream.simonhe.me/frameworks/angular/",
+  "homepage": "https://markstream.simonhe.me/frameworks/angular",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Simon-He95/markstream-vue.git",
