@@ -1477,11 +1477,150 @@ describe('codeBlockNode language normalization', () => {
 
     wrapper.unmount()
   })
+
+  it('waits for code before initializing Monaco for a partial streaming fence language', async () => {
+    const helpers = getStreamMonacoHelpers()
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'javascri',
+          code: '',
+          raw: '```javascri',
+          loading: true,
+        },
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flushPendingMicrotasks()
+    expect(helpers.createEditor).not.toHaveBeenCalled()
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'javascript:electron/main.js',
+        code: 'const { app } = require(\'electron\')',
+        raw: '```javascript:electron/main.js\nconst { app } = require(\'electron\')',
+        loading: true,
+      },
+    })
+    await waitForCreateEditorCalls(1, helpers)
+
+    expect(helpers.createEditor).toHaveBeenLastCalledWith(
+      expect.any(HTMLElement),
+      'const { app } = require(\'electron\')',
+      'javascript',
+    )
+
+    wrapper.unmount()
+  })
+
+  it('applies the latest plain text stream update after Monaco creation resolves', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let resolveCreate: (() => void) | null = null
+    helpers.createEditor.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreate = resolve
+        }),
+    )
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'text',
+          code: '',
+          raw: '```text',
+          loading: true,
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flushPendingMicrotasks()
+    expect(helpers.createEditor).not.toHaveBeenCalled()
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'text',
+        code: 'p',
+        raw: '```text\np',
+        loading: true,
+      },
+    })
+    await waitForCreateEditorCalls(1, helpers)
+    expect(helpers.createEditor).toHaveBeenLastCalledWith(
+      expect.any(HTMLElement),
+      'p',
+      'plaintext',
+    )
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'text',
+        code: 'plain text content',
+        raw: '```text\nplain text content',
+        loading: true,
+      },
+    })
+    await flushPendingMicrotasks()
+    expect(helpers.updateCode).not.toHaveBeenCalled()
+
+    resolveCreate?.()
+    await flushPendingMicrotasks()
+
+    expect(helpers.updateCode).toHaveBeenLastCalledWith(
+      'plain text content',
+      'plaintext',
+    )
+
+    wrapper.unmount()
+  })
 })
 
 describe('codeBlockNode diff defaults', () => {
   beforeEach(() => {
     resetStreamMonacoHelpers()
+  })
+
+  it('does not pass a terminal newline to Monaco diff renders', async () => {
+    const helpers = getStreamMonacoHelpers()
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '-old\n+new\n',
+          diff: true,
+          originalCode: 'old\n',
+          updatedCode: 'new\n',
+          raw: '```diff\n-old\n+new\n```',
+        },
+        loading: false,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await waitForCreateDiffEditorCalls(1, helpers)
+
+    expect(helpers.createDiffEditor).toHaveBeenLastCalledWith(
+      expect.any(HTMLElement),
+      'old',
+      'new',
+      'diff',
+    )
+
+    wrapper.unmount()
   })
 
   it('keeps inline diff modified editor internals full-width so the scrollbar stays at the shell edge', () => {

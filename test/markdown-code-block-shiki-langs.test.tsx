@@ -923,6 +923,47 @@ describe('markdown code block Shiki langs', () => {
     wrapper.unmount()
   })
 
+  it('does not render Vue Shiki with a partial streaming fence language', async () => {
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'javascri',
+          code: '',
+          raw: '```javascri',
+          loading: true,
+        },
+        loading: true,
+      },
+    })
+
+    await flushAll()
+    await waitForRendererCreated()
+
+    const renderer = streamMarkdownMock.createdRenderers[0]
+    expect(renderer?.updateCode).toHaveBeenLastCalledWith('', 'plaintext')
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'javascript:electron/main.js',
+        code: 'const { app } = require(\'electron\')',
+        raw: '```javascript:electron/main.js\nconst { app } = require(\'electron\')',
+        loading: true,
+      },
+      loading: true,
+    })
+    await flushAll()
+
+    expect(renderer?.updateCode).toHaveBeenLastCalledWith(
+      'const { app } = require(\'electron\')',
+      'javascript',
+    )
+
+    wrapper.unmount()
+  })
+
   it('retries Vue registerHighlight when the previous registration failed', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     streamMarkdownMock.registerHighlight.mockRejectedValueOnce(new Error('load failed'))

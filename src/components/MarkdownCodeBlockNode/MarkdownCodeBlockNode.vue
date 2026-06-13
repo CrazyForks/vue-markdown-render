@@ -81,7 +81,7 @@ const emits = defineEmits<{
 }>()
 const { t } = useSafeI18n()
 
-const codeLanguage = ref<string>(normalizeLanguageIdentifier(props.node.language))
+const codeLanguage = ref<string>(resolveStreamingCodeLanguage(props.node.language, props.node.code, isCodeBlockLoading()))
 const copyText = ref(false)
 const isExpanded = ref(false)
 const isCollapsed = ref(false)
@@ -444,11 +444,27 @@ function normalizeRendererLanguage(rawLang?: string | null) {
   return normalized || 'plaintext'
 }
 
+function resolveStreamingCodeLanguage(language: unknown, code: unknown, loading: boolean) {
+  if (loading && !String(code ?? ''))
+    return 'plain'
+  return normalizeLanguageIdentifier(String(language ?? ''))
+}
+
+function isCodeBlockLoading() {
+  return typeof props.node.loading === 'boolean' ? props.node.loading : props.loading === true
+}
+
+function resolveStreamingRendererLanguage(language: unknown, code: unknown, loading: boolean) {
+  if (loading && !String(code ?? ''))
+    return 'plaintext'
+  return String(language ?? '')
+}
+
 async function updateRendererWithFallback(code: string, rawLang?: string | null, epoch = renderEpoch) {
   if (!renderer || !isCurrentRenderEpoch(epoch))
     return undefined
 
-  const normalized = normalizeRendererLanguage(rawLang)
+  const normalized = normalizeRendererLanguage(resolveStreamingRendererLanguage(rawLang, code, isCodeBlockLoading()))
 
   const renderPlaintext = async (originalError?: unknown) => {
     if (!renderer || !isCurrentRenderEpoch(epoch))
@@ -764,10 +780,11 @@ watch(() => props.autoScrollInitial, (enabled) => {
   autoScrollEnabled.value = enabled !== false
 })
 
-watch(() => [props.node.code, props.node.language], async ([code, lang]) => {
+watch(() => [props.node.code, props.node.language, props.node.loading, props.loading] as const, async ([code, lang, nodeLoading, propLoading]) => {
   const epoch = nextRenderEpoch()
-  const renderedCode = getDisplayCode(code, props.node.loading === true)
-  const normalizedLang = normalizeLanguageIdentifier(lang)
+  const loading = typeof nodeLoading === 'boolean' ? nodeLoading : propLoading === true
+  const renderedCode = getDisplayCode(code, loading)
+  const normalizedLang = resolveStreamingCodeLanguage(lang, code, loading)
   if (normalizedLang !== codeLanguage.value)
     codeLanguage.value = normalizedLang
   if (!viewportReady.value) {

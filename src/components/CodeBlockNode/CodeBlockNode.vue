@@ -168,12 +168,13 @@ const container = ref<HTMLElement | null>(null)
 const copyText = ref(false)
 // local tooltip logic removed; use shared `showTooltipForAnchor` / `hideTooltip`
 
-const codeLanguage = ref(normalizeLanguageIdentifier(props.node.language))
+const codeLanguage = ref(resolveStreamingCodeLanguage(props.node.language, props.node.code, isCodeBlockLoading()))
 const monacoLanguage = computed(() => resolveMonacoLanguageId(codeLanguage.value))
 const isPlainTextLanguage = computed(() => monacoLanguage.value === 'plaintext')
 const isExpanded = ref(false)
 const isCollapsed = ref(false)
 const editorCreated = ref(false)
+const editorRuntimeCreated = ref(false)
 const editorMounted = ref(false)
 const monacoReady = ref(false)
 let isUnmounted = false
@@ -268,6 +269,7 @@ let cleanupEditor: () => void = () => {}
 let safeClean = () => {}
 let refreshDiffPresentation: () => Promise<unknown> | unknown = () => {}
 let createEditorPromise: Promise<void> | null = null
+let editorRuntimeCreationPromise: Promise<void> | null = null
 let detectLanguage: (code: string) => string = () => String(props.node.language ?? 'plaintext')
 let setTheme: (theme: CodeBlockMonacoTheme | undefined) => Promise<void> | void = async () => {}
 let pendingDiffResultErrorFilterInstalled = false
@@ -320,8 +322,8 @@ function resolveDiffWordWrapOption(raw: Record<string, unknown>) {
 
 function resolveDiffRenderPair(original: string, updated: string) {
   return {
-    original: String(original ?? ''),
-    updated: String(updated ?? ''),
+    original: getDisplayCode(original, false),
+    updated: getDisplayCode(updated, false),
   }
 }
 
@@ -2340,10 +2342,35 @@ function getMaxHeightValue(): number {
 // Check if the language is previewable (HTML or SVG)
 const isPreviewable = computed(() => props.isShowPreview && (codeLanguage.value === 'html' || codeLanguage.value === 'svg'))
 
+function isCodeBlockLoading() {
+  return typeof props.node.loading === 'boolean' ? props.node.loading : props.loading === true
+}
+
+function resolveStreamingCodeLanguage(language: unknown, code: unknown, loading: boolean) {
+  if (loading && !String(code ?? ''))
+    return 'plain'
+  return normalizeLanguageIdentifier(String(language ?? ''))
+}
+
+function shouldDeferStreamingEditorCreation() {
+  if (!isCodeBlockLoading())
+    return false
+  if (isDiff.value) {
+    return !String(props.node.originalCode ?? '')
+      && !String(props.node.updatedCode ?? '')
+      && !String(props.node.code ?? '')
+  }
+  return !String(props.node.code ?? '')
+}
+
 watch(
-  () => props.node.language,
-  (newLanguage) => {
-    codeLanguage.value = normalizeLanguageIdentifier(newLanguage)
+  () => [props.node.language, props.node.code, props.node.loading, props.loading] as const,
+  ([newLanguage, code, nodeLoading, propLoading]) => {
+    codeLanguage.value = resolveStreamingCodeLanguage(
+      newLanguage,
+      code,
+      typeof nodeLoading === 'boolean' ? nodeLoading : propLoading === true,
+    )
   },
 )
 
@@ -2378,7 +2405,7 @@ watch(
 
 watch(
   () => [props.node.originalCode, props.node.updatedCode, monacoLanguage.value, isDiff.value] as const,
-  async ([originalCode, updatedCode, _language, diff]) => {
+  async ([, , , diff]) => {
     if (props.stream === false || !diff)
       return
     // If the editor helpers exist but the editor hasn't been created yet,
@@ -2390,9 +2417,19 @@ watch(
       catch {}
     }
 
+    const pendingCreation = editorRuntimeCreationPromise
+    if (pendingCreation && !editorRuntimeCreated.value) {
+      try {
+        await pendingCreation
+      }
+      catch {}
+      if (isUnmounted || !isDiff.value)
+        return
+    }
+
     const pair = resolveDiffRenderPair(
-      String(originalCode ?? ''),
-      String(updatedCode ?? ''),
+      String(props.node.originalCode ?? ''),
+      String(props.node.updatedCode ?? ''),
     )
     const shouldRefreshSettledDiff = props.loading === false
     if (shouldRefreshSettledDiff)
@@ -2436,6 +2473,16 @@ watch(
     if (isDiff.value)
       return
 
+    const pendingCreation = editorRuntimeCreationPromise
+    if (pendingCreation && !editorRuntimeCreated.value) {
+      try {
+        await pendingCreation
+      }
+      catch {}
+      if (isUnmounted || isDiff.value)
+        return
+    }
+
     // If the editor helpers exist but the editor hasn't been created yet,
     // ensure creation first so update calls don't get lost.
     if (createEditor && !editorCreated.value && codeEditor.value) {
@@ -2445,7 +2492,7 @@ watch(
       catch {}
     }
 
-    updateCode(getDisplayCode(newCode, props.node.loading === true), monacoLanguage.value)
+    updateCode(getDisplayCode(props.node.code, props.node.loading === true), monacoLanguage.value)
 
     if (isExpanded.value) {
       safeRaf(() => updateExpandedHeight())
@@ -2703,6 +2750,7 @@ async function runEditorCreation(el: HTMLElement) {
     return
 
   editorCreationFailed.value = false
+  editorRuntimeCreated.value = false
   editorDisplayReady.value = false
   diffFallbackExitActive.value = false
   diffFallbackFadingOut.value = false
@@ -2718,23 +2766,32 @@ async function runEditorCreation(el: HTMLElement) {
   if (isUnmounted)
     return
 
-  if (isDiff.value) {
-    installPendingDiffResultErrorFilter()
-    safeClean()
-    const pair = resolveDiffRenderPair(
-      String(props.node.originalCode ?? ''),
-      String(props.node.updatedCode ?? ''),
-    )
-    if (createDiffEditor) {
-      await createDiffEditor(el as HTMLElement, pair.original, pair.updated, monacoLanguage.value)
+  const runtimeCreation = (async () => {
+    if (isDiff.value) {
+      installPendingDiffResultErrorFilter()
+      safeClean()
+      const pair = resolveDiffRenderPair(
+        String(props.node.originalCode ?? ''),
+        String(props.node.updatedCode ?? ''),
+      )
+      if (createDiffEditor) {
+        await createDiffEditor(el as HTMLElement, pair.original, pair.updated, monacoLanguage.value)
+      }
+      else {
+        await createEditor(el as HTMLElement, props.node.code, monacoLanguage.value)
+      }
     }
     else {
-      await createEditor(el as HTMLElement, props.node.code, monacoLanguage.value)
+      await createEditor(el as HTMLElement, displayCode.value, monacoLanguage.value)
     }
-  }
-  else {
-    await createEditor(el as HTMLElement, displayCode.value, monacoLanguage.value)
-  }
+    editorRuntimeCreated.value = true
+  })()
+  const currentRuntimeCreation = runtimeCreation.finally(() => {
+    if (editorRuntimeCreationPromise === currentRuntimeCreation)
+      editorRuntimeCreationPromise = null
+  })
+  editorRuntimeCreationPromise = currentRuntimeCreation
+  await currentRuntimeCreation
   if (isUnmounted)
     return
 
@@ -2788,6 +2845,8 @@ async function runEditorCreation(el: HTMLElement) {
 function ensureEditorCreation(el: HTMLElement) {
   if (!createEditor || isUnmounted)
     return null
+  if (shouldDeferStreamingEditorCreation())
+    return null
   if (createEditorPromise)
     return createEditorPromise
   if (editorCreated.value && editorMounted.value)
@@ -2810,7 +2869,16 @@ function ensureEditorCreation(el: HTMLElement) {
 
 // 延迟创建编辑器：仅在可见且准备就绪时创建，避免无意义的初始化
 const stopCreateEditorWatch = watch(
-  () => [codeEditor.value, isDiff.value, props.stream, props.loading, monacoReady.value, viewportReady.value] as const,
+  () => [
+    codeEditor.value,
+    isDiff.value,
+    props.stream,
+    props.loading,
+    monacoReady.value,
+    viewportReady.value,
+    props.node.code,
+    props.node.loading,
+  ] as const,
   async ([el, _isDiff, stream, loading, _monacoReady, visible]) => {
     if (!el || !createEditor)
       return
@@ -2819,6 +2887,8 @@ const stopCreateEditorWatch = watch(
 
     // If streaming is disabled, defer editor creation until loading is finished
     if (stream === false && loading !== false)
+      return
+    if (shouldDeferStreamingEditorCreation())
       return
 
     const creation = ensureEditorCreation(el as HTMLElement)
@@ -2873,6 +2943,7 @@ watch(
       editorMounted.value = false
       editorDisplayReady.value = false
       editorCreated.value = false
+      editorRuntimeCreated.value = false
       clearEditorHeightSyncBindings()
       clearInlineFoldProxies()
       safeClean()
@@ -3154,6 +3225,7 @@ watch(
       editorMounted.value = false
       editorDisplayReady.value = false
       editorCreated.value = false
+      editorRuntimeCreated.value = false
       clearEditorHeightSyncBindings()
       clearInlineFoldProxies()
       safeClean()
