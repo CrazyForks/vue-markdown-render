@@ -1,3 +1,17 @@
+## [1.0.3-beta.0](https://github.com/Simon-He95/markstream-vue/compare/markstream-vue@1.0.1...markstream-vue@1.0.3-beta.0) (2026-06-13)
+
+
+### Bug Fixes
+
+* align sandbox code block rendering ([872d6b7](https://github.com/Simon-He95/markstream-vue/commit/872d6b791d43c8540b64ade3275618a77651f551))
+* **docs:** correct inaccurate API examples, benchmark claims, and sidebar config ([0c761a0](https://github.com/Simon-He95/markstream-vue/commit/0c761a0dc2817537f8678c63d7299dfe41e1c504))
+* harden react tailwind and docs seo checks ([f6a598d](https://github.com/Simon-He95/markstream-vue/commit/f6a598d11a163767a0150e0b85a762b7edda6d22))
+* markdown ([63f7839](https://github.com/Simon-He95/markstream-vue/commit/63f7839455a1ed7be9bed6e1177a5c82491e91dc))
+* stabilize streaming code block rendering ([2567f4c](https://github.com/Simon-He95/markstream-vue/commit/2567f4c76b9ab59680df7203994142288b99904b))
+* validate docs seo host output ([f8f8754](https://github.com/Simon-He95/markstream-vue/commit/f8f8754ef0c9563ba3bd991007dc4487e3ba2cee))
+
+
+
 ## [1.0.1](https://github.com/Simon-He95/markstream-vue/compare/markstream-vue@1.0.1-beta.5...markstream-vue@1.0.1) (2026-06-12)
 
 
