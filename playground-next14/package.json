@@ -10,7 +10,7 @@
   "dependencies": {
     "@antv/infographic": "^0.2.19",
     "@terrastruct/d2": "^0.1.33",
-    "katex": "^0.16.46",
+    "katex": "^0.16.47",
     "markstream-react": "workspace:*",
     "mermaid": "^11.15.0",
     "monaco-editor": "^0.52.2",
@@ -21,7 +21,7 @@
   },
   "devDependencies": {
     "@types/node": "^18.19.130",
-    "@types/react": "^18.3.28",
+    "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "typescript": "^5.9.3"
   }

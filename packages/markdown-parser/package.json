@@ -2,7 +2,7 @@
   "name": "stream-markdown-parser",
   "type": "module",
   "version": "1.0.5",
-  "packageManager": "pnpm@10.33.4",
+  "packageManager": "pnpm@10.34.3",
   "description": "Framework-agnostic streaming Markdown parser that outputs structured nodes for Markstream renderers and custom render pipelines.",
   "author": "Simon He",
   "license": "MIT",
@@ -64,9 +64,9 @@
     "markdown-it-ts": "^1.0.0"
   },
   "devDependencies": {
-    "@types/node": "^22.19.19",
+    "@types/node": "^22.19.21",
     "tsdown": "^0.15.12",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.6"
   }
 }
