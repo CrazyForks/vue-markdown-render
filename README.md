@@ -1,8 +1,8 @@
 # Markstream
 
-> Streaming Markdown renderers for AI applications across Vue, React, Svelte, Angular, Nuxt, and Next.js.
+Markstream renders Markdown while it is still streaming.
 
-Markstream is built for Markdown that changes while users are watching it: LLM token streams, SSE/WebSocket output, AI chat messages, long documents, progressive Mermaid diagrams, KaTeX math, streaming code blocks, and safe component-based rendering.
+Built for AI chat, SSE/WebSocket output, incomplete Markdown states, long LLM responses, Mermaid, KaTeX, code blocks, and safe component rendering.
 
 [![中文版](https://img.shields.io/badge/docs-中文文档-blue)](README.zh-CN.md)
 [![Docs](https://img.shields.io/badge/docs-vitepress-blue)](https://markstream.simonhe.me/)
@@ -28,6 +28,14 @@ Other packages:
 [![Security](https://img.shields.io/badge/security-policy-8A2BE2)](./SECURITY.md)
 [![CI](https://github.com/Simon-He95/markstream-vue/actions/workflows/ci.yml/badge.svg)](https://github.com/Simon-He95/markstream-vue/actions/workflows/ci.yml)
 [![License](https://img.shields.io/npm/l/markstream-vue)](./license)
+
+## Why not marked / markdown-it / react-markdown?
+
+Use `marked`, `markdown-it`, or `react-markdown` for finished Markdown documents.
+
+Use Markstream when the Markdown is still changing while the user is reading it.
+
+Detailed comparisons: [react-markdown](https://markstream.simonhe.me/compare/react-markdown), [marked / markdown-it](https://markstream.simonhe.me/compare/marked-markdown-it), and [Streamdown](https://markstream.simonhe.me/compare/streamdown).
 
 ## Packages
 
@@ -72,6 +80,7 @@ For the full release contract and Go / No-Go checklist, see [1.0 Release Readine
 - [Streaming in 30 seconds](#-streaming-in-30-seconds)
 - [Performance presets](#-performance-presets)
 - [Key props & options](#-key-props--options-cheatsheet)
+- [Support the project](#support-the-project)
 - [Where it shines](#-where-it-shines)
 - [FAQ](#-faq-quick-answers)
 - [Why markstream-vue](#-why-markstream-vue-over-a-typical-markdown-renderer)
@@ -166,14 +175,6 @@ npx skills add git@github.com:Simon-He95/markstream-vue.git
 - Issues: please use templates and attach a repro link (https://markstream-vue.simonhe.me/test)
 
 The test page gives you an editor + live preview plus “generate share link” that encodes the input in the URL (with a fallback to open directly or pre-fill a GitHub Issue for long payloads).
-
-## Support the project
-
-If markstream-vue helps your work, you can support ongoing maintenance with one of these QR codes.
-
-| Alipay | WeChat Pay |
-| --- | --- |
-| <img src="https://raw.githubusercontent.com/Simon-He95/markstream-vue/main/docs/public/sponsor/zhifubao.jpg" alt="Alipay QR code" width="240" /> | <img src="https://raw.githubusercontent.com/Simon-He95/markstream-vue/main/docs/public/sponsor/weixin.jpg" alt="WeChat Pay QR code" width="240" /> |
 
 ## ⚡ Quick Starts
 
@@ -558,6 +559,14 @@ Parse hooks example (match server + client):
   }"
 />
 ```
+
+## Support the project
+
+If markstream-vue helps your work, you can support ongoing maintenance with one of these QR codes.
+
+| Alipay | WeChat Pay |
+| --- | --- |
+| <img src="https://raw.githubusercontent.com/Simon-He95/markstream-vue/main/docs/public/sponsor/zhifubao.jpg" alt="Alipay QR code" width="240" /> | <img src="https://raw.githubusercontent.com/Simon-He95/markstream-vue/main/docs/public/sponsor/weixin.jpg" alt="WeChat Pay QR code" width="240" /> |
 
 ## 🔥 Where it shines
 
