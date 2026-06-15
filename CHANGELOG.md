@@ -1,3 +1,12 @@
+## [1.0.3-beta.2](https://github.com/Simon-He95/markstream-vue/compare/markstream-vue@1.0.3-beta.1...markstream-vue@1.0.3-beta.2) (2026-06-15)
+
+
+### Bug Fixes
+
+* refine diff editor layout, height sync, and inline scrollbar behavior ([2647b1c](https://github.com/Simon-He95/markstream-vue/commit/2647b1c52068000ce71f6e8e7340daebdca7c092))
+
+
+
 ## [1.0.3-beta.1](https://github.com/Simon-He95/markstream-vue/compare/markstream-vue@1.0.3-beta.0...markstream-vue@1.0.3-beta.1) (2026-06-15)
 
 
