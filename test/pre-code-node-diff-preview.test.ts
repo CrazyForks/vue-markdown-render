@@ -115,10 +115,12 @@ describe('pre code node diff preview', () => {
     )
 
     expect(source).toContain('pre.markstream-pre--diff-preview.markstream-pre--diff-inline {')
+    expect(source).toContain('--markstream-pre-diff-gutter-marker-width: var(--stream-monaco-gutter-marker-width, 4px);')
     expect(source).toContain('--stream-monaco-modified-scrollable-left')
     expect(source).toContain('pre.markstream-pre--diff-preview.markstream-pre--diff-inline .markstream-pre__diff-line::after')
-    expect(source).toContain('left: calc(var(--markstream-pre-diff-scrollable-left) - 1px);')
+    expect(source).toContain('left: var(--markstream-pre-diff-scrollable-left);')
     expect(source).toContain('background: var(--stream-monaco-pane-divider')
+    expect(source).toContain('width: var(--markstream-pre-diff-gutter-marker-width, 4px);')
   })
 
   it('lets side-by-side diff fallback panes scroll horizontally when wrap is disabled', () => {

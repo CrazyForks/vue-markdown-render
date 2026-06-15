@@ -480,7 +480,7 @@ const diffPreviewPanes = computed(() => isDiffPreview.value ? buildDiffPanes(isI
   content: '';
   position: absolute;
   top: 0;
-  left: calc(var(--markstream-pre-diff-scrollable-left) - 1px);
+  left: var(--markstream-pre-diff-scrollable-left);
   width: 1px;
   height: var(--markstream-pre-diff-line-height, 18px);
   z-index: 1;

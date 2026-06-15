@@ -129,7 +129,9 @@ describe('pre code node family sync', () => {
 
     for (const source of [vue2Source, reactCss]) {
       expect(source).toContain('markstream-pre--diff-inline .markstream-pre__diff-line::after')
-      expect(source).toContain('left: calc(var(--markstream-pre-diff-scrollable-left) - 1px);')
+      expect(source).toContain('--markstream-pre-diff-gutter-marker-width: var(--stream-monaco-gutter-marker-width, 4px);')
+      expect(source).toContain('left: var(--markstream-pre-diff-scrollable-left);')
+      expect(source).toContain('width: var(--markstream-pre-diff-gutter-marker-width, 4px);')
       expect(source).not.toContain('markstream-pre__diff-line--added:not(.markstream-pre__diff-line--empty)')
       expect(source).not.toContain('markstream-pre__diff-line--removed:not(.markstream-pre__diff-line--empty)')
     }

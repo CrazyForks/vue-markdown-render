@@ -644,7 +644,7 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
   padding-right: 0;
   width: 100%;
 
-  --markstream-pre-diff-gutter-marker-width: var(--stream-monaco-gutter-marker-width, 3px);
+  --markstream-pre-diff-gutter-marker-width: var(--stream-monaco-gutter-marker-width, 4px);
   --markstream-pre-diff-gutter-gap: var(--stream-monaco-gutter-gap, 8px);
   --markstream-pre-diff-line-number-width: var(--stream-monaco-line-number-width, 28px);
   --markstream-pre-diff-scrollable-left: var(
@@ -772,7 +772,7 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
   content: '';
   position: absolute;
   top: 0;
-  left: calc(var(--markstream-pre-diff-scrollable-left) - 1px);
+  left: var(--markstream-pre-diff-scrollable-left);
   width: 1px;
   height: var(
     --markstream-pre-diff-content-height,
@@ -792,8 +792,8 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
     --markstream-pre-diff-content-height,
     var(--markstream-pre-diff-line-height, 18px)
   );
-  width: var(--markstream-pre-diff-gutter-marker-width, 3px);
-  min-width: var(--markstream-pre-diff-gutter-marker-width, 3px);
+  width: var(--markstream-pre-diff-gutter-marker-width, 4px);
+  min-width: var(--markstream-pre-diff-gutter-marker-width, 4px);
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-number {
