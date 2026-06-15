@@ -1,3 +1,12 @@
+## [1.0.3-beta.1](https://github.com/Simon-He95/markstream-vue/compare/markstream-vue@1.0.3-beta.0...markstream-vue@1.0.3-beta.1) (2026-06-15)
+
+
+### Features
+
+* enhance diff preview with source-based comparison and auto-detect ([ce59c1d](https://github.com/Simon-He95/markstream-vue/commit/ce59c1d1f2a7e4eea9d29a01615f6e1541026b6c))
+
+
+
 ## [1.0.3-beta.0](https://github.com/Simon-He95/markstream-vue/compare/markstream-vue@1.0.1...markstream-vue@1.0.3-beta.0) (2026-06-13)
 
 
