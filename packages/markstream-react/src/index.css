@@ -1495,6 +1495,22 @@ li .paragraph-node {
   --markstream-pre-diff-line-number-align: var(--markstream-diff-line-number-align, right);
 }
 
+.code-fallback-plain.markstream-pre--diff-preview.markstream-pre--diff-inline {
+  --markstream-pre-diff-scrollable-left: var(
+    --stream-monaco-modified-scrollable-left,
+    var(--stream-monaco-original-scrollable-left)
+  );
+  --markstream-pre-diff-line-number-gap-to-code: var(
+    --stream-monaco-modified-line-number-gap-to-code,
+    var(--stream-monaco-line-number-gap-to-code, var(--markstream-pre-diff-gutter-gap))
+  );
+  --markstream-pre-diff-line-number-left: calc(
+    var(--markstream-pre-diff-scrollable-left)
+    - var(--markstream-pre-diff-line-number-gap-to-code)
+    - var(--markstream-pre-diff-line-number-width)
+  );
+}
+
 .code-fallback-plain.markstream-pre--diff-preview > .markstream-pre__diff-code {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -1505,7 +1521,8 @@ li .paragraph-node {
 }
 
 .code-fallback-plain.markstream-pre--diff-preview.markstream-pre--diff-inline > .markstream-pre__diff-code {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: max-content;
+  width: max-content;
 }
 
 .code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-pane {
@@ -1516,6 +1533,11 @@ li .paragraph-node {
 .code-fallback-plain.markstream-pre--diff-preview:not(.markstream-pre--diff-inline) .markstream-pre__diff-pane {
   overflow-x: auto;
   overflow-y: hidden;
+}
+
+.code-fallback-plain.markstream-pre--diff-preview.markstream-pre--diff-inline .markstream-pre__diff-pane {
+  min-width: max-content;
+  overflow: visible;
 }
 
 .code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-pane--modified {
@@ -1557,6 +1579,18 @@ li .paragraph-node {
   z-index: 0;
   pointer-events: none;
   background: transparent;
+}
+
+.code-fallback-plain.markstream-pre--diff-preview.markstream-pre--diff-inline .markstream-pre__diff-line::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: calc(var(--markstream-pre-diff-scrollable-left) - 1px);
+  width: 1px;
+  height: var(--markstream-pre-diff-line-height, 18px);
+  z-index: 1;
+  pointer-events: none;
+  background: var(--stream-monaco-pane-divider, var(--markstream-diff-pane-divider, rgb(148 163 184 / 0.18)));
 }
 
 .code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-rail {
@@ -1619,19 +1653,19 @@ li .paragraph-node {
   background: var(--stream-monaco-unchanged-bg, var(--markstream-diff-unchanged-bg, transparent));
 }
 
-.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--added:not(.markstream-pre__diff-line--empty)::before {
+.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--added::before {
   background: var(--stream-monaco-added-line-fill, var(--markstream-diff-added-line-fill, transparent));
 }
 
-.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--removed:not(.markstream-pre__diff-line--empty)::before {
+.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--removed::before {
   background: var(--stream-monaco-removed-line-fill, var(--markstream-diff-removed-line-fill, transparent));
 }
 
-.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--added:not(.markstream-pre__diff-line--empty) > .markstream-pre__diff-rail {
+.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--added > .markstream-pre__diff-rail {
   background: var(--stream-monaco-added-gutter, var(--markstream-diff-added-gutter, currentColor));
 }
 
-.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--removed:not(.markstream-pre__diff-line--empty) > .markstream-pre__diff-rail {
+.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--removed > .markstream-pre__diff-rail {
   background: var(--stream-monaco-removed-gutter, var(--markstream-diff-removed-gutter, currentColor));
 }
 

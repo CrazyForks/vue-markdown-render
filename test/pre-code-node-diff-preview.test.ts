@@ -50,7 +50,7 @@ describe('pre code node diff preview', () => {
     wrapper.unmount()
   })
 
-  it('does not paint blank diff preview rows as added or removed', () => {
+  it('does not paint terminal blank diff preview rows as added or removed', () => {
     const wrapper = mount(PreCodeNode, {
       props: {
         showLineNumbers: true,
@@ -78,6 +78,20 @@ describe('pre code node diff preview', () => {
     wrapper.unmount()
   })
 
+  it('allows empty added and removed rows to receive diff fill styles', () => {
+    const source = readFileSync(
+      'src/components/PreCodeNode/PreCodeNode.vue',
+      'utf8',
+    )
+
+    expect(source).toContain('.markstream-pre__diff-line--added::before')
+    expect(source).toContain('.markstream-pre__diff-line--removed::before')
+    expect(source).toContain('.markstream-pre__diff-line--added > .markstream-pre__diff-rail')
+    expect(source).toContain('.markstream-pre__diff-line--removed > .markstream-pre__diff-rail')
+    expect(source).not.toContain('.markstream-pre__diff-line--added:not(.markstream-pre__diff-line--empty)::before')
+    expect(source).not.toContain('.markstream-pre__diff-line--removed:not(.markstream-pre__diff-line--empty)::before')
+  })
+
   it('uses content width for inline diff fallback when wrap is disabled', () => {
     const source = readFileSync(
       'src/components/PreCodeNode/PreCodeNode.vue',
@@ -92,6 +106,19 @@ describe('pre code node diff preview', () => {
     expect(source).toContain('pre.markstream-pre--diff-preview.is-wrap')
     expect(source).toContain('white-space: pre-wrap;')
     expect(source).toContain('overflow-wrap: anywhere;')
+  })
+
+  it('uses modified gutter metrics and divider for inline diff fallback', () => {
+    const source = readFileSync(
+      'src/components/PreCodeNode/PreCodeNode.vue',
+      'utf8',
+    )
+
+    expect(source).toContain('pre.markstream-pre--diff-preview.markstream-pre--diff-inline {')
+    expect(source).toContain('--stream-monaco-modified-scrollable-left')
+    expect(source).toContain('pre.markstream-pre--diff-preview.markstream-pre--diff-inline .markstream-pre__diff-line::after')
+    expect(source).toContain('left: calc(var(--markstream-pre-diff-scrollable-left) - 1px);')
+    expect(source).toContain('background: var(--stream-monaco-pane-divider')
   })
 
   it('lets side-by-side diff fallback panes scroll horizontally when wrap is disabled', () => {
@@ -273,6 +300,46 @@ describe('pre code node diff preview', () => {
     wrapper.unmount()
   })
 
+  it('does not show a modified line number for inline removed rows', () => {
+    const wrapper = mount(PreCodeNode, {
+      props: {
+        showLineNumbers: true,
+        diffInline: true,
+        node: {
+          type: 'code_block',
+          language: 'json',
+          diff: true,
+          originalCode: [
+            '{',
+            '  "type": "module",',
+            '  "version": "1.0.1",',
+            '  "description": "old",',
+            '  "author": "Simon He"',
+            '}',
+          ].join('\n'),
+          updatedCode: [
+            '{',
+            '  "type": "module",',
+            '  "version": "1.0.1",',
+            '  "description": "new",',
+            '  "author": "Simon He"',
+            '}',
+          ].join('\n'),
+          code: '',
+          raw: '',
+        },
+      },
+    })
+
+    const removedNumber = wrapper.get('.markstream-pre__diff-line--removed .markstream-pre__diff-number')
+    const addedNumber = wrapper.get('.markstream-pre__diff-line--added .markstream-pre__diff-number')
+
+    expect(removedNumber.text()).toBe('')
+    expect(addedNumber.text()).toBe('4')
+
+    wrapper.unmount()
+  })
+
   it('keeps unchanged source rows neutral in inline source diff fallback', () => {
     const originalCode = [
       'export const name = "@archships/dim-agent-sdk"',
@@ -337,6 +404,48 @@ describe('pre code node diff preview', () => {
       '  createRunEngine,',
       '} from "./run-engine"',
     ])
+
+    wrapper.unmount()
+  })
+
+  it('does not treat markdown list items as removed lines when source diff data exists', () => {
+    const updatedCode = [
+      '# 示例文档',
+      '',
+      '- 无序项 1',
+      '- 无序项 2',
+      '  - 子项 A',
+      '  - 子项 B',
+    ].join('\n')
+    const wrapper = mount(PreCodeNode, {
+      props: {
+        showLineNumbers: true,
+        diffInline: true,
+        node: {
+          type: 'code_block',
+          language: 'md',
+          diff: true,
+          originalCode: '',
+          updatedCode,
+          code: updatedCode,
+          raw: '',
+        },
+      },
+    })
+
+    expect(wrapper.findAll('.markstream-pre__diff-line--removed')).toHaveLength(0)
+
+    const listRows = wrapper.findAll('.markstream-pre__diff-line').filter(row =>
+      row.find('.markstream-pre__diff-content-inner').text().includes('无序项'),
+    )
+    expect(listRows).toHaveLength(2)
+    for (const row of listRows) {
+      expect(row.classes()).toContain('markstream-pre__diff-line--added')
+    }
+
+    const emptyRows = wrapper.findAll('.markstream-pre__diff-line--empty')
+    expect(emptyRows).toHaveLength(1)
+    expect(emptyRows[0].classes()).toContain('markstream-pre__diff-line--added')
 
     wrapper.unmount()
   })

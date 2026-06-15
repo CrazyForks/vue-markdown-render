@@ -660,9 +660,21 @@ function isAddedDiffLine(line: string) {
   return line.startsWith('+') && !line.startsWith('+++')
 }
 
+function hasDiffSourcePair() {
+  return props.node.originalCode != null || props.node.updatedCode != null
+}
+
+function hasPatchDiffLines(lines: string[]) {
+  const hasRemoved = lines.some(line => isRemovedDiffLine(line))
+  const hasAdded = lines.some(line => isAddedDiffLine(line))
+  return (hasRemoved && hasAdded)
+    || (isDiffFenceInfo(props.node.language) && (hasRemoved || hasAdded))
+    || (isDiffFenceInfo(parseCodeFenceInfo(String(props.node.raw ?? ''))) && (hasRemoved || hasAdded))
+}
+
 function countInlineDiffPreviewLines() {
   const patchLines = String(props.node.code ?? '').split(/\r\n|\n|\r/)
-  if (patchLines.some(line => isRemovedDiffLine(line) || isAddedDiffLine(line)))
+  if (hasPatchDiffLines(patchLines))
     return Math.max(1, patchLines.length)
 
   const original = String(props.node.originalCode ?? '').split(/\r\n|\n|\r/)
@@ -697,9 +709,9 @@ function countInlineDiffPreviewLines() {
 
 function countSideBySideDiffPreviewLines() {
   const patchLines = String(props.node.code ?? '').split(/\r\n|\n|\r/)
-  const hasPatchLines = patchLines.some(line => isRemovedDiffLine(line) || isAddedDiffLine(line))
+  const hasPatchLines = hasPatchDiffLines(patchLines)
 
-  if (!hasPatchLines && (props.node.originalCode != null || props.node.updatedCode != null)) {
+  if (!hasPatchLines && hasDiffSourcePair()) {
     return Math.max(
       countCodeLines(props.node.originalCode),
       countCodeLines(props.node.updatedCode),
