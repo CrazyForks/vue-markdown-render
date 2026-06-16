@@ -1,15 +1,15 @@
 # markstream-angular — Angular streaming Markdown renderer for AI chat
 
-Angular standalone component for streaming Markdown: AI chat, SSE/WebSocket output, long documents, Mermaid, KaTeX, Monaco code blocks, D2, infographic blocks, custom HTML tags, and cross-framework playground parity.
+Angular 20+ standalone component for streaming Markdown: AI chat, LLM token streams, SSE/WebSocket output, incomplete Markdown states, long documents, Mermaid, KaTeX, Monaco code blocks, D2, infographic blocks, custom HTML tags, and cross-framework playground parity.
 
 ## When to use it
 
-Use `markstream-angular` when Markdown streams from an LLM, SSE, or WebSocket into an Angular app.
-For short static Markdown, a simpler parser may be enough.
+Use `markstream-angular` when Markdown streams from an LLM, SSE, or WebSocket into an Angular 20+ standalone app.
+For short static Markdown, a completed-document Markdown renderer or a simpler parser is usually enough.
 
 ## Status
 
-This package is currently alpha. Check npm and the [Angular guide](https://markstream.simonhe.me/guide/angular-quick-start) for the latest API maturity.
+This package is currently alpha. Treat it as a streaming Markdown integration surface to evaluate in your Angular app, not as the most stable package in the Markstream family. Check npm and the [Angular guide](https://markstream.simonhe.me/guide/angular-quick-start) for the latest API maturity.
 
 ## Install
 
@@ -24,6 +24,8 @@ Optional peer dependencies:
 - `katex` for math rendering
 - `@terrastruct/d2` for D2 diagrams
 - `@antv/infographic` for infographic blocks
+
+Install only the peers your output actually needs. Plain Markdown does not require Mermaid, KaTeX, Monaco, D2, or Infographic.
 
 Example:
 

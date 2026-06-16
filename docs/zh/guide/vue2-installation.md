@@ -1,3 +1,21 @@
+---
+title: Vue 2 Markdown 渲染器安装
+description: 在 Vue 2.6、Vue 2.7、Nuxt 2、Vue CLI 或 Webpack 4 项目中安装 markstream-vue2，覆盖 Composition API、vue-demi、可选 peer、worker、CSS 路径和存量 Vue2 排错。
+keywords:
+  - markstream-vue2 安装
+  - Vue 2 Markdown 渲染器安装
+  - Vue 2.6 Composition API Markdown
+  - Vue 2.7 Markdown 渲染器
+  - Nuxt 2 Markdown 渲染器
+  - Vue CLI Markdown 渲染器
+  - Webpack 4 Vue2 Markdown
+  - vue-demi Vue2 Markdown
+  - Vue2 Mermaid Markdown 配置
+  - Vue2 KaTeX Markdown 配置
+  - Vue2 代码块 Markdown 配置
+  - Vue2 存量项目 Markdown 配置
+---
+
 # Vue 2 安装
 
 使用 pnpm、npm 或 yarn 安装 markstream-vue2。

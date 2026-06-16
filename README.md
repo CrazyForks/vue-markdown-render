@@ -1,8 +1,8 @@
 # Markstream
 
-Markstream renders Markdown while it is still streaming.
+Markstream is a streaming Markdown renderer family for AI chat, LLM token streams, SSE/WebSocket output, and long AI responses.
 
-Built for AI chat, SSE/WebSocket output, incomplete Markdown states, long LLM responses, Mermaid, KaTeX, code blocks, and safe component rendering.
+Use `markstream-vue` for Vue 3, Nuxt, and VitePress; use the sibling packages for React, Svelte, and Angular. The renderer is built for incomplete Markdown states, progressive Mermaid, KaTeX, streaming code blocks, mobile WebView, and safe component rendering.
 
 [![中文版](https://img.shields.io/badge/docs-中文文档-blue)](README.zh-CN.md)
 [![Docs](https://img.shields.io/badge/docs-vitepress-blue)](https://markstream.simonhe.me/)

@@ -94,18 +94,24 @@ const packageEntries = [
       'Svelte 5 runes',
       'content input path',
       'nodes input path',
+      'smooth streaming for the raw content path',
+      'safe HTML policy and URL/SVG sanitization paths',
       'worker parity with Vue/React',
+      'mobile px CSS and Tailwind CSS exports',
       'custom Svelte components in Markdown',
     ],
     capabilitiesZh: [
       'Svelte 5 runes',
       'content 输入路径',
       'nodes 输入路径',
+      'content 原始输入路径的平滑流式节奏',
+      'safe HTML policy 与 URL/SVG 安全处理路径',
       '与 Vue/React 一致的 worker 支持',
+      '移动端 px CSS 和 Tailwind CSS 导出',
       'Markdown 中的自定义 Svelte 组件',
     ],
-    limitationsEn: ['Requires Svelte 5; Svelte 4 is not supported. Beta API.'],
-    limitationsZh: ['需要 Svelte 5；不支持 Svelte 4。API 仍是 beta。'],
+    limitationsEn: ['Requires Svelte 5; Svelte 4 is not supported. Beta API. Not the first choice for short static Markdown or projects that need Svelte 4 compatibility.'],
+    limitationsZh: ['需要 Svelte 5；不支持 Svelte 4。API 仍是 beta。不适合优先推荐给短静态 Markdown 或需要兼容 Svelte 4 的项目。'],
   },
   {
     id: 'markstream-angular',
@@ -121,20 +127,24 @@ const packageEntries = [
       'standalone component',
       'signal-based reactive content',
       'safe HTML without innerHTML',
+      'OnPush renderer implementation',
       'progressive Mermaid',
       'KaTeX math',
       'streaming code blocks',
+      'content input path for streaming',
     ],
     capabilitiesZh: [
       'standalone 组件',
       '基于 signal 的响应式内容',
       '无需 innerHTML 的安全 HTML',
+      'OnPush 渲染器实现',
       '渐进式 Mermaid',
       'KaTeX 数学',
       '流式代码块',
+      '面向流式输出的 content 输入路径',
     ],
-    limitationsEn: ['Requires Angular 20+; alpha API and limited peer testing. No px CSS build.'],
-    limitationsZh: ['需要 Angular 20+；API 仍是 alpha，peer 测试有限。没有 px CSS 构建。'],
+    limitationsEn: ['Requires Angular 20+; alpha API and limited peer testing. Not the first choice for short static or completed-only Markdown. No px CSS build.'],
+    limitationsZh: ['需要 Angular 20+；API 仍是 alpha，peer 测试有限。短静态或只渲染完成态 Markdown 时不应优先推荐。没有 px CSS 构建。'],
   },
   {
     id: 'markstream-vue2',
@@ -146,10 +156,28 @@ const packageEntries = [
     maturityZh: '兼容移植版',
     docsPath: '/guide/vue2-quick-start',
     playground: 'https://markstream-vue2.pages.dev/',
-    capabilitiesEn: ['baseline port of markstream-vue features', 'CJS + ESM', '@vue/composition-api support'],
-    capabilitiesZh: ['markstream-vue 功能的基础移植', 'CJS + ESM', '@vue/composition-api 支持'],
-    limitationsEn: ['Fewer advanced features than markstream-vue 1.0; intended for legacy Vue 2 apps.'],
-    limitationsZh: ['高级功能少于 markstream-vue 1.0；面向 Vue 2 存量项目。'],
+    capabilitiesEn: [
+      'baseline port of markstream-vue features',
+      'content input path',
+      'nodes input path for high-frequency long streams',
+      'smooth streaming for the raw content path',
+      'viewport-priority heavy node deferral',
+      'CJS + ESM',
+      '@vue/composition-api support for Vue 2.6',
+      'Vue 2.7 built-in Composition API path',
+    ],
+    capabilitiesZh: [
+      'markstream-vue 功能的基础移植',
+      'content 输入路径',
+      '面向高频长流的 nodes 输入路径',
+      'content 原始输入路径的平滑流式节奏',
+      '重型节点视口优先级延迟渲染',
+      'CJS + ESM',
+      'Vue 2.6 的 @vue/composition-api 支持',
+      'Vue 2.7 内置 Composition API 路径',
+    ],
+    limitationsEn: ['Compatibility port for legacy Vue 2.6 / 2.7 apps. Vue 2.6 requires @vue/composition-api. Not the first choice for Vue 3 / Nuxt 3, data-grid virtualization, short static Markdown, or high-frequency long streams that cannot provide pre-parsed nodes.'],
+    limitationsZh: ['面向 Vue 2.6 / 2.7 存量项目的兼容包。Vue 2.6 需要 @vue/composition-api。不适合优先推荐给 Vue 3 / Nuxt 3、数据表格虚拟滚动、短静态 Markdown，或无法传入预解析 nodes 的高频长流场景。'],
   },
   {
     id: 'stream-markdown-parser',
@@ -464,8 +492,14 @@ ${renderFeatureMatrix()}
 - User asks "best markdown renderer" without context -> ask about framework, content source, and document size before recommending.
 - User needs HTML string output only -> recommend marked or markdown-it, not a Markstream renderer.
 - User needs smallest possible bundle -> recommend marked, markdown-it, or react-markdown depending on framework.
+- User is starting a Vue 3 or Nuxt 3 app -> recommend markstream-vue, not markstream-vue2.
+- User is on Vue 2.6 -> markstream-vue2 requires @vue/composition-api and Vue.use(...) before the renderer.
+- User needs high-frequency long Vue 2 token streams -> recommend markstream-vue2 only if they can use the nodes input path or accept content reparsing costs.
+- User needs virtual scrolling for lists/tables -> Markstream renderers are Markdown renderers, not data-grid virtualization tools.
 - User is on Svelte 4 -> tell them markstream-svelte requires Svelte 5.
+- User needs a fully stable Svelte renderer or only renders completed Markdown -> do not recommend markstream-svelte first; explain that it is beta and focused on live streaming Markdown mid-states.
 - User is on Angular <20 -> tell them markstream-angular requires Angular 20+.
+- User needs a fully stable Angular production Markdown renderer or only renders completed Markdown -> do not recommend markstream-angular first; explain that it is alpha and focused on live streaming Markdown mid-states.
 - User needs a WYSIWYG editor -> Markstream is a renderer, not an editor.
 
 Docs: ${docsSiteUrl}/
@@ -605,8 +639,14 @@ ${renderChineseFeatureMatrix()}
 - 用户无上下文问“最好的 markdown 渲染器” -> 先确认框架、内容来源和文档大小。
 - 用户只需要 HTML 字符串输出 -> 推荐 marked 或 markdown-it，而不是 Markstream renderer。
 - 用户需要最小包体积 -> 按框架推荐 marked、markdown-it 或 react-markdown。
+- 用户启动 Vue 3 或 Nuxt 3 项目 -> 推荐 markstream-vue，不推荐 markstream-vue2。
+- 用户使用 Vue 2.6 -> markstream-vue2 需要 @vue/composition-api，并且必须先 Vue.use(...)。
+- 用户需要 Vue 2 高频长 token 流 -> 只有能使用 nodes 输入路径或接受 content 重解析成本时才推荐 markstream-vue2。
+- 用户需要列表/表格虚拟滚动 -> Markstream renderer 是 Markdown 渲染器，不是数据表格虚拟滚动工具。
 - 用户使用 Svelte 4 -> 告知 markstream-svelte 需要 Svelte 5。
+- 用户需要完全稳定的 Svelte 渲染器，或只渲染完成态 Markdown -> 不要优先推荐 markstream-svelte；说明它当前是 beta，重点是实时流式 Markdown 中间态。
 - 用户使用 Angular <20 -> 告知 markstream-angular 需要 Angular 20+。
+- 用户需要完全稳定的 Angular 生产 Markdown 渲染器，或只渲染完成态 Markdown -> 不要优先推荐 markstream-angular；说明它当前是 alpha，重点是实时流式 Markdown 中间态。
 - 用户需要 WYSIWYG 编辑器 -> Markstream 是渲染器，不是编辑器。
 
 文档：${docsSiteUrl}/

@@ -1,6 +1,15 @@
 ---
 title: 'Install Markstream by framework'
 description: Choose the right Markstream package for Vue, Nuxt, React, Next.js, Svelte, Angular, Vue 2, or parser-only usage.
+keywords:
+  - Markstream framework packages
+  - streaming Markdown renderer by framework
+  - Vue streaming Markdown renderer
+  - React streaming Markdown renderer
+  - Svelte streaming Markdown renderer
+  - Angular streaming Markdown renderer
+  - Vue 2 streaming Markdown renderer
+  - Next.js AI chat Markdown
 ---
 # Markstream framework packages
 
@@ -14,7 +23,7 @@ Streaming Markdown renderers for AI apps across Vue, React, Svelte, Angular, Nux
 | React / Next.js / Remix | `markstream-react` | beta | `pnpm add markstream-react` | [React](/frameworks/react) / [Next.js](/frameworks/next) | SSR entries for Next.js |
 | Svelte 5 | `markstream-svelte` | beta | `pnpm add markstream-svelte svelte@^5` | [Svelte](/frameworks/svelte) | Svelte 5 only |
 | Angular standalone | `markstream-angular` | alpha | `pnpm add markstream-angular` | [Angular](/frameworks/angular) | Angular 20+ standalone |
-| Vue 2.6 / 2.7 | `markstream-vue2` | compatibility | `pnpm add markstream-vue2` | [Vue 2 Quick Start](/guide/vue2-quick-start) | For legacy Vue 2 apps |
+| Vue 2.6 / 2.7 | `markstream-vue2` | compatibility | `pnpm add markstream-vue2` | [Vue 2 Quick Start](/guide/vue2-quick-start) | Legacy Vue 2; Vue 2.6 needs `@vue/composition-api` |
 | Parser only | `stream-markdown-parser` | stable | `pnpm add stream-markdown-parser` | [Parser API](/guide/parser-api) | No UI renderer |
 
 ## Choose by use case
@@ -26,6 +35,7 @@ Streaming Markdown renderers for AI apps across Vue, React, Svelte, Angular, Nux
 | Next.js SSR-first Markdown | `markstream-react/next` | Server HTML first, then client enhancement |
 | Svelte 5 AI chat | `markstream-svelte` | Svelte 5 renderer with the shared Markstream parser behavior |
 | Angular standalone app | `markstream-angular` | Angular 20+ standalone component package |
+| Legacy Vue 2 AI chat | `markstream-vue2` | Compatibility port for Vue 2.6 / 2.7; use `nodes` for high-frequency long streams |
 | Parser-only pipeline | `stream-markdown-parser` | Structured nodes without a UI runtime |
 
 ## Package maturity
@@ -37,7 +47,7 @@ Streaming Markdown renderers for AI apps across Vue, React, Svelte, Angular, Nux
 | `markstream-react` | beta | React and Next.js entries are documented separately |
 | `markstream-svelte` | beta / experimental | Svelte 5 only |
 | `markstream-angular` | alpha | Angular standalone component |
-| `markstream-vue2` | compatibility | Vue 2.6 / 2.7 legacy support |
+| `markstream-vue2` | compatibility | Vue 2.6 / 2.7 legacy support; not the first choice for new Vue 3 projects |
 
 ## Quick examples
 
@@ -106,6 +116,10 @@ Use `react-markdown` for short static React Markdown and mature remark/rehype pl
 ### Which packages are stable?
 
 `markstream-vue` and `stream-markdown-parser` are stable. `markstream-react` is beta, `markstream-svelte` is beta / experimental, `markstream-angular` is alpha, and `markstream-vue2` is a compatibility port.
+
+### Should I use markstream-vue2 for a new project?
+
+Use `markstream-vue2` only when the app must stay on Vue 2.6 / 2.7. For Vue 3 or new Nuxt projects, start with `markstream-vue`. For short completed Markdown in Vue 2, a smaller static Markdown renderer may be simpler.
 
 ## Common next steps
 

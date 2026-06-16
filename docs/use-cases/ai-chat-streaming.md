@@ -1,6 +1,22 @@
 ---
 title: AI chat streaming Markdown — use cases and patterns
 description: Render streaming Markdown from LLMs in AI chat UIs using Markstream. Patterns for token-by-token output, SSE, WebSocket, and batched rendering across Vue, React, Svelte, and Angular.
+keywords:
+  - AI chat streaming Markdown
+  - LLM Markdown renderer
+  - token-by-token Markdown
+  - SSE Markdown renderer
+  - WebSocket Markdown renderer
+  - incomplete Markdown renderer
+  - streaming code block Markdown
+  - streaming Mermaid in AI chat
+faq:
+  - question: Can Markstream render Markdown while an LLM response is still incomplete?
+    answer: Yes. Markstream is designed for streaming mid-states such as unclosed code fences, partial links, loading images, and incomplete tables while the final Markdown is still arriving.
+  - question: Should I pass a growing Markdown string or pre-parsed nodes?
+    answer: Start with the growing content string. Use pre-parsed nodes only when another layer already owns parsing, batching, or worker-based AST generation.
+  - question: Is Markstream only for React AI chat?
+    answer: No. Markstream has renderer packages for Vue, React, Svelte, Angular, Nuxt, and Next.js, with shared parser behavior across the family.
 ---
 # AI chat streaming Markdown
 

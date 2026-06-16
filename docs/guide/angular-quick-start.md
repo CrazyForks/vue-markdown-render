@@ -1,3 +1,14 @@
+---
+title: Angular Quick Start
+description: Get markstream-angular running in an Angular 20+ standalone app with signal-based content, streaming Markdown, smooth pacing, Mermaid, KaTeX, Monaco options, and alpha API notes.
+keywords:
+  - markstream-angular quick start
+  - Angular streaming Markdown quick start
+  - Angular AI chat Markdown
+  - Angular signal Markdown renderer
+  - Angular standalone Markdown
+---
+
 # Angular Quick Start
 
 Get `markstream-angular` rendering markdown in a standalone Angular app.

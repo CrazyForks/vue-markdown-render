@@ -1,3 +1,19 @@
+---
+title: Svelte 5 streaming Markdown guide
+description: Install and configure markstream-svelte for Svelte 5 and SvelteKit AI chat, LLM token streams, raw content streaming, smooth pacing, workers, custom components, Mermaid, KaTeX, and beta API limits.
+keywords:
+  - Svelte 5 Markdown guide
+  - SvelteKit AI chat Markdown
+  - markstream-svelte guide
+  - Svelte streaming Markdown setup
+  - Svelte LLM token stream
+  - Svelte smooth streaming Markdown
+  - Svelte Mermaid worker
+  - Svelte KaTeX worker
+  - Svelte custom Markdown components
+  - Svelte 5 beta Markdown renderer
+---
+
 # Svelte
 
 `markstream-svelte` provides the Svelte 5-only renderer with the same component names, worker helpers, and playground fixtures as the Vue and React packages. Svelte 4 is not supported.

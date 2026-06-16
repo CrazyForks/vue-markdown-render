@@ -1,6 +1,27 @@
+---
+title: Vue 2 streaming Markdown quick start
+description: Add markstream-vue2 to Vue 2.6 or Vue 2.7 legacy apps for AI chat Markdown, SSE/WebSocket streams, Composition API setup, smooth content streaming, nodes-based high-frequency streams, Mermaid, KaTeX, and code blocks.
+keywords:
+  - markstream-vue2
+  - Vue 2 streaming Markdown
+  - Vue 2 AI chat Markdown
+  - Vue 2.6 Markdown renderer
+  - Vue 2.7 Markdown renderer
+  - Vue2 SSE Markdown
+  - Vue2 WebSocket Markdown
+  - Vue2 LLM Markdown renderer
+  - Vue2 Composition API Markdown
+  - Vue2 incomplete Markdown
+  - Vue2 Mermaid Markdown
+  - Vue2 KaTeX Markdown
+  - legacy Vue2 Markdown renderer
+---
+
 # Vue 2 Quick Start
 
 Get started with markstream-vue2 in your Vue 2 project.
+
+`markstream-vue2` is the compatibility package for legacy Vue 2.6 / 2.7 apps. For Vue 3 or new Nuxt projects, use `markstream-vue`.
 
 ## Basic Setup
 
@@ -466,6 +487,14 @@ Fine-tune pacing with `smooth-streaming-options`:
   }"
 />
 ```
+
+For high-frequency SSE, long conversations, or large code/table/math blocks, prefer external parsing and pass `nodes` to avoid reparsing the full `content` string on every token update.
+
+## When not to use markstream-vue2
+
+- You are starting a Vue 3 / Nuxt 3 project; use `markstream-vue`.
+- You only render short static Markdown; a smaller Vue 2 Markdown component is usually simpler.
+- You need virtual scrolling for lists or tables; this package renders Markdown, not data grids.
 
 ## VitePress Integration (Vue 2)
 

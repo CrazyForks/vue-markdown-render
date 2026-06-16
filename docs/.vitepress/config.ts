@@ -7,10 +7,41 @@ import { defineConfig } from 'vitepress'
 
 const docsSiteUrl = process.env.VITEPRESS_SITE_URL || 'https://markstream.simonhe.me'
 const docsOgImageUrl = `${docsSiteUrl}/og-image.svg`
+const docsOgImageAlt = 'Markstream streaming Markdown renderer documentation overview'
 const docsDefaultDescription = 'Streaming Markdown renderers for AI apps across Vue, React, Svelte, Angular, Nuxt, and Next.js'
 const githubRepoUrl = 'https://github.com/Simon-He95/markstream-vue'
 const docsRootDir = fileURLToPath(new URL('..', import.meta.url))
 const workspaceRootDir = fileURLToPath(new URL('../..', import.meta.url))
+
+const docsDefaultKeywords = [
+  'streaming Markdown renderer',
+  'AI chat Markdown renderer',
+  'LLM Markdown renderer',
+  'SSE Markdown renderer',
+  'WebSocket Markdown renderer',
+  'incomplete Markdown states',
+  'Vue Markdown renderer',
+  'React Markdown renderer',
+  'Nuxt Markdown renderer',
+  'streaming Mermaid',
+  'KaTeX Markdown',
+  'streaming code blocks',
+]
+
+const docsDefaultKeywordsZh = [
+  '流式 Markdown 渲染器',
+  'AI 聊天 Markdown 渲染器',
+  'LLM Markdown 渲染',
+  'SSE Markdown 渲染',
+  'WebSocket Markdown 渲染',
+  '未闭合 Markdown',
+  'Vue Markdown 渲染器',
+  'React Markdown 渲染器',
+  'Nuxt Markdown 渲染器',
+  'Mermaid 渐进渲染',
+  'KaTeX 数学公式',
+  '流式代码块',
+]
 
 // TypeScript sometimes rejects VitePress site locales on the `Config` type.
 // Cast to `any` to avoid strict type errors in the docs config while keeping intellisense.
@@ -278,9 +309,10 @@ const siteHead = [
   ['meta', { property: 'og:type', content: 'website' }],
   ['meta', { property: 'og:site_name', content: 'Markstream' }],
   ['meta', { property: 'og:image', content: docsOgImageUrl }],
-  ['meta', { property: 'og:image:alt', content: 'Markstream logo and documentation overview' }],
+  ['meta', { property: 'og:image:alt', content: docsOgImageAlt }],
   ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
   ['meta', { name: 'twitter:image', content: docsOgImageUrl }],
+  ['meta', { name: 'twitter:image:alt', content: docsOgImageAlt }],
 ]
 
 const seoExcludedDocsPaths = new Set([
@@ -523,6 +555,11 @@ function frontmatterStringArray(value: unknown) {
   return typeof value === 'string' && value.length > 0 ? [value] : []
 }
 
+function getDocsPageKeywords(frontmatter: Record<string, any>, isChinese: boolean) {
+  const keywords = frontmatterStringArray(frontmatter.keywords)
+  return keywords.length > 0 ? keywords : isChinese ? docsDefaultKeywordsZh : docsDefaultKeywords
+}
+
 function frontmatterFaqItems(value: unknown) {
   if (!Array.isArray(value))
     return []
@@ -547,6 +584,7 @@ function createDocsStructuredData(path: string, title: string, description: stri
   const graph: Record<string, any>[] = []
   const homePath = isChinese ? '/zh' : '/'
   const faqItems = frontmatterFaqItems(frontmatter.faq)
+  const keywords = getDocsPageKeywords(frontmatter, isChinese).join(', ')
   const lastVerified = typeof frontmatter.lastVerified === 'string' && frontmatter.lastVerified.length > 0
     ? frontmatter.lastVerified
     : null
@@ -559,6 +597,7 @@ function createDocsStructuredData(path: string, title: string, description: stri
       'url': `${docsSiteUrl}${homePath === '/' ? '/' : homePath}`,
       'inLanguage': isChinese ? 'zh-CN' : 'en-US',
       description,
+      keywords,
       'publisher': {
         '@type': 'Organization',
         'name': 'Markstream',
@@ -573,6 +612,7 @@ function createDocsStructuredData(path: string, title: string, description: stri
       'operatingSystem': 'Web',
       'url': `${docsSiteUrl}${homePath === '/' ? '/' : homePath}`,
       description,
+      keywords,
       'offers': {
         '@type': 'Offer',
         'price': '0',
@@ -601,6 +641,7 @@ function createDocsStructuredData(path: string, title: string, description: stri
       'name': softwareName,
       description,
       'url': `${docsSiteUrl}${path}`,
+      keywords,
       'codeRepository': githubRepoUrl,
       'license': 'https://opensource.org/licenses/MIT',
       'applicationCategory': 'DeveloperApplication',
@@ -616,6 +657,7 @@ function createDocsStructuredData(path: string, title: string, description: stri
       'headline': title,
       description,
       'url': `${docsSiteUrl}${path}`,
+      keywords,
       'mainEntityOfPage': `${docsSiteUrl}${path}`,
       'articleSection': isChinese ? 'Markdown 渲染器对比' : 'Markdown renderer comparison',
       'inLanguage': isChinese ? 'zh-CN' : 'en-US',
@@ -795,6 +837,7 @@ export default defineConfig({
     const frontmatter = ctx.pageData.frontmatter ?? {}
     const isChinese = normalizedPath === '/zh' || normalizedPath.startsWith('/zh/')
     const description = frontmatter.description || ctx.description || docsDefaultDescription
+    const keywords = getDocsPageKeywords(frontmatter, isChinese)
     const title = createDocsSeoTitle(frontmatter.title || ctx.pageData.title || ctx.title)
     const shouldIndex = !ctx.pageData.isNotFound && !frontmatter.noindex && !isDocsSeoExcluded(normalizedPath)
     const alternates = getDocsAlternatePaths(normalizedPath)
@@ -829,6 +872,7 @@ export default defineConfig({
       ['link', { rel: 'canonical', href: canonicalUrl }],
       ...alternateHead,
       ['meta', { name: 'description', content: description }],
+      ['meta', { name: 'keywords', content: keywords.join(', ') }],
       ['meta', { name: 'robots', content: shouldIndex ? 'index,follow' : 'noindex,nofollow' }],
       ['meta', { property: 'og:locale', content: isChinese ? 'zh_CN' : 'en_US' }],
       ...alternateLocales

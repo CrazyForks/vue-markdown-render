@@ -1,3 +1,14 @@
+---
+title: Angular 快速开始
+description: 在 Angular 20+ standalone 应用中快速使用 markstream-angular，覆盖 signal 内容、流式 Markdown、Mermaid、KaTeX、Monaco 选项和 alpha API 注意事项。
+keywords:
+  - markstream-angular 快速开始
+  - Angular 流式 Markdown 快速开始
+  - Angular AI 聊天 Markdown
+  - Angular signal Markdown 渲染器
+  - Angular standalone Markdown
+---
+
 # Angular 快速开始
 
 在 Angular standalone 应用里快速跑起 `markstream-angular`。

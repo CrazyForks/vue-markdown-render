@@ -1,17 +1,21 @@
 # markstream-svelte
 
-Svelte 5 streaming Markdown renderer for AI chat, SSE/WebSocket output, long documents, custom components, Mermaid, KaTeX, and Monaco.
+Svelte 5 streaming Markdown renderer for AI chat, LLM token streams, SSE/WebSocket output, incomplete Markdown states, long documents, custom components, Mermaid, KaTeX, Monaco, D2, and Infographic.
 
 ## When to use it
 
 Use `markstream-svelte` when Markdown changes while users are reading it:
 LLM output, SSE streams, WebSocket streams, AI chat messages, long generated answers,
-or progressive diagrams and code blocks.
+progressive diagrams, math, or code blocks.
+
+For normal chat streaming, start with the raw `content` string path. Use pre-parsed
+`nodes` only when another part of your app already owns the parser or AST state.
 
 ## Known limitations
 
 - **Svelte 5 only.** Svelte 4 is not supported.
 - This package is currently beta. Check npm and the [Svelte guide](https://markstream.simonhe.me/guide/svelte) for the latest API maturity.
+- It is not the first choice for short static Markdown or apps that require a fully stable Svelte 4-compatible API.
 
 ## Install
 
@@ -19,7 +23,8 @@ or progressive diagrams and code blocks.
 pnpm add markstream-svelte svelte@^5
 ```
 
-Optional heavy renderers stay as peer dependencies, matching the Vue and React packages:
+Optional heavy renderers stay as peer dependencies, matching the Vue and React packages.
+Plain Markdown does not require these packages:
 
 ```bash
 pnpm add katex mermaid stream-monaco @terrastruct/d2 @antv/infographic

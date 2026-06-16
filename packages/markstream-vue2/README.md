@@ -1,6 +1,8 @@
 # markstream-vue2
 
-Vue 2.6-compatible renderer for markstream-vue.
+Vue 2.6 / 2.7 compatibility renderer for legacy Vue 2 apps that need streaming Markdown, AI chat output, long documents, progressive Mermaid/KaTeX, and streaming code blocks.
+
+For Vue 3 or new Vue/Nuxt projects, use `markstream-vue` instead.
 
 ## Install
 
@@ -14,6 +16,7 @@ pnpm add markstream-vue2
 
 - Vue 2.6.14+ (Vue 2.7 recommended for better TS support)
 - @vue/composition-api (required for Vue 2.6.x)
+- `vue` and `vue-template-compiler` must use the same Vue 2 version
 
 ## Composition API compatibility
 
@@ -141,7 +144,8 @@ new Vue({
 
 ## Streaming best practices
 
-- For high-frequency SSE / token streaming, prefer parsing outside the renderer and pass `nodes` instead of reparsing the whole `content` string every chunk.
+- For simple chat streaming, passing `content` is the fastest way to integrate.
+- For high-frequency SSE / token streaming, long conversations, or very large code/table/math blocks, prefer parsing outside the renderer and pass `nodes` instead of reparsing the whole `content` string every chunk.
 - Keep `viewport-priority` enabled unless you explicitly want eager rendering. Mermaid / Monaco / D2 blocks now stay idle while offscreen and resume when they approach the viewport.
 
 ```vue
@@ -319,9 +323,10 @@ module.exports = {
 
 ## Notes
 
-- The Vue 2 package mirrors the Vue 3 renderer feature set where possible (virtualization, streaming code blocks, Monaco, Mermaid, KaTeX, tooltip singleton).
+- The Vue 2 package is a compatibility port for legacy Vue 2 apps and mirrors the Vue 3 renderer feature set where practical (virtualization, streaming code blocks, Monaco, Mermaid, KaTeX, tooltip singleton).
 - Optional peers are still required for those features (`stream-monaco`, `stream-markdown`, `mermaid`, `katex`, etc.).
 - Custom node components are supported via `setCustomComponents` from `markstream-vue2`.
+- If you only render short static Markdown, a smaller Vue 2 Markdown component may be a simpler fit.
 
 ## TypeScript
 

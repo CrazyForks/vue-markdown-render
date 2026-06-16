@@ -1,6 +1,15 @@
 ---
 title: Markstream 框架选择
 description: 为 Vue、React、Svelte、Angular、Nuxt 和 Next.js 选择合适的 Markstream 流式 Markdown 渲染器。
+keywords:
+  - Markstream 框架包
+  - 按框架选择流式 Markdown 渲染器
+  - Vue 流式 Markdown 渲染器
+  - React 流式 Markdown 渲染器
+  - Svelte 流式 Markdown 渲染器
+  - Angular 流式 Markdown 渲染器
+  - Vue 2 流式 Markdown 渲染器
+  - Next.js AI 聊天 Markdown
 ---
 
 # Markstream 框架包
@@ -27,6 +36,7 @@ Markstream 是一组面向 AI 应用的流式 Markdown 渲染器，覆盖 Vue、
 | Next.js SSR-first Markdown | `markstream-react/next` | 先输出服务端 HTML，再做客户端增强 |
 | Svelte 5 AI 聊天 | `markstream-svelte` | Svelte 5 渲染器，复用 Markstream parser 行为 |
 | Angular standalone 应用 | `markstream-angular` | Angular 20+ standalone component |
+| Vue 2 存量 AI 聊天 | `markstream-vue2` | Vue 2.6 / 2.7 兼容包；高频长流建议传 `nodes` |
 | 只要 parser 管线 | `stream-markdown-parser` | 输出结构化 nodes，不绑定 UI runtime |
 
 ## 包成熟度
@@ -38,7 +48,7 @@ Markstream 是一组面向 AI 应用的流式 Markdown 渲染器，覆盖 Vue、
 | `markstream-react` | beta | React 与 Next.js 入口分开说明 |
 | `markstream-svelte` | beta / experimental | 仅支持 Svelte 5 |
 | `markstream-angular` | alpha | Angular standalone component |
-| `markstream-vue2` | compatibility | Vue 2.6 / 2.7 兼容包 |
+| `markstream-vue2` | compatibility | Vue 2.6 / 2.7 兼容包；新 Vue 3 项目不应优先使用 |
 
 如果只是把短静态 Markdown 转成 HTML，`marked`、`markdown-it` 或框架生态里的普通 Markdown 组件通常更轻。Markstream 的价值在流式场景：LLM token 流、SSE/WebSocket、未闭合代码块、长回答、渐进 Mermaid 和需要稳定 DOM 的 AI 聊天界面。
 
@@ -109,6 +119,10 @@ export class MessageComponent {
 ### 哪些包是稳定的？
 
 `markstream-vue` 和 `stream-markdown-parser` 是 stable。`markstream-react` 是 beta，`markstream-svelte` 是 beta / experimental，`markstream-angular` 是 alpha，`markstream-vue2` 是兼容包。
+
+### 新项目应该用 markstream-vue2 吗？
+
+只有应用必须停留在 Vue 2.6 / 2.7 时才使用 `markstream-vue2`。Vue 3 或新的 Nuxt 项目应从 `markstream-vue` 开始。Vue 2 中只渲染短完成态 Markdown 时，普通静态 Markdown 渲染器通常更简单。
 
 ## 常用下一步
 

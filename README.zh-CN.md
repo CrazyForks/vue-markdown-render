@@ -2,7 +2,9 @@
 
 > 面向 AI 应用的多框架流式 Markdown 渲染器家族 — 支持 Vue、React、Svelte、Angular、Nuxt 和 Next.js。
 
-Markstream 专为在用户眼前持续变化的 Markdown 场景而构建：LLM token 流、SSE/WebSocket 输出、AI 聊天消息、长文档、渐进式 Mermaid 图表、KaTeX 数学公式、流式代码块以及安全的组件化渲染。
+Markstream 专为在用户眼前持续变化的 Markdown 场景而构建：LLM token 流、SSE/WebSocket 输出、AI 聊天消息、未闭合 Markdown 中间态、长文档、渐进式 Mermaid 图表、KaTeX 数学公式、流式代码块以及安全的组件化渲染。
+
+Vue 3、Nuxt 和 VitePress 项目优先使用 `markstream-vue`；React、Svelte、Angular 项目使用对应 sibling package。普通 AI 聊天可以直接传不断累积的 `content` 字符串，只有外层已经负责解析、batch 或 worker AST 时才需要 `nodes` 路径。
 
 [![English](https://img.shields.io/badge/docs-English-blue)](README.md)
 [![Docs](https://img.shields.io/badge/docs-中文文档-blue)](https://markstream.simonhe.me/zh/guide)

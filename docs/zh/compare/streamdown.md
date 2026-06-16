@@ -1,6 +1,15 @@
 ---
 title: markstream-react 与 Streamdown 对比
 description: 对比 markstream-react 和 Streamdown 在 React 流式 Markdown、AI 聊天、Mermaid、KaTeX、Shiki、长回答和跨框架一致性中的差异。
+keywords:
+  - markstream-react 与 Streamdown 对比
+  - Streamdown 替代方案
+  - React 流式 Markdown 渲染器
+  - React AI 聊天 Markdown
+  - React 未闭合 Markdown
+  - react-markdown 流式替代
+  - React Mermaid 流式渲染
+  - 长回答 Markdown 渲染
 lastVerified: '2026-06-12'
 faq:
   - question: markstream-react 和 Streamdown 都是流式 Markdown 渲染器吗？
@@ -24,6 +33,12 @@ faq:
 | 多框架产品线需要一致行为 | `markstream-react` |
 | 长 AI 回答需要 renderer 层 live node 控制 | `markstream-react` |
 | 想复用 Vue/React/Svelte/Angular 同一套 parser 心智 | `markstream-react` |
+
+## content 路径和 nodes 路径
+
+普通 AI 聊天消息可以把不断累积的 Markdown 字符串直接传给 `MarkdownRender`，不需要为了接 SSE 或 WebSocket 输出而手动预解析 nodes。
+
+当外层已经负责解析、batch、worker 执行或 AST transform 时，再使用 `nodes` 路径。
 
 ```tsx
 import MarkdownRender from 'markstream-react'

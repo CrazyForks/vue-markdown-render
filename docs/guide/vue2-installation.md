@@ -1,3 +1,21 @@
+---
+title: Vue 2 Markdown renderer installation
+description: Install markstream-vue2 in Vue 2.6, Vue 2.7, Nuxt 2, Vue CLI, or Webpack 4 projects with Composition API setup, vue-demi notes, optional peers, workers, CSS paths, and legacy Vue2 troubleshooting.
+keywords:
+  - markstream-vue2 installation
+  - Vue 2 Markdown renderer installation
+  - Vue 2.6 Composition API Markdown
+  - Vue 2.7 Markdown renderer
+  - Nuxt 2 Markdown renderer
+  - Vue CLI Markdown renderer
+  - Webpack 4 Vue2 Markdown
+  - vue-demi Vue2 Markdown
+  - Vue2 Mermaid Markdown setup
+  - Vue2 KaTeX Markdown setup
+  - Vue2 code block Markdown setup
+  - legacy Vue2 Markdown setup
+---
+
 # Vue 2 Installation
 
 Install markstream-vue2 with pnpm, npm or yarn.

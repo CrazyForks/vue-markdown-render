@@ -1,6 +1,27 @@
+---
+title: Vue 2 流式 Markdown 快速开始
+description: 在 Vue 2.6 / Vue 2.7 存量项目中使用 markstream-vue2，覆盖 AI 聊天 Markdown、SSE/WebSocket 流、Composition API 配置、平滑 content 流、nodes 高频流、Mermaid、KaTeX 和代码块。
+keywords:
+  - markstream-vue2
+  - Vue 2 流式 Markdown
+  - Vue 2 AI 聊天 Markdown
+  - Vue 2.6 Markdown 渲染器
+  - Vue 2.7 Markdown 渲染器
+  - Vue2 SSE Markdown
+  - Vue2 WebSocket Markdown
+  - Vue2 LLM Markdown 渲染器
+  - Vue2 Composition API Markdown
+  - Vue2 未闭合 Markdown
+  - Vue2 Mermaid Markdown
+  - Vue2 KaTeX Markdown
+  - Vue2 存量项目 Markdown 渲染器
+---
+
 # Vue 2 快速开始
 
 在你的 Vue 2 项目中开始使用 markstream-vue2。
+
+`markstream-vue2` 是面向 Vue 2.6 / 2.7 存量项目的兼容包。Vue 3 或新的 Nuxt 项目应使用 `markstream-vue`。
 
 ## 基础设置
 
@@ -384,7 +405,7 @@ export default {
 
 ## 流式内容
 
-markstream-vue2 支持流式 markdown 内容，适用于 AI 生成的内容：
+markstream-vue2 支持流式 markdown 内容，并内置适合 AI 生成内容的平滑节奏：
 
 ```vue
 <script>
@@ -395,6 +416,7 @@ export default {
   data() {
     return {
       markdown: '',
+      isFinal: false,
       fullText: `# 流式传输演示
 
 此内容正在**逐步**流式传输。
@@ -415,6 +437,7 @@ console.log('流式传输已启用:', streaming)
   methods: {
     startStreaming() {
       this.markdown = ''
+      this.isFinal = false
       let i = 0
       const interval = setInterval(() => {
         if (i < this.fullText.length) {
@@ -422,6 +445,7 @@ console.log('流式传输已启用:', streaming)
           i++
         }
         else {
+          this.isFinal = true
           clearInterval(interval)
         }
       }, 20)
@@ -435,10 +459,42 @@ console.log('流式传输已启用:', streaming)
     <button @click="startStreaming">
       开始流式传输
     </button>
-    <MarkdownRender :content="markdown" />
+    <MarkdownRender
+      custom-id="chat"
+      :content="markdown"
+      :final="isFinal"
+      :max-live-nodes="0"
+      :batch-rendering="true"
+      :typewriter="true"
+    />
   </div>
 </template>
 ```
+
+默认 `smooth-streaming="auto"` 会在 `typewriter` 开启或 `max-live-nodes <= 0` 时启用节奏控制。只有你明确希望首屏内容也从空白开始时才使用 `:smooth-streaming="true"`；它会绕过 mounted gate，SSR 场景可能出现 hydration mismatch 或空白闪烁。
+
+可以用 `smooth-streaming-options` 微调节奏：
+
+```vue
+<MarkdownRender
+  :content="markdown"
+  :final="isFinal"
+  :smooth-streaming-options="{
+    minCharsPerSecond: 45,
+    maxCharsPerSecond: 1200,
+    targetLatencyMs: 900,
+    catchUpLatencyMs: 350,
+  }"
+/>
+```
+
+高频 SSE、长对话或包含大型代码块/表格/公式时，建议在外部解析后传 `nodes`，避免每个 token 更新都重新解析完整 `content` 字符串。
+
+## 不适合使用 markstream-vue2 的情况
+
+- 你在启动 Vue 3 / Nuxt 3 项目，应使用 `markstream-vue`。
+- 你只渲染短静态 Markdown，普通 Vue 2 Markdown 组件通常更简单。
+- 你要解决列表或表格虚拟滚动问题；这个包渲染 Markdown，不是数据表格组件。
 
 ## VitePress 集成（Vue 2）
 

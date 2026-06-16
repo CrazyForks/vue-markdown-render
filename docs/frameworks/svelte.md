@@ -1,6 +1,19 @@
 ---
 title: 'Svelte 5 streaming Markdown renderer for AI chat'
-description: Use markstream-svelte to render streamed Markdown in Svelte 5 AI chat, SSE, WebSocket, long documents, custom components, Mermaid, KaTeX, and Monaco.
+description: Use markstream-svelte to render streamed Markdown in Svelte 5 and SvelteKit AI chat, LLM token streams, SSE, WebSocket, incomplete Markdown states, long documents, custom components, Mermaid, KaTeX, and Monaco. Beta API; Svelte 4 is not supported.
+keywords:
+  - markstream-svelte
+  - Svelte 5 streaming Markdown renderer
+  - SvelteKit streaming Markdown
+  - Svelte AI chat Markdown
+  - Svelte LLM Markdown renderer
+  - Svelte SSE Markdown renderer
+  - Svelte WebSocket Markdown
+  - Svelte incomplete Markdown renderer
+  - Svelte Mermaid Markdown
+  - Svelte KaTeX Markdown
+  - Svelte custom Markdown components
+  - Svelte 5 Markdown beta
 softwareName: markstream-svelte
 softwarePackage: markstream-svelte
 npmPackage: markstream-svelte
@@ -14,13 +27,17 @@ faq:
   - question: Does markstream-svelte support Svelte 4?
     answer: No. markstream-svelte requires Svelte 5.
   - question: When should I use markstream-svelte?
-    answer: Use it for Svelte 5 AI chat, SSE/WebSocket output, long responses, custom Svelte components, or progressive Mermaid and KaTeX.
+    answer: Use it for Svelte 5 AI chat, SvelteKit SSE/WebSocket output, long responses, custom Svelte components, smooth streamed content, or progressive Mermaid and KaTeX.
   - question: Is markstream-svelte as mature as markstream-vue?
     answer: No. markstream-svelte is beta and newer than the Vue renderer.
+  - question: Do I need to pre-parse nodes for Svelte streaming output?
+    answer: No. For normal LLM/SSE/WebSocket streaming, start with the raw content prop and final state. Use nodes only when your app already owns parser or AST state.
+  - question: Does markstream-svelte sanitize untrusted Markdown and HTML?
+    answer: The renderer defaults to the safe HTML policy and sanitizes link, image, class, and SVG output paths. Review the policy against your own threat model before rendering untrusted content.
 ---
 # Svelte 5 streaming Markdown renderer for AI chat
 
-`markstream-svelte` is the Svelte 5 renderer in the Markstream family. It provides the same component names, worker helpers, and streaming behavior as the Vue and React packages.
+`markstream-svelte` is the Svelte 5 renderer in the Markstream family. It uses Svelte 5 runes and provides the same component names, worker helpers, and streaming behavior as the Vue and React packages. The package is beta, so check the current release notes before treating the API as fixed.
 
 **Svelte 4 is not supported.**
 
@@ -29,11 +46,13 @@ faq:
 Use `markstream-svelte` when:
 
 - Content streams from an LLM, SSE, or WebSocket into a Svelte 5 app
-- Incomplete Markdown states must not flicker
+- Incomplete Markdown states and token-by-token updates must stay readable
 - Long AI responses or long documents matter
 - Mermaid/KaTeX/code blocks appear during streaming
 - You need Markstream's cross-framework parser behavior
 - You need custom Svelte 5 components inside Markdown
+
+For normal chat streaming, pass the raw `content` string and `final` state. The `nodes` path is available for apps that already own parser or AST state.
 
 ## Quick Start
 
@@ -76,11 +95,14 @@ pnpm add markstream-svelte svelte@^5
 | `@terrastruct/d2` | D2 diagrams |
 | `@antv/infographic` | Infographic blocks |
 
+Plain Markdown does not require these optional peers. Install them only for the block types you render.
+
 Shiki is not documented for `markstream-svelte` unless you add a supported integration path.
 
 ## When not to use this package
 
 - You are on Svelte 4
+- You need a fully stable Svelte renderer API today
 - You only render short static Markdown and do not need streaming mid-state handling
 - Your app already has a simpler static Markdown stack that covers all content types
 
@@ -88,6 +110,8 @@ Shiki is not documented for `markstream-svelte` unless you add a supported integ
 
 - **Svelte 5 runes**: uses `$props()`, `$state()`, `$derived()`
 - **Two input paths**: raw `content` and pre-parsed `nodes`
+- **Smooth streaming**: `smoothStreaming="auto"` can pace the raw `content` path for typewriter-style LLM output
+- **Safe HTML policy**: defaults to safe HTML handling and URL/SVG sanitization paths, but you should still review the policy for untrusted content
 - **Custom components**: slot Svelte components into Markdown
 - **Optional peers**: Mermaid, KaTeX, Monaco, D2, Infographic
 - **Worker parity**: same Katex/Mermaid worker setup as Vue/React

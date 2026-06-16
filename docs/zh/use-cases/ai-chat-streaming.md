@@ -1,6 +1,22 @@
 ---
 title: AI 聊天流式 Markdown 渲染
 description: 在 AI 聊天 UI 中使用 Markstream 渲染 LLM token 流、SSE/WebSocket 输出、未闭合 Markdown、Mermaid、KaTeX 和长回答。
+keywords:
+  - AI 聊天流式 Markdown
+  - LLM Markdown 渲染器
+  - token 流 Markdown
+  - SSE Markdown 渲染器
+  - WebSocket Markdown 渲染器
+  - 未闭合 Markdown 渲染
+  - 流式代码块 Markdown
+  - AI 聊天 Mermaid 渲染
+faq:
+  - question: Markstream 能在 LLM 回复还没输出完整时渲染 Markdown 吗？
+    answer: 可以。Markstream 面向流式中间态设计，会处理未闭合代码块、半截链接、loading 图片和不完整表格等还在生成中的 Markdown。
+  - question: AI 聊天里应该传不断增长的 Markdown 字符串，还是传预解析 nodes？
+    answer: 优先从不断增长的 content 字符串开始。只有当外层已经负责解析、batch 或 worker AST 生成时，再使用 nodes 路径。
+  - question: Markstream 只适合 React AI 聊天吗？
+    answer: 不是。Markstream 提供 Vue、React、Svelte、Angular、Nuxt 和 Next.js 渲染器，并在家族内共享解析行为。
 ---
 
 # AI 聊天流式 Markdown 渲染

@@ -1,6 +1,15 @@
 ---
 title: markstream-react vs Streamdown for React streaming Markdown
 description: Compare markstream-react and Streamdown for streaming AI Markdown in React. Both support streaming; choose based on API fit, heavy blocks, long documents, and cross-framework needs.
+keywords:
+  - markstream-react vs Streamdown
+  - Streamdown alternative
+  - React streaming Markdown renderer
+  - React AI chat Markdown
+  - incomplete Markdown React
+  - react-markdown streaming alternative
+  - streaming Mermaid React
+  - long AI response Markdown
 lastVerified: '2026-06-12'
 faq:
   - question: Are markstream-react and Streamdown both streaming Markdown renderers?
@@ -21,7 +30,7 @@ Both `markstream-react` and [Streamdown](https://streamdown.ai) are designed for
 | Capability | markstream-react | Streamdown |
 | --- | --- | --- |
 | React streaming Markdown | ✅ | ✅ |
-| Incomplete Markdown handling | Streaming-aware mid-state handling | Streaming-optimized |
+| Incomplete Markdown handling | Streaming mid-state handling for partial fences, links, images, tables, and inline syntax | Streaming-optimized |
 | react-markdown-style API | ❌ different API | ✅ drop-in style |
 | Mermaid | ✅ built-in Markstream integration / optional peer | ✅ via `@streamdown/mermaid` |
 | Math / KaTeX | ✅ optional peer / worker-capable | ✅ via `@streamdown/math` |
@@ -50,6 +59,12 @@ Streamdown is a **drop-in replacement for `react-markdown`** designed for AI-pow
 - You want consistent Markdown behavior across React, Vue, Svelte, and Angular
 - You need both raw `content` and pre-parsed `nodes` input paths
 - You need optional peer dependencies — install only what your AI output needs
+
+## Content path vs nodes path
+
+For a normal AI chat message, you can pass the accumulating Markdown string directly to `MarkdownRender`. You do **not** need to pre-parse nodes just to handle SSE or WebSocket output.
+
+Use the `nodes` path when another layer already owns parsing, batching, worker execution, or AST transforms.
 
 ## Streaming example comparison
 
