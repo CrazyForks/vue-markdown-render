@@ -149,6 +149,7 @@ const englishGuideSidebar = [
     items: [
       { text: 'Frameworks overview', link: '/frameworks/' },
       { text: 'Vue (SEO landing)', link: '/frameworks/vue' },
+      { text: 'Vue 2 (SEO landing)', link: '/frameworks/vue2' },
       { text: 'Nuxt (SEO landing)', link: '/frameworks/nuxt' },
       { text: 'React (SEO landing)', link: '/frameworks/react' },
       { text: 'Next.js (SEO landing)', link: '/frameworks/next' },
@@ -251,6 +252,7 @@ const chineseGuideSidebar = [
     items: [
       { text: '框架总览', link: '/zh/frameworks/' },
       { text: 'Vue 流式 Markdown 渲染器', link: '/zh/frameworks/vue' },
+      { text: 'Vue 2 流式 Markdown 渲染器', link: '/zh/frameworks/vue2' },
       { text: 'Nuxt 流式 Markdown 渲染器', link: '/zh/frameworks/nuxt' },
       { text: 'React 流式 Markdown 渲染器', link: '/zh/frameworks/react' },
       { text: 'Next.js 流式 Markdown 渲染器', link: '/zh/frameworks/next' },
@@ -415,6 +417,7 @@ const availableDocsRoutePaths = collectDocsRoutePaths(docsRootDir)
 
 const docsPrimaryLandingPaths = new Set([
   '/frameworks/vue',
+  '/frameworks/vue2',
   '/frameworks',
   '/frameworks/react',
   '/frameworks/svelte',
@@ -648,6 +651,27 @@ function createDocsStructuredData(path: string, title: string, description: stri
       'programmingLanguage': programmingLanguage.length > 0 ? programmingLanguage : ['TypeScript'],
       'runtimePlatform': runtimePlatform,
       'sameAs': [`https://www.npmjs.com/package/${npmPackage}`],
+    })
+
+    graph.push({
+      '@type': 'SoftwareApplication',
+      'name': softwareName,
+      'applicationCategory': 'DeveloperApplication',
+      'operatingSystem': 'Any',
+      'programmingLanguage': programmingLanguage.length > 0 ? programmingLanguage : ['TypeScript'],
+      'softwareVersion': 'latest',
+      'url': `${docsSiteUrl}${path}`,
+      description,
+      keywords,
+      'sameAs': [
+        githubRepoUrl,
+        `https://www.npmjs.com/package/${npmPackage}`,
+      ],
+      'offers': {
+        '@type': 'Offer',
+        'price': '0',
+        'priceCurrency': 'USD',
+      },
     })
   }
 

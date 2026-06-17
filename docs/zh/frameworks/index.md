@@ -24,7 +24,7 @@ Markstream 是一组面向 AI 应用的流式 Markdown 渲染器，覆盖 Vue、
 | React / Next.js / Remix | `markstream-react` | beta | `pnpm add markstream-react` | [React](/zh/frameworks/react) / [Next.js](/zh/frameworks/next) |
 | Svelte 5 | `markstream-svelte` | beta | `pnpm add markstream-svelte svelte@^5` | [Svelte](/zh/frameworks/svelte) |
 | Angular standalone | `markstream-angular` | alpha | `pnpm add markstream-angular` | [Angular](/zh/frameworks/angular) |
-| Vue 2.6 / 2.7 | `markstream-vue2` | compatibility | `pnpm add markstream-vue2` | [Vue 2 快速开始](/zh/guide/vue2-quick-start) |
+| Vue 2.6 / 2.7 | `markstream-vue2` | compatibility | `pnpm add markstream-vue2` | [Vue 2](/zh/frameworks/vue2) |
 | 只要解析器 | `stream-markdown-parser` | stable | `pnpm add stream-markdown-parser` | [解析器 API](/zh/guide/parser-api) |
 
 ## 按场景选择
@@ -131,6 +131,7 @@ pnpm add markstream-vue
 pnpm add markstream-react
 pnpm add markstream-svelte svelte@^5
 pnpm add markstream-angular
+pnpm add markstream-vue2
 ```
 
 需要最小可运行示例时看 [多框架快速开始](/zh/quick-start)。如果你已经确定框架，直接进入对应页面会更快。

@@ -23,7 +23,7 @@ Streaming Markdown renderers for AI apps across Vue, React, Svelte, Angular, Nux
 | React / Next.js / Remix | `markstream-react` | beta | `pnpm add markstream-react` | [React](/frameworks/react) / [Next.js](/frameworks/next) | SSR entries for Next.js |
 | Svelte 5 | `markstream-svelte` | beta | `pnpm add markstream-svelte svelte@^5` | [Svelte](/frameworks/svelte) | Svelte 5 only |
 | Angular standalone | `markstream-angular` | alpha | `pnpm add markstream-angular` | [Angular](/frameworks/angular) | Angular 20+ standalone |
-| Vue 2.6 / 2.7 | `markstream-vue2` | compatibility | `pnpm add markstream-vue2` | [Vue 2 Quick Start](/guide/vue2-quick-start) | Legacy Vue 2; Vue 2.6 needs `@vue/composition-api` |
+| Vue 2.6 / 2.7 | `markstream-vue2` | compatibility | `pnpm add markstream-vue2` | [Vue 2](/frameworks/vue2) | Legacy Vue 2; Vue 2.6 needs `@vue/composition-api` |
 | Parser only | `stream-markdown-parser` | stable | `pnpm add stream-markdown-parser` | [Parser API](/guide/parser-api) | No UI renderer |
 
 ## Choose by use case
@@ -127,3 +127,4 @@ Use `markstream-vue2` only when the app must stay on Vue 2.6 / 2.7. For Vue 3 or
 - Use [React installation](/guide/react-installation) after choosing `markstream-react`.
 - Use [Svelte Quick Start](/guide/svelte) after choosing `markstream-svelte`.
 - Use [Angular installation](/guide/angular-installation) after choosing `markstream-angular`.
+- Use [Vue 2 landing](/frameworks/vue2) after choosing `markstream-vue2`.

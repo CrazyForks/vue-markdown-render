@@ -15,6 +15,7 @@ const primaryLandingPaths = [
   '/',
   '/frameworks',
   '/frameworks/vue',
+  '/frameworks/vue2',
   '/frameworks/nuxt',
   '/frameworks/react',
   '/frameworks/next',
@@ -31,6 +32,7 @@ const primaryLandingPaths = [
   '/zh',
   '/zh/frameworks',
   '/zh/frameworks/vue',
+  '/zh/frameworks/vue2',
   '/zh/frameworks/nuxt',
   '/zh/frameworks/react',
   '/zh/frameworks/next',
@@ -194,8 +196,10 @@ for (const filePath of walkFiles(docsDir, new Set(['.vitepress', 'node_modules']
     checks.push(['markstream-faq', 'visible FAQ section'])
   }
 
-  if (hasFrontmatterKey(frontmatter, 'softwarePackage'))
+  if (hasFrontmatterKey(frontmatter, 'softwarePackage')) {
     checks.push(['SoftwareSourceCode', 'structured data'])
+    checks.push(['SoftwareApplication', 'structured data'])
+  }
 
   if (isArticle)
     checks.push(['Article', 'structured data'])

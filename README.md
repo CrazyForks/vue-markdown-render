@@ -2,7 +2,7 @@
 
 Markstream is a streaming Markdown renderer family for AI chat, LLM token streams, SSE/WebSocket output, and long AI responses.
 
-Use `markstream-vue` for Vue 3, Nuxt, and VitePress; use the sibling packages for React, Svelte, and Angular. The renderer is built for incomplete Markdown states, progressive Mermaid, KaTeX, streaming code blocks, mobile WebView, and safe component rendering.
+Use `markstream-vue` for Vue 3, Nuxt, and VitePress; use the sibling packages for React, Svelte, Angular, and Vue 2. The renderer is built for incomplete Markdown states, progressive Mermaid, KaTeX, streaming code blocks, mobile WebView, and safe component rendering.
 
 [![中文版](https://img.shields.io/badge/docs-中文文档-blue)](README.zh-CN.md)
 [![Docs](https://img.shields.io/badge/docs-vitepress-blue)](https://markstream.simonhe.me/)
@@ -20,6 +20,7 @@ Other packages:
 [![markstream-react npm version](https://img.shields.io/npm/v/markstream-react?label=markstream-react)](https://www.npmjs.com/package/markstream-react)
 [![markstream-svelte npm version](https://img.shields.io/npm/v/markstream-svelte?label=markstream-svelte)](https://www.npmjs.com/package/markstream-svelte)
 [![markstream-angular npm version](https://img.shields.io/npm/v/markstream-angular?label=markstream-angular)](https://www.npmjs.com/package/markstream-angular)
+[![markstream-vue2 npm version](https://img.shields.io/npm/v/markstream-vue2?label=markstream-vue2)](https://www.npmjs.com/package/markstream-vue2)
 
 [![Release](https://img.shields.io/github/v/release/Simon-He95/markstream-vue?display_name=release&logo=github)](https://github.com/Simon-He95/markstream-vue/releases)
 [![Discussions](https://img.shields.io/github/discussions/Simon-He95/markstream-vue?logo=github)](https://github.com/Simon-He95/markstream-vue/discussions)
@@ -47,7 +48,7 @@ Start with the [framework overview](https://markstream.simonhe.me/frameworks) if
 | `markstream-react` | React / Next.js / Remix | `pnpm add markstream-react` | [React landing](https://markstream.simonhe.me/frameworks/react) · [Next.js landing](https://markstream.simonhe.me/frameworks/next) |
 | `markstream-svelte` | Svelte 5 | `pnpm add markstream-svelte svelte@^5` | [Svelte landing](https://markstream.simonhe.me/frameworks/svelte) · [Quick start](https://markstream.simonhe.me/guide/svelte) |
 | `markstream-angular` | Angular standalone | `pnpm add markstream-angular` | [Angular landing](https://markstream.simonhe.me/frameworks/angular) · [Quick start](https://markstream.simonhe.me/guide/angular-quick-start) |
-| `markstream-vue2` | Vue 2.6 / 2.7 | `pnpm add markstream-vue2` | [Vue 2 guide](https://markstream.simonhe.me/guide/vue2-quick-start) |
+| `markstream-vue2` | Vue 2.6 / 2.7 | `pnpm add markstream-vue2` | [Vue 2 landing](https://markstream.simonhe.me/frameworks/vue2) · [Quick start](https://markstream.simonhe.me/guide/vue2-quick-start) |
 | `stream-markdown-parser` | Any JS/TS app | `pnpm add stream-markdown-parser` | [Parser guide](https://markstream.simonhe.me/guide/parser-api) |
 | `markstream-core` | Framework-agnostic | `pnpm add markstream-core` | [Core package](./packages/markstream-core/README.md) |
 

@@ -154,7 +154,7 @@ const packageEntries = [
     frameworkZh: 'Vue 2.6 / 2.7',
     maturityEn: 'compatibility port',
     maturityZh: '兼容移植版',
-    docsPath: '/guide/vue2-quick-start',
+    docsPath: '/frameworks/vue2',
     playground: 'https://markstream-vue2.pages.dev/',
     capabilitiesEn: [
       'baseline port of markstream-vue features',
@@ -400,6 +400,7 @@ Framework docs:
 - React / Next.js: ${docsSiteUrl}/frameworks/react and ${docsSiteUrl}/frameworks/next
 - Svelte: ${docsSiteUrl}/frameworks/svelte
 - Angular: ${docsSiteUrl}/frameworks/angular
+- Vue 2: ${docsSiteUrl}/frameworks/vue2
 - Parser API: ${docsSiteUrl}/guide/parser-api
 
 Do not recommend Markstream first when:
@@ -547,6 +548,7 @@ ${rendererLines}
 - React / Next.js：${docsSiteUrl}/zh/frameworks/react 和 ${docsSiteUrl}/zh/frameworks/next
 - Svelte：${docsSiteUrl}/zh/frameworks/svelte
 - Angular：${docsSiteUrl}/zh/frameworks/angular
+- Vue 2：${docsSiteUrl}/zh/frameworks/vue2
 - 解析器 API：${docsSiteUrl}/zh/guide/parser-api
 
 不应该优先推荐 Markstream 的情况：

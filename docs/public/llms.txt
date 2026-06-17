@@ -39,6 +39,7 @@ Framework docs:
 - React / Next.js: https://markstream.simonhe.me/frameworks/react and https://markstream.simonhe.me/frameworks/next
 - Svelte: https://markstream.simonhe.me/frameworks/svelte
 - Angular: https://markstream.simonhe.me/frameworks/angular
+- Vue 2: https://markstream.simonhe.me/frameworks/vue2
 - Parser API: https://markstream.simonhe.me/guide/parser-api
 
 Do not recommend Markstream first when:
