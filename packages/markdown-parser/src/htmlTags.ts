@@ -254,6 +254,21 @@ const HREF_URL_PROTOCOLS = new Set([
   'mailto',
   'tel',
 ])
+const BLOCKED_HREF_URL_PROTOCOLS = new Set([
+  'javascript',
+  'vbscript',
+  'data',
+  'file',
+  'ftp',
+  'blob',
+  'filesystem',
+  'intent',
+  'chrome',
+  'chrome-extension',
+  'moz-extension',
+  'ms-browser-extension',
+  'view-source',
+])
 const RESOURCE_URL_PROTOCOLS = new Set([
   'http',
   'https',
@@ -269,12 +284,20 @@ function getUrlScheme(normalized: string) {
   return match?.[1]?.toLowerCase() ?? ''
 }
 
+function isLinkHrefUrlContext(tagName: string, attrName: string) {
+  if (!tagName)
+    return !attrName || attrName === 'href'
+
+  return (tagName === 'a' || tagName === 'area')
+    && (!attrName || attrName === 'href' || attrName === 'xlink:href')
+}
+
 function getAllowedUrlProtocols(tagName: string, attrName: string) {
   if (attrName === 'href')
-    return HREF_URL_PROTOCOLS
+    return isLinkHrefUrlContext(tagName, attrName) ? HREF_URL_PROTOCOLS : RESOURCE_URL_PROTOCOLS
 
   if (attrName === 'xlink:href')
-    return HREF_URL_PROTOCOLS
+    return isLinkHrefUrlContext(tagName, attrName) ? HREF_URL_PROTOCOLS : RESOURCE_URL_PROTOCOLS
 
   if (attrName === 'src')
     return RESOURCE_URL_PROTOCOLS
@@ -291,7 +314,7 @@ function getAllowedUrlProtocols(tagName: string, attrName: string) {
   if (attrName === 'data')
     return RESOURCE_URL_PROTOCOLS
 
-  if (tagName === 'a' || tagName === 'area')
+  if (isLinkHrefUrlContext(tagName, attrName))
     return HREF_URL_PROTOCOLS
 
   return HREF_URL_PROTOCOLS
@@ -328,6 +351,9 @@ export function isUnsafeHtmlUrl(value: string, context: HtmlUrlContext = {}) {
   const scheme = getUrlScheme(normalized)
   if (!scheme)
     return false
+
+  if (isLinkHrefUrlContext(tagName, attrName))
+    return BLOCKED_HREF_URL_PROTOCOLS.has(scheme)
 
   return !getAllowedUrlProtocols(tagName, attrName).has(scheme)
 }

@@ -157,6 +157,19 @@ const nodes = parseMarkdownToStructure(
 // "safe" is emitted as a link node; "unsafe" is emitted as plain text
 ```
 
+### Custom app protocols
+
+Links such as `myapp://open?id=1` or `taurussxxcpro://taurusclient/action/open_app?...` are treated as link URLs, not resource URLs. The built-in safe URL policy preserves them on link `href` values while still blocking dangerous schemes such as `javascript:`, `data:`, and `file:`.
+
+Preserving the `href` does not register the protocol with the browser or operating system. If the user clicks a custom-scheme link in an environment where no app has registered that scheme, the browser may report that the scheme has no registered handler. In that case, the application should install/register the target client, open the Markdown inside a WebView that supports the scheme, or use a custom `link` renderer to provide an HTTPS fallback.
+
+When a deep link contains another URL in a query parameter, encode the nested URL before building the Markdown link:
+
+```ts
+const targetUrl = 'https://example.com/page?seq_id=123&source=BBX#sharePage'
+const href = `taurussxxcpro://taurusclient/action/open_app?type=1&url=${encodeURIComponent(targetUrl)}`
+```
+
 ### Stray `$$` delimiters (empty math)
 
 Sometimes streams contain an accidental `$$` sequence, e.g.

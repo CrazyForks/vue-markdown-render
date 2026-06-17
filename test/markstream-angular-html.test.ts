@@ -21,6 +21,21 @@ describe('markstream-angular html renderer', () => {
     expect(html).toContain('const value = 1')
   })
 
+  it('keeps custom-protocol href values in nested link html', () => {
+    const href = 'taurussxxcpro://taurusclient/action/open_app?type=1&offline=false&url=https%3A%2F%2Fexample.com%2Fa%3Fb%3D1%26c%3D2'
+    const html = renderMarkdownNodeToHtml({
+      type: 'link',
+      href,
+      title: null,
+      text: 'open',
+      raw: `[open](${href})`,
+      children: [{ type: 'text', content: 'open', raw: 'open' }],
+    } as any)
+
+    expect(html).toContain('href="taurussxxcpro://taurusclient/action/open_app?type=1&amp;offline=false')
+    expect(html).not.toContain('target="_blank"')
+  })
+
   it('preserves diff metadata on code fences for advanced enhancers', () => {
     const html = renderMarkdownToHtml({
       content: `\`\`\`diff ts
