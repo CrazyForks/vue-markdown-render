@@ -149,6 +149,19 @@ const nodes = parseMarkdownToStructure(
 // "safe" 会输出为 link 节点；"unsafe" 会降级为纯文本
 ```
 
+### 自定义 app 协议链接
+
+`myapp://open?id=1` 或 `taurussxxcpro://taurusclient/action/open_app?...` 这类链接会被当作链接 URL，而不是资源 URL。内置安全 URL 策略会在链接 `href` 上保留这类自定义协议，同时继续拦截 `javascript:`、`data:`、`file:` 等危险协议。
+
+保留 `href` 不等于浏览器或操作系统已经注册了对应协议。如果用户在没有注册该协议处理器的环境里点击自定义 scheme 链接，浏览器可能会提示该 scheme 没有可用的 handler。此时需要业务层安装/注册目标客户端、在支持该 scheme 的 WebView 中打开 Markdown，或通过自定义 `link` renderer 提供 HTTPS fallback。
+
+如果 deep link 的 query 参数里还包含另一个 URL，生成 Markdown 链接前应先编码内部 URL：
+
+```ts
+const targetUrl = 'https://example.com/page?seq_id=123&source=BBX#sharePage'
+const href = `taurussxxcpro://taurusclient/action/open_app?type=1&url=${encodeURIComponent(targetUrl)}`
+```
+
 ### `$$` 异常分隔符（空公式/误触发）的解释
 
 有些内容会出现“奇怪的 `$$`”，例如：
