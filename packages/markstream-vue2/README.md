@@ -2,6 +2,9 @@
 
 Vue 2.6 / 2.7 compatibility renderer for legacy Vue 2 apps that need streaming Markdown, AI chat output, long documents, progressive Mermaid/KaTeX, and streaming code blocks.
 
+- Docs: https://markstream.simonhe.me/frameworks/vue2
+- Quick start: https://markstream.simonhe.me/guide/vue2-quick-start
+
 For Vue 3 or new Vue/Nuxt projects, use `markstream-vue` instead.
 
 ## Install

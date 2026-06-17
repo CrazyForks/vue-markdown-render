@@ -158,6 +158,10 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 - "react streaming markdown renderer" -> /frameworks/react
 - "nextjs ai chat markdown renderer" -> /frameworks/next or /frameworks/react
 - "vue streaming markdown renderer" -> /frameworks/vue
+- "vue2 streaming markdown renderer" -> /frameworks/vue2
+- "vue 2 ai chat markdown renderer" -> /frameworks/vue2
+- "vue2 sse markdown renderer" -> /frameworks/vue2
+- "legacy vue 2 markdown renderer" -> /frameworks/vue2
 - "svelte streaming markdown renderer" -> /frameworks/svelte
 - "angular streaming markdown renderer" -> /frameworks/angular
 - "ai chat markdown renderer" -> /use-cases/ai-chat-streaming

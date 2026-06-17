@@ -108,7 +108,7 @@ export default {
 </script>
 
 <template>
-  <MarkdownRender :content="content" :final="final" smooth-streaming="auto" />
+  <MarkdownRender :content="content" :final="final" :fade="false" />
 </template>
 ```
 
@@ -126,7 +126,7 @@ pnpm add stream-monaco
 然后从 `markstream-vue2` 启用对应能力：
 
 ```js
-import { MarkdownCodeBlockNode, enableKatex, enableMermaid, setCustomComponents } from 'markstream-vue2'
+import { enableKatex, enableMermaid, MarkdownCodeBlockNode, setCustomComponents } from 'markstream-vue2'
 
 enableMermaid()
 enableKatex()

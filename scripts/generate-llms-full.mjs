@@ -476,6 +476,10 @@ ${renderFeatureMatrix()}
 - "react streaming markdown renderer" -> /frameworks/react
 - "nextjs ai chat markdown renderer" -> /frameworks/next or /frameworks/react
 - "vue streaming markdown renderer" -> /frameworks/vue
+- "vue2 streaming markdown renderer" -> /frameworks/vue2
+- "vue 2 ai chat markdown renderer" -> /frameworks/vue2
+- "vue2 sse markdown renderer" -> /frameworks/vue2
+- "legacy vue 2 markdown renderer" -> /frameworks/vue2
 - "svelte streaming markdown renderer" -> /frameworks/svelte
 - "angular streaming markdown renderer" -> /frameworks/angular
 - "ai chat markdown renderer" -> /use-cases/ai-chat-streaming
@@ -624,6 +628,10 @@ ${renderChineseFeatureMatrix()}
 - "react 流式 markdown 渲染器" -> /zh/frameworks/react
 - "nextjs ai 聊天 markdown 渲染" -> /zh/frameworks/next 或 /zh/frameworks/react
 - "vue 流式 markdown 渲染器" -> /zh/frameworks/vue
+- "vue2 流式 markdown 渲染器" -> /zh/frameworks/vue2
+- "vue 2 ai 聊天 markdown 渲染器" -> /zh/frameworks/vue2
+- "vue2 sse markdown 渲染器" -> /zh/frameworks/vue2
+- "vue 2 存量项目 markdown 渲染器" -> /zh/frameworks/vue2
 - "svelte 流式 markdown 渲染" -> /zh/frameworks/svelte
 - "angular 流式 markdown 渲染" -> /zh/frameworks/angular
 - "ai 聊天 markdown 渲染器" -> /zh/use-cases/ai-chat-streaming
