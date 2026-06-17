@@ -68,6 +68,38 @@ describe('link and image URL policy', () => {
     expect(attrs.rel).toBeUndefined()
   })
 
+  it('keeps custom-protocol href values on direct link nodes', async () => {
+    const href = 'taurussxxcpro://taurusclient/action/open_app?type=1&offline=false&url=https%3A%2F%2Fexample.com%2Fa%3Fb%3D1%26c%3D2'
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        typewriter: false,
+        batchRendering: false,
+        nodes: [
+          {
+            type: 'paragraph',
+            raw: '',
+            children: [
+              {
+                type: 'link',
+                href,
+                title: null,
+                text: 'open',
+                raw: `[open](${href})`,
+                children: [{ type: 'text', content: 'open', raw: 'open' }],
+              },
+            ],
+          },
+        ],
+      },
+    })
+
+    await flushAll()
+    const attrs = wrapper.get('a.link-node').attributes()
+    expect(attrs.href).toBe(href)
+    expect(attrs.target).toBeUndefined()
+    expect(attrs.rel).toBeUndefined()
+  })
+
   it('does not forward ping from direct link node attrs', async () => {
     const wrapper = mount(NodeRenderer, {
       props: {

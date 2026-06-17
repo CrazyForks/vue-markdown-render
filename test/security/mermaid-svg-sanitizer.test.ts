@@ -8,6 +8,7 @@ import { isBrokenMermaidSvg, sanitizeMermaidSvg, toSafeMermaidSvgMarkup, toSafeS
 import { describe, expect, it } from 'vitest'
 
 const mermaidSvgFixtureDir = join(process.cwd(), 'test/fixtures/mermaid-svg')
+const customAppHref = 'taurussxxcpro://taurusclient/action/open_app'
 
 function readMermaidSvgFixtures() {
   return readdirSync(mermaidSvgFixtureDir)
@@ -252,22 +253,27 @@ describe('mermaid SVG sanitizer', () => {
 
   it('uses SVG tag and attribute context when sanitizing URL attributes', () => {
     const svg = sanitizeMermaidSvg(`
-      <svg viewBox="0 0 10 10">
+      <svg viewBox="0 0 10 10" xmlns:xlink="http://www.w3.org/1999/xlink">
         <image href="mailto:a@example.com" />
+        <image href="${customAppHref}" />
+        <image xlink:href="${customAppHref}" />
         <image src="data:image/png;base64,AAAA" />
         <use href="https://evil.example/sprite.svg#x" />
         <use href="#local-symbol" />
         <a href="mailto:a@example.com"><text>x</text></a>
+        <a href="${customAppHref}"><text>app</text></a>
         <rect width="10" height="10" />
       </svg>
     `)
 
     expect(svg).toBeTruthy()
     expect(svg).not.toMatch(/<image[^>]+mailto:/i)
+    expect(svg).not.toMatch(/<image[^>]+taurussxxcpro:/i)
     expect(svg).toMatch(/<image[^>]+data:image\/png/i)
     expect(svg).not.toMatch(/<use[^>]+https:/i)
     expect(svg).toMatch(/<use[^>]+#local-symbol/i)
     expect(svg).toMatch(/<a[^>]+mailto:/i)
+    expect(svg).toMatch(/<a[^>]+taurussxxcpro:/i)
   })
 
   it('allows local SVG references but rejects external paint-server URLs', () => {

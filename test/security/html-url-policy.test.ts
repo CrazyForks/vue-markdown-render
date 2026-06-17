@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { sanitizeAttrs, sanitizeImageSrc } from '../../src/utils/htmlRenderer'
 
+const customAppHref = 'taurussxxcpro://taurusclient/action/open_app?type=1&offline=false&url=https%3A%2F%2Fexample.com%2Fa%3Fb%3D1%26c%3D2'
+
 describe('html URL policy', () => {
   it('rejects script protocols with whitespace and control characters', () => {
     expect(sanitizeAttrs({ href: 'java\nscript:alert(1)' }).href).toBeUndefined()
@@ -27,7 +29,7 @@ describe('html URL policy', () => {
       expect(sanitizeAttrs({ href: payload }, 'safe', 'a').href).toBeUndefined()
   })
 
-  it('rejects non-allowlisted absolute URL schemes', () => {
+  it('rejects unsafe absolute URL schemes', () => {
     const unsafe = [
       'file:///etc/passwd',
       'ftp://example.com/file',
@@ -47,6 +49,7 @@ describe('html URL policy', () => {
       'http://example.com',
       'mailto:a@example.com',
       'tel:+123456789',
+      customAppHref,
       '/docs',
       './relative',
       '../relative',
@@ -88,6 +91,16 @@ describe('html URL policy', () => {
     expect(sanitizeAttrs({ data: 'tel:+123456789' }, 'trusted', 'object').data).toBeUndefined()
     expect(sanitizeAttrs({ src: 'https://example.com/a.png' }, 'safe', 'img').src).toBe('https://example.com/a.png')
     expect(sanitizeAttrs({ poster: 'https://example.com/poster.png' }, 'trusted', 'video').poster).toBe('https://example.com/poster.png')
+    expect(sanitizeAttrs({ href: customAppHref }, 'safe', 'a').href).toBe(customAppHref)
+    expect(sanitizeAttrs({ 'xlink:href': customAppHref }, 'safe', 'a')['xlink:href']).toBe(customAppHref)
+    expect(sanitizeAttrs({ src: customAppHref }, 'safe', 'img').src).toBeUndefined()
+    expect(sanitizeAttrs({ srcset: `${customAppHref} 1x` }, 'safe', 'img').srcset).toBeUndefined()
+    expect(sanitizeAttrs({ poster: customAppHref }, 'trusted', 'video').poster).toBeUndefined()
+    expect(sanitizeAttrs({ action: customAppHref }, 'trusted', 'form').action).toBeUndefined()
+    expect(sanitizeAttrs({ formaction: customAppHref }, 'trusted', 'button').formaction).toBeUndefined()
+    expect(sanitizeAttrs({ data: customAppHref }, 'trusted', 'object').data).toBeUndefined()
+    expect(sanitizeAttrs({ href: customAppHref }, 'safe', 'image').href).toBeUndefined()
+    expect(sanitizeAttrs({ 'xlink:href': customAppHref }, 'safe', 'image')['xlink:href']).toBeUndefined()
   })
 
   it('rejects unsafe data documents but allows image data URLs', () => {
