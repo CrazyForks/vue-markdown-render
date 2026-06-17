@@ -1,3 +1,12 @@
+## [1.0.3-beta.3](https://github.com/Simon-He95/markstream-vue/compare/markstream-vue@1.0.3-beta.2...markstream-vue@1.0.3-beta.3) (2026-06-17)
+
+
+### Bug Fixes
+
+* preserve custom protocol links ([92f5230](https://github.com/Simon-He95/markstream-vue/commit/92f5230dd6dcf629dcb9c95b124f86461ce1158c))
+
+
+
 ## [1.0.3-beta.2](https://github.com/Simon-He95/markstream-vue/compare/markstream-vue@1.0.3-beta.1...markstream-vue@1.0.3-beta.2) (2026-06-15)
 
 
