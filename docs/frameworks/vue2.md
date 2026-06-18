@@ -70,10 +70,22 @@ pnpm add @vue/composition-api
 
 ```js
 import VueCompositionAPI from '@vue/composition-api'
+import { VueRendererMarkdown } from 'markstream-vue2'
 import Vue from 'vue'
 import 'markstream-vue2/index.css'
 
 Vue.use(VueCompositionAPI)
+Vue.use(VueRendererMarkdown)
+```
+
+Vue 2.7 apps do not need `@vue/composition-api`, but should still install the renderer plugin:
+
+```js
+import { VueRendererMarkdown } from 'markstream-vue2'
+import Vue from 'vue'
+import 'markstream-vue2/index.css'
+
+Vue.use(VueRendererMarkdown)
 ```
 
 Minimal Vue 2 message component:
@@ -91,6 +103,12 @@ export default {
 <template>
   <MarkdownRender :content="content" :final="done" :fade="false" />
 </template>
+```
+
+Vue CLI 4 / Webpack 4 projects should use the real CSS file path because Webpack 4 does not support `package.json#exports`:
+
+```js
+import 'markstream-vue2/dist/index.css'
 ```
 
 ## Streaming example
@@ -119,19 +137,29 @@ For high-frequency long streams, use the parser/node path described in the [Vue 
 Install optional peers only for the blocks you render:
 
 ```bash
-pnpm add mermaid katex stream-markdown
-pnpm add stream-monaco
+pnpm add stream-markdown
 ```
 
-Then enable the matching renderer pieces from `markstream-vue2`:
+Then enable Shiki-backed code blocks:
 
 ```js
-import { enableKatex, enableMermaid, MarkdownCodeBlockNode, setCustomComponents } from 'markstream-vue2'
+import { MarkdownCodeBlockNode, setCustomComponents } from 'markstream-vue2'
 
-enableMermaid()
-enableKatex()
 setCustomComponents({ code_block: MarkdownCodeBlockNode })
 ```
+
+For Mermaid diagrams, install `mermaid`. For KaTeX math, install `katex` and import its stylesheet:
+
+```bash
+pnpm add mermaid
+pnpm add katex
+```
+
+```js
+import 'katex/dist/katex.min.css'
+```
+
+The default Mermaid and KaTeX loaders are enabled. Use `enableMermaid()` or `enableKatex()` only after disabling them or when providing a custom loader.
 
 ## Compared with Vue Markdown renderers
 

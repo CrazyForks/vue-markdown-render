@@ -70,10 +70,22 @@ pnpm add @vue/composition-api
 
 ```js
 import VueCompositionAPI from '@vue/composition-api'
+import { VueRendererMarkdown } from 'markstream-vue2'
 import Vue from 'vue'
 import 'markstream-vue2/index.css'
 
 Vue.use(VueCompositionAPI)
+Vue.use(VueRendererMarkdown)
+```
+
+Vue 2.7 应用不需要 `@vue/composition-api`，但仍应安装渲染器插件：
+
+```js
+import { VueRendererMarkdown } from 'markstream-vue2'
+import Vue from 'vue'
+import 'markstream-vue2/index.css'
+
+Vue.use(VueRendererMarkdown)
 ```
 
 最小 Vue 2 消息组件：
@@ -91,6 +103,12 @@ export default {
 <template>
   <MarkdownRender :content="content" :final="done" :fade="false" />
 </template>
+```
+
+Vue CLI 4 / Webpack 4 项目应使用真实 CSS 文件路径，因为 Webpack 4 不支持 `package.json#exports`：
+
+```js
+import 'markstream-vue2/dist/index.css'
 ```
 
 ## 流式示例
@@ -119,19 +137,29 @@ export default {
 只安装你需要的可选 peer：
 
 ```bash
-pnpm add mermaid katex stream-markdown
-pnpm add stream-monaco
+pnpm add stream-markdown
 ```
 
-然后从 `markstream-vue2` 启用对应能力：
+然后启用 Shiki 代码块：
 
 ```js
-import { enableKatex, enableMermaid, MarkdownCodeBlockNode, setCustomComponents } from 'markstream-vue2'
+import { MarkdownCodeBlockNode, setCustomComponents } from 'markstream-vue2'
 
-enableMermaid()
-enableKatex()
 setCustomComponents({ code_block: MarkdownCodeBlockNode })
 ```
+
+Mermaid 图表安装 `mermaid`。KaTeX 数学公式安装 `katex`，并导入它的样式：
+
+```bash
+pnpm add mermaid
+pnpm add katex
+```
+
+```js
+import 'katex/dist/katex.min.css'
+```
+
+默认 Mermaid 和 KaTeX loader 已经启用。只有在手动关闭后重新启用，或需要自定义 loader 时，才调用 `enableMermaid()` 或 `enableKatex()`。
 
 ## 与普通 Vue Markdown 渲染器对比
 

@@ -47,6 +47,7 @@ const primaryLandingPaths = [
 ]
 
 const failures = []
+const jsonLdNodesByRelativePath = new Map()
 
 function walkFiles(dir, ignoredNames = new Set()) {
   if (!existsSync(dir))
@@ -126,9 +127,144 @@ function hasFrontmatterKey(frontmatter, key) {
   return new RegExp(`^${key}:`, 'm').test(frontmatter)
 }
 
-function hasStructuredDataType(content, type) {
-  return content.includes(`"@type":"${type}"`)
-    || content.includes(`&quot;@type&quot;:&quot;${type}&quot;`)
+function decodeHtmlEntities(value) {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&#34;/g, '"')
+    .replace(/&#x22;/gi, '"')
+    .replace(/&#39;/g, '\'')
+    .replace(/&#x27;/gi, '\'')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+}
+
+function structuredDataTypes(node) {
+  const type = node?.['@type']
+  if (typeof type === 'string')
+    return [type]
+
+  return Array.isArray(type) ? type.filter(item => typeof item === 'string') : []
+}
+
+function hasStructuredDataType(nodes, type) {
+  return nodes.some(node => structuredDataTypes(node).includes(type))
+}
+
+function collectStructuredDataNodes(jsonLd) {
+  if (Array.isArray(jsonLd))
+    return jsonLd.flatMap(item => collectStructuredDataNodes(item))
+
+  if (!jsonLd || typeof jsonLd !== 'object')
+    return []
+
+  if (Array.isArray(jsonLd['@graph']))
+    return jsonLd['@graph'].filter(item => item && typeof item === 'object')
+
+  return [jsonLd]
+}
+
+function parseStructuredDataNodes(content, relativePath) {
+  const nodes = []
+  const scriptPattern = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi
+  let match
+
+  while ((match = scriptPattern.exec(content))) {
+    const [, attrs, body] = match
+    if (!/\btype=(["'])application\/ld\+json\1/i.test(attrs))
+      continue
+
+    try {
+      nodes.push(...collectStructuredDataNodes(JSON.parse(decodeHtmlEntities(body.trim()))))
+    }
+    catch (error) {
+      failures.push(`${relativePath} has invalid JSON-LD: ${error.message}`)
+    }
+  }
+
+  return nodes
+}
+
+function hasNonEmptyString(value) {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function hasStringArray(value) {
+  return Array.isArray(value) && value.some(item => hasNonEmptyString(item))
+}
+
+function hasOfferPrice(value) {
+  const offers = Array.isArray(value) ? value : value && typeof value === 'object' ? [value] : []
+  return offers.some(offer => hasNonEmptyString(offer.price))
+}
+
+function validateSoftwareApplicationNode(node, relativePath) {
+  if (!hasNonEmptyString(node.name))
+    failures.push(`${relativePath} SoftwareApplication is missing name`)
+
+  if (!hasOfferPrice(node.offers))
+    failures.push(`${relativePath} SoftwareApplication is missing offers.price`)
+
+  if (!node.aggregateRating && !node.review)
+    failures.push(`${relativePath} SoftwareApplication is missing aggregateRating or review`)
+
+  if (node.softwareVersion === 'latest')
+    failures.push(`${relativePath} SoftwareApplication uses non-specific softwareVersion "latest"`)
+}
+
+function validateSoftwareSourceCodeNode(node, relativePath) {
+  for (const field of ['name', 'description', 'url', 'codeRepository', 'license', 'applicationCategory']) {
+    if (!hasNonEmptyString(node[field]))
+      failures.push(`${relativePath} SoftwareSourceCode is missing ${field}`)
+  }
+
+  if (!hasStringArray(node.programmingLanguage))
+    failures.push(`${relativePath} SoftwareSourceCode is missing programmingLanguage`)
+
+  if (!hasStringArray(node.sameAs))
+    failures.push(`${relativePath} SoftwareSourceCode is missing sameAs`)
+}
+
+function validateFaqPageNode(node, relativePath) {
+  if (!Array.isArray(node.mainEntity) || node.mainEntity.length === 0) {
+    failures.push(`${relativePath} FAQPage is missing mainEntity`)
+    return
+  }
+
+  for (const item of node.mainEntity) {
+    if (!item || typeof item !== 'object' || !structuredDataTypes(item).includes('Question')) {
+      failures.push(`${relativePath} FAQPage contains a non-Question mainEntity`)
+      continue
+    }
+
+    if (!hasNonEmptyString(item.name))
+      failures.push(`${relativePath} FAQPage Question is missing name`)
+
+    const answer = item.acceptedAnswer
+    if (!answer || typeof answer !== 'object' || !structuredDataTypes(answer).includes('Answer') || !hasNonEmptyString(answer.text))
+      failures.push(`${relativePath} FAQPage Question is missing acceptedAnswer.text`)
+  }
+}
+
+function validateArticleNode(node, relativePath, lastVerified) {
+  for (const field of ['headline', 'description', 'url', 'mainEntityOfPage']) {
+    if (!hasNonEmptyString(node[field]))
+      failures.push(`${relativePath} Article is missing ${field}`)
+  }
+
+  if (lastVerified && node.dateModified !== lastVerified)
+    failures.push(`${relativePath} is missing Article dateModified ${lastVerified}`)
+}
+
+function validateStructuredDataNodes(relativePath, nodes) {
+  for (const node of nodes) {
+    if (structuredDataTypes(node).includes('SoftwareApplication'))
+      validateSoftwareApplicationNode(node, relativePath)
+  }
+}
+
+function findStructuredDataNode(nodes, type) {
+  return nodes.find(node => structuredDataTypes(node).includes(type))
 }
 
 function expectContains(content, relativePath, marker, message) {
@@ -150,6 +286,12 @@ for (const filePath of walkFiles(distDir)) {
 
   if (content.includes(oldHost))
     failures.push(`${relativePath} still contains old docs host ${oldHost}`)
+
+  if (extname(filePath) === '.html') {
+    const nodes = parseStructuredDataNodes(content, relativePath)
+    jsonLdNodesByRelativePath.set(relativePath, nodes)
+    validateStructuredDataNodes(relativePath, nodes)
+  }
 }
 
 const requiredNewHostFiles = [
@@ -198,7 +340,6 @@ for (const filePath of walkFiles(docsDir, new Set(['.vitepress', 'node_modules']
 
   if (hasFrontmatterKey(frontmatter, 'softwarePackage')) {
     checks.push(['SoftwareSourceCode', 'structured data'])
-    checks.push(['SoftwareApplication', 'structured data'])
   }
 
   if (isArticle)
@@ -211,10 +352,12 @@ for (const filePath of walkFiles(docsDir, new Set(['.vitepress', 'node_modules']
   if (!content)
     continue
 
+  const structuredDataNodes = jsonLdNodesByRelativePath.get(relativePath) ?? parseStructuredDataNodes(content, relativePath)
+
   for (const [marker, label] of checks) {
     const found = label === 'visible FAQ section'
       ? content.includes(marker)
-      : hasStructuredDataType(content, marker)
+      : hasStructuredDataType(structuredDataNodes, marker)
 
     if (!found)
       failures.push(`${relativePath} is missing ${marker} ${label}`)
@@ -229,14 +372,17 @@ for (const filePath of walkFiles(docsDir, new Set(['.vitepress', 'node_modules']
   ) {
     lastVerified = lastVerified.slice(1, -1)
   }
-  const dateModifiedMarker = `"dateModified":"${lastVerified}"`
-  if (
-    isArticle
-    && lastVerified
-    && !content.includes(dateModifiedMarker)
-    && !content.includes(dateModifiedMarker.replaceAll('"', '&quot;'))
-  ) {
-    failures.push(`${relativePath} is missing Article dateModified ${lastVerified}`)
+  const softwareSourceCodeNode = findStructuredDataNode(structuredDataNodes, 'SoftwareSourceCode')
+  if (softwareSourceCodeNode)
+    validateSoftwareSourceCodeNode(softwareSourceCodeNode, relativePath)
+
+  const faqPageNode = findStructuredDataNode(structuredDataNodes, 'FAQPage')
+  if (faqPageNode)
+    validateFaqPageNode(faqPageNode, relativePath)
+
+  const articleNode = findStructuredDataNode(structuredDataNodes, 'Article')
+  if (articleNode) {
+    validateArticleNode(articleNode, relativePath, lastVerified)
   }
 }
 
@@ -247,4 +393,4 @@ if (failures.length > 0) {
   process.exit(1)
 }
 
-console.log('[docs-seo-output] Docs host output, redirects, canonical tags, LLM files, visible FAQ content, and JSON-LD types are valid.')
+console.log('[docs-seo-output] Docs host output, redirects, canonical tags, LLM files, visible FAQ content, and JSON-LD nodes are valid.')

@@ -607,26 +607,6 @@ function createDocsStructuredData(path: string, title: string, description: stri
         'url': githubRepoUrl,
       },
     })
-
-    graph.push({
-      '@type': 'SoftwareApplication',
-      'name': 'Markstream',
-      'applicationCategory': 'DeveloperApplication',
-      'operatingSystem': 'Web',
-      'url': `${docsSiteUrl}${homePath === '/' ? '/' : homePath}`,
-      description,
-      keywords,
-      'offers': {
-        '@type': 'Offer',
-        'price': '0',
-        'priceCurrency': 'USD',
-      },
-      'sameAs': [
-        githubRepoUrl,
-        docsSiteUrl,
-        'https://markstream-vue.simonhe.me/',
-      ],
-    })
   }
 
   if (typeof frontmatter.softwarePackage === 'string') {
@@ -651,27 +631,6 @@ function createDocsStructuredData(path: string, title: string, description: stri
       'programmingLanguage': programmingLanguage.length > 0 ? programmingLanguage : ['TypeScript'],
       'runtimePlatform': runtimePlatform,
       'sameAs': [`https://www.npmjs.com/package/${npmPackage}`],
-    })
-
-    graph.push({
-      '@type': 'SoftwareApplication',
-      'name': softwareName,
-      'applicationCategory': 'DeveloperApplication',
-      'operatingSystem': 'Any',
-      'programmingLanguage': programmingLanguage.length > 0 ? programmingLanguage : ['TypeScript'],
-      'softwareVersion': 'latest',
-      'url': `${docsSiteUrl}${path}`,
-      description,
-      keywords,
-      'sameAs': [
-        githubRepoUrl,
-        `https://www.npmjs.com/package/${npmPackage}`,
-      ],
-      'offers': {
-        '@type': 'Offer',
-        'price': '0',
-        'priceCurrency': 'USD',
-      },
     })
   }
 
