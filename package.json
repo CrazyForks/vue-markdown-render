@@ -9,8 +9,7 @@
   "homepage": "https://markstream.simonhe.me/frameworks/vue",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Simon-He95/markstream-vue.git",
-    "directory": "."
+    "url": "git+https://github.com/Simon-He95/markstream-vue.git"
   },
   "bugs": {
     "url": "https://github.com/Simon-He95/markstream-vue/issues"
