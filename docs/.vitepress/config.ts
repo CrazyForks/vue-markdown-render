@@ -627,7 +627,6 @@ function createDocsStructuredData(path: string, title: string, description: stri
       keywords,
       'codeRepository': githubRepoUrl,
       'license': 'https://opensource.org/licenses/MIT',
-      'applicationCategory': 'DeveloperApplication',
       'programmingLanguage': programmingLanguage.length > 0 ? programmingLanguage : ['TypeScript'],
       'runtimePlatform': runtimePlatform,
       'sameAs': [`https://www.npmjs.com/package/${npmPackage}`],
