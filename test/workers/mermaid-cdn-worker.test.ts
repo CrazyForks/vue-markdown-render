@@ -21,6 +21,16 @@ describe('mermaid CDN worker factory', () => {
     expect(src).toContain('mermaid.esm.min.mjs')
   })
 
+  it('includes sequence text semicolon parse retry logic', () => {
+    const src = buildMermaidCDNWorkerSource({
+      mermaidUrl: 'https://cdn.example.com/mermaid.esm.min.mjs',
+      mode: 'module',
+    })
+
+    expect(src).toContain('function escapeSequenceTextSemicolons')
+    expect(src).toContain('await anyMermaid.parse(retryCode)')
+  })
+
   it('is SSR-safe and returns null worker when Worker is unavailable', () => {
     const prev = (globalThis as any).Worker
     try {

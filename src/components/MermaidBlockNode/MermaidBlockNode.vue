@@ -8,6 +8,7 @@ import { useViewportPriority } from '../../composables/viewportPriority'
 import mermaidIcon from '../../icon/mermaid.svg?raw'
 import { clampMermaidPreviewHeight, estimateMermaidPreviewHeight, getMermaidDiagramKind, parsePositiveNumber } from '../../utils/diagramHeight'
 import { resolveLifecycleIndexKey } from '../../utils/lifecycleIndexKey'
+import { escapeSequenceTextSemicolons } from '../../utils/mermaidSequenceSemicolons'
 import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import { safeRaf } from '../../utils/safeRaf'
 import { canParseOffthread as canParseOffthreadClient, findPrefixOffthread as findPrefixOffthreadClient, terminateWorker as terminateMermaidWorker } from '../../workers/mermaidWorkerClient'
@@ -582,6 +583,14 @@ function isTimeoutError(error: unknown) {
   return typeof message === 'string' && /timed out/i.test(message)
 }
 
+function isAbortError(error: unknown) {
+  return (error as any)?.name === 'AbortError'
+}
+
+function shouldRetrySequenceSemicolonEscape(error: unknown) {
+  return !isTimeoutError(error) && !isAbortError(error)
+}
+
 const tooltipsEnabled = computed(() => props.showTooltips !== false)
 
 // Tooltip helpers (singleton)
@@ -708,19 +717,80 @@ async function canParseOnMain(
   const anyMermaid = mermaidInstance as any
   const themed = applyThemeTo(code, theme)
   if (typeof anyMermaid.parse === 'function') {
-    await withTimeoutSignal(() => anyMermaid.parse(themed), {
-      timeoutMs: opts?.timeoutMs ?? timeouts.value.parse,
-      signal: opts?.signal,
-    })
+    try {
+      await withTimeoutSignal(() => anyMermaid.parse(themed), {
+        timeoutMs: opts?.timeoutMs ?? timeouts.value.parse,
+        signal: opts?.signal,
+      })
+    }
+    catch (error) {
+      if (!shouldRetrySequenceSemicolonEscape(error))
+        throw error
+      const retryCode = escapeSequenceTextSemicolons(themed)
+      if (retryCode === themed)
+        throw error
+      try {
+        await withTimeoutSignal(() => anyMermaid.parse(retryCode), {
+          timeoutMs: opts?.timeoutMs ?? timeouts.value.parse,
+          signal: opts?.signal,
+        })
+      }
+      catch {
+        throw error
+      }
+    }
     return true
   }
   // Fallback: try a headless render (no target element) just to validate
   const id = `mermaid-parse-${Math.random().toString(36).slice(2, 9)}`
-  await withTimeoutSignal(() => (mermaidInstance as any).render(id, themed), {
-    timeoutMs: opts?.timeoutMs ?? timeouts.value.render,
-    signal: opts?.signal,
-  })
+  try {
+    await withTimeoutSignal(() => (mermaidInstance as any).render(id, themed), {
+      timeoutMs: opts?.timeoutMs ?? timeouts.value.render,
+      signal: opts?.signal,
+    })
+  }
+  catch (error) {
+    if (!shouldRetrySequenceSemicolonEscape(error))
+      throw error
+    const retryCode = escapeSequenceTextSemicolons(themed)
+    if (retryCode === themed)
+      throw error
+    try {
+      await withTimeoutSignal(() => (mermaidInstance as any).render(`${id}-retry`, retryCode), {
+        timeoutMs: opts?.timeoutMs ?? timeouts.value.render,
+        signal: opts?.signal,
+      })
+    }
+    catch {
+      throw error
+    }
+  }
   return true
+}
+
+async function renderMermaidWithSequenceRetry(mermaidInstance: any, id: string, code: string, timeoutMs: number) {
+  try {
+    return await withTimeoutSignal(
+      () => mermaidInstance.render(id, code),
+      { timeoutMs },
+    )
+  }
+  catch (error) {
+    if (!shouldRetrySequenceSemicolonEscape(error))
+      throw error
+    const retryCode = escapeSequenceTextSemicolons(code)
+    if (retryCode === code)
+      throw error
+    try {
+      return await withTimeoutSignal(
+        () => mermaidInstance.render(`${id}-retry`, retryCode),
+        { timeoutMs },
+      )
+    }
+    catch {
+      throw error
+    }
+  }
 }
 
 async function canParseOffthread(
@@ -1317,12 +1387,11 @@ async function initMermaid() {
       }
       const currentTheme = props.isDark ? 'dark' : 'light'
       const codeWithTheme = getCodeWithTheme(currentTheme)
-      const res: any = await withTimeoutSignal(
-        () => (mermaidInstance as any).render(
-          id,
-          codeWithTheme,
-        ),
-        { timeoutMs: timeouts.value.fullRender },
+      const res: any = await renderMermaidWithSequenceRetry(
+        mermaidInstance,
+        id,
+        codeWithTheme,
+        timeouts.value.fullRender,
       )
       const svg = res?.svg
 
@@ -1454,9 +1523,11 @@ async function renderPartial(code: string) {
     const safePrefix = getSafePrefixCandidate(code)
     const codeForRender = safePrefix && safePrefix.trim() ? safePrefix : code
     const codeWithTheme = applyThemeTo(codeForRender, theme)
-    const res: any = await withTimeoutSignal(
-      () => (mermaidInstance as any).render(id, codeWithTheme),
-      { timeoutMs: timeouts.value.render },
+    const res: any = await renderMermaidWithSequenceRetry(
+      mermaidInstance,
+      id,
+      codeWithTheme,
+      timeouts.value.render,
     )
     const svg = res?.svg
     if (mermaidContent.value && svg) {
