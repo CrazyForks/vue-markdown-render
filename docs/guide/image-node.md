@@ -49,6 +49,53 @@ export default ({ app }: { app: App }) => {
 
 For zoom/gesture/slide support, call a lightbox library such as `photoswipe`, `fslightbox` or `basiclightbox` inside `onImageClick`, or control an application-level modal to show the preview.
 
+## Local file images in desktop apps
+
+Markdown image sources are still browser URLs. A filesystem path such as `/Users/eric/.app/data/image.png` is treated as a site-absolute URL, not as a direct file read. If the page runs at `http://localhost:5173`, the browser requests `http://localhost:5173/Users/eric/.app/data/image.png`. `file://` image URLs are blocked by the default image URL policy.
+
+For Electron, Tauri, and other desktop shells, expose trusted files through an application-controlled URL first, then rewrite Markdown image sources with a custom image component. Common options are:
+
+- an Electron custom protocol such as `app-file://...`
+- a local HTTP endpoint such as `http://127.0.0.1:<port>/blobs/...`
+- a generated object URL or data URL for files the application has already read and authorized
+
+Keep the mapping scoped to directories your application owns. Do not pass arbitrary filesystem paths from Markdown directly to `file://`.
+
+```vue twoslash
+<script setup lang="ts">
+import type { ImageNodeProps } from 'markstream-vue'
+import { computed } from 'vue'
+
+const props = defineProps<ImageNodeProps>()
+
+const src = computed(() => {
+  const value = props.node.src
+
+  if (value.startsWith('/Users/') && value.includes('/.my-app/data/sessions/'))
+    return `app-file://${encodeURI(value)}`
+
+  return value
+})
+</script>
+
+<template>
+  <img :src="src" :alt="props.node.alt" :title="props.node.title ?? props.node.alt">
+</template>
+```
+
+Register that component with `setCustomComponents`:
+
+```ts twoslash
+import type { Component } from 'vue'
+import { setCustomComponents } from 'markstream-vue'
+
+declare const DesktopImageNode: Component
+
+setCustomComponents('desktop-app', {
+  image: DesktopImageNode,
+})
+```
+
 ## Summary
 
 The `click` event from `ImageNode` is the primary hook for implementing custom previews. The usual approach is wrapping the original component and registering it with `setCustomComponents` in the client app. The wrapper can also forward `load`/`error` events or add additional behavior (analytics, alternative lazy-load handling, custom placeholders, etc.).

@@ -73,6 +73,8 @@ Bitmap data URLs are only allowed for Markdown image / `img src` handling. `srcs
 
 If your application needs trusted `blob:` image URLs, render images through a custom ImageNode/custom component and apply your own URL policy.
 
+Local filesystem paths are not special-cased. `/Users/alice/image.png` is treated as a site-absolute URL, and `file://` is blocked by default. Desktop apps should expose trusted files through an application-controlled protocol or local endpoint and rewrite Markdown images with a custom `ImageNode`; see [ImageNode — Local file images in desktop apps](/guide/image-node#local-file-images-in-desktop-apps).
+
 Protocol-relative URLs such as `//cdn.example.com/a.png` are blocked because they can silently load external resources.
 
 Mermaid SVG output is sanitized before mounting in both strict and loose Mermaid modes. `isStrict=false` controls Mermaid's parse/render configuration; it does not mean raw SVG insertion. Unsupported active SVG/HTML structures such as `foreignObject` are still stripped by the built-in sanitizer. If you need full trusted Mermaid HTML-label output, render it through a trusted custom component outside the built-in sanitizer.

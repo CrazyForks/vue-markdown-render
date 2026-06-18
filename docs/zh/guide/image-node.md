@@ -48,6 +48,53 @@ export default ({ app }: { app: App }) => {
 可选建议：
 - 若希望更丰富的预览体验（缩放、手势、幻灯片），可在 `onImageClick` 中调用诸如 `photoswipe`、`fslightbox` 等库，或使用应用级 modal 管理预览状态。
 
+## 桌面应用中的本地文件图片
+
+Markdown 图片的 `src` 仍然是浏览器 URL。像 `/Users/eric/.app/data/image.png` 这样的文件系统路径会被浏览器当成站点绝对路径，而不是直接读取本机文件。如果页面运行在 `http://localhost:5173`，浏览器实际请求的是 `http://localhost:5173/Users/eric/.app/data/image.png`。默认图片 URL 策略也会阻断 `file://` 图片。
+
+Electron、Tauri 等桌面应用应该先把受信任文件暴露为应用自己控制的 URL，再通过自定义图片组件改写 Markdown 图片源。常见做法包括：
+
+- Electron 自定义协议，例如 `app-file://...`
+- 本地 HTTP 地址，例如 `http://127.0.0.1:<port>/blobs/...`
+- 应用读取并授权后的 object URL 或 data URL
+
+路径映射应限制在应用自己的数据目录内，不要把 Markdown 中的任意文件系统路径直接转成 `file://`。
+
+```vue twoslash
+<script setup lang="ts">
+import type { ImageNodeProps } from 'markstream-vue'
+import { computed } from 'vue'
+
+const props = defineProps<ImageNodeProps>()
+
+const src = computed(() => {
+  const value = props.node.src
+
+  if (value.startsWith('/Users/') && value.includes('/.my-app/data/sessions/'))
+    return `app-file://${encodeURI(value)}`
+
+  return value
+})
+</script>
+
+<template>
+  <img :src="src" :alt="props.node.alt" :title="props.node.title ?? props.node.alt">
+</template>
+```
+
+再用 `setCustomComponents` 注册这个组件：
+
+```ts twoslash
+import type { Component } from 'vue'
+import { setCustomComponents } from 'markstream-vue'
+
+declare const DesktopImageNode: Component
+
+setCustomComponents('desktop-app', {
+  image: DesktopImageNode,
+})
+```
+
 说明小结：
 - `ImageNode` 提供的 `click` 事件是接管自定义预览的入口；常见做法是用一个包装组件替换默认实现并通过 `setCustomComponents` 注册到 VitePress/客户端应用中。
 - 包装组件也可以复用 `load` / `error` 事件，或在内部实现更多逻辑（统计、懒加载补偿、占位符策略等）。
