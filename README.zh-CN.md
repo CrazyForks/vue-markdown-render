@@ -4,7 +4,7 @@
 
 Markstream 专为在用户眼前持续变化的 Markdown 场景而构建：LLM token 流、SSE/WebSocket 输出、AI 聊天消息、未闭合 Markdown 中间态、长文档、渐进式 Mermaid 图表、KaTeX 数学公式、流式代码块以及安全的组件化渲染。
 
-Vue 3、Nuxt 和 VitePress 项目优先使用 `markstream-vue`；React、Svelte、Angular 项目使用对应 sibling package。普通 AI 聊天可以直接传不断累积的 `content` 字符串，只有外层已经负责解析、batch 或 worker AST 时才需要 `nodes` 路径。
+Vue 3、Nuxt 和 VitePress 项目优先使用 `markstream-vue`；React、Svelte、Angular、Vue 2 项目使用对应 sibling package。普通 AI 聊天可以直接传不断累积的 `content` 字符串，只有外层已经负责解析、batch 或 worker AST 时才需要 `nodes` 路径。
 
 [![English](https://img.shields.io/badge/docs-English-blue)](README.md)
 [![Docs](https://img.shields.io/badge/docs-中文文档-blue)](https://markstream.simonhe.me/zh/guide)
@@ -22,6 +22,7 @@ Vue 包：
 [![markstream-react npm version](https://img.shields.io/npm/v/markstream-react?label=markstream-react)](https://www.npmjs.com/package/markstream-react)
 [![markstream-svelte npm version](https://img.shields.io/npm/v/markstream-svelte?label=markstream-svelte)](https://www.npmjs.com/package/markstream-svelte)
 [![markstream-angular npm version](https://img.shields.io/npm/v/markstream-angular?label=markstream-angular)](https://www.npmjs.com/package/markstream-angular)
+[![markstream-vue2 npm version](https://img.shields.io/npm/v/markstream-vue2?label=markstream-vue2)](https://www.npmjs.com/package/markstream-vue2)
 
 [![Release](https://img.shields.io/github/v/release/Simon-He95/markstream-vue?display_name=release&logo=github)](https://github.com/Simon-He95/markstream-vue/releases)
 [![Discussions](https://img.shields.io/github/discussions/Simon-He95/markstream-vue?logo=github)](https://github.com/Simon-He95/markstream-vue/discussions)
@@ -41,7 +42,7 @@ Vue 包：
 | `markstream-react` | React / Next.js / Remix | `pnpm add markstream-react` | [React 指南](https://markstream.simonhe.me/zh/frameworks/react) · [Next.js 指南](https://markstream.simonhe.me/zh/frameworks/next) |
 | `markstream-svelte` | Svelte 5 | `pnpm add markstream-svelte svelte@^5` | [Svelte 指南](https://markstream.simonhe.me/zh/frameworks/svelte) |
 | `markstream-angular` | Angular standalone | `pnpm add markstream-angular` | [Angular 指南](https://markstream.simonhe.me/zh/frameworks/angular) |
-| `markstream-vue2` | Vue 2.6 / 2.7 | `pnpm add markstream-vue2` | [Vue 2 指南](https://markstream.simonhe.me/zh/guide/vue2-quick-start) |
+| `markstream-vue2` | Vue 2.6 / 2.7 | `pnpm add markstream-vue2` | [Vue 2 指南](https://markstream.simonhe.me/zh/frameworks/vue2) · [快速开始](https://markstream.simonhe.me/zh/guide/vue2-quick-start) |
 | `stream-markdown-parser` | 任意 JS/TS 应用 | `pnpm add stream-markdown-parser` | [解析器指南](https://markstream.simonhe.me/zh/guide/parser-api) |
 | `markstream-core` | 框架无关 | `pnpm add markstream-core` | [Core 包](./packages/markstream-core/README.md) |
 
