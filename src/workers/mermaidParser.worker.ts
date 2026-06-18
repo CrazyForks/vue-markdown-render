@@ -2,6 +2,7 @@
 
 // Note: types may not be available in worker TS context in some setups; a local shim is provided.
 import mermaid from 'mermaid'
+import { escapeSequenceTextSemicolons } from '../utils/mermaidSequenceSemicolons'
 
 declare const self: DedicatedWorkerGlobalScope
 
@@ -48,7 +49,15 @@ async function canParse(code: string, theme: Theme) {
   const themed = applyThemeTo(code, theme)
   const anyMermaid = mermaid as any
   if (typeof anyMermaid.parse === 'function') {
-    await anyMermaid.parse?.(themed)
+    try {
+      await anyMermaid.parse?.(themed)
+    }
+    catch (error) {
+      const retryCode = escapeSequenceTextSemicolons(themed)
+      if (retryCode === themed)
+        throw error
+      await anyMermaid.parse?.(retryCode)
+    }
     return true
   }
   // If parse is unavailable in this mermaid version, signal fallback

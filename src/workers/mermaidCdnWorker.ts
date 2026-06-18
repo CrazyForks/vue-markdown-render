@@ -91,6 +91,92 @@ function applyThemeTo(code, theme) {
   return themeConfig + code
 }
 
+function getMermaidDiagramKind(code) {
+  const lines = String(code || '').split(/\\r?\\n/)
+  for (const rawLine of lines) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('%%'))
+      continue
+    const match = line.match(/^([A-Z][\\w-]*)\\b/i)
+    return (match && match[1] ? match[1].toLowerCase() : '')
+  }
+  return ''
+}
+
+function isEscapedEntityBefore(text, index) {
+  return /(?:&#\\d+|#\\d+|&[a-z]+)$/i.test(text.slice(Math.max(0, index - 12), index))
+}
+
+function hasSequenceArrow(text) {
+  return text.includes('->')
+    || text.includes('-->')
+    || text.includes('->>')
+    || text.includes('-->>')
+    || text.includes('-x')
+    || text.includes('--x')
+    || text.includes('-)')
+    || text.includes('--)')
+    || text.includes('-+')
+    || text.includes('--+')
+}
+
+function startsSequenceMessage(text) {
+  const segment = text.split(';', 1)[0]
+  const colonIndex = segment.indexOf(':')
+  return colonIndex > 0 && hasSequenceArrow(segment.slice(0, colonIndex))
+}
+
+function startsSequenceStatement(text) {
+  const source = text.trimStart()
+  return /^(?:accDescr|accTitle|activate|actor|and|alt|autonumber|box|break|critical|create\\s+(?:actor|participant)|deactivate|destroy|else|end|link|links|loop|Note|opt|option|par|participant|properties|rect)\\b/i.test(source)
+    || startsSequenceMessage(source)
+}
+
+function isSequenceTextLine(line, colonIndex) {
+  const prefix = line.slice(0, colonIndex)
+  return /^\\s*Note\\b/i.test(prefix) || hasSequenceArrow(prefix)
+}
+
+function escapeTextSemicolons(text) {
+  let escaped = ''
+  let changed = false
+  for (let index = 0; index < text.length; index++) {
+    const char = text[index]
+    if (char !== ';' || isEscapedEntityBefore(text, index)) {
+      escaped += char
+      continue
+    }
+    if (startsSequenceStatement(text.slice(index + 1))) {
+      escaped += char
+      continue
+    }
+    escaped += '#59;'
+    changed = true
+  }
+  return changed ? escaped : text
+}
+
+function escapeSequenceTextSemicolons(code) {
+  if (getMermaidDiagramKind(code) !== 'sequencediagram')
+    return code
+  const parts = String(code || '').split(/(\\r\\n|\\n|\\r)/)
+  let changed = false
+  for (let index = 0; index < parts.length; index += 2) {
+    const line = parts[index]
+    if (!line.includes(';'))
+      continue
+    const colonIndex = line.indexOf(':')
+    if (colonIndex === -1 || !isSequenceTextLine(line, colonIndex))
+      continue
+    const escapedText = escapeTextSemicolons(line.slice(colonIndex + 1))
+    if (escapedText !== line.slice(colonIndex + 1)) {
+      parts[index] = line.slice(0, colonIndex + 1) + escapedText
+      changed = true
+    }
+  }
+  return changed ? parts.join('') : code
+}
+
 function findHeaderIndex(lines) {
   const headerRe = /^(?:graph|flowchart|flowchart\\s+tb|flowchart\\s+lr|sequenceDiagram|gantt|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|pie|quadrantChart|timeline|xychart(?:-beta)?)\\b/
   for (let i = 0; i < lines.length; i++) {
@@ -109,7 +195,15 @@ async function canParse(code, theme) {
   const themed = applyThemeTo(code, theme)
   const anyMermaid = mermaid
   if (anyMermaid && typeof anyMermaid.parse === 'function') {
-    await anyMermaid.parse(themed)
+    try {
+      await anyMermaid.parse(themed)
+    }
+    catch (error) {
+      const retryCode = escapeSequenceTextSemicolons(themed)
+      if (retryCode === themed)
+        throw error
+      await anyMermaid.parse(retryCode)
+    }
     return true
   }
   throw new Error('mermaid.parse not available in worker')
