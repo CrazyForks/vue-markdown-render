@@ -332,9 +332,9 @@ const showSettings = ref(false)
 const isCompactSettings = useMediaQuery('(max-width: 1023px)')
 const shouldShowSettingsPanel = computed(() => !isCompactSettings.value || showSettings.value)
 
-// Use reversed column layout and let the browser handle native scrolling.
 const messagesContainer = ref<HTMLElement | null>(null)
 const scrollRoot = ref<HTMLElement | null>(null)
+const shouldStickToBottom = ref(true)
 
 // 性能友好的监听：使用 ResizeObserver 监听消息区域和渲染内容变化，
 // 当内容高度超过全屏滚动区域时，在消息区域上添加 `disable-min-height` 类以移除渲染器的 min-height。
@@ -347,7 +347,51 @@ let __scheduled = false
 let __minHeightDisabled = false
 let __overflowConfirmations = 0
 let __clearConfirmations = 0
+let __autoScrollScheduled = false
 // Observers and scheduler
+
+function getScrollRoot() {
+  return scrollRoot.value || document.scrollingElement || document.documentElement
+}
+
+function isScrollRootAtBottom(root = getScrollRoot(), threshold = 24) {
+  return root.scrollHeight - root.scrollTop - root.clientHeight <= threshold
+}
+
+function scrollToBottom() {
+  const root = getScrollRoot()
+  root.scrollTop = root.scrollHeight
+}
+
+function scheduleScrollToBottom() {
+  if (!shouldStickToBottom.value || __autoScrollScheduled)
+    return
+
+  __autoScrollScheduled = true
+  requestAnimationFrame(() => {
+    __autoScrollScheduled = false
+    if (shouldStickToBottom.value)
+      scrollToBottom()
+  })
+}
+
+function handleScrollRootScroll() {
+  shouldStickToBottom.value = isScrollRootAtBottom()
+}
+
+function handleScrollRootWheel(event: WheelEvent) {
+  if (event.deltaY < 0)
+    shouldStickToBottom.value = false
+}
+
+function handleScrollRootTouchMove() {
+  shouldStickToBottom.value = false
+}
+
+function handleScrollRootTouchEnd() {
+  if (isScrollRootAtBottom())
+    shouldStickToBottom.value = true
+}
 
 // Streaming updates can change the rendered height without reliably triggering
 // ResizeObserver (e.g. due to layout containment / virtualization). Ensure we
@@ -356,6 +400,7 @@ watch(
   () => content.value.length,
   () => {
     scheduleCheckMinHeight()
+    scheduleScrollToBottom()
   },
   { flush: 'post' },
 )
@@ -396,6 +441,7 @@ function scheduleCheckMinHeight() {
           container.classList.remove('disable-min-height')
         }
       }
+      scheduleScrollToBottom()
       return
     }
 
@@ -429,6 +475,7 @@ function scheduleCheckMinHeight() {
       // Revert probe change before paint.
       container.classList.remove('disable-min-height')
     }
+    scheduleScrollToBottom()
   })
 }
 
@@ -479,6 +526,7 @@ onMounted(() => {
     scheduleCheckMinHeight()
   })
   __mo.observe(container, { childList: true, subtree: true })
+  scheduleScrollToBottom()
 })
 
 onBeforeUnmount(() => {
@@ -711,7 +759,16 @@ onBeforeUnmount(() => {
     </Transition>
 
     <!-- Main chat area -->
-    <div ref="scrollRoot" class="chat-wrapper" :class="{ 'chat-wrapper--with-sidebar': !isCompactSettings }">
+    <div
+      ref="scrollRoot"
+      class="chat-wrapper"
+      :class="{ 'chat-wrapper--with-sidebar': !isCompactSettings }"
+      @scroll.passive="handleScrollRootScroll"
+      @wheel.passive="handleScrollRootWheel"
+      @touchmove.passive="handleScrollRootTouchMove"
+      @touchend.passive="handleScrollRootTouchEnd"
+      @touchcancel.passive="handleScrollRootTouchEnd"
+    >
       <div class="chat-container">
         <!-- Header bar -->
         <header class="chat-header">
@@ -1178,7 +1235,7 @@ onBeforeUnmount(() => {
   position: relative;
   z-index: 1;
   display: flex;
-  flex-direction: column-reverse;
+  flex-direction: column;
   align-items: center;
   justify-content: flex-start;
   box-sizing: border-box;
@@ -1430,7 +1487,7 @@ onBeforeUnmount(() => {
 .chat-messages {
   flex: 1 0 auto;
   display: flex;
-  flex-direction: column-reverse;
+  flex-direction: column;
   scroll-behavior: smooth;
 }
 
