@@ -1,3 +1,16 @@
+## [1.0.3](https://github.com/Simon-He95/markstream-vue/compare/markstream-vue@1.0.3-beta.3...markstream-vue@1.0.3) (2026-06-18)
+
+
+### Bug Fixes
+
+* address vue2 seo review feedback ([cbc6f98](https://github.com/Simon-He95/markstream-vue/commit/cbc6f986c1bd43e9470787c349ef129cf8023ec6))
+* render sequence mermaid text semicolons ([244d64b](https://github.com/Simon-He95/markstream-vue/commit/244d64b7bec454c991b761260f62ad995de8a0f6))
+* resolve vue2 seo review blockers ([42ddba8](https://github.com/Simon-He95/markstream-vue/commit/42ddba8e28c9b4802ef65c83316a5a94f47b3bfd))
+* respect mobile scroll interruption in playground ([1e4e565](https://github.com/Simon-He95/markstream-vue/commit/1e4e565dc90c96b45afaa15c0d26ba08e80da4e1))
+* validate docs structured data prices ([a6cfa8b](https://github.com/Simon-He95/markstream-vue/commit/a6cfa8bade39f2a3333f49a06788b3eaba32bad4))
+
+
+
 ## [1.0.3-beta.3](https://github.com/Simon-He95/markstream-vue/compare/markstream-vue@1.0.3-beta.2...markstream-vue@1.0.3-beta.3) (2026-06-17)
 
 
