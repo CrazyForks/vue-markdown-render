@@ -46,4 +46,67 @@ describe('math block streaming close handling', () => {
     expect(mathBlocks[0].content).not.toMatch(/\]\s*$/)
     expect(textNodes.map(node => node.content)).not.toContain(']')
   })
+
+  it('closes bracket math after lines that should not keep a markdown fence open', () => {
+    const prefix = `${Array.from(
+      { length: 40 },
+      (_, index) => `Paragraph ${index + 1} before the bracket math streaming close regression.`,
+    ).join('\n\n')}\n\n`
+    const cases = [
+      { label: 'four spaces', firstChunk: `${prefix}    \`\`\`\n\\[\n` },
+      { label: 'tab indent', firstChunk: `${prefix}\t\`\`\`\n\\[\n` },
+      { label: 'backtick info', firstChunk: `${prefix}\`\`\` bad\`info\n\\[\n` },
+      { label: 'ended blockquote', firstChunk: `${prefix}> \`\`\`\n\\[\n` },
+      { label: 'ended list', firstChunk: `${prefix}- item\n  \`\`\`\n\\[\n` },
+    ]
+
+    for (const testCase of cases) {
+      const md = getMarkdown(`math-block-streaming-fence-rules-${testCase.label}`)
+      const chunks = [
+        testCase.firstChunk,
+        'x + y\n',
+        '\\',
+        ']',
+      ]
+      let markdown = ''
+      let nodes: any[] = []
+
+      for (const chunk of chunks) {
+        markdown += chunk
+        nodes = parseMarkdownToStructure(markdown, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }
+
+      const mathBlocks = collect(nodes, 'math_block')
+
+      expect(mathBlocks, testCase.label).toHaveLength(1)
+      expect(mathBlocks[0].loading, testCase.label).toBe(false)
+      expect(mathBlocks[0].content, testCase.label).toBe('x + y')
+    }
+  })
+
+  it('does not repeatedly rescan previous source for literal bracket closes without an opener', () => {
+    const run = (chunk: string) => {
+      const md = getMarkdown(`math-block-streaming-close-perf-${chunk}`)
+      let markdown = ''
+      const startedAt = performance.now()
+
+      for (let index = 0; index < 240; index++) {
+        markdown += chunk
+        parseMarkdownToStructure(markdown, md, {
+          final: false,
+          streamParse: true,
+        })
+      }
+
+      return performance.now() - startedAt
+    }
+
+    const plainMs = run('plain text\n')
+    const literalCloseMs = run('\\]\n')
+
+    expect(literalCloseMs).toBeLessThan(plainMs * 8 + 80)
+  })
 })
