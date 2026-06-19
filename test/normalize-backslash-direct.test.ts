@@ -47,9 +47,22 @@ describe('normalizeStandaloneBackslashT direct tests', () => {
     expect(out).toMatchInlineSnapshot(`"atb"`)
   })
 
-  it('escapes exclamation to \\!', () => {
+  it('does not escape factorial exclamation marks', () => {
     const out = normalizeStandaloneBackslashT('a!b')
-    expect(out).toBe('a\\!b')
+    expect(out).toBe('a!b')
+    expect(normalizeStandaloneBackslashT('2! + n! + (n+1)!')).toBe('2! + n! + (n+1)!')
+    expect(normalizeStandaloneBackslashT('\\alpha!')).toBe('\\alpha!')
+    expect(normalizeStandaloneBackslashT('π!')).toBe('π!')
+    expect(normalizeStandaloneBackslashT('x\'!')).toBe('x\'!')
+    expect(normalizeStandaloneBackslashT('|x|!')).toBe('|x|!')
+    expect(normalizeStandaloneBackslashT('𝑛! + 𝟚! + x\u0301!')).toBe('𝑛! + 𝟚! + x\u0301!')
+  })
+
+  it('escapes standalone exclamation to \\!', () => {
+    const out = normalizeStandaloneBackslashT('!')
+    expect(out).toBe('\\!')
+    expect(normalizeStandaloneBackslashT('x ! y')).toBe('x \\! y')
+    expect(normalizeStandaloneBackslashT('x+! y')).toBe('x+\\! y')
   })
 
   it('span to \\{\\}', () => {

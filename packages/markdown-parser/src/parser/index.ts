@@ -355,6 +355,83 @@ function appendedChunkMayAffectTolerantMathBoundary(previousSource: string, appe
   return false
 }
 
+function countTrailingBackslashes(source: string) {
+  let count = 0
+  for (let index = source.length - 1; index >= 0 && source[index] === '\\'; index--)
+    count++
+  return count
+}
+
+function isEscapedDelimiterAt(source: string, index: number) {
+  let cursor = index - 1
+  let backslashes = 0
+  while (cursor >= 0 && source[cursor] === '\\') {
+    backslashes++
+    cursor--
+  }
+  return backslashes % 2 === 1
+}
+
+function findLastUnescapedDelimiter(source: string, delimiter: string) {
+  let searchPos = source.length - delimiter.length
+
+  while (searchPos >= 0) {
+    const index = source.lastIndexOf(delimiter, searchPos)
+    if (index === -1)
+      return -1
+    if (!isEscapedDelimiterAt(source, index))
+      return index
+    searchPos = index - 1
+  }
+
+  return -1
+}
+
+function hasUnclosedExplicitBracketMathOpen(source: string) {
+  const openIndex = findLastUnescapedDelimiter(source, '\\[')
+  if (openIndex === -1)
+    return false
+
+  return findLastUnescapedDelimiter(source, '\\]') < openIndex
+}
+
+function hasUnescapedDelimiterInAppendedChunk(previousSource: string, appended: string, delimiter: string) {
+  let searchPos = 0
+
+  while (searchPos < appended.length) {
+    const index = appended.indexOf(delimiter, searchPos)
+    if (index === -1)
+      return false
+
+    let cursor = index - 1
+    let backslashes = 0
+    while (cursor >= 0 && appended[cursor] === '\\') {
+      backslashes++
+      cursor--
+    }
+    if (cursor === -1)
+      backslashes += countTrailingBackslashes(previousSource)
+
+    if (backslashes % 2 === 0)
+      return true
+
+    searchPos = index + Math.max(1, delimiter.length)
+  }
+
+  return false
+}
+
+function appendedChunkCompletesExplicitBracketMathClose(previousSource: string, appended: string) {
+  const completesInChunk = hasUnescapedDelimiterInAppendedChunk(previousSource, appended, '\\]')
+  const completesAcrossBoundary = appended[0] === ']'
+    && countTrailingBackslashes(previousSource) % 2 === 1
+
+  if (!completesInChunk && !completesAcrossBoundary)
+    return false
+
+  return hasUnclosedExplicitBracketMathOpen(previousSource)
+}
+
 function syncTolerantMathBoundaryStreamCache(md: MarkdownIt, source: string) {
   if (!hasMarkstreamMathPlugin(md))
     return
@@ -369,12 +446,20 @@ function syncTolerantMathBoundaryStreamCache(md: MarkdownIt, source: string) {
   if (previous?.source === source)
     return
 
-  if (previous && source.startsWith(previous.source)) {
-    const appended = source.slice(previous.source.length)
+  const sourceExtendsPrevious = previous ? source.startsWith(previous.source) : false
+  const appended = sourceExtendsPrevious && previous ? source.slice(previous.source.length) : ''
+  const completesExplicitBracketMathClose = sourceExtendsPrevious && previous
+    ? appendedChunkCompletesExplicitBracketMathClose(
+        previous.source,
+        appended,
+      )
+    : false
 
+  if (previous && sourceExtendsPrevious) {
     if (
       previous.key === null
       && previous.pendingCandidate === false
+      && !completesExplicitBracketMathClose
       && !appendedChunkMayAffectTolerantMathBoundary(previous.source, appended)
       && !sourceEndsWithSplitTolerantBoundaryPrefix(source)
     ) {
@@ -384,9 +469,9 @@ function syncTolerantMathBoundaryStreamCache(md: MarkdownIt, source: string) {
   }
 
   const nextKey = getTolerantMathBlockBoundaryStreamKey(source)
-  const sourceWasReplaced = previous ? !source.startsWith(previous.source) : false
+  const sourceWasReplaced = previous ? !sourceExtendsPrevious : false
 
-  if (previous && (sourceWasReplaced || previous.key !== nextKey))
+  if (previous && (sourceWasReplaced || previous.key !== nextKey || completesExplicitBracketMathClose))
     stream.reset()
   else if (!previous && nextKey)
     stream.reset()
