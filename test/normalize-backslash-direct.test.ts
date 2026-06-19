@@ -56,6 +56,8 @@ describe('normalizeStandaloneBackslashT direct tests', () => {
     expect(normalizeStandaloneBackslashT('x\'!')).toBe('x\'!')
     expect(normalizeStandaloneBackslashT('|x|!')).toBe('|x|!')
     expect(normalizeStandaloneBackslashT('𝑛! + 𝟚! + x\u0301!')).toBe('𝑛! + 𝟚! + x\u0301!')
+    expect(normalizeStandaloneBackslashT('n!! + n!!!')).toBe('n!! + n!!!')
+    expect(normalizeStandaloneBackslashT('⌊n⌋! + ⟨x⟩! + ‖x‖!')).toBe('⌊n⌋! + ⟨x⟩! + ‖x‖!')
   })
 
   it('escapes standalone exclamation to \\!', () => {

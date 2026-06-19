@@ -136,7 +136,7 @@ const SPAN_CURLY_RE = /span\{([^}]+)\}/
 const OPERATORNAME_SPAN_RE = /\\operatorname\{span\}\{((?:[^{}]|\{[^}]*\})+)\}/
 const SINGLE_BACKSLASH_NEWLINE_RE = /(^|[^\\])\\\r?\n/g
 const ENDING_SINGLE_BACKSLASH_RE = /(^|[^\\])\\$/g
-const FACTORIAL_PRECEDING_RE = /[\p{L}\p{M}\p{N})\]}'′″‴|]/u
+const FACTORIAL_PRECEDING_RE = /[\p{L}\p{M}\p{N}\p{Pe}\p{Pf}'′″‴|‖]/u
 
 // Cache for dynamically built regexes depending on commands list
 // Avoid lookbehind; capture possible prefix so replacements can preserve it.
@@ -206,10 +206,11 @@ function countUnescapedStrong(s: string) {
 }
 
 function escapeStandaloneExclamation(value: string) {
-  return value.replace(/(^|[^\\])!/gu, (match: string, prefix: string) => {
+  return value.replace(/(^|[^\\])!+/gu, (match: string, prefix: string) => {
     if (prefix && FACTORIAL_PRECEDING_RE.test(prefix))
       return match
-    return `${prefix}\\!`
+    const marks = prefix ? match.slice(prefix.length) : match
+    return `${prefix}${'\\!'.repeat(marks.length)}`
   })
 }
 

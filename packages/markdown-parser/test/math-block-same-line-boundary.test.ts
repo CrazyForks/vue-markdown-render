@@ -165,6 +165,52 @@ $$ where $\\epsilon$ denotes the target accuracy, $n$ is the number of nodes, an
     expect(resetCount).toBeGreaterThanOrEqual(1)
   })
 
+  it('does not reset stream cache for bracket math delimiters inside code', () => {
+    const cases = [
+      [
+        'fenced',
+        [
+          '```tex\n\\[\n```\n\n',
+          '\\]\n\n',
+        ],
+      ],
+      [
+        'inline',
+        [
+          'Example `\\[`\n\n',
+          '\\]\n\n',
+        ],
+      ],
+    ] as const
+
+    for (const [name, chunks] of cases) {
+      const md = getMarkdown(`standard-bracket-code-delimiters-no-reset-${name}`)
+      ;(md as any).stream.reset()
+      ;(md as any).stream.resetStats?.()
+
+      const stream = (md as any).stream
+      const originalReset = stream.reset.bind(stream)
+      let resetCount = 0
+      stream.reset = () => {
+        resetCount++
+        return originalReset()
+      }
+
+      let source = ''
+      let nodes: any[] = []
+      for (const chunk of chunks) {
+        source += chunk
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }
+
+      expect(resetCount, name).toBe(0)
+      expect(collectByType(nodes, 'math_block'), name).toHaveLength(0)
+    }
+  })
+
   it('ignores escaped bracket close before a later split close delimiter', () => {
     const md = getMarkdown('standard-bracket-escaped-close-before-split-close-reset')
     ;(md as any).stream.reset()

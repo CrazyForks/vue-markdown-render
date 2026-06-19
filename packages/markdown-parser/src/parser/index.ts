@@ -372,27 +372,165 @@ function isEscapedDelimiterAt(source: string, index: number) {
   return backslashes % 2 === 1
 }
 
-function findLastUnescapedDelimiter(source: string, delimiter: string) {
-  let searchPos = source.length - delimiter.length
+function isIndentWhitespace(ch: string) {
+  return ch === ' ' || ch === '\t'
+}
 
-  while (searchPos >= 0) {
-    const index = source.lastIndexOf(delimiter, searchPos)
-    if (index === -1)
+function parseMarkdownFenceMarker(line: string) {
+  let index = 0
+  while (index < line.length && isIndentWhitespace(line[index]))
+    index++
+
+  const markerChar = line[index]
+  if (markerChar !== '`' && markerChar !== '~')
+    return null
+
+  let markerEnd = index
+  while (markerEnd < line.length && line[markerEnd] === markerChar)
+    markerEnd++
+
+  const markerLen = markerEnd - index
+  if (markerLen < 3)
+    return null
+
+  return { markerChar: markerChar as '`' | '~', markerLen, rest: line.slice(markerEnd) }
+}
+
+function stripMarkdownBlockquotePrefix(line: string) {
+  let index = 0
+  while (index < line.length && isIndentWhitespace(line[index]))
+    index++
+
+  let saw = false
+  while (index < line.length && line[index] === '>') {
+    saw = true
+    index++
+    while (index < line.length && isIndentWhitespace(line[index]))
+      index++
+  }
+
+  return saw ? line.slice(index) : null
+}
+
+function matchMarkdownFenceMarker(line: string) {
+  const direct = parseMarkdownFenceMarker(line)
+  if (direct)
+    return direct
+
+  const quoted = stripMarkdownBlockquotePrefix(line)
+  return quoted == null ? null : parseMarkdownFenceMarker(quoted)
+}
+
+function countRepeatedChar(source: string, index: number, ch: string) {
+  let end = index
+  while (end < source.length && source[end] === ch)
+    end++
+  return end - index
+}
+
+function findCodeSpanCloseIndex(line: string, start: number, markerLen: number) {
+  let index = start
+
+  while (index < line.length) {
+    const next = line.indexOf('`', index)
+    if (next === -1)
       return -1
-    if (!isEscapedDelimiterAt(source, index))
-      return index
-    searchPos = index - 1
+
+    const runLen = countRepeatedChar(line, next, '`')
+    if (runLen === markerLen)
+      return next
+
+    index = next + runLen
   }
 
   return -1
 }
 
-function hasUnclosedExplicitBracketMathOpen(source: string) {
-  const openIndex = findLastUnescapedDelimiter(source, '\\[')
-  if (openIndex === -1)
-    return false
+function scanLineForExplicitBracketMathState(line: string, lineStart: number, source: string, inMath: boolean) {
+  let index = 0
 
-  return findLastUnescapedDelimiter(source, '\\]') < openIndex
+  while (index < line.length) {
+    const sourceIndex = lineStart + index
+
+    if (inMath) {
+      if (line.startsWith('\\]', index) && !isEscapedDelimiterAt(source, sourceIndex)) {
+        inMath = false
+        index += 2
+        continue
+      }
+
+      index++
+      continue
+    }
+
+    if (line[index] === '`' && !isEscapedDelimiterAt(source, sourceIndex)) {
+      const markerLen = countRepeatedChar(line, index, '`')
+      const closeIndex = findCodeSpanCloseIndex(line, index + markerLen, markerLen)
+      if (closeIndex === -1)
+        break
+      index = closeIndex + markerLen
+      continue
+    }
+
+    if (line.startsWith('\\[', index) && !isEscapedDelimiterAt(source, sourceIndex)) {
+      inMath = true
+      index += 2
+      continue
+    }
+
+    index++
+  }
+
+  return inMath
+}
+
+function hasUnclosedExplicitBracketMathOpen(source: string) {
+  let inMath = false
+  let inFence = false
+  let fenceChar: '`' | '~' | '' = ''
+  let fenceLen = 0
+  let index = 0
+
+  while (index < source.length) {
+    const newlineIndex = source.indexOf('\n', index)
+    const hasNewline = newlineIndex !== -1
+    const lineEnd = hasNewline && newlineIndex > index && source[newlineIndex - 1] === '\r'
+      ? newlineIndex - 1
+      : hasNewline ? newlineIndex : source.length
+    const line = source.slice(index, lineEnd)
+
+    if (!inMath) {
+      const fenceMatch = matchMarkdownFenceMarker(line)
+      if (fenceMatch) {
+        if (inFence) {
+          if (
+            fenceMatch.markerChar === fenceChar
+            && fenceMatch.markerLen >= fenceLen
+            && /^\s*$/.test(fenceMatch.rest)
+          ) {
+            inFence = false
+            fenceChar = ''
+            fenceLen = 0
+          }
+        }
+        else {
+          inFence = true
+          fenceChar = fenceMatch.markerChar
+          fenceLen = fenceMatch.markerLen
+        }
+      }
+      else if (!inFence) {
+        inMath = scanLineForExplicitBracketMathState(line, index, source, inMath)
+      }
+    }
+    else {
+      inMath = scanLineForExplicitBracketMathState(line, index, source, inMath)
+    }
+
+    index = hasNewline ? newlineIndex + 1 : source.length
+  }
+
+  return inMath
 }
 
 function hasUnescapedDelimiterInAppendedChunk(previousSource: string, appended: string, delimiter: string) {
