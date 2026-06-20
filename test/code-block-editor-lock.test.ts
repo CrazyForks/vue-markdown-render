@@ -87,6 +87,16 @@ async function waitForCreateDiffEditorCalls(expected: number, helpers: StreamMon
   }
 }
 
+function createDeferred() {
+  let resolve: () => void = () => {}
+  let reject: (error: unknown) => void = () => {}
+  const promise = new Promise<void>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
+
 describe('codeBlockNode editor creation locking', () => {
   beforeEach(() => {
     resetStreamMonacoHelpers()
@@ -123,6 +133,7 @@ describe('codeBlockNode editor creation locking', () => {
     expect(wrapper.find('pre.code-pre-fallback').classes()).toContain('markstream-pre--line-numbers')
     expect(wrapper.findAll('.markstream-pre__line-number').map(node => node.text())).toEqual(['1'])
     expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-pending')).toBe('true')
+    expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhancement-state')).toBe('pending')
     expect(wrapper.find('.code-editor-container').classes()).toContain('is-hidden')
 
     const finish = resolveCreate
@@ -133,6 +144,7 @@ describe('codeBlockNode editor creation locking', () => {
     await vi.waitFor(() => {
       expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(false)
       expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-pending')).toBeUndefined()
+      expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhancement-state')).toBe('ready')
       expect(wrapper.find('.code-editor-container').classes()).not.toContain('is-hidden')
     })
 
@@ -175,6 +187,64 @@ describe('codeBlockNode editor creation locking', () => {
     expect(helpers.updateCode).toHaveBeenCalledWith('console.log(2)', 'javascript')
 
     wrapper.unmount()
+  })
+
+  it('marks Monaco recreation failures as terminal fallback state', async () => {
+    const helpers = getStreamMonacoHelpers()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    helpers.createEditor.mockImplementation(async () => {})
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'js',
+          code: 'console.log(1)',
+          raw: '```js\nconsole.log(1)\n```',
+        },
+        loading: false,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flushPendingMicrotasks()
+    await waitForCreateEditorCalls(1, helpers)
+    await vi.waitFor(() => {
+      expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhancement-state')).toBe('ready')
+    })
+
+    helpers.createDiffEditor.mockImplementation(async () => {
+      throw new Error('recreate failed')
+    })
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'diff-ts',
+        code: '- console.log(1)\n+ console.log(2)',
+        raw: '```diff-ts\n- console.log(1)\n+ console.log(2)\n```',
+        diff: true,
+        originalCode: 'console.log(1)',
+        updatedCode: 'console.log(2)',
+      },
+    })
+    await flushPendingMicrotasks()
+    await waitForCreateDiffEditorCalls(1, helpers)
+
+    try {
+      await vi.waitFor(() => {
+        const root = wrapper.get('[data-markstream-code-block="1"]')
+        const fallback = wrapper.find('pre.code-pre-fallback')
+        expect(fallback.exists()).toBe(true)
+        expect(fallback.text()).toContain('console.log(1)')
+        expect(root.attributes('data-markstream-enhancement-state')).toBe('fallback')
+        expect(root.attributes('data-markstream-pending')).toBeUndefined()
+      })
+    }
+    finally {
+      warn.mockRestore()
+      wrapper.unmount()
+    }
   })
 
   it('keeps a terminal newline while an ordinary Monaco code block is still loading', async () => {
@@ -1173,6 +1243,289 @@ describe('codeBlockNode editor creation locking', () => {
     wrapper.unmount()
   })
 
+  it('does not retry editor creation after the initial Monaco mount fails into terminal fallback', async () => {
+    const helpers = getStreamMonacoHelpers()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    helpers.createEditor.mockImplementation(async () => {
+      throw new Error('initial create failed')
+    })
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'js',
+          code: 'console.log(1)',
+          raw: '```js\nconsole.log(1)\n```',
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flushPendingMicrotasks()
+    await waitForCreateEditorCalls(1, helpers)
+
+    try {
+      await vi.waitFor(() => {
+        const fallback = wrapper.find('pre')
+        expect(fallback.exists()).toBe(true)
+        expect(fallback.text()).toContain('console.log(1)')
+      })
+      await flushPendingMicrotasks()
+
+      expect(helpers.createEditor).toHaveBeenCalledTimes(1)
+      const root = wrapper.get('[data-markstream-code-block="1"]')
+      expect(root.attributes('data-markstream-enhancement-state')).toBe('fallback')
+      expect(root.attributes('data-markstream-pending')).toBeUndefined()
+    }
+    finally {
+      warn.mockRestore()
+      wrapper.unmount()
+    }
+  })
+
+  it('allows Monaco creation again after a terminal failure when the editor kind changes', async () => {
+    const helpers = getStreamMonacoHelpers()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    helpers.createEditor.mockRejectedValueOnce(new Error('single create failed'))
+    helpers.createDiffEditor.mockResolvedValue(undefined)
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'js',
+          code: 'console.log(1)',
+          raw: '```js\nconsole.log(1)\n```',
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flushPendingMicrotasks()
+    await waitForCreateEditorCalls(1, helpers)
+
+    await vi.waitFor(() => {
+      expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhancement-state')).toBe('fallback')
+    })
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'diff',
+        code: '-old\n+new',
+        raw: '```diff\n-old\n+new\n```',
+        diff: true,
+        originalCode: 'old',
+        updatedCode: 'new',
+      },
+    })
+    await flushPendingMicrotasks()
+    await waitForCreateDiffEditorCalls(1, helpers)
+
+    expect(helpers.createEditor).toHaveBeenCalledTimes(1)
+    expect(helpers.createDiffEditor).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhancement-state')).not.toBe('fallback')
+
+    warn.mockRestore()
+    wrapper.unmount()
+  })
+
+  it('allows Monaco creation again after a terminal failure when the code changes', async () => {
+    const helpers = getStreamMonacoHelpers()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    helpers.createEditor.mockRejectedValueOnce(new Error('single create failed'))
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'js',
+          code: 'console.log(1)',
+          raw: '```js\nconsole.log(1)\n```',
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flushPendingMicrotasks()
+    await waitForCreateEditorCalls(1, helpers)
+
+    await vi.waitFor(() => {
+      expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhancement-state')).toBe('fallback')
+    })
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'js',
+        code: 'console.log(2)',
+        raw: '```js\nconsole.log(2)\n```',
+      },
+    })
+    await flushPendingMicrotasks()
+    await waitForCreateEditorCalls(2, helpers)
+
+    expect(helpers.createEditor).toHaveBeenCalledTimes(2)
+    expect(helpers.createEditor.mock.calls[1]?.[1]).toBe('console.log(2)')
+    expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhancement-state')).not.toBe('fallback')
+
+    warn.mockRestore()
+    wrapper.unmount()
+  })
+
+  it('allows Monaco creation again after a terminal failure when creation options change', async () => {
+    const helpers = getStreamMonacoHelpers()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    helpers.createEditor.mockRejectedValueOnce(new Error('single create failed'))
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'js',
+          code: 'console.log(1)',
+          raw: '```js\nconsole.log(1)\n```',
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+        monacoOptions: {
+          wordWrap: 'off',
+        },
+      },
+    })
+
+    await flushPendingMicrotasks()
+    await waitForCreateEditorCalls(1, helpers)
+
+    await vi.waitFor(() => {
+      expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhancement-state')).toBe('fallback')
+    })
+
+    await wrapper.setProps({
+      monacoOptions: {
+        wordWrap: 'on',
+      },
+    })
+    await flushPendingMicrotasks()
+    await waitForCreateEditorCalls(2, helpers)
+
+    expect(helpers.createEditor).toHaveBeenCalledTimes(2)
+    expect(helpers.createEditor.mock.calls[1]?.[1]).toBe('console.log(1)')
+    expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhancement-state')).not.toBe('fallback')
+
+    warn.mockRestore()
+    wrapper.unmount()
+  })
+
+  it('retries the latest code after an earlier Monaco creation attempt rejects', async () => {
+    const helpers = getStreamMonacoHelpers()
+    const firstCreate = createDeferred()
+
+    helpers.createEditor
+      .mockImplementationOnce(() => firstCreate.promise)
+      .mockImplementationOnce(async () => {})
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'js',
+          code: 'console.log(1)',
+          raw: '```js\nconsole.log(1)\n```',
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flushPendingMicrotasks()
+    await waitForCreateEditorCalls(1, helpers)
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'js',
+        code: 'console.log(2)',
+        raw: '```js\nconsole.log(2)\n```',
+      },
+    })
+    await flushPendingMicrotasks()
+
+    firstCreate.reject(new Error('stale create failed'))
+    await flushPendingMicrotasks()
+    await waitForCreateEditorCalls(2, helpers)
+
+    expect(helpers.createEditor.mock.calls[1]?.[1]).toBe('console.log(2)')
+    expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhancement-state')).not.toBe('fallback')
+
+    wrapper.unmount()
+  })
+
+  it('includes diff fallback code in the Monaco creation failure signature', async () => {
+    const helpers = getStreamMonacoHelpers()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const createDiffEditor = helpers.createDiffEditor
+    ;(helpers as any).createDiffEditor = undefined
+    helpers.createEditor.mockRejectedValueOnce(new Error('fallback create failed'))
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '-old\n+new',
+          raw: '```diff\n-old\n+new\n```',
+          diff: true,
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    try {
+      await flushPendingMicrotasks()
+      await waitForCreateEditorCalls(1, helpers)
+
+      await vi.waitFor(() => {
+        expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhancement-state')).toBe('fallback')
+      })
+
+      await wrapper.setProps({
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '-old\n+newer',
+          raw: '```diff\n-old\n+newer\n```',
+          diff: true,
+        },
+      })
+      await flushPendingMicrotasks()
+      await waitForCreateEditorCalls(2, helpers)
+
+      expect(helpers.createEditor.mock.calls[1]?.[1]).toBe('-old\n+newer')
+      expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhancement-state')).not.toBe('fallback')
+    }
+    finally {
+      ;(helpers as any).createDiffEditor = createDiffEditor
+      warn.mockRestore()
+      wrapper.unmount()
+    }
+  })
+
   it('caps the `<pre>` fallback while Monaco is mounting', async () => {
     const helpers = getStreamMonacoHelpers()
     let resolveCreate: (() => void) | null = null
@@ -1702,6 +2055,23 @@ describe('codeBlockNode diff defaults', () => {
     expect(source).toContain('--stream-monaco-gutter-marker-width: 4px;')
     expect(source).toContain('--stream-monaco-modified-scrollable-left: var(--stream-monaco-modified-margin-width);')
     expect(source).not.toContain('--stream-monaco-modified-scrollable-left: calc(var(--stream-monaco-modified-margin-width) + 1px);')
+  })
+
+  it('rechecks current loading guards after cold Monaco runtime loading', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/components/CodeBlockNode/CodeBlockNode.vue'),
+      'utf8',
+    )
+
+    const runtimeLoad = source.indexOf('await ensureMonacoRuntime()')
+    const postRuntimeGuard = source.indexOf('if (watchEpoch !== createEditorWatchEpoch)', runtimeLoad)
+
+    expect(source).toContain('let createEditorWatchEpoch = 0')
+    expect(source).toContain('const watchEpoch = ++createEditorWatchEpoch')
+    expect(postRuntimeGuard).toBeGreaterThan(runtimeLoad)
+    expect(source.indexOf('if (props.stream === false && props.loading !== false)', postRuntimeGuard)).toBeGreaterThan(postRuntimeGuard)
+    expect(source.indexOf('if (shouldDeferStreamingEditorCreation())', postRuntimeGuard)).toBeGreaterThan(postRuntimeGuard)
+    expect(source.indexOf('if (!viewportReady.value)', postRuntimeGuard)).toBeGreaterThan(postRuntimeGuard)
   })
 
   it('keeps the inline diff fallback height pinned during Monaco handoff', () => {

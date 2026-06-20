@@ -33,23 +33,46 @@ const d2Available = ref(false)
 const renderError = ref<string | null>(null)
 const isRendering = ref(false)
 const svgMarkup = ref('')
+const svgRenderSignature = ref('')
 const renderToken = ref(0)
+const lastCompletedRenderSignature = ref('')
+const lastFailedRenderSignature = ref('')
 const bodyRef = ref<HTMLElement | null>(null)
 const bodyMinHeight = ref<number | null>(null)
 const viewportTarget = ref<HTMLElement | null>(null)
 const registerViewport = useViewportPriority()
 const viewportHandle = ref<ReturnType<typeof registerViewport> | null>(null)
+const isClient = typeof window !== 'undefined'
+const hasMounted = ref(false)
 const viewportReady = ref(typeof window === 'undefined')
 
 const baseCode = computed(() => props.node.code ?? '')
 const lifecycleIndexKey = computed(() => {
   return resolveLifecycleIndexKey(props, attrs)
 })
-const renderSignature = computed(() => `${props.isDark ? 'dark' : 'light'}:${baseCode.value}`)
-const showSourceFallback = computed(() => {
-  return showSource.value || !d2Available.value || !svgMarkup.value
+const renderSignature = computed(() => [
+  props.isDark ? 'dark' : 'light',
+  props.themeId ?? 'auto',
+  props.darkThemeId ?? 'auto',
+  baseCode.value,
+].join(':'))
+const hasCurrentPreview = computed(() => !!svgMarkup.value && svgRenderSignature.value === renderSignature.value)
+const isPreviewPending = computed(() => {
+  if (!hasMounted.value || !baseCode.value || showSource.value)
+    return false
+  const signature = renderSignature.value
+  if (isRendering.value)
+    return true
+  if (lastCompletedRenderSignature.value === signature)
+    return false
+  if (renderError.value && lastFailedRenderSignature.value === signature)
+    return false
+  return true
 })
-const hasPreview = computed(() => !!svgMarkup.value)
+const hasPreview = computed(() => hasCurrentPreview.value || (!!svgMarkup.value && isPreviewPending.value))
+const showSourceFallback = computed(() => {
+  return showSource.value || !d2Available.value || !hasPreview.value
+})
 const bodyStyle = computed(() => {
   if (!showSourceFallback.value || !bodyMinHeight.value)
     return undefined
@@ -66,7 +89,6 @@ const renderStyle = computed(() => {
   return undefined
 })
 
-const isClient = typeof window !== 'undefined'
 let d2Instance: any | null = null
 let scheduled = false
 let unmounted = false
@@ -74,7 +96,6 @@ let lastRenderAt = 0
 let throttleTimer: number | null = null
 let pendingRender = false
 let bodyObserver: ResizeObserver | null = null
-let lastCompletedRenderSignature = ''
 let lifecyclePendingIndexKey = ''
 
 function markLifecyclePending() {
@@ -283,13 +304,15 @@ function toSafeSvgMarkup(svg: string | null | undefined) {
   return svgElement.outerHTML
 }
 
-function setSvg(svg: string) {
+function setSvg(svg: string, signature: string) {
   const safe = toSafeSvgMarkup(svg)
   svgMarkup.value = safe || ''
+  svgRenderSignature.value = safe ? signature : ''
 }
 
 function clearSvg() {
   svgMarkup.value = ''
+  svgRenderSignature.value = ''
 }
 
 function extractSvg(renderResult: any) {
@@ -335,7 +358,7 @@ async function renderDiagram() {
   if (props.loading && !props.progressiveRender)
     return
   const signature = renderSignature.value
-  if (signature === lastCompletedRenderSignature && !renderError.value && svgMarkup.value) {
+  if (signature === lastCompletedRenderSignature.value && !renderError.value && hasCurrentPreview.value) {
     d2Available.value = true
     if (props.loading)
       showSource.value = false
@@ -345,13 +368,15 @@ async function renderDiagram() {
   if (!code) {
     clearSvg()
     renderError.value = null
-    lastCompletedRenderSignature = ''
+    lastCompletedRenderSignature.value = ''
+    lastFailedRenderSignature.value = ''
     return
   }
 
   const token = ++renderToken.value
   isRendering.value = true
   renderError.value = null
+  lastFailedRenderSignature.value = ''
   markLifecyclePending()
 
   try {
@@ -361,6 +386,7 @@ async function renderDiagram() {
       showSource.value = true
       clearSvg()
       renderError.value = 'D2 is not available.'
+      lastFailedRenderSignature.value = signature
       return
     }
     if (typeof instance.compile !== 'function' || typeof instance.render !== 'function') {
@@ -399,8 +425,9 @@ async function renderDiagram() {
     const svg = extractSvg(renderResult)
     if (!svg)
       throw new Error('D2 render returned empty output.')
-    setSvg(svg)
-    lastCompletedRenderSignature = signature
+    setSvg(svg, signature)
+    lastCompletedRenderSignature.value = signature
+    lastFailedRenderSignature.value = ''
     if (props.loading)
       showSource.value = false
     renderError.value = null
@@ -409,9 +436,11 @@ async function renderDiagram() {
     if (token !== renderToken.value)
       return
     const message = err?.message ? String(err.message) : 'D2 render failed.'
-    if (!props.loading)
+    if (!props.loading) {
       renderError.value = message
-    lastCompletedRenderSignature = ''
+      lastFailedRenderSignature.value = signature
+    }
+    lastCompletedRenderSignature.value = ''
     if (message.includes('@terrastruct/d2')) {
       d2Available.value = false
       showSource.value = true
@@ -471,7 +500,7 @@ function scheduleRender(force = false) {
 }
 
 function exportSvg() {
-  if (!svgMarkup.value)
+  if (!hasCurrentPreview.value)
     return
   try {
     const blob = new Blob([svgMarkup.value], { type: 'image/svg+xml;charset=utf-8' })
@@ -501,7 +530,7 @@ function updateBodyMinHeight() {
 }
 
 watch(
-  () => [props.node.code, props.loading, props.isDark],
+  () => [props.node.code, props.loading, props.isDark, props.themeId, props.darkThemeId],
   () => {
     scheduleRender()
   },
@@ -534,6 +563,7 @@ watch(
 )
 
 onMounted(() => {
+  hasMounted.value = true
   nextTick(() => {
     updateBodyMinHeight()
   })
@@ -549,7 +579,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   unmounted = true
   clearLifecyclePending()
-  lastCompletedRenderSignature = ''
+  lastCompletedRenderSignature.value = ''
   viewportHandle.value?.destroy()
   viewportHandle.value = null
   if (throttleTimer != null) {
@@ -567,6 +597,7 @@ onBeforeUnmount(() => {
     class="d2-block-container rounded-lg border overflow-hidden"
     data-markstream-d2="1"
     :data-markstream-mode="showSourceFallback ? 'fallback' : 'preview'"
+    :data-markstream-pending="isPreviewPending ? 'true' : undefined"
     :class="{ dark: props.isDark }"
   >
     <div
@@ -623,7 +654,7 @@ onBeforeUnmount(() => {
         </button>
 
         <button
-          v-if="props.showExportButton && svgMarkup"
+          v-if="props.showExportButton && hasCurrentPreview"
           type="button"
           class="d2-action-btn p-[var(--ms-action-btn-padding)] rounded-md"
           :aria-label="t('common.export') || 'Export'"

@@ -161,10 +161,11 @@ The 1.0 public benchmark covers the shipped playground scenarios:
 
 - Diagnostic Studio baseline, thinking, diff, and stress samples in MarkdownCodeBlock and Monaco modes using `/test?benchmark=1`.
 - Main playground reverse-flex chat initial load, full-scroll pass, and streaming replay using `/?benchmark=1`.
+- Real-browser Web Vitals probes for a million-character restore and scripted scroll path, plus a code-block scroll-into-Monaco path.
 
-Track LCP, CLS, settle time, frame sample count, frame p95 `requestAnimationFrame` interval, full-scroll heavy-settle frame p95, max long task, page DOM node count, renderer DOM node count, visible fallback count, heavy-block readiness, scroll drift, and best-effort Chrome-only heap after renderer unmount plus GC. Frame p95 is report evidence for 1.0; the hard release gate stays on fallback counts, heavy-block readiness, DOM budget, CLS, long tasks, and settle time.
+Track LCP, CLS, settle time, frame sample count, frame p95/max `requestAnimationFrame` interval, frame sample density, full-scroll heavy-settle frame p95, max long task, page DOM node count, renderer DOM node count, visible fallback count, heavy-block readiness, scroll drift, and best-effort Chrome-only heap after renderer unmount plus GC. The hard release gate covers fallback counts, heavy-block readiness, DOM budget, CLS, long tasks, settle time, and Web Vitals frame stall budgets.
 
-Extended synthetic scenarios such as 1 MB documents, 1000 code blocks, 100 Mermaid blocks, and 10k pre-parsed nodes are planned for 1.0.x. Do not use them as 1.0 release evidence until they are implemented in `pnpm benchmark:1.0`.
+Extended synthetic scenarios such as 1000 code blocks, 100 Mermaid blocks, and 10k pre-parsed nodes are planned for 1.0.x. Do not use them as 1.0 release evidence until they are implemented in `pnpm benchmark:1.0`.
 
 Generate the public report with:
 

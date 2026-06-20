@@ -629,6 +629,44 @@ describe('markdown code block Shiki langs', () => {
     wrapper.unmount()
   })
 
+  it('marks Vue Shiki code blocks pending until the renderer commits', async () => {
+    const registration = createDeferred()
+    streamMarkdownMock.registerHighlight.mockImplementationOnce(() => registration.promise)
+
+    const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+    const wrapper = mount(MarkdownCodeBlockNode, {
+      props: {
+        loading: false,
+        node: makeNode('typescript'),
+        langs: ['typescript'],
+      },
+    })
+
+    await waitUntil(
+      () => streamMarkdownMock.registerHighlight.mock.calls.length > 0,
+      () => 'Timed out waiting for pending highlight registration',
+    )
+
+    const root = wrapper.get('[data-markstream-code-block="1"]')
+    expect(root.attributes('data-markstream-enhancement-state')).toBe('pending')
+    expect(root.attributes('data-markstream-enhanced')).toBe('false')
+    expect(root.attributes('data-markstream-pending')).toBe('true')
+    expect(wrapper.find('.code-fallback-plain').exists()).toBe(true)
+
+    registration.resolve()
+    await flushAll()
+    await waitForRendererCreated()
+    await waitUntil(
+      () => wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhancement-state') === 'ready',
+      () => 'Timed out waiting for Shiki code block ready state',
+    )
+
+    expect(root.attributes('data-markstream-enhanced')).toBe('true')
+    expect(root.attributes('data-markstream-pending')).toBeUndefined()
+
+    wrapper.unmount()
+  })
+
   it('lets codeBlockProps.langs override top-level langs in Vue Shiki mode', async () => {
     const { default: NodeRenderer } = await import('../src/components/NodeRenderer')
     const wrapper = mount(NodeRenderer, {
@@ -3491,6 +3529,8 @@ describe('markdown code block Shiki langs', () => {
 
       expect(importAttempts).toBe(1)
       expect(streamMarkdownMock.createShikiStreamRenderer).not.toHaveBeenCalled()
+      expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhancement-state')).toBe('fallback')
+      expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-pending')).toBeUndefined()
       expect(warnSpy).toHaveBeenCalledTimes(1)
     }
     finally {

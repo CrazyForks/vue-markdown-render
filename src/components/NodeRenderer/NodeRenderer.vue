@@ -181,7 +181,7 @@ const RENDERER_MODE_DEFAULTS: Record<NodeRendererMode, Pick<
     renderBatchBudgetMs: 6,
     renderBatchIdleTimeoutMs: 120,
     deferNodesUntilVisible: true,
-    maxLiveNodes: 320,
+    maxLiveNodes: 220,
     liveNodeBuffer: 60,
     nodeVirtual: 'auto',
   },

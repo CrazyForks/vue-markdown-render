@@ -156,7 +156,7 @@ flowchart TD
 
 | Prop | 默认值 | 说明 |
 | ---- | ------ | ---- |
-| `max-live-nodes` | `320` | 虚拟化阈值；设为 `0` 可关闭虚拟化（全部渲染）。 |
+| `max-live-nodes` | `220` | 虚拟化阈值；设为 `0` 可关闭虚拟化（全部渲染）。 |
 | `live-node-buffer` | `60` | 视窗前后保留的节点数量（overscan）。 |
 | `batch-rendering` | `true` | 分批渲染（仅当 `max-live-nodes <= 0` 时启用）。 |
 | `smooth-streaming` | `'auto'` | 在 typewriter / 增量模式下内置流式 pacing（`typewriter` 或 `max-live-nodes <= 0`）。设 `true` 强制启用，`false` 按原始 chunk 节奏渲染。 |

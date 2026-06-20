@@ -47,7 +47,7 @@ stream-markdown-parser@1.0.0
 pnpm run release:gate:1.0
 ```
 
-该命令会执行 release verification、docs build、size budget 和 1.0 benchmark report。当前 public benchmark 覆盖已发布 playground 场景：Diagnostic Studio 的 baseline、thinking、diff、stress，以及主 playground reverse-flex chat。Diagnostic Studio 场景使用 `/test?benchmark=1`，主 playground 使用 `/?benchmark=1`；报告中的 frame p95 使用 phase-local sample window，full-scroll 行的 `scrollFrameP95Ms` 只覆盖 active scroll loop，post-scroll heavy block settle 的 `heavySettleFrameP95Ms` 单独记录。1.0 中 frame p95 是 report metric；硬门禁保留在 fallback count、重节点 readiness、DOM budget、CLS、long tasks 和 settle time 上。benchmark 会生成 `benchmark/*.json`、`benchmark/*.md`、`benchmark/latest-summary.md`，release notes 应优先引用 `1.0 Benchmark` workflow artifact；本地生成的报告只代表文件名和环境信息披露的本机快照。
+该命令会执行 release verification、docs build、size budget 和 1.0 benchmark report。当前 public benchmark 覆盖已发布 playground 场景：Diagnostic Studio 的 baseline、thinking、diff、stress，以及主 playground reverse-flex chat。Diagnostic Studio 场景使用 `/test?benchmark=1`，主 playground 使用 `/?benchmark=1`；报告中的 frame p95 使用 phase-local sample window，full-scroll 行的 `scrollFrameP95Ms` 只覆盖 active scroll loop，post-scroll heavy block settle 的 `heavySettleFrameP95Ms` 单独记录。硬门禁覆盖 fallback count、重节点 readiness、DOM budget、CLS、long tasks、settle time，以及 Web Vitals frame p95/max 和 sample-density 预算。benchmark 会生成 `benchmark/*.json`、`benchmark/*.md`、`benchmark/latest-summary.md`，release notes 应优先引用 `1.0 Benchmark` workflow artifact；本地生成的报告只代表文件名和环境信息披露的本机快照。
 
 最终发布前运行完整 dry run：
 

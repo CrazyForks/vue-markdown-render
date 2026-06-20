@@ -377,7 +377,7 @@ export interface NodeRendererProps {
   renderBatchIdleTimeoutMs?: number
   /** Defer rendering nodes until they are near the viewport */
   deferNodesUntilVisible?: boolean
-  /** Maximum number of fully rendered nodes kept in DOM. Default: 320 */
+  /** Maximum number of fully rendered nodes kept in DOM. Default: 220 */
   maxLiveNodes?: number
   /** Number of nodes to keep before/after focus. Default: 60 */
   liveNodeBuffer?: number

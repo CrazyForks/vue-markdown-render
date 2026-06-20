@@ -90,6 +90,7 @@ const codeBlockContent = ref<HTMLElement | null>(null)
 const rendererTarget = ref<HTMLElement | null>(null)
 const fallbackHtml = ref('')
 const rendererReady = ref(false)
+const rendererFallbackTerminal = ref(false)
 let renderObserver: MutationObserver | undefined
 let lastCommittedRenderSignature = ''
 let rendererMutationVersion = 0
@@ -230,14 +231,16 @@ function escapeHtml(str: string) {
     .replace(/'/g, '&#39;')
 }
 
-function renderFallback(code: string) {
+function renderFallback(code: string, options: { terminal?: boolean } = {}) {
   pendingRenderSignature = null
   disconnectReadyObserver()
+  rendererFallbackTerminal.value = options.terminal === true
   if (!code) {
     clearRendererTarget()
     lastCommittedRenderSignature = ''
     fallbackHtml.value = ''
     rendererReady.value = false
+    rendererFallbackTerminal.value = false
     return
   }
   fallbackHtml.value = `<pre class="shiki shiki-fallback"><code>${escapeHtml(code)}</code></pre>`
@@ -247,6 +250,7 @@ function renderFallback(code: string) {
 function clearFallback() {
   fallbackHtml.value = ''
   rendererReady.value = true
+  rendererFallbackTerminal.value = false
 }
 
 function clearRendererTarget() {
@@ -376,6 +380,17 @@ let streamMarkdownLoadPromise: Promise<void> | null = null
 let streamMarkdownLoadFailed = false
 let warnedStreamMarkdownUnavailable = false
 
+const codeBlockEnhancementState = computed(() => {
+  if (!displayCode.value)
+    return 'ready'
+  if (rendererReady.value && !fallbackHtml.value)
+    return 'ready'
+  if (rendererFallbackTerminal.value || streamMarkdownLoadFailed)
+    return 'fallback'
+  return 'pending'
+})
+const codeBlockPending = computed(() => codeBlockEnhancementState.value === 'pending')
+
 function nextRenderEpoch() {
   renderEpoch += 1
   return renderEpoch
@@ -403,6 +418,7 @@ function disposeCurrentRenderer() {
   finally {
     clearRendererTarget()
     rendererReady.value = false
+    rendererFallbackTerminal.value = false
   }
 }
 
@@ -617,6 +633,10 @@ async function initRenderer(epoch: number) {
   await ensureStreamMarkdownLoaded()
   if (!isCurrentRenderEpoch(epoch))
     return
+  if (streamMarkdownLoadFailed) {
+    renderFallback(renderedCode, { terminal: true })
+    return
+  }
 
   if (!codeBlockContent.value || !rendererTarget.value) {
     renderFallback(renderedCode)
@@ -668,7 +688,7 @@ async function initRenderer(epoch: number) {
     if (needsRendererReconfigure && renderer && hasRendererContent())
       clearFallback()
     else
-      renderFallback(renderedCode)
+      renderFallback(renderedCode, { terminal: true })
     return
   }
 
@@ -685,7 +705,7 @@ async function initRenderer(epoch: number) {
   }
 
   if (!renderer) {
-    renderFallback(renderedCode)
+    renderFallback(renderedCode, { terminal: true })
     return
   }
 
@@ -712,6 +732,7 @@ async function initRenderer(epoch: number) {
   else {
     pendingRenderSignature = null
     disconnectReadyObserver()
+    renderFallback(renderedCode, { terminal: true })
   }
 }
 
@@ -724,7 +745,7 @@ async function safeInitRenderer(epoch = nextRenderEpoch()) {
       return
     if (isDevEnv)
       console.warn('[MarkdownCodeBlockNode] Failed to initialize Shiki renderer.', err)
-    renderFallback(displayCode.value)
+    renderFallback(displayCode.value, { terminal: true })
   }
 }
 
@@ -832,6 +853,7 @@ watch(() => [props.node.code, props.node.language, props.node.loading, props.loa
   else {
     pendingRenderSignature = null
     disconnectReadyObserver()
+    renderFallback(renderedCode, { terminal: true })
   }
 })
 
@@ -999,6 +1021,10 @@ function previewCode() {
     :style="containerStyle"
     class="code-block-container rounded-lg border overflow-hidden"
     :class="{ dark: props.isDark }"
+    data-markstream-code-block="1"
+    :data-markstream-enhanced="codeBlockEnhancementState === 'ready' ? 'true' : 'false'"
+    :data-markstream-enhancement-state="codeBlockEnhancementState"
+    :data-markstream-pending="codeBlockPending ? 'true' : undefined"
   >
     <CodeBlockShell
       :show-header="props.showHeader"

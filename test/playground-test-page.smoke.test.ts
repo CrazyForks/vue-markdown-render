@@ -5,6 +5,11 @@ import { buildTestPageHref, decodeMarkdownHashAsync } from '../playground-shared
 import TestPage from '../playground/src/pages/test.vue'
 import { flushAll } from './setup/flush-all'
 
+const markdownRenderMockState = vi.hoisted(() => ({
+  mountCount: 0,
+  unmountCount: 0,
+}))
+
 vi.mock('@iconify/vue', () => ({
   Icon: {
     name: 'IconStub',
@@ -48,7 +53,7 @@ vi.mock('../src/components/NodeRenderer', () => ({
       },
       maxLiveNodes: {
         type: Number,
-        default: 320,
+        default: 220,
       },
       liveNodeBuffer: {
         type: Number,
@@ -66,6 +71,16 @@ vi.mock('../src/components/NodeRenderer', () => ({
         type: Number,
         default: 16,
       },
+      fade: {
+        type: Boolean,
+        default: true,
+      },
+    },
+    mounted() {
+      markdownRenderMockState.mountCount += 1
+    },
+    unmounted() {
+      markdownRenderMockState.unmountCount += 1
     },
     template: '<div data-testid="preview">{{ content }}</div>',
   },
@@ -190,6 +205,8 @@ describe('playground /test smoke', () => {
   beforeEach(() => {
     katexEnabled = true
     mermaidEnabled = true
+    markdownRenderMockState.mountCount = 0
+    markdownRenderMockState.unmountCount = 0
     window.localStorage.clear()
     window.history.replaceState({}, '', '/test')
     document.documentElement.classList.remove('dark')
@@ -253,6 +270,7 @@ describe('playground /test smoke', () => {
     expect(wrapper.text()).toContain('版本沙箱')
     expect(wrapper.text()).toContain('Angular')
     expect(wrapper.get('iframe').attributes('src')).toContain('/test-sandbox?framework=vue3')
+    expect(wrapper.get('.preview-surface').attributes('tabindex')).toBeUndefined()
 
     wrapper.unmount()
   })
@@ -483,9 +501,9 @@ describe('playground /test smoke', () => {
     expect(wrapper.find('textarea').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('Cross-framework regression lab')
     expect(wrapper.get('[data-testid="preview"]').text()).toBe('## shared only')
-    expect(preview.props('batchRendering')).toBe(true)
-    expect(preview.props('viewportPriority')).toBe(false)
-    expect(preview.props('maxLiveNodes')).toBe(0)
+    expect(preview.props('batchRendering')).toBe(false)
+    expect(preview.props('viewportPriority')).toBe(true)
+    expect(preview.props('maxLiveNodes')).toBe(220)
     expect(wrapper.get('[data-testid="immersive-preview-back-button"]').text()).toContain('Test Page')
     expect(wrapper.get('[data-testid="immersive-preview-star-link"]').attributes('href')).toBe('https://github.com/Simon-He95/markstream-vue')
 
@@ -581,7 +599,7 @@ describe('playground /test smoke', () => {
 
     expect(preview.props('batchRendering')).toBe(false)
     expect(preview.props('viewportPriority')).toBe(true)
-    expect(preview.props('maxLiveNodes')).toBe(320)
+    expect(preview.props('maxLiveNodes')).toBe(220)
 
     await wrapper.get('[data-testid="preview-fullscreen-button"]').trigger('click')
     await nextTick()
@@ -593,6 +611,314 @@ describe('playground /test smoke', () => {
     expect(preview.props('renderBatchSize')).toBe(180)
     expect(preview.props('renderBatchDelay')).toBe(0)
 
+    wrapper.unmount()
+  })
+
+  it('disables benchmark-only preview animations for stable performance metrics', async () => {
+    window.history.replaceState({}, '', '/test?benchmark=1')
+
+    const wrapper = await mountTestPage()
+    const preview = wrapper.getComponent({ name: 'MarkdownRenderStub' })
+
+    expect(wrapper.get('.test-lab').classes()).toContain('test-lab--benchmark')
+    expect(preview.props('fade')).toBe(false)
+    expect(wrapper.get('.preview-surface').attributes('tabindex')).toBe('0')
+
+    wrapper.unmount()
+  })
+
+  it('uses a full render during native browser print without remounting the preview', async () => {
+    const wrapper = await mountTestPage()
+    const textarea = wrapper.get('textarea')
+
+    await textarea.setValue(createLongMarkdown())
+    await nextTick()
+
+    const preview = wrapper.getComponent({ name: 'MarkdownRenderStub' })
+    expect(preview.props('batchRendering')).toBe(true)
+    expect(preview.props('viewportPriority')).toBe(true)
+    expect(preview.props('maxLiveNodes')).toBe(220)
+
+    window.dispatchEvent(new Event('beforeprint'))
+
+    expect(preview.props('batchRendering')).toBe(false)
+    expect(preview.props('viewportPriority')).toBe(false)
+    expect(preview.props('maxLiveNodes')).toBe(0)
+
+    window.dispatchEvent(new Event('afterprint'))
+
+    const restoredPreview = wrapper.getComponent({ name: 'MarkdownRenderStub' })
+    expect(restoredPreview.props('batchRendering')).toBe(true)
+    expect(restoredPreview.props('viewportPriority')).toBe(true)
+    expect(restoredPreview.props('maxLiveNodes')).toBe(220)
+    expect(markdownRenderMockState.mountCount).toBe(1)
+    expect(markdownRenderMockState.unmountCount).toBe(0)
+
+    wrapper.unmount()
+  })
+
+  it('uses a batched full render only while exporting preview PDF', async () => {
+    window.history.replaceState({}, '', buildTestPageHref('/test', createLongMarkdown(), 'preview'))
+
+    const wrapper = await mountTestPage()
+    const preview = wrapper.getComponent({ name: 'MarkdownRenderStub' })
+    const pending = document.createElement('div')
+    const codeBlock = document.createElement('div')
+    const markdownCodeBlock = document.createElement('div')
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {
+      expect(preview.props('batchRendering')).toBe(true)
+      expect(preview.props('viewportPriority')).toBe(false)
+      expect(preview.props('maxLiveNodes')).toBe(0)
+    })
+
+    expect(preview.props('batchRendering')).toBe(true)
+    expect(preview.props('viewportPriority')).toBe(true)
+    expect(preview.props('maxLiveNodes')).toBe(220)
+
+    pending.dataset.markstreamPending = 'true'
+    codeBlock.dataset.markstreamCodeBlock = '1'
+    codeBlock.dataset.markstreamEnhanced = 'false'
+    markdownCodeBlock.dataset.markstreamCodeBlock = '1'
+    markdownCodeBlock.dataset.markstreamEnhanced = 'false'
+    markdownCodeBlock.dataset.markstreamEnhancementState = 'pending'
+    wrapper.get('.preview-stage').element.appendChild(pending)
+    wrapper.get('.preview-stage').element.appendChild(codeBlock)
+    wrapper.get('.preview-stage').element.appendChild(markdownCodeBlock)
+
+    const exportButton = wrapper.get('[data-testid="preview-export-pdf-button"]')
+    const exportClick = exportButton.trigger('click')
+    await exportButton.trigger('click')
+    await flushAll()
+
+    expect(exportButton.attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="preview-cancel-pdf-button"]').attributes('disabled')).toBeUndefined()
+    expect(print).not.toHaveBeenCalled()
+
+    pending.remove()
+    await new Promise(resolve => setTimeout(resolve, 60))
+    await nextTick()
+    expect(print).not.toHaveBeenCalled()
+
+    codeBlock.dataset.markstreamEnhanced = 'true'
+    await new Promise(resolve => setTimeout(resolve, 60))
+    await nextTick()
+    expect(print).not.toHaveBeenCalled()
+
+    markdownCodeBlock.dataset.markstreamEnhanced = 'true'
+    markdownCodeBlock.dataset.markstreamEnhancementState = 'ready'
+    await exportClick
+    for (let attempt = 0; attempt < 20 && print.mock.calls.length === 0; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 20))
+      await nextTick()
+    }
+
+    expect(print).toHaveBeenCalledTimes(1)
+    await flushAll()
+    const restoredPreview = wrapper.getComponent({ name: 'MarkdownRenderStub' })
+    expect(restoredPreview.props('batchRendering')).toBe(true)
+    expect(restoredPreview.props('viewportPriority')).toBe(true)
+    expect(restoredPreview.props('maxLiveNodes')).toBe(220)
+    expect(markdownRenderMockState.mountCount).toBe(1)
+    expect(markdownRenderMockState.unmountCount).toBe(0)
+
+    print.mockRestore()
+    wrapper.unmount()
+  })
+
+  it('prints preview PDF when a code block reaches terminal fallback state', async () => {
+    window.history.replaceState({}, '', buildTestPageHref('/test', createLongMarkdown(), 'preview'))
+
+    const wrapper = await mountTestPage()
+    const preview = wrapper.getComponent({ name: 'MarkdownRenderStub' })
+    const codeBlock = document.createElement('div')
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {
+      expect(preview.props('batchRendering')).toBe(true)
+      expect(preview.props('viewportPriority')).toBe(false)
+      expect(preview.props('maxLiveNodes')).toBe(0)
+    })
+
+    codeBlock.dataset.markstreamCodeBlock = '1'
+    codeBlock.dataset.markstreamEnhanced = 'false'
+    codeBlock.dataset.markstreamEnhancementState = 'fallback'
+    wrapper.get('.preview-stage').element.appendChild(codeBlock)
+
+    await wrapper.get('[data-testid="preview-export-pdf-button"]').trigger('click')
+    for (let attempt = 0; attempt < 20 && print.mock.calls.length === 0; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 20))
+      await nextTick()
+    }
+
+    expect(print).toHaveBeenCalledTimes(1)
+    await flushAll()
+    const restoredPreview = wrapper.getComponent({ name: 'MarkdownRenderStub' })
+    expect(restoredPreview.props('batchRendering')).toBe(true)
+    expect(restoredPreview.props('viewportPriority')).toBe(true)
+    expect(restoredPreview.props('maxLiveNodes')).toBe(220)
+
+    print.mockRestore()
+    wrapper.unmount()
+  })
+
+  it('keeps full render active after preview PDF readiness timeout', async () => {
+    window.history.replaceState({}, '', buildTestPageHref('/test', createLongMarkdown(), 'preview'))
+
+    const wrapper = await mountTestPage()
+    const preview = wrapper.getComponent({ name: 'MarkdownRenderStub' })
+    const pending = document.createElement('div')
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {})
+    const now = vi.spyOn(Date, 'now')
+
+    now.mockReturnValue(0)
+    pending.dataset.markstreamPending = 'true'
+    wrapper.get('.preview-stage').element.appendChild(pending)
+
+    const exportClick = (wrapper.vm as any).exportPreviewAsPdf()
+    await nextTick()
+
+    now.mockReturnValue(5000)
+    for (let attempt = 0; attempt < 20 && !wrapper.find('[data-testid="preview-cancel-pdf-button"]').exists(); attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 20))
+      await nextTick()
+    }
+    await exportClick
+
+    expect(print).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="preview-cancel-pdf-button"]').exists()).toBe(true)
+    expect(preview.props('batchRendering')).toBe(true)
+    expect(preview.props('viewportPriority')).toBe(false)
+    expect(preview.props('maxLiveNodes')).toBe(0)
+    expect(wrapper.get('[data-testid="preview-export-pdf-button"]').text()).toContain('继续等待 PDF')
+
+    await wrapper.get('[data-testid="preview-cancel-pdf-button"]').trigger('click')
+    await flushAll()
+
+    const restoredPreview = wrapper.getComponent({ name: 'MarkdownRenderStub' })
+    expect(restoredPreview.props('batchRendering')).toBe(true)
+    expect(restoredPreview.props('viewportPriority')).toBe(true)
+    expect(restoredPreview.props('maxLiveNodes')).toBe(220)
+    expect(markdownRenderMockState.mountCount).toBe(1)
+    expect(markdownRenderMockState.unmountCount).toBe(0)
+
+    now.mockRestore()
+    print.mockRestore()
+    wrapper.unmount()
+  })
+
+  it('cancels preview PDF preparation when leaving preview before readiness timeout', async () => {
+    window.history.replaceState({}, '', buildTestPageHref('/test', createLongMarkdown(), 'preview'))
+
+    const wrapper = await mountTestPage()
+    const preview = wrapper.getComponent({ name: 'MarkdownRenderStub' })
+    const pending = document.createElement('div')
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {})
+    const now = vi.spyOn(Date, 'now')
+
+    now.mockReturnValue(0)
+    pending.dataset.markstreamPending = 'true'
+    wrapper.get('.preview-stage').element.appendChild(pending)
+
+    const exportClick = (wrapper.vm as any).exportPreviewAsPdf()
+    await nextTick()
+
+    expect(preview.props('batchRendering')).toBe(true)
+    expect(preview.props('viewportPriority')).toBe(false)
+    expect(preview.props('maxLiveNodes')).toBe(0)
+    expect(wrapper.get('[data-testid="preview-cancel-pdf-button"]').attributes('disabled')).toBeUndefined()
+
+    await (wrapper.vm as any).returnToEditableTestPage()
+    await flushAll()
+
+    const restoredPreview = wrapper.getComponent({ name: 'MarkdownRenderStub' })
+    expect(restoredPreview.props('batchRendering')).toBe(true)
+    expect(restoredPreview.props('viewportPriority')).toBe(true)
+    expect(restoredPreview.props('maxLiveNodes')).toBe(220)
+    expect(markdownRenderMockState.mountCount).toBe(1)
+    expect(markdownRenderMockState.unmountCount).toBe(0)
+
+    now.mockReturnValue(5000)
+    await exportClick
+    await flushAll()
+
+    expect(print).not.toHaveBeenCalled()
+    const finalPreview = wrapper.getComponent({ name: 'MarkdownRenderStub' })
+    expect(finalPreview.props('batchRendering')).toBe(true)
+    expect(finalPreview.props('viewportPriority')).toBe(true)
+    expect(finalPreview.props('maxLiveNodes')).toBe(220)
+
+    now.mockRestore()
+    print.mockRestore()
+    wrapper.unmount()
+  })
+
+  it('cancels preview PDF preparation when the page unmounts before readiness timeout', async () => {
+    window.history.replaceState({}, '', buildTestPageHref('/test', createLongMarkdown(), 'preview'))
+
+    const wrapper = await mountTestPage()
+    const preview = wrapper.getComponent({ name: 'MarkdownRenderStub' })
+    const pending = document.createElement('div')
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {})
+    const now = vi.spyOn(Date, 'now')
+
+    now.mockReturnValue(0)
+    pending.dataset.markstreamPending = 'true'
+    wrapper.get('.preview-stage').element.appendChild(pending)
+
+    const exportClick = (wrapper.vm as any).exportPreviewAsPdf()
+    await nextTick()
+
+    expect(preview.props('maxLiveNodes')).toBe(0)
+
+    wrapper.unmount()
+    now.mockReturnValue(5000)
+    await exportClick
+    await flushAll()
+
+    expect(print).not.toHaveBeenCalled()
+
+    now.mockRestore()
+    print.mockRestore()
+  })
+
+  it('clears preview PDF full render when leaving preview mode after timeout', async () => {
+    window.history.replaceState({}, '', buildTestPageHref('/test', createLongMarkdown(), 'preview'))
+
+    const wrapper = await mountTestPage()
+    const preview = wrapper.getComponent({ name: 'MarkdownRenderStub' })
+    const pending = document.createElement('div')
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {})
+    const now = vi.spyOn(Date, 'now')
+
+    now.mockReturnValue(0)
+    pending.dataset.markstreamPending = 'true'
+    wrapper.get('.preview-stage').element.appendChild(pending)
+
+    const exportClick = (wrapper.vm as any).exportPreviewAsPdf()
+    await nextTick()
+
+    now.mockReturnValue(5000)
+    for (let attempt = 0; attempt < 20 && !wrapper.find('[data-testid="preview-cancel-pdf-button"]').exists(); attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 20))
+      await nextTick()
+    }
+    await exportClick
+
+    expect(print).not.toHaveBeenCalled()
+    expect(preview.props('batchRendering')).toBe(true)
+    expect(preview.props('viewportPriority')).toBe(false)
+    expect(preview.props('maxLiveNodes')).toBe(0)
+
+    await (wrapper.vm as any).returnToEditableTestPage()
+    await flushAll()
+
+    const restoredPreview = wrapper.getComponent({ name: 'MarkdownRenderStub' })
+    expect(restoredPreview.props('batchRendering')).toBe(true)
+    expect(restoredPreview.props('viewportPriority')).toBe(true)
+    expect(restoredPreview.props('maxLiveNodes')).toBe(220)
+    expect(markdownRenderMockState.mountCount).toBe(1)
+    expect(markdownRenderMockState.unmountCount).toBe(0)
+
+    now.mockRestore()
+    print.mockRestore()
     wrapper.unmount()
   })
 

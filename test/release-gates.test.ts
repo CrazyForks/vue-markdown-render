@@ -80,12 +80,165 @@ describe('release dependency gates', () => {
     const benchmarkScript = readFileSync(resolve(process.cwd(), 'scripts/benchmark-1-0.mjs'), 'utf8')
     const diagnosticScript = readFileSync(resolve(process.cwd(), 'scripts/e2e-playground-performance.mjs'), 'utf8')
     const mainScript = readFileSync(resolve(process.cwd(), 'scripts/e2e-main-playground-performance.mjs'), 'utf8')
+    const webVitalsScript = readFileSync(resolve(process.cwd(), 'scripts/e2e-web-vitals-performance.mjs'), 'utf8')
 
-    expect(benchmarkScript).toContain('BENCHMARK_JSON_PATH: resultPath')
-    expect(benchmarkScript).toContain('result: readJsonFile(resultPath)')
+    expect(benchmarkScript).toContain('const resultPathEnv = scenario.resultPathEnv || \'BENCHMARK_JSON_PATH\'')
+    expect(benchmarkScript).toContain('[resultPathEnv]: resultPath')
+    expect(benchmarkScript).toContain('resultPathEnv: \'WEB_VITALS_JSON_PATH\'')
+    expect(benchmarkScript).toContain('function tryReadJsonFile(filePath)')
+    expect(benchmarkScript).toContain('result: resultRead.result')
+    expect(benchmarkScript).toContain('resultReadError')
     expect(benchmarkScript).not.toContain('parseJsonOutput')
     expect(diagnosticScript).toContain('process.env.BENCHMARK_JSON_PATH')
     expect(mainScript).toContain('process.env.BENCHMARK_JSON_PATH')
+    expect(webVitalsScript).toContain('process.env.WEB_VITALS_JSON_PATH')
+  })
+
+  it('hard-fails Web Vitals warnings during the release gate', () => {
+    const webVitalsScript = readFileSync(resolve(process.cwd(), 'scripts/e2e-web-vitals-performance.mjs'), 'utf8')
+
+    expect(webVitalsScript).toContain('process.env.MARKSTREAM_RELEASE_GATE === \'1\'')
+    expect(webVitalsScript).toContain('function assertScenario(result)')
+    expect(webVitalsScript).toContain('Web Vitals release gate failed')
+    expect(webVitalsScript).toContain('assertScenario(result)')
+  })
+
+  it('runs the 1.0 benchmark workflow with the same Web Vitals release gate', () => {
+    const workflow = readFileSync(resolve(process.cwd(), '.github/workflows/benchmark-1-0.yml'), 'utf8')
+    const webVitalsScript = readFileSync(resolve(process.cwd(), 'scripts/e2e-web-vitals-performance.mjs'), 'utf8')
+
+    expect(workflow).toContain('MARKSTREAM_RELEASE_GATE: \'1\'')
+    expect(workflow).toContain('run: pnpm benchmark:1.0')
+    expect(webVitalsScript).toContain('\'million-scripted-scroll\': {')
+    expect(webVitalsScript).toContain('longTaskTotalMs: 9000')
+    expect(webVitalsScript).toContain('frameP95Ms: 800')
+    expect(webVitalsScript).toContain('minFrameSamplesPerSecond: 4')
+    expect(webVitalsScript).toContain('frame sample density below')
+  })
+
+  it('reports row-specific viewports for mixed 1.0 benchmark scenarios', () => {
+    const benchmarkScript = readFileSync(resolve(process.cwd(), 'scripts/benchmark-1-0.mjs'), 'utf8')
+    const webVitalsScript = readFileSync(resolve(process.cwd(), 'scripts/e2e-web-vitals-performance.mjs'), 'utf8')
+
+    expect(benchmarkScript).toContain('function formatViewport(value)')
+    expect(benchmarkScript).toContain('| Scenario | Phase | Viewport |')
+    expect(benchmarkScript).toContain('row.viewport ?? item.viewport ?? report.environment.defaultViewport')
+    expect(benchmarkScript).toContain('mixed; default 1600 x 1200, row-specific overrides in Results')
+    expect(webVitalsScript).toContain('viewport: copyViewport(viewport)')
+    expect(webVitalsScript).toContain('restore.viewport = copyViewport(viewport)')
+    expect(webVitalsScript).toContain('scroll.viewport = copyViewport(viewport)')
+  })
+
+  it('keeps terminal Monaco pre fallbacks in the Web Vitals code block gate', () => {
+    const webVitalsScript = readFileSync(resolve(process.cwd(), 'scripts/e2e-web-vitals-performance.mjs'), 'utf8')
+
+    expect(webVitalsScript).toContain('const codeBlockScenarioExpectedCodeBlockCount = 12')
+    expect(webVitalsScript).toContain('terminalPreFallbackElements')
+    expect(webVitalsScript).toContain('[data-markstream-pre="1"]')
+    expect(webVitalsScript).toContain('!element.closest(\'.code-block-container\')')
+    expect(webVitalsScript).toContain('expected $' + '{codeBlockScenarioExpectedCodeBlockCount} code blocks')
+  })
+
+  it('requires offscreen Monaco blocks to stay deferred before scripted scroll', () => {
+    const webVitalsScript = readFileSync(resolve(process.cwd(), 'scripts/e2e-web-vitals-performance.mjs'), 'utf8')
+
+    expect(webVitalsScript).toContain('__MARKSTREAM_CODE_BLOCK_VIEWPORT_ROOT_MARGIN__')
+    expect(webVitalsScript).toContain('codeBlockViewportRootMargin: \'0px\'')
+    expect(webVitalsScript).toContain('offscreenEnhancedCodeBlockCount !== 0')
+    expect(webVitalsScript).toContain('expected all offscreen code blocks to remain deferred')
+  })
+
+  it('scopes Web Vitals INP candidate to real interaction groups', () => {
+    const webVitalsScript = readFileSync(resolve(process.cwd(), 'scripts/e2e-web-vitals-performance.mjs'), 'utf8')
+
+    expect(webVitalsScript).toContain('const inpInteractionValues = [...interactions.entries()]')
+    expect(webVitalsScript).toContain('.filter(([key]) => key.startsWith(\'interaction:\'))')
+    expect(webVitalsScript).toContain('eventTimingInpCandidateMs: inpInteractionValues.length')
+    expect(webVitalsScript).toContain('topEvents: sortedEvents.slice(0, 8)')
+  })
+
+  it('gates and reports Web Vitals interaction metrics', () => {
+    const benchmarkScript = readFileSync(resolve(process.cwd(), 'scripts/benchmark-1-0.mjs'), 'utf8')
+    const webVitalsScript = readFileSync(resolve(process.cwd(), 'scripts/e2e-web-vitals-performance.mjs'), 'utf8')
+
+    expect(webVitalsScript).toContain('const webVitalsInteractionBudgets = {')
+    expect(webVitalsScript).toContain('\'codeblock-copy\': {')
+    expect(webVitalsScript).toContain('eventTimingInpCandidateMs: 1000')
+    expect(webVitalsScript).toContain('for (const interaction of scenario.interactions ?? [])')
+    expect(webVitalsScript).toContain('INP candidate exceeded')
+    expect(webVitalsScript).toContain('max input delay exceeded')
+    expect(webVitalsScript).toContain('max event processing exceeded')
+    expect(benchmarkScript).toContain('million interaction $' + '{interaction.label}')
+    expect(benchmarkScript).toContain('codeblock interaction $' + '{interaction.label}')
+    expect(benchmarkScript).toContain('INP candidate ms')
+    expect(benchmarkScript).toContain('row.eventTimingMaxProcessingMs')
+  })
+
+  it('asserts million restore content identity and deep scroll correctness', () => {
+    const webVitalsScript = readFileSync(resolve(process.cwd(), 'scripts/e2e-web-vitals-performance.mjs'), 'utf8')
+
+    expect(webVitalsScript).toContain('const millionRestoreStartMarker')
+    expect(webVitalsScript).toContain('const millionRestoreDeepMarker')
+    expect(webVitalsScript).toContain('const millionRestoreEndMarker')
+    expect(webVitalsScript).toContain('waitForMarkerVisible(page, millionRestoreStartMarker)')
+    expect(webVitalsScript).toContain('assertMillionRestoreReady(restoreSnapshot, restoreSnapshot.label)')
+    expect(webVitalsScript).toContain('waitForMarkerVisible(page, millionRestoreDeepMarker)')
+    expect(webVitalsScript).toContain('waitForMarkerVisible(page, millionRestoreEndMarker)')
+    expect(webVitalsScript).toContain('assertMillionRestoreScrolled(scrollSnapshot, scrollSnapshot.label)')
+    expect(webVitalsScript).toContain('previewScrollRatio >= 0.9')
+  })
+
+  it('keeps code block scroll measurement before stateful copy and collapse interactions', () => {
+    const webVitalsScript = readFileSync(resolve(process.cwd(), 'scripts/e2e-web-vitals-performance.mjs'), 'utf8')
+    const scrollCapture = webVitalsScript.indexOf('const scrollSnapshot = await captureVitalsSnapshot(page, \'codeblock-scripted-scroll-into-monaco\')')
+    const restoreTop = webVitalsScript.indexOf('await scrollPreviewByRatio(page, 0)', scrollCapture)
+    const copyInteraction = webVitalsScript.indexOf('interactions.push(await runInteraction(page, \'codeblock-copy\'')
+    const collapseInteraction = webVitalsScript.indexOf('interactions.push(await runInteraction(page, \'codeblock-collapse\'')
+
+    expect(scrollCapture).toBeGreaterThan(-1)
+    expect(restoreTop).toBeGreaterThan(scrollCapture)
+    expect(copyInteraction).toBeGreaterThan(restoreTop)
+    expect(collapseInteraction).toBeGreaterThan(copyInteraction)
+  })
+
+  it('keeps the Web Vitals frame sampler running across long phases', () => {
+    const webVitalsScript = readFileSync(resolve(process.cwd(), 'scripts/e2e-web-vitals-performance.mjs'), 'utf8')
+
+    expect(webVitalsScript).toContain('if (state.frames.length > 3600)')
+    expect(webVitalsScript).toContain('state.frames.shift()')
+    expect(webVitalsScript).toContain('requestAnimationFrame(sampleFrame)')
+    expect(webVitalsScript).not.toContain('if (state.frames.length < 3600)')
+  })
+
+  it('assigns Web Vitals observer entries by start time at snapshot', () => {
+    const webVitalsScript = readFileSync(resolve(process.cwd(), 'scripts/e2e-web-vitals-performance.mjs'), 'utf8')
+
+    expect(webVitalsScript).toContain('const phaseStartedAt = Number(state.phaseStartedAt ?? state.startedAt ?? 0)')
+    expect(webVitalsScript).toContain('const inCurrentPhase = entry => Number(entry.startTime || 0) >= phaseStartedAt')
+    expect(webVitalsScript).toContain('const longTasks = (Array.isArray(state.longTasks) ? state.longTasks : []).filter(inCurrentPhase)')
+    expect(webVitalsScript).toContain('const events = (Array.isArray(state.events) ? state.events : []).filter(inCurrentPhase)')
+    expect(webVitalsScript).toContain('const layoutShifts = (Array.isArray(state.layoutShifts) ? state.layoutShifts : []).filter(inCurrentPhase)')
+    expect(webVitalsScript).toContain('const computeCls = (shifts) => {')
+    expect(webVitalsScript).toContain('startTime - lastShiftTime > 1000')
+    expect(webVitalsScript).toContain('startTime - windowStart > 5000')
+    expect(webVitalsScript).toContain('layoutShiftTotal')
+    expect(webVitalsScript).not.toContain('state.longTasks = []')
+    expect(webVitalsScript).not.toContain('phase: state.phase')
+  })
+
+  it('checkpoints Web Vitals results after each completed subscenario', () => {
+    const webVitalsScript = readFileSync(resolve(process.cwd(), 'scripts/e2e-web-vitals-performance.mjs'), 'utf8')
+
+    expect(webVitalsScript).toContain('function checkpointWebVitalsResult(result)')
+    expect(webVitalsScript).toContain('result.warnings = collectResultWarnings(result)')
+    expect(webVitalsScript).toContain('result.millionRestore = await runMillionRestoreScenario(browser, port)')
+    expect(webVitalsScript).toContain('result.codeblockMonaco = await runCodeBlockScenario(browser, port)')
+    const millionRestoreAssignment = webVitalsScript.indexOf('result.millionRestore = await runMillionRestoreScenario(browser, port)')
+    const firstCheckpointCall = webVitalsScript.indexOf('checkpointWebVitalsResult(result)', millionRestoreAssignment)
+
+    expect(millionRestoreAssignment).toBeGreaterThan(-1)
+    expect(firstCheckpointCall).toBeGreaterThan(millionRestoreAssignment)
+    expect(webVitalsScript.match(/checkpointWebVitalsResult\(result\)/g)?.length).toBe(3)
   })
 
   it('captures stream parser metrics in the 1.0 benchmark', () => {

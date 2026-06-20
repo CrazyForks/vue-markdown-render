@@ -509,7 +509,7 @@ This avoids re-parsing SSR content while letting later SSE/WebSocket chunks cont
 
 ## ⚙️ Performance presets
 
-- **Virtual window (default)** – keep `max-live-nodes` at its default `320` to enable virtualization. Nodes render immediately and the renderer keeps a sliding window of elements mounted so long docs remain responsive without showing skeleton placeholders.
+- **Virtual window (default)** – keep `max-live-nodes` at its default `220` to enable virtualization. Nodes render immediately and the renderer keeps a sliding window of elements mounted so long docs remain responsive without showing skeleton placeholders.
 - **Incremental stream** – set `:max-live-nodes="0"` when you want a true typewriter effect. This disables virtualization and turns on incremental batching governed by `batchRendering`, `initialRenderBatchSize`, `renderBatchSize`, `renderBatchDelay`, and `renderBatchBudgetMs`, so new content flows in small slices with lightweight placeholders.
 
 Pick one mode per surface: virtualization for best scrollback and steady memory usage, or incremental batching for AI-style “typing” previews.
@@ -519,7 +519,7 @@ Pick one mode per surface: virtualization for best scrollback and steady memory 
 ## 🧰 Key props & options (cheatsheet)
 
 - `content` vs `nodes`: pass raw Markdown or pre-parsed nodes (from `parseMarkdownToStructure`).
-- `max-live-nodes`: `320` (default virtualization) or `0` (incremental batches).
+- `max-live-nodes`: `220` (default virtualization) or `0` (incremental batches).
 - `batchRendering`: fine-tune batches with `initialRenderBatchSize`, `renderBatchSize`, `renderBatchDelay`, `renderBatchBudgetMs`.
 - `enableMermaid` / `enableKatex`: (re)enable heavy peers or custom loaders when needed (pairs with `disableMermaid` / `disableKatex`).
 - `parse-options`: reuse parser hooks (e.g., `preTransformTokens`, `requireClosingStrong`) on the component.
