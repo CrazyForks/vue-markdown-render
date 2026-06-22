@@ -1,3 +1,20 @@
+## [1.0.4-beta.0](https://github.com/Simon-He95/markstream-vue/compare/markstream-vue@1.0.3...markstream-vue@1.0.4-beta.0) (2026-06-22)
+
+
+### Bug Fixes
+
+* handle fast interactions and stale render states ([8595ea6](https://github.com/Simon-He95/markstream-vue/commit/8595ea657b53f3a35157c5ffd9a9fd1f2856da7c))
+* preserve Monaco retry after loading guard ([94cb208](https://github.com/Simon-He95/markstream-vue/commit/94cb2086a0b81228542619a6cff9c81604e97572))
+* render trusted media html blocks ([6027182](https://github.com/Simon-He95/markstream-vue/commit/602718284562b07a779aec403ee3bec8425df287))
+* scope web vitals event timing gates ([5fa3d5e](https://github.com/Simon-He95/markstream-vue/commit/5fa3d5ec187bbd5612a1bcad5276aac61d79636a))
+* stabilize editor retries and INP gate ([d15232c](https://github.com/Simon-He95/markstream-vue/commit/d15232c37696a7d6c6cfc64d96e884e7ddff6316))
+
+
+### Performance Improvements
+
+* optimize large render recovery ([da2f9e6](https://github.com/Simon-He95/markstream-vue/commit/da2f9e63793080d06ed4da544f5408a1886236d5))
+
+
 ## [1.0.3](https://github.com/Simon-He95/markstream-vue/compare/markstream-vue@1.0.3-beta.3...markstream-vue@1.0.3) (2026-06-18)
 
 
