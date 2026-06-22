@@ -23,6 +23,17 @@ if (script.includes('/scripts/e2e-')) {
     result = { initial: {}, fullScroll: {}, replay: {} }
   }
   else if (script.includes('e2e-web-vitals-performance')) {
+    if (process.env.MARKSTREAM_TEST_WEB_VITALS_PARTIAL === '1') {
+      result = {
+        environment: {},
+        millionRestore: { restore: { phaseElapsedMs: 1 }, scroll: { phaseElapsedMs: 2 } },
+        warnings: [],
+      }
+      writeFileSync(resultPath, JSON.stringify(result))
+      console.error('synthetic web vitals failure')
+      process.exit(7)
+    }
+
     result = {
       environment: {},
       millionRestore: { restore: {}, scroll: {} },
@@ -84,6 +95,41 @@ describe('benchmark 1.0 runner partial reports', () => {
       expect(summary).toContain('Result JSON read error:')
       expect(summary).toContain('Diagnostic Studio / ok')
       expect(summary).toContain('Web Vitals / restore and scroll')
+    }
+    finally {
+      rmSync(tmpRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('omits missing Web Vitals subscenario rows from partial reports', () => {
+    const tmpRoot = mkdtempSync(join(tmpdir(), 'markstream-benchmark-runner-'))
+    try {
+      const hookPath = join(tmpRoot, 'benchmark-child-hook.cjs')
+      const outputDir = join(tmpRoot, 'benchmark')
+      writeChildProcessHook(hookPath)
+
+      const run = spawnSync(process.execPath, ['scripts/benchmark-1-0.mjs'], {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GITHUB_SHA: 'benchmark-test-sha',
+          MARKSTREAM_BENCHMARK_OUTPUT_DIR: outputDir,
+          MARKSTREAM_BENCHMARK_SAMPLES: 'ok',
+          MARKSTREAM_BENCHMARK_SKIP_BUILD: '1',
+          MARKSTREAM_TEST_WEB_VITALS_PARTIAL: '1',
+          NODE_OPTIONS: [process.env.NODE_OPTIONS, `--require=${hookPath}`].filter(Boolean).join(' '),
+          PLAYWRIGHT_CHROME_PATH: join(tmpRoot, 'missing-chrome'),
+        },
+      })
+
+      expect(run.status).toBe(1)
+
+      const summary = readFileSync(join(outputDir, 'latest-partial-summary.md'), 'utf8')
+      expect(summary).toContain('| Web Vitals / restore and scroll | million restore navigation |')
+      expect(summary).toContain('| Web Vitals / restore and scroll | million scripted scroll |')
+      expect(summary).not.toContain('| Web Vitals / restore and scroll | codeblock initial |')
+      expect(summary).not.toContain('| Web Vitals / restore and scroll | codeblock scripted scroll |')
     }
     finally {
       rmSync(tmpRoot, { recursive: true, force: true })

@@ -3116,7 +3116,8 @@ const stopCreateEditorWatch = watch(
       markEditorCreationFailed()
     }
 
-    stopCreateEditorWatch()
+    if (editorMounted.value && editorDisplayReady.value)
+      stopCreateEditorWatch()
   },
 )
 
@@ -3466,15 +3467,19 @@ function markEditorCreationFailed(key = editorCreationFailureKey.value) {
 }
 
 watch(editorCreationFailureKey, async () => {
-  const wasFailed = editorCreationFailed.value
-  clearEditorCreationFailureIfKeyChanged()
-  if (!wasFailed || editorCreationFailed.value)
+  if (!editorCreationFailed.value)
+    return
+  if (failedEditorCreationKey.value === editorCreationFailureKey.value)
     return
   if (!createEditor || !codeEditor.value || usePreCodeRender.value || isUnmounted || !viewportReady.value)
     return
   if (props.stream === false && props.loading !== false)
     return
   if (shouldDeferStreamingEditorCreation())
+    return
+
+  clearEditorCreationFailureIfKeyChanged()
+  if (editorCreationFailed.value)
     return
 
   try {

@@ -297,12 +297,16 @@ function scenarioRows(entry) {
   }
 
   if (entry.id === 'web-vitals-performance') {
-    rows.push({ scenario: entry.title, phase: 'million restore navigation', row: result.millionRestore?.restore, heavyBlockScope: 'all' })
-    rows.push({ scenario: entry.title, phase: 'million scripted scroll', row: result.millionRestore?.scroll, heavyBlockScope: 'all' })
+    if (result.millionRestore?.restore)
+      rows.push({ scenario: entry.title, phase: 'million restore navigation', row: result.millionRestore.restore, heavyBlockScope: 'all' })
+    if (result.millionRestore?.scroll)
+      rows.push({ scenario: entry.title, phase: 'million scripted scroll', row: result.millionRestore.scroll, heavyBlockScope: 'all' })
     for (const interaction of result.millionRestore?.interactions ?? [])
       rows.push({ scenario: entry.title, phase: `million interaction ${interaction.label}`, row: interaction, viewport: result.millionRestore?.viewport, heavyBlockScope: 'all' })
-    rows.push({ scenario: entry.title, phase: 'codeblock initial', row: result.codeblockMonaco?.initial, heavyBlockScope: 'visible' })
-    rows.push({ scenario: entry.title, phase: 'codeblock scripted scroll', row: result.codeblockMonaco?.scroll, heavyBlockScope: 'visible' })
+    if (result.codeblockMonaco?.initial)
+      rows.push({ scenario: entry.title, phase: 'codeblock initial', row: result.codeblockMonaco.initial, heavyBlockScope: 'visible' })
+    if (result.codeblockMonaco?.scroll)
+      rows.push({ scenario: entry.title, phase: 'codeblock scripted scroll', row: result.codeblockMonaco.scroll, heavyBlockScope: 'visible' })
     for (const interaction of result.codeblockMonaco?.interactions ?? [])
       rows.push({ scenario: entry.title, phase: `codeblock interaction ${interaction.label}`, row: interaction, viewport: result.codeblockMonaco?.viewport, heavyBlockScope: 'visible' })
   }

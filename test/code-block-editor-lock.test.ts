@@ -1503,6 +1503,61 @@ describe('codeBlockNode editor creation locking', () => {
     wrapper.unmount()
   })
 
+  it('retries terminal Monaco failure after non-streaming loading settles when options changed while loading', async () => {
+    const helpers = getStreamMonacoHelpers()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    helpers.createEditor.mockRejectedValueOnce(new Error('single create failed'))
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'js',
+          code: 'console.log(1)',
+          raw: '```js\nconsole.log(1)\n```',
+        },
+        loading: false,
+        stream: false,
+        showHeader: false,
+        monacoOptions: {
+          wordWrap: 'off',
+        },
+      },
+    })
+
+    await flushPendingMicrotasks()
+    await waitForCreateEditorCalls(1, helpers)
+
+    await vi.waitFor(() => {
+      expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhancement-state')).toBe('fallback')
+    })
+
+    await wrapper.setProps({
+      loading: true,
+      monacoOptions: {
+        wordWrap: 'on',
+      },
+    })
+    await flushPendingMicrotasks()
+
+    expect(helpers.createEditor).toHaveBeenCalledTimes(1)
+
+    await wrapper.setProps({
+      loading: false,
+    })
+    await flushPendingMicrotasks()
+    await waitForCreateEditorCalls(2, helpers)
+
+    expect(helpers.createEditor).toHaveBeenCalledTimes(2)
+    await vi.waitFor(() => {
+      expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhancement-state')).toBe('ready')
+    })
+
+    warn.mockRestore()
+    wrapper.unmount()
+  })
+
   it('retries the latest code after an earlier Monaco creation attempt rejects', async () => {
     const helpers = getStreamMonacoHelpers()
     const firstCreate = createDeferred()
