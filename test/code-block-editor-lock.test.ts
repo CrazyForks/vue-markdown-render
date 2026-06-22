@@ -1337,7 +1337,7 @@ describe('codeBlockNode editor creation locking', () => {
     wrapper.unmount()
   })
 
-  it('allows Monaco creation again after a terminal failure when the code changes', async () => {
+  it('retries Monaco creation once with the latest code when streaming finishes after a terminal failure', async () => {
     const helpers = getStreamMonacoHelpers()
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
@@ -1373,11 +1373,85 @@ describe('codeBlockNode editor creation locking', () => {
       },
     })
     await flushPendingMicrotasks()
+
+    expect(helpers.createEditor).toHaveBeenCalledTimes(1)
+
+    await wrapper.setProps({
+      loading: false,
+      node: {
+        type: 'code_block',
+        language: 'js',
+        code: 'console.log(2)',
+        raw: '```js\nconsole.log(2)\n```',
+      },
+    })
+    await flushPendingMicrotasks()
     await waitForCreateEditorCalls(2, helpers)
 
     expect(helpers.createEditor).toHaveBeenCalledTimes(2)
     expect(helpers.createEditor.mock.calls[1]?.[1]).toBe('console.log(2)')
     expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhancement-state')).not.toBe('fallback')
+
+    warn.mockRestore()
+    wrapper.unmount()
+  })
+
+  it('does not retry a terminal Monaco creation failure for every streaming code chunk', async () => {
+    const helpers = getStreamMonacoHelpers()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    helpers.createEditor.mockImplementation(async () => {
+      throw new Error('create always failed')
+    })
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'js',
+          code: 'console.log(0)',
+          raw: '```js\nconsole.log(0)\n```',
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flushPendingMicrotasks()
+    await waitForCreateEditorCalls(1, helpers)
+
+    await vi.waitFor(() => {
+      expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhancement-state')).toBe('fallback')
+    })
+
+    for (let index = 1; index <= 20; index++) {
+      await wrapper.setProps({
+        node: {
+          type: 'code_block',
+          language: 'js',
+          code: `console.log(${index})`,
+          raw: `\`\`\`js\nconsole.log(${index})\n\`\`\``,
+        },
+      })
+      await flushPendingMicrotasks()
+    }
+
+    expect(helpers.createEditor).toHaveBeenCalledTimes(1)
+
+    await wrapper.setProps({
+      loading: false,
+      node: {
+        type: 'code_block',
+        language: 'js',
+        code: 'console.log(20)',
+        raw: '```js\nconsole.log(20)\n```',
+      },
+    })
+    await flushPendingMicrotasks()
+    await waitForCreateEditorCalls(2, helpers)
+
+    expect(helpers.createEditor).toHaveBeenCalledTimes(2)
 
     warn.mockRestore()
     wrapper.unmount()
@@ -1474,7 +1548,7 @@ describe('codeBlockNode editor creation locking', () => {
     wrapper.unmount()
   })
 
-  it('includes diff fallback code in the Monaco creation failure signature', async () => {
+  it('retries the latest diff fallback code when streaming finishes after a creation failure', async () => {
     const helpers = getStreamMonacoHelpers()
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const createDiffEditor = helpers.createDiffEditor
@@ -1505,6 +1579,20 @@ describe('codeBlockNode editor creation locking', () => {
       })
 
       await wrapper.setProps({
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '-old\n+newer',
+          raw: '```diff\n-old\n+newer\n```',
+          diff: true,
+        },
+      })
+      await flushPendingMicrotasks()
+
+      expect(helpers.createEditor).toHaveBeenCalledTimes(1)
+
+      await wrapper.setProps({
+        loading: false,
         node: {
           type: 'code_block',
           language: 'diff',

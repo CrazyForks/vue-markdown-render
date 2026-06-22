@@ -7,6 +7,7 @@ import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright-core'
+import { collectWebVitalsInteractionWarnings } from './web-vitals-budget-checks.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(__dirname, '..')
@@ -703,9 +704,10 @@ async function captureVitalsSnapshot(page, label, performanceDelta = null) {
       eventObserverSupported: Boolean(state.eventObserverSupported),
       eventObserverError: state.eventObserverError ?? null,
       eventCount: events.length,
+      interactionGroupCount: inpInteractionValues.length,
       eventTimingInpCandidateMs: inpInteractionValues.length
         ? Math.max(...inpInteractionValues.map(interaction => Number(interaction.duration || 0)))
-        : 0,
+        : null,
       eventTimingMaxInputDelayMs: interactionValues.length
         ? Math.max(...interactionValues.map(interaction => Number(interaction.inputDelay || 0)))
         : 0,
@@ -991,6 +993,8 @@ async function runInteraction(page, label, action) {
   return {
     label,
     actionToNextFramesMs: endedAt - startedAt,
+    eventObserverSupported: vitals.eventObserverSupported,
+    interactionGroupCount: vitals.interactionGroupCount,
     eventCount: vitals.eventCount,
     eventTimingInpCandidateMs: vitals.eventTimingInpCandidateMs,
     eventTimingMaxInputDelayMs: vitals.eventTimingMaxInputDelayMs,
@@ -1244,16 +1248,7 @@ function collectScenarioWarnings(name, scenario) {
 
   for (const interaction of scenario.interactions ?? []) {
     const budget = webVitalsInteractionBudgets[interaction.label] ?? {}
-    if (typeof budget.phaseCls === 'number' && !(interaction.phaseCls <= budget.phaseCls))
-      warnings.push(`[${name}:${interaction.label}] interaction CLS exceeded ${budget.phaseCls}: ${interaction.phaseCls}.`)
-    if (typeof budget.eventTimingInpCandidateMs === 'number' && !(interaction.eventTimingInpCandidateMs <= budget.eventTimingInpCandidateMs))
-      warnings.push(`[${name}:${interaction.label}] INP candidate exceeded ${budget.eventTimingInpCandidateMs}ms: ${interaction.eventTimingInpCandidateMs}.`)
-    if (typeof budget.eventTimingMaxInputDelayMs === 'number' && !(interaction.eventTimingMaxInputDelayMs <= budget.eventTimingMaxInputDelayMs))
-      warnings.push(`[${name}:${interaction.label}] max input delay exceeded ${budget.eventTimingMaxInputDelayMs}ms: ${interaction.eventTimingMaxInputDelayMs}.`)
-    if (typeof budget.eventTimingMaxProcessingMs === 'number' && !(interaction.eventTimingMaxProcessingMs <= budget.eventTimingMaxProcessingMs))
-      warnings.push(`[${name}:${interaction.label}] max event processing exceeded ${budget.eventTimingMaxProcessingMs}ms: ${interaction.eventTimingMaxProcessingMs}.`)
-    if (interaction.eventObserverError)
-      warnings.push(`[${name}:${interaction.label}] Event Timing observer failed: ${interaction.eventObserverError}.`)
+    warnings.push(...collectWebVitalsInteractionWarnings(name, interaction, budget))
   }
 
   return warnings

@@ -483,10 +483,12 @@ const currentEditorKind = ref<'diff' | 'single'>(desiredEditorKind.value)
 const usePreCodeRender = ref(false)
 const editorDisplayReady = ref(false)
 const editorCreationFailed = ref(false)
-const failedEditorCreationSignature = ref<string | null>(null)
+const failedEditorCreationKey = ref<string | null>(null)
+const editorCreationContentRevision = ref(0)
 const diffFallbackExitActive = ref(false)
 const diffFallbackFadingOut = ref(false)
 let diffFallbackExitTimer: number | null = null
+let staleContentRetryFailureKey: string | null = null
 const preFallbackWrap = computed(() => {
   if (isDiff.value) {
     const diffWordWrap = resolvedMonacoOptions.value?.diffWordWrap
@@ -2887,7 +2889,7 @@ async function runEditorCreation(el: HTMLElement) {
     return
 
   editorCreationFailed.value = false
-  failedEditorCreationSignature.value = null
+  failedEditorCreationKey.value = null
   editorRuntimeCreated.value = false
   editorDisplayReady.value = false
   diffFallbackExitActive.value = false
@@ -2987,7 +2989,7 @@ function ensureEditorCreation(el: HTMLElement) {
     return null
   if (props.stream === false && props.loading !== false)
     return null
-  clearEditorCreationFailureIfSignatureChanged()
+  clearEditorCreationFailureIfKeyChanged()
   if (isEditorCreationBlocked())
     return null
   if (usePreCodeRender.value || codeEditor.value !== el)
@@ -2999,16 +3001,24 @@ function ensureEditorCreation(el: HTMLElement) {
   if (editorCreated.value && editorMounted.value)
     return Promise.resolve()
 
-  const attemptSignature = getEditorCreationSignature()
+  const attemptFailureKey = getEditorCreationFailureKey()
+  const attemptContentRevision = editorCreationContentRevision.value
   let retryCurrentSignature = false
   editorCreated.value = true
   markLifecyclePending()
   const pending = (async () => {
     try {
       await withMonacoPassiveTouchListeners(() => runEditorCreation(el))
+      staleContentRetryFailureKey = null
     }
     catch (error) {
-      if (attemptSignature !== getEditorCreationSignature()) {
+      const currentFailureKey = getEditorCreationFailureKey()
+      const contentChangedDuringCreation = attemptContentRevision !== editorCreationContentRevision.value
+      const canRetryStaleContent = contentChangedDuringCreation
+        && staleContentRetryFailureKey !== currentFailureKey
+      if (attemptFailureKey !== currentFailureKey || canRetryStaleContent) {
+        if (canRetryStaleContent)
+          staleContentRetryFailureKey = currentFailureKey
         retryCurrentSignature = true
         editorCreated.value = false
         editorMounted.value = false
@@ -3016,7 +3026,7 @@ function ensureEditorCreation(el: HTMLElement) {
         editorDisplayReady.value = false
         return
       }
-      markEditorCreationFailed(attemptSignature)
+      markEditorCreationFailed(attemptFailureKey)
       throw error
     }
   })()
@@ -3404,18 +3414,22 @@ watch(
   { deep: true },
 )
 
-function getEditorCreationSignature() {
+watch(
+  () => [
+    displayCode.value,
+    props.node.originalCode,
+    props.node.updatedCode,
+  ] as const,
+  () => {
+    editorCreationContentRevision.value += 1
+  },
+)
+
+function getEditorCreationFailureKey() {
   const requestedTheme = resolveRequestedTheme()
   return JSON.stringify({
     kind: desiredEditorKind.value,
     language: monacoLanguage.value,
-    code: isDiff.value
-      ? {
-          original: String(props.node.originalCode ?? ''),
-          updated: String(props.node.updatedCode ?? ''),
-          fallback: displayCode.value,
-        }
-      : displayCode.value,
     structural: monacoStructuralSignature.value,
     optionsRevision: editorCreationOptionsRevision.value,
     theme: getThemeName(requestedTheme) ?? (requestedTheme == null ? null : 'custom'),
@@ -3423,16 +3437,17 @@ function getEditorCreationSignature() {
   })
 }
 
-const editorCreationSignature = computed(() => getEditorCreationSignature())
+const editorCreationFailureKey = computed(() => getEditorCreationFailureKey())
 
-function clearEditorCreationFailureIfSignatureChanged() {
+function clearEditorCreationFailureIfKeyChanged() {
   if (!editorCreationFailed.value)
     return
-  if (failedEditorCreationSignature.value === editorCreationSignature.value)
+  if (failedEditorCreationKey.value === editorCreationFailureKey.value)
     return
 
   editorCreationFailed.value = false
-  failedEditorCreationSignature.value = null
+  failedEditorCreationKey.value = null
+  staleContentRetryFailureKey = null
   editorCreated.value = false
   editorMounted.value = false
   editorRuntimeCreated.value = false
@@ -3440,19 +3455,19 @@ function clearEditorCreationFailureIfSignatureChanged() {
 }
 
 function isEditorCreationBlocked() {
-  clearEditorCreationFailureIfSignatureChanged()
+  clearEditorCreationFailureIfKeyChanged()
   return editorCreationFailed.value
-    && failedEditorCreationSignature.value === editorCreationSignature.value
+    && failedEditorCreationKey.value === editorCreationFailureKey.value
 }
 
-function markEditorCreationFailed(signature = editorCreationSignature.value) {
-  failedEditorCreationSignature.value = signature
+function markEditorCreationFailed(key = editorCreationFailureKey.value) {
+  failedEditorCreationKey.value = key
   editorCreationFailed.value = true
 }
 
-watch(editorCreationSignature, async () => {
+watch(editorCreationFailureKey, async () => {
   const wasFailed = editorCreationFailed.value
-  clearEditorCreationFailureIfSignatureChanged()
+  clearEditorCreationFailureIfKeyChanged()
   if (!wasFailed || editorCreationFailed.value)
     return
   if (!createEditor || !codeEditor.value || usePreCodeRender.value || isUnmounted || !viewportReady.value)
@@ -3550,6 +3565,37 @@ watch(
   { flush: 'post' },
 )
 
+async function retryFailedEditorCreationAfterStreamingSettled() {
+  if (!editorCreationFailed.value)
+    return false
+  if (!createEditor || !codeEditor.value || usePreCodeRender.value || isUnmounted || !viewportReady.value)
+    return false
+
+  editorCreationFailed.value = false
+  failedEditorCreationKey.value = null
+  staleContentRetryFailureKey = null
+  editorCreated.value = false
+  editorMounted.value = false
+  editorRuntimeCreated.value = false
+  editorDisplayReady.value = false
+  clearEditorHeightSyncBindings()
+  clearInlineFoldProxies()
+  safeClean()
+  await nextTick()
+
+  try {
+    await ensureEditorCreation(codeEditor.value as HTMLElement)
+  }
+  catch (error) {
+    warnCodeBlockDev('Failed to mount Monaco editor after streaming settled', error)
+    editorMounted.value = false
+    editorDisplayReady.value = false
+    markEditorCreationFailed()
+  }
+
+  return true
+}
+
 // 当 loading 变为 false 时：计算并缓存一次展开高度
 watch(
   () => [props.loading, viewportReady.value],
@@ -3583,6 +3629,10 @@ watch(
     safeRaf(() => {
       void (async () => {
         try {
+          if (loadingJustFinished && await retryFailedEditorCreationAfterStreamingSettled()) {
+            syncEditorHostHeight(false)
+            return
+          }
           if (loadingJustFinished && editorCreated.value) {
             if (isDiff.value && codeEditor.value) {
               const pendingCreation = createEditorPromise

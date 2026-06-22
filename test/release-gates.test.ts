@@ -153,6 +153,7 @@ describe('release dependency gates', () => {
 
     expect(webVitalsScript).toContain('const inpInteractionValues = [...interactions.entries()]')
     expect(webVitalsScript).toContain('.filter(([key]) => key.startsWith(\'interaction:\'))')
+    expect(webVitalsScript).toContain('interactionGroupCount: inpInteractionValues.length')
     expect(webVitalsScript).toContain('eventTimingInpCandidateMs: inpInteractionValues.length')
     expect(webVitalsScript).toContain('topEvents: sortedEvents.slice(0, 8)')
   })
@@ -160,14 +161,17 @@ describe('release dependency gates', () => {
   it('gates and reports Web Vitals interaction metrics', () => {
     const benchmarkScript = readFileSync(resolve(process.cwd(), 'scripts/benchmark-1-0.mjs'), 'utf8')
     const webVitalsScript = readFileSync(resolve(process.cwd(), 'scripts/e2e-web-vitals-performance.mjs'), 'utf8')
+    const webVitalsBudgetScript = readFileSync(resolve(process.cwd(), 'scripts/web-vitals-budget-checks.mjs'), 'utf8')
 
     expect(webVitalsScript).toContain('const webVitalsInteractionBudgets = {')
+    expect(webVitalsScript).toContain('collectWebVitalsInteractionWarnings')
     expect(webVitalsScript).toContain('\'codeblock-copy\': {')
     expect(webVitalsScript).toContain('eventTimingInpCandidateMs: 1000')
     expect(webVitalsScript).toContain('for (const interaction of scenario.interactions ?? [])')
-    expect(webVitalsScript).toContain('INP candidate exceeded')
-    expect(webVitalsScript).toContain('max input delay exceeded')
-    expect(webVitalsScript).toContain('max event processing exceeded')
+    expect(webVitalsBudgetScript).toContain('INP candidate exceeded')
+    expect(webVitalsBudgetScript).toContain('max input delay exceeded')
+    expect(webVitalsBudgetScript).toContain('max event processing exceeded')
+    expect(webVitalsBudgetScript).toContain('Event Timing measurement unavailable')
     expect(benchmarkScript).toContain('million interaction $' + '{interaction.label}')
     expect(benchmarkScript).toContain('codeblock interaction $' + '{interaction.label}')
     expect(benchmarkScript).toContain('INP candidate ms')
