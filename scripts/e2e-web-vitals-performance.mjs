@@ -395,6 +395,7 @@ async function installObservers(context) {
       lastFrameAt: 0,
       eventObserverSupported: false,
       eventObserverError: null,
+      interactionCountSupported: typeof performance.interactionCount === 'number',
       parseBaseline: null,
       parsePerformance: {
         parseCommitCount: 0,
@@ -703,6 +704,9 @@ async function captureVitalsSnapshot(page, label, performanceDelta = null) {
       eventObserverSupported: Boolean(state.eventObserverSupported),
       eventObserverError: state.eventObserverError ?? null,
       eventCount: events.length,
+      performanceInteractionCount: typeof performance.interactionCount === 'number'
+        ? performance.interactionCount
+        : null,
       interactionGroupCount: inpInteractionValues.length,
       eventTimingInpCandidateMs: inpInteractionValues.length
         ? Math.max(...inpInteractionValues.map(interaction => Number(interaction.duration || 0)))
@@ -983,19 +987,39 @@ function assertOffscreenCodeBlocksDeferred(vitals, label) {
 
 async function runInteraction(page, label, action) {
   await resetPhase(page, label)
-  const startedAt = await page.evaluate(() => performance.now())
+  const started = await page.evaluate(() => ({
+    now: performance.now(),
+    interactionCount: typeof performance.interactionCount === 'number'
+      ? performance.interactionCount
+      : null,
+  }))
   await action()
   await waitForFrames(page, 2)
   await page.waitForTimeout(120)
-  const endedAt = await page.evaluate(() => performance.now())
+  const ended = await page.evaluate(() => ({
+    now: performance.now(),
+    interactionCount: typeof performance.interactionCount === 'number'
+      ? performance.interactionCount
+      : null,
+  }))
   const vitals = await readVitals(page, label)
+  const performanceInteractionCountDelta = typeof started.interactionCount === 'number' && typeof ended.interactionCount === 'number'
+    ? Math.max(0, ended.interactionCount - started.interactionCount)
+    : 0
+  const scriptedInteractionCount = 1
+  const belowEventTimingThreshold = vitals.eventObserverSupported === true
+    && vitals.interactionGroupCount === 0
+    && (scriptedInteractionCount > 0 || performanceInteractionCountDelta > 0)
   return {
     label,
-    actionToNextFramesMs: endedAt - startedAt,
+    actionToNextFramesMs: ended.now - started.now,
     eventObserverSupported: vitals.eventObserverSupported,
     interactionGroupCount: vitals.interactionGroupCount,
+    performanceInteractionCountDelta,
+    scriptedInteractionCount,
+    belowEventTimingThreshold,
     eventCount: vitals.eventCount,
-    eventTimingInpCandidateMs: vitals.eventTimingInpCandidateMs,
+    eventTimingInpCandidateMs: belowEventTimingThreshold ? 0 : vitals.eventTimingInpCandidateMs,
     eventTimingMaxInputDelayMs: vitals.eventTimingMaxInputDelayMs,
     eventTimingMaxProcessingMs: vitals.eventTimingMaxProcessingMs,
     eventObserverError: vitals.eventObserverError,

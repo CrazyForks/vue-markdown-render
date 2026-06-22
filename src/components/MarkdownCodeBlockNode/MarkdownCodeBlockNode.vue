@@ -380,11 +380,56 @@ let streamMarkdownLoadPromise: Promise<void> | null = null
 let streamMarkdownLoadFailed = false
 let warnedStreamMarkdownUnavailable = false
 
+function getDesiredRenderLanguage(rawLang: unknown, code: string, loading: boolean) {
+  const normalized = normalizeRendererLanguage(resolveStreamingRendererLanguage(rawLang, code, loading))
+  return normalized !== 'plaintext' && failedRendererLanguages.has(normalized)
+    ? 'plaintext'
+    : normalized
+}
+
+function getDesiredRenderSignature(configKey: string | null | undefined, code: string) {
+  return getRenderSignature(
+    configKey,
+    getDesiredRenderLanguage(props.node.language, code, isCodeBlockLoading()),
+    code,
+  )
+}
+
+function hasCommittedCurrentRender(configKey: string | null | undefined, code: string) {
+  return lastCommittedRenderSignature === getDesiredRenderSignature(configKey, code)
+}
+
+function hasCommittedCurrentCodeAndLanguage(code: string) {
+  const firstSeparator = lastCommittedRenderSignature.indexOf('\u0000')
+  const secondSeparator = firstSeparator >= 0
+    ? lastCommittedRenderSignature.indexOf('\u0000', firstSeparator + 1)
+    : -1
+  if (secondSeparator < 0)
+    return false
+
+  return lastCommittedRenderSignature.slice(firstSeparator + 1, secondSeparator) === getDesiredRenderLanguage(props.node.language, code, isCodeBlockLoading())
+    && lastCommittedRenderSignature.slice(secondSeparator + 1) === code
+}
+
+function hasRendererTextForCode(code: string) {
+  return Boolean(rendererTarget.value?.textContent?.includes(code))
+}
+
 const codeBlockEnhancementState = computed(() => {
   if (!displayCode.value)
     return 'ready'
-  if (rendererReady.value && !fallbackHtml.value)
+  const runtimeConfig = getRuntimeConfigWithFailedLangsFallback(props.themes, props.langs)
+  if (
+    rendererReady.value
+    && !fallbackHtml.value
+    && (
+      hasCommittedCurrentRender(runtimeConfig.key, displayCode.value)
+      || hasCommittedCurrentCodeAndLanguage(displayCode.value)
+      || hasRendererTextForCode(displayCode.value)
+    )
+  ) {
     return 'ready'
+  }
   if (rendererFallbackTerminal.value || streamMarkdownLoadFailed)
     return 'fallback'
   return 'pending'
@@ -685,10 +730,21 @@ async function initRenderer(epoch: number) {
 
   needsRendererReconfigure = Boolean(renderer && rendererConfigKey !== nextRendererConfigKey)
   if (highlightStatus === 'failed') {
-    if (needsRendererReconfigure && renderer && hasRendererContent())
+    if (
+      needsRendererReconfigure
+      && renderer
+      && hasRendererContent()
+      && (
+        hasCommittedCurrentRender(nextRendererConfigKey, renderedCode)
+        || hasCommittedCurrentCodeAndLanguage(renderedCode)
+        || hasRendererTextForCode(renderedCode)
+      )
+    ) {
       clearFallback()
-    else
+    }
+    else {
       renderFallback(renderedCode, { terminal: true })
+    }
     return
   }
 

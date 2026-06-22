@@ -485,10 +485,13 @@ const editorDisplayReady = ref(false)
 const editorCreationFailed = ref(false)
 const failedEditorCreationKey = ref<string | null>(null)
 const editorCreationContentRevision = ref(0)
+const editorCreationSettledContentGeneration = ref(0)
 const diffFallbackExitActive = ref(false)
 const diffFallbackFadingOut = ref(false)
 let diffFallbackExitTimer: number | null = null
 let staleContentRetryFailureKey: string | null = null
+let editorCreationFailureRetryInProgress = false
+let editorCreationFailureKeyRetriedKey: string | null = null
 const preFallbackWrap = computed(() => {
   if (isDiff.value) {
     const diffWordWrap = resolvedMonacoOptions.value?.diffWordWrap
@@ -2984,7 +2987,7 @@ async function runEditorCreation(el: HTMLElement) {
   await revealEditorDisplay()
 }
 
-function ensureEditorCreation(el: HTMLElement) {
+function ensureEditorCreation(el: HTMLElement, options: { allowStaleContentRetry?: boolean } = {}) {
   if (!createEditor || isUnmounted)
     return null
   if (props.stream === false && props.loading !== false)
@@ -3014,7 +3017,8 @@ function ensureEditorCreation(el: HTMLElement) {
     catch (error) {
       const currentFailureKey = getEditorCreationFailureKey()
       const contentChangedDuringCreation = attemptContentRevision !== editorCreationContentRevision.value
-      const canRetryStaleContent = contentChangedDuringCreation
+      const canRetryStaleContent = options.allowStaleContentRetry !== false
+        && contentChangedDuringCreation
         && staleContentRetryFailureKey !== currentFailureKey
       if (attemptFailureKey !== currentFailureKey || canRetryStaleContent) {
         if (canRetryStaleContent)
@@ -3072,6 +3076,8 @@ const stopCreateEditorWatch = watch(
     if (!el)
       return
     if (!visible)
+      return
+    if (editorCreationFailureRetryInProgress)
       return
 
     // If streaming is disabled, defer editor creation until loading is finished
@@ -3423,6 +3429,8 @@ watch(
   ] as const,
   () => {
     editorCreationContentRevision.value += 1
+    if (!isCodeBlockLoading())
+      editorCreationSettledContentGeneration.value += 1
   },
 )
 
@@ -3433,6 +3441,7 @@ function getEditorCreationFailureKey() {
     language: monacoLanguage.value,
     structural: monacoStructuralSignature.value,
     optionsRevision: editorCreationOptionsRevision.value,
+    settledContentGeneration: editorCreationSettledContentGeneration.value,
     theme: getThemeName(requestedTheme) ?? (requestedTheme == null ? null : 'custom'),
     isDark: props.isDark,
   })
@@ -3449,6 +3458,7 @@ function clearEditorCreationFailureIfKeyChanged() {
   editorCreationFailed.value = false
   failedEditorCreationKey.value = null
   staleContentRetryFailureKey = null
+  editorCreationFailureKeyRetriedKey = null
   editorCreated.value = false
   editorMounted.value = false
   editorRuntimeCreated.value = false
@@ -3467,6 +3477,8 @@ function markEditorCreationFailed(key = editorCreationFailureKey.value) {
 }
 
 watch(editorCreationFailureKey, async () => {
+  if (editorCreationFailureRetryInProgress)
+    return
   if (!editorCreationFailed.value)
     return
   if (failedEditorCreationKey.value === editorCreationFailureKey.value)
@@ -3478,11 +3490,12 @@ watch(editorCreationFailureKey, async () => {
   if (shouldDeferStreamingEditorCreation())
     return
 
-  clearEditorCreationFailureIfKeyChanged()
-  if (editorCreationFailed.value)
-    return
-
+  const retryKey = editorCreationFailureKey.value
+  editorCreationFailureRetryInProgress = true
   try {
+    clearEditorCreationFailureIfKeyChanged()
+    if (editorCreationFailed.value)
+      return
     await ensureEditorCreation(codeEditor.value as HTMLElement)
   }
   catch (error) {
@@ -3490,6 +3503,11 @@ watch(editorCreationFailureKey, async () => {
     editorMounted.value = false
     editorDisplayReady.value = false
     markEditorCreationFailed()
+  }
+  finally {
+    editorCreationFailureKeyRetriedKey = retryKey
+    await nextTick()
+    editorCreationFailureRetryInProgress = false
   }
 })
 
@@ -3558,7 +3576,7 @@ watch(
       clearInlineFoldProxies()
       safeClean()
       await nextTick()
-      await ensureEditorCreation(codeEditor.value as HTMLElement)
+      await ensureEditorCreation(codeEditor.value as HTMLElement, { allowStaleContentRetry: false })
     }
     catch (error) {
       warnCodeBlockDev('Failed to recreate Monaco editor after Monaco options changed', error)
@@ -3575,27 +3593,36 @@ async function retryFailedEditorCreationAfterStreamingSettled() {
     return false
   if (!createEditor || !codeEditor.value || usePreCodeRender.value || isUnmounted || !viewportReady.value)
     return false
+  if (editorCreationFailureKeyRetriedKey === editorCreationFailureKey.value)
+    return true
 
-  editorCreationFailed.value = false
-  failedEditorCreationKey.value = null
-  staleContentRetryFailureKey = null
-  editorCreated.value = false
-  editorMounted.value = false
-  editorRuntimeCreated.value = false
-  editorDisplayReady.value = false
-  clearEditorHeightSyncBindings()
-  clearInlineFoldProxies()
-  safeClean()
-  await nextTick()
-
+  editorCreationFailureRetryInProgress = true
   try {
-    await ensureEditorCreation(codeEditor.value as HTMLElement)
-  }
-  catch (error) {
-    warnCodeBlockDev('Failed to mount Monaco editor after streaming settled', error)
+    editorCreationFailed.value = false
+    failedEditorCreationKey.value = null
+    staleContentRetryFailureKey = null
+    editorCreated.value = false
     editorMounted.value = false
+    editorRuntimeCreated.value = false
     editorDisplayReady.value = false
-    markEditorCreationFailed()
+    clearEditorHeightSyncBindings()
+    clearInlineFoldProxies()
+    safeClean()
+    await nextTick()
+
+    try {
+      await ensureEditorCreation(codeEditor.value as HTMLElement)
+    }
+    catch (error) {
+      warnCodeBlockDev('Failed to mount Monaco editor after streaming settled', error)
+      editorMounted.value = false
+      editorDisplayReady.value = false
+      markEditorCreationFailed()
+    }
+  }
+  finally {
+    await nextTick()
+    editorCreationFailureRetryInProgress = false
   }
 
   return true
