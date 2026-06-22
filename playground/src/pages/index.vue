@@ -123,7 +123,8 @@ const {
 })
 
 // 预加载 Monaco 编辑器
-getUseMonaco()
+if (!isBenchmarkMode)
+  getUseMonaco()
 setKaTeXWorker(new KatexWorker())
 setMermaidWorker(new MermaidWorker())
 const router = useRouter()

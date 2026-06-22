@@ -86,13 +86,13 @@ async function withMonacoPassiveTouchListeners<T>(task: () => Promise<T> | T) {
   if (typeof window === 'undefined')
     return await task()
 
-  try {
-    const proto = window.Element?.prototype
-    const nativeAdd = proto?.addEventListener
-    if (!proto || !nativeAdd)
-      return await task()
+  const proto = window.Element?.prototype
+  const nativeAdd = proto?.addEventListener
+  if (!proto || !nativeAdd)
+    return await task()
 
-    const state = getMonacoTouchPatchState()
+  const state = getMonacoTouchPatchState()
+  try {
     if (state.depth === 0) {
       state.original = nativeAdd
       proto.addEventListener = function patchedMonacoTouchStart(
@@ -109,19 +109,20 @@ async function withMonacoPassiveTouchListeners<T>(task: () => Promise<T> | T) {
     }
 
     state.depth++
-    try {
-      return await task()
-    }
-    finally {
-      state.depth = Math.max(0, state.depth - 1)
-      if (state.depth === 0 && state.original && proto.addEventListener !== state.original) {
-        proto.addEventListener = state.original
-        state.original = null
-      }
-    }
   }
   catch {
     return await task()
+  }
+
+  try {
+    return await task()
+  }
+  finally {
+    state.depth = Math.max(0, state.depth - 1)
+    if (state.depth === 0 && state.original && proto.addEventListener !== state.original) {
+      proto.addEventListener = state.original
+      state.original = null
+    }
   }
 }
 
@@ -198,7 +199,9 @@ if (typeof window !== 'undefined') {
         viewportReady.value = false
         return
       }
-      const handle = registerVisibility(el, { rootMargin: '400px' })
+      const configuredRootMargin = (window as any).__MARKSTREAM_CODE_BLOCK_VIEWPORT_ROOT_MARGIN__
+      const rootMargin = typeof configuredRootMargin === 'string' ? configuredRootMargin : '400px'
+      const handle = registerVisibility(el, { rootMargin })
       viewportHandle.value = handle
       viewportReady.value = handle.isVisible.value
       handle.whenVisible.then(() => {
@@ -270,6 +273,7 @@ let safeClean = () => {}
 let refreshDiffPresentation: () => Promise<unknown> | unknown = () => {}
 let createEditorPromise: Promise<void> | null = null
 let editorRuntimeCreationPromise: Promise<void> | null = null
+let monacoRuntimePromise: Promise<void> | null = null
 let detectLanguage: (code: string) => string = () => String(props.node.language ?? 'plaintext')
 let setTheme: (theme: CodeBlockMonacoTheme | undefined) => Promise<void> | void = async () => {}
 let pendingDiffResultErrorFilterInstalled = false
@@ -479,9 +483,15 @@ const currentEditorKind = ref<'diff' | 'single'>(desiredEditorKind.value)
 const usePreCodeRender = ref(false)
 const editorDisplayReady = ref(false)
 const editorCreationFailed = ref(false)
+const failedEditorCreationKey = ref<string | null>(null)
+const editorCreationContentRevision = ref(0)
+const editorCreationSettledContentGeneration = ref(0)
 const diffFallbackExitActive = ref(false)
 const diffFallbackFadingOut = ref(false)
 let diffFallbackExitTimer: number | null = null
+let staleContentRetryFailureKey: string | null = null
+let editorCreationFailureRetryInProgress = false
+let editorCreationFailureKeyRetriedKey: string | null = null
 const preFallbackWrap = computed(() => {
   if (isDiff.value) {
     const diffWordWrap = resolvedMonacoOptions.value?.diffWordWrap
@@ -548,6 +558,11 @@ const restoreVisualPending = computed(() =>
   && !editorCreationFailed.value
   && (showPreWhileMonacoLoads.value || diffFallbackExitActive.value || diffFallbackFadingOut.value),
 )
+const codeBlockEnhancementState = computed(() => {
+  if (editorDisplayReady.value && !usePreCodeRender.value)
+    return 'ready'
+  return editorCreationFailed.value ? 'fallback' : 'pending'
+})
 const showInlinePreview = ref(false)
 const displayCode = computed(() => getDisplayCode(props.node.code, props.node.loading === true))
 const preCodeNode = computed(() => {
@@ -566,62 +581,67 @@ const preCodeNode = computed(() => {
     diff: true,
   }
 })
-// Defer client-only editor initialization to the browser to avoid SSR errors
-if (typeof window !== 'undefined') {
-  ;(async () => {
+async function ensureMonacoRuntime() {
+  if (typeof window === 'undefined' || isUnmounted)
+    return
+  if (monacoReady.value || usePreCodeRender.value)
+    return
+  if (monacoRuntimePromise)
+    return monacoRuntimePromise
+
+  const pending = (async () => {
     try {
       const mod = await getUseMonaco()
       if (isUnmounted)
         return
-      // If mod is null, stream-monaco is not available
       if (!mod) {
-        // Only log warning in development mode
         if (import.meta.env?.DEV) {
           console.warn('[markstream-vue] stream-monaco is not installed. Code blocks will use basic rendering. Install stream-monaco for enhanced code editor features.')
         }
         usePreCodeRender.value = true
         return
       }
-      // `useMonaco` and `detectLanguage` should be available
       const useMonaco = mod.useMonaco
       const det = mod.detectLanguage
       if (typeof det === 'function')
         detectLanguage = det
-      if (typeof useMonaco === 'function') {
-        const theme = resolveRequestedTheme()
-        if (theme && props.themes && Array.isArray(props.themes) && !props.themes.includes(theme)) {
-          throw new Error('Preferred theme not in provided themes array')
-        }
-        runtimeMonacoOptions = buildRuntimeMonacoOptions()
-        const helpers = useMonaco(runtimeMonacoOptions)
-        createEditor = helpers.createEditor || createEditor
-        createDiffEditor = helpers.createDiffEditor || createDiffEditor
-        updateCode = helpers.updateCode || updateCode
-        updateDiffCode = helpers.updateDiff || updateDiffCode
-        getEditor = helpers.getEditor || getEditor
-        getEditorView = helpers.getEditorView || getEditorView
-        getDiffEditorView = helpers.getDiffEditorView || getDiffEditorView
-        cleanupEditor = helpers.cleanupEditor || cleanupEditor
-        safeClean = helpers.safeClean || helpers.cleanupEditor || safeClean
-        refreshDiffPresentation = helpers.refreshDiffPresentation || refreshDiffPresentation
-        setTheme = helpers.setTheme || setTheme
-        monacoReady.value = true
+      if (typeof useMonaco !== 'function')
+        return
 
-        if (!isUnmounted && codeEditor.value)
-          await ensureEditorCreation(codeEditor.value as HTMLElement)
-      }
+      const theme = resolveRequestedTheme()
+      if (theme && props.themes && Array.isArray(props.themes) && !props.themes.includes(theme))
+        throw new Error('Preferred theme not in provided themes array')
+
+      runtimeMonacoOptions = buildRuntimeMonacoOptions()
+      const helpers = useMonaco(runtimeMonacoOptions)
+      createEditor = helpers.createEditor || createEditor
+      createDiffEditor = helpers.createDiffEditor || createDiffEditor
+      updateCode = helpers.updateCode || updateCode
+      updateDiffCode = helpers.updateDiff || updateDiffCode
+      getEditor = helpers.getEditor || getEditor
+      getEditorView = helpers.getEditorView || getEditorView
+      getDiffEditorView = helpers.getDiffEditorView || getDiffEditorView
+      cleanupEditor = helpers.cleanupEditor || cleanupEditor
+      safeClean = helpers.safeClean || helpers.cleanupEditor || safeClean
+      refreshDiffPresentation = helpers.refreshDiffPresentation || refreshDiffPresentation
+      setTheme = helpers.setTheme || setTheme
+      monacoReady.value = true
     }
     catch (err) {
       if (isUnmounted)
         return
-      // Only log warning in development mode
-      if (import.meta.env?.DEV) {
+      if (import.meta.env?.DEV)
         console.warn('[markstream-vue] Failed to initialize Monaco editor:', err)
-      }
-      // Use PreCodeNode for rendering
       usePreCodeRender.value = true
     }
   })()
+
+  const currentPromise = pending.finally(() => {
+    if (monacoRuntimePromise === currentPromise)
+      monacoRuntimePromise = null
+  })
+  monacoRuntimePromise = currentPromise
+  return currentPromise
 }
 
 const codeFontMin = 10
@@ -2872,6 +2892,7 @@ async function runEditorCreation(el: HTMLElement) {
     return
 
   editorCreationFailed.value = false
+  failedEditorCreationKey.value = null
   editorRuntimeCreated.value = false
   editorDisplayReady.value = false
   diffFallbackExitActive.value = false
@@ -2966,8 +2987,15 @@ async function runEditorCreation(el: HTMLElement) {
   await revealEditorDisplay()
 }
 
-function ensureEditorCreation(el: HTMLElement) {
+function ensureEditorCreation(el: HTMLElement, options: { allowStaleContentRetry?: boolean } = {}) {
   if (!createEditor || isUnmounted)
+    return null
+  if (props.stream === false && props.loading !== false)
+    return null
+  clearEditorCreationFailureIfKeyChanged()
+  if (isEditorCreationBlocked())
+    return null
+  if (usePreCodeRender.value || codeEditor.value !== el)
     return null
   if (shouldDeferStreamingEditorCreation())
     return null
@@ -2976,20 +3004,60 @@ function ensureEditorCreation(el: HTMLElement) {
   if (editorCreated.value && editorMounted.value)
     return Promise.resolve()
 
+  const attemptFailureKey = getEditorCreationFailureKey()
+  const attemptContentRevision = editorCreationContentRevision.value
+  let retryCurrentSignature = false
   editorCreated.value = true
   markLifecyclePending()
   const pending = (async () => {
-    await withMonacoPassiveTouchListeners(() => runEditorCreation(el))
+    try {
+      await withMonacoPassiveTouchListeners(() => runEditorCreation(el))
+      staleContentRetryFailureKey = null
+    }
+    catch (error) {
+      const currentFailureKey = getEditorCreationFailureKey()
+      const contentChangedDuringCreation = attemptContentRevision !== editorCreationContentRevision.value
+      const canRetryStaleContent = options.allowStaleContentRetry !== false
+        && contentChangedDuringCreation
+        && staleContentRetryFailureKey !== currentFailureKey
+      if (attemptFailureKey !== currentFailureKey || canRetryStaleContent) {
+        if (canRetryStaleContent)
+          staleContentRetryFailureKey = currentFailureKey
+        retryCurrentSignature = true
+        editorCreated.value = false
+        editorMounted.value = false
+        editorRuntimeCreated.value = false
+        editorDisplayReady.value = false
+        return
+      }
+      markEditorCreationFailed(attemptFailureKey)
+      throw error
+    }
   })()
 
   const currentPromise = pending.finally(() => {
     if (createEditorPromise === currentPromise)
       createEditorPromise = null
     markLifecycleSettled()
+    if (retryCurrentSignature && !isUnmounted) {
+      queueMicrotask(() => {
+        const currentEl = codeEditor.value
+        if (!currentEl || isUnmounted)
+          return
+        ensureEditorCreation(currentEl as HTMLElement)?.catch((error) => {
+          warnCodeBlockDev('Failed to mount Monaco editor after stale creation failed', error)
+          editorMounted.value = false
+          editorDisplayReady.value = false
+          markEditorCreationFailed()
+        })
+      })
+    }
   })
   createEditorPromise = currentPromise
   return currentPromise
 }
+
+let createEditorWatchEpoch = 0
 
 // 延迟创建编辑器：仅在可见且准备就绪时创建，避免无意义的初始化
 const stopCreateEditorWatch = watch(
@@ -3004,9 +3072,12 @@ const stopCreateEditorWatch = watch(
     props.node.loading,
   ] as const,
   async ([el, _isDiff, stream, loading, _monacoReady, visible]) => {
-    if (!el || !createEditor)
+    const watchEpoch = ++createEditorWatchEpoch
+    if (!el)
       return
     if (!visible)
+      return
+    if (editorCreationFailureRetryInProgress)
       return
 
     // If streaming is disabled, defer editor creation until loading is finished
@@ -3014,6 +3085,27 @@ const stopCreateEditorWatch = watch(
       return
     if (shouldDeferStreamingEditorCreation())
       return
+    if (!createEditor) {
+      await ensureMonacoRuntime()
+      if (watchEpoch !== createEditorWatchEpoch)
+        return
+      if (props.stream === false && props.loading !== false)
+        return
+      if (shouldDeferStreamingEditorCreation())
+        return
+      if (!viewportReady.value)
+        return
+      if (
+        !createEditor
+        || usePreCodeRender.value
+        || editorCreated.value
+        || isEditorCreationBlocked()
+        || isUnmounted
+        || codeEditor.value !== el
+      ) {
+        return
+      }
+    }
 
     const creation = ensureEditorCreation(el as HTMLElement)
     if (!creation)
@@ -3027,10 +3119,11 @@ const stopCreateEditorWatch = watch(
       warnCodeBlockDev('Failed to mount Monaco editor', error)
       editorMounted.value = false
       editorDisplayReady.value = false
-      editorCreationFailed.value = true
+      markEditorCreationFailed()
     }
 
-    stopCreateEditorWatch()
+    if (editorMounted.value && editorDisplayReady.value)
+      stopCreateEditorWatch()
   },
 )
 
@@ -3079,7 +3172,7 @@ watch(
       // Keep fallback rendering if recreation fails.
       editorMounted.value = false
       editorDisplayReady.value = false
-      editorCreationFailed.value = true
+      markEditorCreationFailed()
     }
   },
 )
@@ -3318,6 +3411,106 @@ const monacoStructuralSignature = computed(() => JSON.stringify({
   originalEditable: resolvedMonacoOptions.value?.originalEditable ?? false,
 }))
 
+const editorCreationOptionsRevision = ref(0)
+
+watch(
+  () => [props.monacoOptions, props.theme, props.themes, props.lightTheme, props.darkTheme] as const,
+  () => {
+    editorCreationOptionsRevision.value += 1
+  },
+  { deep: true },
+)
+
+watch(
+  () => [
+    displayCode.value,
+    props.node.originalCode,
+    props.node.updatedCode,
+  ] as const,
+  () => {
+    editorCreationContentRevision.value += 1
+    if (!isCodeBlockLoading())
+      editorCreationSettledContentGeneration.value += 1
+  },
+)
+
+function getEditorCreationFailureKey() {
+  const requestedTheme = resolveRequestedTheme()
+  return JSON.stringify({
+    kind: desiredEditorKind.value,
+    language: monacoLanguage.value,
+    structural: monacoStructuralSignature.value,
+    optionsRevision: editorCreationOptionsRevision.value,
+    settledContentGeneration: editorCreationSettledContentGeneration.value,
+    theme: getThemeName(requestedTheme) ?? (requestedTheme == null ? null : 'custom'),
+    isDark: props.isDark,
+  })
+}
+
+const editorCreationFailureKey = computed(() => getEditorCreationFailureKey())
+
+function clearEditorCreationFailureIfKeyChanged() {
+  if (!editorCreationFailed.value)
+    return
+  if (failedEditorCreationKey.value === editorCreationFailureKey.value)
+    return
+
+  editorCreationFailed.value = false
+  failedEditorCreationKey.value = null
+  staleContentRetryFailureKey = null
+  editorCreationFailureKeyRetriedKey = null
+  editorCreated.value = false
+  editorMounted.value = false
+  editorRuntimeCreated.value = false
+  editorDisplayReady.value = false
+}
+
+function isEditorCreationBlocked() {
+  clearEditorCreationFailureIfKeyChanged()
+  return editorCreationFailed.value
+    && failedEditorCreationKey.value === editorCreationFailureKey.value
+}
+
+function markEditorCreationFailed(key = editorCreationFailureKey.value) {
+  failedEditorCreationKey.value = key
+  editorCreationFailed.value = true
+}
+
+watch(editorCreationFailureKey, async () => {
+  if (editorCreationFailureRetryInProgress)
+    return
+  if (!editorCreationFailed.value)
+    return
+  if (failedEditorCreationKey.value === editorCreationFailureKey.value)
+    return
+  if (!createEditor || !codeEditor.value || usePreCodeRender.value || isUnmounted || !viewportReady.value)
+    return
+  if (props.stream === false && props.loading !== false)
+    return
+  if (shouldDeferStreamingEditorCreation())
+    return
+
+  const retryKey = editorCreationFailureKey.value
+  editorCreationFailureRetryInProgress = true
+  try {
+    clearEditorCreationFailureIfKeyChanged()
+    if (editorCreationFailed.value)
+      return
+    await ensureEditorCreation(codeEditor.value as HTMLElement)
+  }
+  catch (error) {
+    warnCodeBlockDev('Failed to mount Monaco editor after code block identity changed', error)
+    editorMounted.value = false
+    editorDisplayReady.value = false
+    markEditorCreationFailed()
+  }
+  finally {
+    editorCreationFailureKeyRetriedKey = retryKey
+    await nextTick()
+    editorCreationFailureRetryInProgress = false
+  }
+})
+
 // Watch for monacoOptions changes (deep) and try to update editor options or
 // recreate the editor when necessary.
 watch(
@@ -3383,17 +3576,57 @@ watch(
       clearInlineFoldProxies()
       safeClean()
       await nextTick()
-      await ensureEditorCreation(codeEditor.value as HTMLElement)
+      await ensureEditorCreation(codeEditor.value as HTMLElement, { allowStaleContentRetry: false })
     }
     catch (error) {
       warnCodeBlockDev('Failed to recreate Monaco editor after Monaco options changed', error)
       editorMounted.value = false
       editorDisplayReady.value = false
-      editorCreationFailed.value = true
+      markEditorCreationFailed()
     }
   },
   { flush: 'post' },
 )
+
+async function retryFailedEditorCreationAfterStreamingSettled() {
+  if (!editorCreationFailed.value)
+    return false
+  if (!createEditor || !codeEditor.value || usePreCodeRender.value || isUnmounted || !viewportReady.value)
+    return false
+  if (editorCreationFailureKeyRetriedKey === editorCreationFailureKey.value)
+    return true
+
+  editorCreationFailureRetryInProgress = true
+  try {
+    editorCreationFailed.value = false
+    failedEditorCreationKey.value = null
+    staleContentRetryFailureKey = null
+    editorCreated.value = false
+    editorMounted.value = false
+    editorRuntimeCreated.value = false
+    editorDisplayReady.value = false
+    clearEditorHeightSyncBindings()
+    clearInlineFoldProxies()
+    safeClean()
+    await nextTick()
+
+    try {
+      await ensureEditorCreation(codeEditor.value as HTMLElement)
+    }
+    catch (error) {
+      warnCodeBlockDev('Failed to mount Monaco editor after streaming settled', error)
+      editorMounted.value = false
+      editorDisplayReady.value = false
+      markEditorCreationFailed()
+    }
+  }
+  finally {
+    await nextTick()
+    editorCreationFailureRetryInProgress = false
+  }
+
+  return true
+}
 
 // 当 loading 变为 false 时：计算并缓存一次展开高度
 watch(
@@ -3428,6 +3661,10 @@ watch(
     safeRaf(() => {
       void (async () => {
         try {
+          if (loadingJustFinished && await retryFailedEditorCreationAfterStreamingSettled()) {
+            syncEditorHostHeight(false)
+            return
+          }
           if (loadingJustFinished && editorCreated.value) {
             if (isDiff.value && codeEditor.value) {
               const pendingCreation = createEditorPromise
@@ -3506,6 +3743,7 @@ onUnmounted(() => {
     class="code-block-container rounded-lg border"
     data-markstream-code-block="1"
     :data-markstream-enhanced="editorDisplayReady && !usePreCodeRender ? 'true' : 'false'"
+    :data-markstream-enhancement-state="codeBlockEnhancementState"
     :data-markstream-pending="restoreVisualPending ? 'true' : undefined"
     :class="[
       { 'dark': props.isDark, 'is-rendering': props.loading, 'is-dark': resolvedSurfaceIsDark, 'is-diff': isDiff, 'is-plain-text': isPlainTextLanguage },

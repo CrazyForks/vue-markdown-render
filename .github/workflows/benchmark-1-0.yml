@@ -12,6 +12,7 @@ on:
       - playground-shared/**
       - scripts/benchmark-1-0.mjs
       - scripts/e2e-*-performance.mjs
+      - scripts/web-vitals-budget-checks.mjs
       - package.json
       - pnpm-lock.yaml
       - .github/workflows/benchmark-1-0.yml
@@ -24,6 +25,7 @@ on:
       - playground-shared/**
       - scripts/benchmark-1-0.mjs
       - scripts/e2e-*-performance.mjs
+      - scripts/web-vitals-budget-checks.mjs
       - package.json
       - pnpm-lock.yaml
       - .github/workflows/benchmark-1-0.yml
@@ -40,6 +42,7 @@ jobs:
     timeout-minutes: 30
     env:
       CI: true
+      MARKSTREAM_RELEASE_GATE: '1'
       MARKSTREAM_BENCHMARK_MAX_LONG_TASK_MS: 800
     steps:
       - uses: actions/checkout@v4

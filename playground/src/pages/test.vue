@@ -9,7 +9,7 @@ import type { StreamTransportMode } from '../composables/useStreamSimulator'
 import { Icon } from '@iconify/vue'
 import { useDebounceFn, useLocalStorage, useResizeObserver } from '@vueuse/core'
 import { createDrauu } from 'drauu'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { resolveMarkdownTextareaPaste } from '../../../playground-shared/markdownPaste'
 import { TEST_LAB_FRAMEWORKS, TEST_LAB_SAMPLES } from '../../../playground-shared/testLabFixtures'
 import { buildTestPageHref, buildTestPageHrefAsync, decodeMarkdownHashAsync, resolveFrameworkTestHref, resolveTestPageViewMode, withTestPageViewMode } from '../../../playground-shared/testPageState'
@@ -231,7 +231,8 @@ const mathEnabled = useLocalStorage<boolean>('vmr-test-math-enabled', isKatexEna
 const mermaidEnabled = useLocalStorage<boolean>('vmr-test-mermaid-enabled', isMermaidEnabled())
 const testPageCustomHtmlTags = ['think', 'thinking'] as const
 
-getUseMonaco()
+if (!isBenchmarkMode)
+  getUseMonaco()
 setKaTeXWorker(new KatexWorker())
 setMermaidWorker(new MermaidWorker())
 
@@ -247,6 +248,8 @@ const issueUrl = ref<string>('')
 const editorTextareaRef = ref<HTMLTextAreaElement | null>(null)
 const previewCardRef = ref<HTMLElement | null>(null)
 const previewStageRef = ref<HTMLElement | null>(null)
+const previewRendererRef = ref<unknown | null>(null)
+const testPageInstance = getCurrentInstance()
 const benchmarkRenderPreview = ref(true)
 const annotationDrawSvgRef = ref<SVGSVGElement | null>(null)
 const annotationTextInputRef = ref<HTMLTextAreaElement | null>(null)
@@ -371,14 +374,23 @@ const previewD2MaxHeight = computed(() => 'none')
 const charCount = computed(() => input.value.length)
 const lineCount = computed(() => (input.value ? input.value.split('\n').length : 0))
 const isSharePreviewMode = computed(() => testPageViewMode.value === 'preview')
-const previewIsImmersive = computed(() => isPreviewFullscreen.value || isSharePreviewMode.value)
-const previewViewportPriority = computed(() => previewIsImmersive.value ? false : viewportPriority.value)
-const previewBatchRendering = computed(() => previewIsImmersive.value ? true : batchRendering.value)
-const previewMaxLiveNodes = computed(() => previewIsImmersive.value ? 0 : 320)
-const previewLiveNodeBuffer = computed(() => previewIsImmersive.value ? 180 : 60)
-const previewInitialRenderBatchSize = computed(() => previewIsImmersive.value ? 240 : 40)
-const previewRenderBatchSize = computed(() => previewIsImmersive.value ? 180 : 80)
-const previewRenderBatchDelay = computed(() => previewIsImmersive.value ? 0 : 16)
+const isPreviewPrintExporting = ref(false)
+const isPreviewPrintPreparing = ref(false)
+const isPreviewNativePrintPreparing = ref(false)
+let previewPrintAttemptId = 0
+const previewUsesFullRender = computed(() => isPreviewFullscreen.value || isPreviewPrintPreparing.value || isPreviewNativePrintPreparing.value)
+const previewViewportPriority = computed(() => previewUsesFullRender.value ? false : viewportPriority.value)
+const previewBatchRendering = computed(() => isPreviewNativePrintPreparing.value ? false : previewUsesFullRender.value ? true : batchRendering.value)
+const previewMaxLiveNodes = computed(() => previewUsesFullRender.value ? 0 : 220)
+const previewLiveNodeBuffer = computed(() => previewUsesFullRender.value ? 180 : 60)
+const previewInitialRenderBatchSize = computed(() => previewUsesFullRender.value ? 240 : 40)
+const previewRenderBatchSize = computed(() => previewUsesFullRender.value ? 180 : 80)
+const previewRenderBatchDelay = computed(() => previewUsesFullRender.value ? 0 : 16)
+const previewExportPdfButtonLabel = computed(() => {
+  if (isPreviewPrintExporting.value)
+    return '等待渲染'
+  return isPreviewPrintPreparing.value ? '继续等待 PDF' : '导出 PDF'
+})
 const labShareUsesLocalStorage = ref(false)
 const previewShareUsesLocalStorage = ref(false)
 let shareModeHintRequestId = 0
@@ -388,6 +400,7 @@ const previewShareButtonLabel = computed(() => {
   return previewShareUsesLocalStorage.value ? '复制本地预览链接' : '分享预览'
 })
 const labShareButtonLabel = computed(() => labShareUsesLocalStorage.value ? '复制本地实验页链接' : '复制实验页链接')
+
 const showImmersivePreviewControls = computed(() => !isBenchmarkMode && (isSharePreviewMode.value || isPreviewFullscreen.value))
 const immersiveBackLabel = computed(() => isSharePreviewMode.value ? '打开 Test Page' : '返回编辑')
 const showPreviewAnnotations = computed(() => !isBenchmarkMode && (isSharePreviewMode.value || isPreviewFullscreen.value))
@@ -766,7 +779,10 @@ function openIssueInNewTab() {
 }
 
 function syncPreviewFullscreenState() {
-  isPreviewFullscreen.value = document.fullscreenElement === previewCardRef.value
+  const isFullscreen = document.fullscreenElement === previewCardRef.value
+  isPreviewFullscreen.value = isFullscreen
+  if (!isFullscreen && !isSharePreviewMode.value)
+    cancelPreviewPdfExport()
 }
 
 async function togglePreviewFullscreen() {
@@ -2367,14 +2383,95 @@ function handleEditorPaste(event: ClipboardEvent) {
   input.value = next.nextValue
 }
 
-function exportPreviewAsPdf() {
+function waitForPreviewPaintFrame() {
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => resolve())
+    })
+  })
+}
+
+function isPreviewPrintReady() {
+  const root = previewStageRef.value
+  if (!root)
+    return false
+
+  if (root.querySelector('.node-placeholder, [data-markstream-pending="true"], [data-markstream-mode="loading"], [data-markstream-mode="pending"], [data-markstream-code-block="1"][data-markstream-enhancement-state="pending"], [data-markstream-code-block="1"]:not([data-markstream-enhancement-state]):not([data-markstream-enhanced="true"])'))
+    return false
+
+  return Array.from(root.querySelectorAll('img'))
+    .every(image => image.complete)
+}
+
+async function waitForPreviewPrintReady(timeoutMs = 4000, shouldContinue = () => true) {
+  const startedAt = Date.now()
+
+  await waitForPreviewPaintFrame()
+  while (shouldContinue() && !isPreviewPrintReady() && Date.now() - startedAt < timeoutMs) {
+    await new Promise(resolve => window.setTimeout(resolve, 50))
+    await nextTick()
+    await waitForPreviewPaintFrame()
+  }
+  return shouldContinue() && isPreviewPrintReady()
+}
+
+async function exportPreviewAsPdf() {
+  if (isPreviewPrintExporting.value)
+    return
+
   if (annotationTextDraft.value?.content.trim())
     commitTextAnnotationDraft()
   else
     annotationTextDraft.value = null
 
-  showToast('已打开浏览器打印导出，请在系统对话框里选择“保存为 PDF”。', 'info', 2800)
-  window.print()
+  const attemptId = ++previewPrintAttemptId
+  const isCurrentAttempt = () => previewPrintAttemptId === attemptId
+  isPreviewPrintPreparing.value = true
+  isPreviewPrintExporting.value = true
+  try {
+    await nextTick()
+    const isReady = await waitForPreviewPrintReady(4000, () => isCurrentAttempt() && isPreviewPrintPreparing.value)
+    if (!isCurrentAttempt())
+      return
+    if (!showImmersivePreviewControls.value) {
+      isPreviewPrintPreparing.value = false
+      return
+    }
+    if (!isReady) {
+      showToast('仍有内容未渲染完成，可继续等待或取消导出。', 'warning', 3200)
+      return
+    }
+
+    showToast('已打开浏览器打印导出，请在系统对话框里选择“保存为 PDF”。', 'info', 2800)
+    window.print()
+    if (isCurrentAttempt())
+      isPreviewPrintPreparing.value = false
+  }
+  finally {
+    if (isCurrentAttempt())
+      isPreviewPrintExporting.value = false
+  }
+}
+
+function cancelPreviewPdfExport() {
+  previewPrintAttemptId += 1
+  isPreviewPrintPreparing.value = false
+  isPreviewPrintExporting.value = false
+}
+
+function flushPreviewPrintStateSync() {
+  (testPageInstance as any)?.update?.()
+  ;(previewRendererRef.value as any)?.$?.update?.()
+}
+
+function onBeforeNativePrint() {
+  isPreviewNativePrintPreparing.value = true
+  flushPreviewPrintStateSync()
+}
+
+function onAfterNativePrint() {
+  isPreviewNativePrintPreparing.value = false
+  flushPreviewPrintStateSync()
 }
 
 async function restoreFromUrl() {
@@ -2406,6 +2503,7 @@ function restoreViewModeFromUrl() {
 }
 
 async function exitSharedPreview() {
+  cancelPreviewPdfExport()
   testPageViewMode.value = 'lab'
   const full = await generateShareLink('lab', { silent: true })
   shareUrl.value = full
@@ -2524,7 +2622,8 @@ async function initializeTestPage() {
   window.addEventListener('pointerup', onAnnotationSelectionPointerUp, { passive: false })
   window.addEventListener('pointercancel', onAnnotationSelectionPointerUp, { passive: false })
   window.addEventListener('keydown', onAnnotationShortcutKeydown)
-  void refreshShareModeHints()
+  if (!isBenchmarkMode && !isSharePreviewMode.value)
+    void refreshShareModeHints()
 }
 
 onMounted(() => {
@@ -2534,12 +2633,17 @@ onMounted(() => {
       benchmarkRenderPreview.value = false
     }
   }
+  window.addEventListener('beforeprint', onBeforeNativePrint)
+  window.addEventListener('afterprint', onAfterNativePrint)
   void initializeTestPage()
 })
 
 onBeforeUnmount(() => {
+  cancelPreviewPdfExport()
   const benchmarkWindow = window as Window & { __markstreamBenchmarkUnmount?: () => void }
   delete benchmarkWindow.__markstreamBenchmarkUnmount
+  window.removeEventListener('beforeprint', onBeforeNativePrint)
+  window.removeEventListener('afterprint', onAfterNativePrint)
   document.removeEventListener('fullscreenchange', syncPreviewFullscreenState)
   window.removeEventListener('pointermove', onAnnotationSelectionPointerMove)
   window.removeEventListener('pointerup', onAnnotationSelectionPointerUp)
@@ -2585,7 +2689,8 @@ watch(input, (value, previousValue) => {
   copiedShareTarget.value = null
   if (!isStreaming.value && typeof window !== 'undefined')
     shareUrl.value = currentBasePageUrl()
-  refreshShareModeHintsDebounced()
+  if (!isBenchmarkMode && !isSharePreviewMode.value)
+    refreshShareModeHintsDebounced()
   if (sandboxAutoSync.value)
     syncSandboxDebounced()
   persistAnnotationCacheDebounced()
@@ -2696,7 +2801,7 @@ watch(mermaidEnabled, (enabled) => {
 </script>
 
 <template>
-  <div class="test-lab" :class="{ 'test-lab--dark': isDark, 'dark': isDark, 'test-lab--share-preview': isSharePreviewMode }">
+  <div class="test-lab" :class="{ 'test-lab--dark': isDark, 'dark': isDark, 'test-lab--share-preview': isSharePreviewMode, 'test-lab--benchmark': isBenchmarkMode }">
     <div v-if="!isSharePreviewMode" class="test-lab__glow test-lab__glow--1" />
     <div v-if="!isSharePreviewMode" class="test-lab__glow test-lab__glow--2" />
     <div v-if="!isSharePreviewMode" class="test-lab__glow test-lab__glow--3" />
@@ -3061,9 +3166,20 @@ watch(mermaidEnabled, (enabled) => {
                 <button
                   type="button"
                   class="ghost-button preview-immersive-toolbar__button"
+                  data-testid="preview-export-pdf-button"
+                  :disabled="isPreviewPrintExporting"
                   @click="exportPreviewAsPdf"
                 >
-                  导出 PDF
+                  {{ previewExportPdfButtonLabel }}
+                </button>
+                <button
+                  v-if="isPreviewPrintPreparing"
+                  type="button"
+                  class="ghost-button preview-immersive-toolbar__button"
+                  data-testid="preview-cancel-pdf-button"
+                  @click="cancelPreviewPdfExport"
+                >
+                  取消导出
                 </button>
                 <div v-if="showAnnotationToolbar" class="preview-annotation-toolbar">
                   <span class="preview-annotation-toolbar__hint">
@@ -3180,12 +3296,13 @@ watch(mermaidEnabled, (enabled) => {
               </div>
             </header>
 
-            <div class="preview-surface">
+            <div class="preview-surface" :tabindex="isBenchmarkMode ? 0 : undefined">
               <div v-if="!isBenchmarkMode" class="preview-surface__grid" />
               <div class="preview-stage-frame">
                 <div ref="previewStageRef" class="preview-stage">
                   <MarkdownRender
                     v-if="benchmarkRenderPreview"
+                    ref="previewRendererRef"
                     :content="previewContent"
                     :custom-html-tags="testPageCustomHtmlTags"
                     :is-dark="isDark"
@@ -3201,6 +3318,7 @@ watch(mermaidEnabled, (enabled) => {
                     :initial-render-batch-size="previewInitialRenderBatchSize"
                     :render-batch-size="previewRenderBatchSize"
                     :render-batch-delay="previewRenderBatchDelay"
+                    :fade="!isBenchmarkMode"
                     code-block-dark-theme="vitesse-dark"
                     code-block-light-theme="vitesse-light"
                     :code-block-monaco-options="testPageMonacoOptions"
@@ -3650,6 +3768,11 @@ watch(mermaidEnabled, (enabled) => {
 
 .test-lab--share-preview {
   padding: 0;
+}
+
+.test-lab--benchmark :deep(*) {
+  animation: none !important;
+  transition: none !important;
 }
 
 /* ─── Background Glows ─── */

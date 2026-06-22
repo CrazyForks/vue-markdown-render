@@ -1,5 +1,5 @@
 import type { Ref } from 'vue'
-import { inject, provide, ref } from 'vue'
+import { inject, provide, ref, watch } from 'vue'
 
 // Injection key for viewport-priority registration
 const ViewportPriorityKey = Symbol('ViewportPriority') as unknown as InjectionKey<RegisterFn>
@@ -109,7 +109,21 @@ export function provideViewportPriority(
     cleanupObserver()
   }
 
+  watch(
+    enabledRef,
+    (enabled) => {
+      if (enabled)
+        return
+      for (const target of Array.from(targets.keys()))
+        settleTarget(target)
+      clearIdleJob()
+    },
+    { flush: 'sync' },
+  )
+
   function scheduleIdleDrain() {
+    if ((window as any).__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__ === true)
+      return
     if (!requestIdle || idleJob != null || !idleQueue.size)
       return
     idleJob = requestIdle(() => {
@@ -262,6 +276,8 @@ export function useViewportPriority() {
   }
 
   const scheduleLocalIdleDrain = () => {
+    if ((window as any).__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__ === true)
+      return
     if (!requestIdle || localIdleJob != null || !localIdleQueue.size)
       return
     localIdleJob = requestIdle(() => {

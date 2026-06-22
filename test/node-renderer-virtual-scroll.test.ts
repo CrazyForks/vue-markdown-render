@@ -1159,6 +1159,75 @@ describe('node renderer virtual-scroll coordination', () => {
     }
   })
 
+  it('keeps full-render batches cancellable before all nodes mount', async () => {
+    const originalNodeEnv = process.env.NODE_ENV
+    const frames = new Map<number, FrameRequestCallback>()
+    let nextFrameId = 1
+    let wrapper: ReturnType<typeof mount> | null = null
+    const nodes = Array.from({ length: 200 }, (_, index) => createParagraph(index + 1))
+
+    process.env.NODE_ENV = 'development'
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      const frameId = nextFrameId++
+      frames.set(frameId, callback)
+      return frameId
+    })
+    vi.stubGlobal('cancelAnimationFrame', (frameId: number) => {
+      frames.delete(frameId)
+    })
+
+    const flushFrames = async () => {
+      await nextTick()
+      const pending = Array.from(frames.values())
+      frames.clear()
+      for (const callback of pending)
+        callback(performance.now())
+      await nextTick()
+    }
+
+    try {
+      const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+
+      wrapper = mount(NodeRenderer, {
+        attachTo: document.body,
+        props: {
+          nodes,
+          final: true,
+          batchRendering: true,
+          maxLiveNodes: 0,
+          initialRenderBatchSize: 8,
+          renderBatchSize: 8,
+          renderBatchDelay: 1000,
+          fade: false,
+          viewportPriority: false,
+          virtualScroll: {
+            enabled: true,
+            sessionKey: 'pdf-full-render-cancel',
+            settleMode: 'manual',
+            settledToken: true,
+          },
+        },
+      })
+
+      await flushAll()
+
+      const renderedBeforeCancel = getRootNodeContentElements(wrapper.element).length
+      expect(renderedBeforeCancel).toBeGreaterThan(0)
+      expect(renderedBeforeCancel).toBeLessThan(nodes.length)
+
+      await wrapper.setProps({ maxLiveNodes: 12 })
+      await flushFrames()
+
+      const renderedAfterCancel = getRootNodeContentElements(wrapper.element).length
+      expect(renderedAfterCancel).toBeGreaterThanOrEqual(renderedBeforeCancel)
+      expect(renderedAfterCancel).toBeLessThan(nodes.length)
+    }
+    finally {
+      wrapper?.unmount()
+      process.env.NODE_ENV = originalNodeEnv
+    }
+  })
+
   it('invalidates measured heights when node content changes in the same session', async () => {
     const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default

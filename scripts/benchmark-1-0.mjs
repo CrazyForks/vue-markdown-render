@@ -41,6 +41,14 @@ const scenarios = [
     env: {},
     notes: 'Runs /?benchmark=1 in the main AI chat playground, full-scrolls the reverse-flex viewport, and replays streaming.',
   },
+  {
+    id: 'web-vitals-performance',
+    title: 'Web Vitals / restore and scroll',
+    command: ['node', ['scripts/e2e-web-vitals-performance.mjs']],
+    env: {},
+    resultPathEnv: 'WEB_VITALS_JSON_PATH',
+    notes: 'Runs lab LCP, phase CLS, Event Timing, trace, and DOM probes for million-character restore, scroll recovery, and Monaco code block interaction.',
+  },
 ]
 const requiredScenarioIds = scenarios.map(scenario => scenario.id)
 
@@ -71,6 +79,14 @@ function formatNumber(value) {
     : '-'
 }
 
+function formatViewport(value) {
+  if (typeof value === 'string')
+    return value
+  if (value && typeof value === 'object' && Number.isFinite(value.width) && Number.isFinite(value.height))
+    return `${value.width} x ${value.height}`
+  return '-'
+}
+
 async function resolveGitSha() {
   if (process.env.GITHUB_SHA)
     return process.env.GITHUB_SHA
@@ -78,7 +94,7 @@ async function resolveGitSha() {
 }
 
 function phaseFrameSampleCount(row) {
-  return row.scrollFrameSampleCount ?? row.frameSampleCount
+  return row.scrollFrameSampleCount ?? row.frameSampleCount ?? row.frameCount
 }
 
 function phaseFrameP95Ms(row) {
@@ -167,6 +183,21 @@ async function runCommand(command, args, env) {
 
 function readJsonFile(filePath) {
   return JSON.parse(readFileSync(filePath, 'utf8'))
+}
+
+function tryReadJsonFile(filePath) {
+  if (!existsSync(filePath))
+    return { result: undefined, error: undefined }
+
+  try {
+    return { result: readJsonFile(filePath), error: undefined }
+  }
+  catch (error) {
+    return {
+      result: undefined,
+      error: error instanceof Error ? error.message : String(error),
+    }
+  }
 }
 
 function resultPathForScenario(scenario) {
@@ -265,6 +296,21 @@ function scenarioRows(entry) {
     rows.push({ scenario: entry.title, phase: 'stream replay', row: result.replay, heavyBlockScope: 'all', memoryAfterUnmountBytes: result.memoryAfterUnmountBytes })
   }
 
+  if (entry.id === 'web-vitals-performance') {
+    if (result.millionRestore?.restore)
+      rows.push({ scenario: entry.title, phase: 'million restore navigation', row: result.millionRestore.restore, heavyBlockScope: 'all' })
+    if (result.millionRestore?.scroll)
+      rows.push({ scenario: entry.title, phase: 'million scripted scroll', row: result.millionRestore.scroll, heavyBlockScope: 'all' })
+    for (const interaction of result.millionRestore?.interactions ?? [])
+      rows.push({ scenario: entry.title, phase: `million interaction ${interaction.label}`, row: interaction, viewport: result.millionRestore?.viewport, heavyBlockScope: 'all' })
+    if (result.codeblockMonaco?.initial)
+      rows.push({ scenario: entry.title, phase: 'codeblock initial', row: result.codeblockMonaco.initial, heavyBlockScope: 'visible' })
+    if (result.codeblockMonaco?.scroll)
+      rows.push({ scenario: entry.title, phase: 'codeblock scripted scroll', row: result.codeblockMonaco.scroll, heavyBlockScope: 'visible' })
+    for (const interaction of result.codeblockMonaco?.interactions ?? [])
+      rows.push({ scenario: entry.title, phase: `codeblock interaction ${interaction.label}`, row: interaction, viewport: result.codeblockMonaco?.viewport, heavyBlockScope: 'visible' })
+  }
+
   return rows
 }
 
@@ -294,13 +340,27 @@ function renderMarkdownReport(report) {
   lines.push('')
   lines.push('## Results')
   lines.push('')
-  lines.push('| Scenario | Phase | LCP ms | CLS | Settle ms | Frame samples | Frame p95 ms | Heavy settle frame samples | Heavy settle frame p95 ms | Max long task ms | Page DOM nodes | Renderer DOM nodes | Parse stream | Fallbacks | Heavy blocks readiness | Scroll drift px | Heap after renderer unmount + GC |')
-  lines.push('| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | ---: | ---: |')
+  lines.push('| Scenario | Phase | Viewport | LCP ms | CLS | INP candidate ms | Max input delay ms | Max event processing ms | Settle ms | Frame samples | Frame p95 ms | Heavy settle frame samples | Heavy settle frame p95 ms | Max long task ms | Page DOM nodes | Renderer DOM nodes | Parse stream | Fallbacks | Heavy blocks readiness | Scroll drift px | Heap after renderer unmount + GC |')
+  lines.push('| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | ---: | ---: |')
 
   for (const entry of report.scenarios) {
     for (const item of scenarioRows(entry)) {
       const row = item.row ?? {}
-      lines.push(`| ${item.scenario} | ${item.phase} | ${formatMs(row.lcpMs)} | ${typeof row.cls === 'number' ? row.cls.toFixed(4) : '-'} | ${formatMs(row.settleTimeMs)} | ${formatNumber(phaseFrameSampleCount(row))} | ${formatMs(phaseFrameP95Ms(row))} | ${formatNumber(row.heavySettleFrameSampleCount)} | ${formatMs(row.heavySettleFrameP95Ms)} | ${formatMs(row.longTaskMaxMs)} | ${formatNumber(row.pageDomNodeCount)} | ${formatNumber(row.rendererDomNodeCount)} | ${parsePerformanceSummary(row)} | ${fallbackSummary(row)} | ${heavyBlockSummary(row, item.heavyBlockScope)} | ${formatMs(row.scrollDriftPx)} | ${formatBytes(item.memoryAfterUnmountBytes)} |`)
+      const cls = row.cls ?? row.phaseCls
+      const settleMs = row.settleTimeMs ?? row.phaseElapsedMs
+      const viewport = row.viewport ?? item.viewport ?? report.environment.defaultViewport
+      lines.push(`| ${item.scenario} | ${item.phase} | ${formatViewport(viewport)} | ${formatMs(row.lcpMs)} | ${typeof cls === 'number' ? cls.toFixed(4) : '-'} | ${formatMs(row.eventTimingInpCandidateMs)} | ${formatMs(row.eventTimingMaxInputDelayMs)} | ${formatMs(row.eventTimingMaxProcessingMs)} | ${formatMs(settleMs)} | ${formatNumber(phaseFrameSampleCount(row))} | ${formatMs(phaseFrameP95Ms(row))} | ${formatNumber(row.heavySettleFrameSampleCount)} | ${formatMs(row.heavySettleFrameP95Ms)} | ${formatMs(row.longTaskMaxMs)} | ${formatNumber(row.pageDomNodeCount)} | ${formatNumber(row.rendererDomNodeCount)} | ${parsePerformanceSummary(row)} | ${fallbackSummary(row)} | ${heavyBlockSummary(row, item.heavyBlockScope)} | ${formatMs(row.scrollDriftPx)} | ${formatBytes(item.memoryAfterUnmountBytes)} |`)
+    }
+  }
+
+  const warningScenarios = report.scenarios.filter(entry => Array.isArray(entry.result?.warnings) && entry.result.warnings.length > 0)
+  if (warningScenarios.length) {
+    lines.push('')
+    lines.push('## Scenario Warnings')
+    lines.push('')
+    for (const entry of warningScenarios) {
+      for (const warning of entry.result.warnings)
+        lines.push(`- **${entry.title}**: ${warning}`)
     }
   }
 
@@ -315,6 +375,10 @@ function renderMarkdownReport(report) {
       lines.push('```txt')
       lines.push(String(entry.error || 'Unknown benchmark failure').slice(0, 8000))
       lines.push('```')
+      if (entry.resultReadError) {
+        lines.push('')
+        lines.push(`Result JSON read error: ${entry.resultReadError}`)
+      }
       lines.push('')
     }
   }
@@ -325,7 +389,7 @@ function renderMarkdownReport(report) {
   for (const entry of report.scenarios)
     lines.push(`- **${entry.title}**: ${entry.notes}`)
   lines.push('')
-  lines.push('This report records measured release evidence from the shipped playgrounds. Initial rows report readiness for heavy blocks visible in the phase viewport, and show N/A when that viewport contains no heavy blocks. Full-scroll rows report all heavy blocks after the scroll pass. Page DOM nodes are recorded for diagnostics; renderer DOM nodes are scoped to the benchmark surface and are the value used by the release gate. Parse stream metrics record renderer parse commits, coalesced smooth-stream parse updates, and markdown-it stream parser full/append/tail/cache counters. Frame p95 is the phase-local p95 `requestAnimationFrame` delta; for full-scroll rows it covers only the active scroll loop. Heavy-settle frame p95 covers post-scroll heavy block readiness separately. Frame p95 values are reported for review, but are not a 1.0 hard release gate. Raw scrollTop drift is recorded for diagnostics but is not a 1.0 release gate. Heap after renderer unmount is best-effort Chrome-only `performance.memory` after unmount plus GC. Keep benchmark claims tied to this environment disclosure and rerun before publishing 1.0.')
+  lines.push('This report records measured release evidence from the shipped playgrounds. The environment viewport is mixed because Web Vitals scenarios use row-specific viewports; use the Results table viewport column when citing LCP, CLS, visible heavy-block readiness, or DOM-node counts. Initial rows report readiness for heavy blocks visible in the phase viewport, and show N/A when that viewport contains no heavy blocks. Full-scroll rows report all heavy blocks after the scroll pass. Page DOM nodes are recorded for diagnostics; renderer DOM nodes are scoped to the benchmark surface and are the value used by the release gate. Parse stream metrics record renderer parse commits, coalesced smooth-stream parse updates, and markdown-it stream parser full/append/tail/cache counters. Frame p95 is the phase-local p95 `requestAnimationFrame` delta; for full-scroll rows it covers only the active scroll loop. Heavy-settle frame p95 covers post-scroll heavy block readiness separately. Web Vitals frame p95/max and sample density are hard release-gate metrics. Raw scrollTop drift is recorded for diagnostics but is not a 1.0 release gate. Heap after renderer unmount is best-effort Chrome-only `performance.memory` after unmount plus GC. Keep benchmark claims tied to this environment disclosure and rerun before publishing 1.0.')
   return `${lines.join('\n')}\n`
 }
 
@@ -366,7 +430,8 @@ async function run() {
       cpu: cpus()[0]?.model ?? 'unknown',
       totalMemoryBytes: totalmem(),
       browser,
-      viewport: '1600 x 1200',
+      defaultViewport: '1600 x 1200',
+      viewport: 'mixed; default 1600 x 1200, row-specific overrides in Results',
       serverMode,
     },
     scenarios: [],
@@ -386,30 +451,39 @@ async function run() {
     console.error(`[benchmark:1.0] ${scenario.title}`)
     try {
       rmSync(resultPath, { force: true })
+      const resultPathEnv = scenario.resultPathEnv || 'BENCHMARK_JSON_PATH'
       await runCommand(command, args, {
         ...scenario.env,
-        BENCHMARK_JSON_PATH: resultPath,
+        [resultPathEnv]: resultPath,
         PLAYGROUND_PERFORMANCE_SERVER: 'preview',
       })
+      const resultRead = tryReadJsonFile(resultPath)
+      if (resultRead.error)
+        throw new Error(`Failed to read benchmark result ${path.relative(repoRoot, resultPath)}: ${resultRead.error}`)
+      if (!resultRead.result)
+        throw new Error(`Benchmark did not write result file ${path.relative(repoRoot, resultPath)}.`)
       report.scenarios.push({
         id: scenario.id,
         title: scenario.title,
         notes: scenario.notes,
         env: scenario.env,
         status: 'passed',
-        result: readJsonFile(resultPath),
+        result: resultRead.result,
       })
       writeReportFiles(report, true)
     }
     catch (error) {
       const message = error instanceof Error ? error.message : String(error)
+      const resultRead = tryReadJsonFile(resultPath)
       report.scenarios.push({
         id: scenario.id,
         title: scenario.title,
         notes: scenario.notes,
         env: scenario.env,
         status: 'failed',
+        result: resultRead.result,
         error: message,
+        ...(resultRead.error ? { resultReadError: resultRead.error } : {}),
       })
       failedScenarios.push(scenario.title)
       writeReportFiles(report, true)

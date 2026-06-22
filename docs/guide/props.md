@@ -164,7 +164,7 @@ Use `html-policy="escape"` when you want literal HTML text to stay visible inste
 
 | Prop | Default | Notes |
 | ---- | ------- | ----- |
-| `max-live-nodes` | `320` | Virtualization threshold; set `0` to disable virtualization (renders everything). |
+| `max-live-nodes` | `220` | Virtualization threshold; set `0` to disable virtualization (renders everything). |
 | `live-node-buffer` | `60` | Overscan window (how many nodes to keep before/after the focus range). |
 | `batch-rendering` | `true` | Incremental rendering batches (only when `max-live-nodes <= 0`). |
 | `smooth-streaming` | `'auto'` | Built-in stream pacing in typewriter/incremental mode (`typewriter` or `max-live-nodes <= 0`). Set `true` to force-enable, `false` for raw chunk cadence. |

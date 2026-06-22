@@ -90,6 +90,7 @@ const codeBlockContent = ref<HTMLElement | null>(null)
 const rendererTarget = ref<HTMLElement | null>(null)
 const fallbackHtml = ref('')
 const rendererReady = ref(false)
+const rendererFallbackTerminal = ref(false)
 let renderObserver: MutationObserver | undefined
 let lastCommittedRenderSignature = ''
 let rendererMutationVersion = 0
@@ -230,14 +231,16 @@ function escapeHtml(str: string) {
     .replace(/'/g, '&#39;')
 }
 
-function renderFallback(code: string) {
+function renderFallback(code: string, options: { terminal?: boolean } = {}) {
   pendingRenderSignature = null
   disconnectReadyObserver()
+  rendererFallbackTerminal.value = options.terminal === true
   if (!code) {
     clearRendererTarget()
     lastCommittedRenderSignature = ''
     fallbackHtml.value = ''
     rendererReady.value = false
+    rendererFallbackTerminal.value = false
     return
   }
   fallbackHtml.value = `<pre class="shiki shiki-fallback"><code>${escapeHtml(code)}</code></pre>`
@@ -247,6 +250,7 @@ function renderFallback(code: string) {
 function clearFallback() {
   fallbackHtml.value = ''
   rendererReady.value = true
+  rendererFallbackTerminal.value = false
 }
 
 function clearRendererTarget() {
@@ -376,6 +380,62 @@ let streamMarkdownLoadPromise: Promise<void> | null = null
 let streamMarkdownLoadFailed = false
 let warnedStreamMarkdownUnavailable = false
 
+function getDesiredRenderLanguage(rawLang: unknown, code: string, loading: boolean) {
+  const normalized = normalizeRendererLanguage(resolveStreamingRendererLanguage(rawLang, code, loading))
+  return normalized !== 'plaintext' && failedRendererLanguages.has(normalized)
+    ? 'plaintext'
+    : normalized
+}
+
+function getDesiredRenderSignature(configKey: string | null | undefined, code: string) {
+  return getRenderSignature(
+    configKey,
+    getDesiredRenderLanguage(props.node.language, code, isCodeBlockLoading()),
+    code,
+  )
+}
+
+function hasCommittedCurrentRender(configKey: string | null | undefined, code: string) {
+  return lastCommittedRenderSignature === getDesiredRenderSignature(configKey, code)
+}
+
+function hasCommittedCurrentCodeAndLanguage(code: string) {
+  const firstSeparator = lastCommittedRenderSignature.indexOf('\u0000')
+  const secondSeparator = firstSeparator >= 0
+    ? lastCommittedRenderSignature.indexOf('\u0000', firstSeparator + 1)
+    : -1
+  if (secondSeparator < 0)
+    return false
+
+  return lastCommittedRenderSignature.slice(firstSeparator + 1, secondSeparator) === getDesiredRenderLanguage(props.node.language, code, isCodeBlockLoading())
+    && lastCommittedRenderSignature.slice(secondSeparator + 1) === code
+}
+
+function hasRendererTextForCode(code: string) {
+  return Boolean(rendererTarget.value?.textContent?.includes(code))
+}
+
+const codeBlockEnhancementState = computed(() => {
+  if (!displayCode.value)
+    return 'ready'
+  const runtimeConfig = getRuntimeConfigWithFailedLangsFallback(props.themes, props.langs)
+  if (
+    rendererReady.value
+    && !fallbackHtml.value
+    && (
+      hasCommittedCurrentRender(runtimeConfig.key, displayCode.value)
+      || hasCommittedCurrentCodeAndLanguage(displayCode.value)
+      || hasRendererTextForCode(displayCode.value)
+    )
+  ) {
+    return 'ready'
+  }
+  if (rendererFallbackTerminal.value || streamMarkdownLoadFailed)
+    return 'fallback'
+  return 'pending'
+})
+const codeBlockPending = computed(() => codeBlockEnhancementState.value === 'pending')
+
 function nextRenderEpoch() {
   renderEpoch += 1
   return renderEpoch
@@ -403,6 +463,7 @@ function disposeCurrentRenderer() {
   finally {
     clearRendererTarget()
     rendererReady.value = false
+    rendererFallbackTerminal.value = false
   }
 }
 
@@ -617,6 +678,10 @@ async function initRenderer(epoch: number) {
   await ensureStreamMarkdownLoaded()
   if (!isCurrentRenderEpoch(epoch))
     return
+  if (streamMarkdownLoadFailed) {
+    renderFallback(renderedCode, { terminal: true })
+    return
+  }
 
   if (!codeBlockContent.value || !rendererTarget.value) {
     renderFallback(renderedCode)
@@ -665,10 +730,21 @@ async function initRenderer(epoch: number) {
 
   needsRendererReconfigure = Boolean(renderer && rendererConfigKey !== nextRendererConfigKey)
   if (highlightStatus === 'failed') {
-    if (needsRendererReconfigure && renderer && hasRendererContent())
+    if (
+      needsRendererReconfigure
+      && renderer
+      && hasRendererContent()
+      && (
+        hasCommittedCurrentRender(nextRendererConfigKey, renderedCode)
+        || hasCommittedCurrentCodeAndLanguage(renderedCode)
+        || hasRendererTextForCode(renderedCode)
+      )
+    ) {
       clearFallback()
-    else
-      renderFallback(renderedCode)
+    }
+    else {
+      renderFallback(renderedCode, { terminal: true })
+    }
     return
   }
 
@@ -685,7 +761,7 @@ async function initRenderer(epoch: number) {
   }
 
   if (!renderer) {
-    renderFallback(renderedCode)
+    renderFallback(renderedCode, { terminal: true })
     return
   }
 
@@ -712,6 +788,7 @@ async function initRenderer(epoch: number) {
   else {
     pendingRenderSignature = null
     disconnectReadyObserver()
+    renderFallback(renderedCode, { terminal: true })
   }
 }
 
@@ -724,7 +801,7 @@ async function safeInitRenderer(epoch = nextRenderEpoch()) {
       return
     if (isDevEnv)
       console.warn('[MarkdownCodeBlockNode] Failed to initialize Shiki renderer.', err)
-    renderFallback(displayCode.value)
+    renderFallback(displayCode.value, { terminal: true })
   }
 }
 
@@ -832,6 +909,7 @@ watch(() => [props.node.code, props.node.language, props.node.loading, props.loa
   else {
     pendingRenderSignature = null
     disconnectReadyObserver()
+    renderFallback(renderedCode, { terminal: true })
   }
 })
 
@@ -999,6 +1077,10 @@ function previewCode() {
     :style="containerStyle"
     class="code-block-container rounded-lg border overflow-hidden"
     :class="{ dark: props.isDark }"
+    data-markstream-code-block="1"
+    :data-markstream-enhanced="codeBlockEnhancementState === 'ready' ? 'true' : 'false'"
+    :data-markstream-enhancement-state="codeBlockEnhancementState"
+    :data-markstream-pending="codeBlockPending ? 'true' : undefined"
   >
     <CodeBlockShell
       :show-header="props.showHeader"

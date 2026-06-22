@@ -136,7 +136,7 @@ describe('node renderer smooth streaming', () => {
     })
 
     await nextTick()
-    // With default maxLiveNodes (320), 'auto' should not enable smooth streaming
+    // With default maxLiveNodes (220), 'auto' should not enable smooth streaming
     expect(wrapper.text()).toContain('Auto mode test')
     wrapper.unmount()
   })

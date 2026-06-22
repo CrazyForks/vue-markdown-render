@@ -1,5 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, onMounted, ref } from 'vue'
+import { provideViewportPriority } from '../src/composables/viewportPriority'
 import { flushAll } from './setup/flush-all'
 
 interface Entry { target: Element, isIntersecting: boolean, intersectionRatio: number }
@@ -55,6 +57,59 @@ afterEach(() => {
 })
 
 describe('markdownRender deferNodesUntilVisible', () => {
+  it('settles registered viewport-priority targets when disabled after registration', async () => {
+    const OriginalIO = globalThis.IntersectionObserver
+    const benchmarkWindow = window as any
+    vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)
+    benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__ = true
+
+    const Probe = defineComponent({
+      setup() {
+        const enabled = ref(true)
+        const target = ref<HTMLElement | null>(null)
+        const visible = ref(false)
+        const resolved = ref(false)
+        const register = provideViewportPriority(() => null, enabled)
+
+        onMounted(() => {
+          const handle = register(target.value!)
+          visible.value = handle.isVisible.value
+          handle.whenVisible.then(() => {
+            visible.value = handle.isVisible.value
+            resolved.value = true
+          })
+        })
+
+        return { enabled, resolved, target, visible }
+      },
+      template: '<div><div ref="target" data-target="1" /></div>',
+    })
+
+    let wrapper: ReturnType<typeof mount> | null = null
+    try {
+      wrapper = mount(Probe)
+      await flushAll()
+
+      const target = wrapper.get('[data-target="1"]').element
+      const observer = FakeIntersectionObserver.instances.find(instance => instance.elements.has(target))
+      expect(observer).toBeTruthy()
+      expect(wrapper.vm.visible).toBe(false)
+      expect(wrapper.vm.resolved).toBe(false)
+
+      wrapper.vm.enabled = false
+      await flushAll()
+
+      expect(observer?.elements.has(target)).toBe(false)
+      expect(wrapper.vm.visible).toBe(true)
+      expect(wrapper.vm.resolved).toBe(true)
+    }
+    finally {
+      wrapper?.unmount()
+      delete benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__
+      vi.stubGlobal('IntersectionObserver', OriginalIO as any)
+    }
+  })
+
   it('keeps nodes as placeholders until IO marks them visible', async () => {
     const OriginalIO = globalThis.IntersectionObserver
     vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)
@@ -67,7 +122,7 @@ describe('markdownRender deferNodesUntilVisible', () => {
       wrapper = mount(MarkdownRender, {
         props: {
           content: markdown,
-          // Ensure deferral is on and virtualization stays off (60 <= 320 default).
+          // Ensure deferral is on and virtualization stays off (60 <= 220 default).
           deferNodesUntilVisible: true,
           viewportPriority: true,
           initialRenderBatchSize: 40,
