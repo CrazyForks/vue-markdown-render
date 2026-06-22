@@ -178,6 +178,7 @@ export const BLOCKED_HTML_TAG_NAMES = [
 
 export const NON_STRUCTURING_HTML_TAG_NAMES = [
   'pre',
+  'iframe',
   'script',
   'style',
   'table',
@@ -189,6 +190,7 @@ export const NON_STRUCTURING_HTML_TAG_NAMES = [
   'textarea',
   'tr',
   'title',
+  'video',
 ] as const
 
 export const VOID_HTML_TAGS = new Set<string>(VOID_HTML_TAG_NAMES)

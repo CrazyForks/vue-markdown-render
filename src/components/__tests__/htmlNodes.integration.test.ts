@@ -691,6 +691,42 @@ describe('component Behavior', () => {
     expect(wrapper.text()).toContain('前端重构')
   })
 
+  it('renders trusted video and iframe html while preserving text after video close', async () => {
+    const markdown = `<video controls width="250">
+  <source src="/shared-assets/videos/flower.webm" type="video/webm" />
+
+  <source src="/shared-assets/videos/flower.mp4" type="video/mp4" />
+
+  Download the
+  <a href="/shared-assets/videos/flower.webm">WEBM</a>
+  or
+  <a href="/shared-assets/videos/flower.mp4">MP4</a>
+  video.
+</video>
+1
+
+<iframe src="https://example.com"></iframe>`
+
+    const wrapper = mount(MarkdownRender, {
+      props: {
+        content: markdown,
+        htmlPolicy: 'trusted',
+        final: true,
+        batchRendering: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    expect(wrapper.find('video').exists()).toBe(true)
+    expect(wrapper.findAll('video source')).toHaveLength(2)
+    expect(wrapper.find('iframe').exists()).toBe(true)
+    expect(wrapper.findAll('p.paragraph-node').some(p => p.text().trim() === '1')).toBe(true)
+    expect(wrapper.findAll('video ul')).toHaveLength(0)
+  })
+
   it('renders details summary as the first direct child for issue #397 content', async () => {
     const markdown = `# Structural Stress
 

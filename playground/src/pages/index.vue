@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { HtmlPolicy } from 'stream-markdown-parser'
 import type { StreamSliceMode } from '../composables/createLocalTextStream'
 import type { StreamPresetId } from '../composables/streamPresets'
 import type { StreamTransportMode } from '../composables/useStreamSimulator'
@@ -58,6 +59,7 @@ const streamBurstiness = useLocalStorage<number>('vmr-settings-stream-burstiness
 const streamTransportMode = useLocalStorage<StreamTransportMode>('vmr-settings-stream-transport-mode', 'readable-stream')
 const streamSliceMode = useLocalStorage<StreamSliceMode>('vmr-settings-stream-slice-mode', 'pure-random')
 const smoothStreaming = useLocalStorage<boolean>('vmr-settings-smooth-streaming', true)
+const htmlPolicy = useLocalStorage<HtmlPolicy>('vmr-settings-html-policy', 'trusted')
 const normalizedChunkDelayRange = computed(() => normalizeStreamRange(
   Number(streamChunkDelayMin.value),
   Number(streamChunkDelayMax.value),
@@ -612,6 +614,25 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
+        <!-- HTML Policy -->
+        <div class="setting-group">
+          <label class="setting-label">HTML Policy</label>
+          <div class="setting-select-wrap">
+            <select v-model="htmlPolicy" class="setting-select" aria-label="HTML policy">
+              <option value="trusted">
+                Trusted
+              </option>
+              <option value="safe">
+                Safe
+              </option>
+              <option value="escape">
+                Escape
+              </option>
+            </select>
+            <Icon icon="carbon:chevron-down" class="setting-select-icon" />
+          </div>
+        </div>
+
         <!-- Stream Profile -->
         <div class="setting-group">
           <label class="setting-label">Stream Profile</label>
@@ -906,6 +927,7 @@ onBeforeUnmount(() => {
             :code-block-dark-theme="selectedTheme || undefined"
             :code-block-light-theme="selectedTheme || undefined"
             :code-block-monaco-options="playgroundMonacoOptions"
+            :html-policy="htmlPolicy"
             :themes="themes"
             :custom-html-tags="['thinking']"
             :escape-html-tags="['question', 'answer']"
