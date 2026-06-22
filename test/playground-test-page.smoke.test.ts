@@ -31,6 +31,14 @@ vi.mock('../src/components/NodeRenderer', () => ({
         type: String,
         default: '',
       },
+      final: {
+        type: Boolean,
+        default: false,
+      },
+      htmlPolicy: {
+        type: String,
+        default: 'safe',
+      },
       mermaidProps: {
         type: Object,
         default: () => ({}),
@@ -513,6 +521,17 @@ describe('playground /test smoke', () => {
     expect(wrapper.find('textarea').exists()).toBe(true)
     expect(window.location.search).toBe('')
     expect(await decodeMarkdownHashAsync(window.location.hash)).toBe('## shared only')
+
+    wrapper.unmount()
+  })
+
+  it('uses trusted final rendering for static test page previews', async () => {
+    const wrapper = await mountTestPage()
+    const preview = wrapper.getComponent({ name: 'MarkdownRenderStub' })
+
+    expect(preview.props('htmlPolicy')).toBe('trusted')
+    expect(preview.props('final')).toBe(true)
+    expect(wrapper.text()).toContain('HTML trusted')
 
     wrapper.unmount()
   })

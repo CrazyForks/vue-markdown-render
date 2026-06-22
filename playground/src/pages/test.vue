@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Brush, Drauu, DrawingMode } from 'drauu'
+import type { HtmlPolicy } from 'stream-markdown-parser'
 import type { TestLabFrameworkId, TestLabSampleId } from '../../../playground-shared/testLabFixtures'
 import type { TestPageViewMode } from '../../../playground-shared/testPageState'
 import type { SandboxFrameworkId, SandboxRenderSource } from '../../../playground-shared/versionSandbox'
@@ -158,6 +159,11 @@ const RENDER_MODE_OPTIONS = [
   { value: 'markdown', label: 'MarkdownCodeBlock' },
   { value: 'pre', label: 'PreCodeNode' },
 ] as const satisfies ReadonlyArray<{ value: 'monaco' | 'markdown' | 'pre', label: string }>
+const HTML_POLICY_OPTIONS = [
+  { value: 'trusted', label: 'Trusted' },
+  { value: 'safe', label: 'Safe' },
+  { value: 'escape', label: 'Escape' },
+] as const satisfies ReadonlyArray<{ value: HtmlPolicy, label: string }>
 type DiffLayoutMode = 'inline' | 'side-by-side'
 const DIFF_LAYOUT_OPTIONS = [
   { value: 'inline', label: 'Diff 1 列' },
@@ -229,6 +235,7 @@ const typewriter = useLocalStorage<boolean>('vmr-test-typewriter', true)
 const debugParse = useLocalStorage<boolean>('vmr-test-debug-parse', false)
 const mathEnabled = useLocalStorage<boolean>('vmr-test-math-enabled', isKatexEnabled())
 const mermaidEnabled = useLocalStorage<boolean>('vmr-test-mermaid-enabled', isMermaidEnabled())
+const htmlPolicy = useLocalStorage<HtmlPolicy>('vmr-test-html-policy', 'trusted')
 const testPageCustomHtmlTags = ['think', 'thinking'] as const
 
 if (!isBenchmarkMode)
@@ -2939,6 +2946,7 @@ watch(mermaidEnabled, (enabled) => {
                 <span class="stream-summary__item" :class="{ 'stream-summary__item--active': typewriter }">typewriter</span>
                 <span class="stream-summary__item" :class="{ 'stream-summary__item--active': mathEnabled }">KaTeX</span>
                 <span class="stream-summary__item" :class="{ 'stream-summary__item--active': mermaidEnabled }">Mermaid</span>
+                <span class="stream-summary__item stream-summary__item--active">HTML {{ htmlPolicy }}</span>
                 <span v-if="debugParse" class="stream-summary__item stream-summary__item--active">解析树 debug</span>
                 <span v-if="streamDebug" class="stream-summary__item stream-summary__item--active">chunk debug</span>
               </div>
@@ -3304,6 +3312,8 @@ watch(mermaidEnabled, (enabled) => {
                     v-if="benchmarkRenderPreview"
                     ref="previewRendererRef"
                     :content="previewContent"
+                    :final="!isStreaming"
+                    :html-policy="htmlPolicy"
                     :custom-html-tags="testPageCustomHtmlTags"
                     :is-dark="isDark"
                     :mermaid-props="previewMermaidProps"
@@ -3602,6 +3612,12 @@ watch(mermaidEnabled, (enabled) => {
               v-model="selectedStreamPresetId"
               label="流式画像 preset"
               :options="streamPresetOptions"
+            />
+
+            <LabSelect
+              v-model="htmlPolicy"
+              label="HTML Policy"
+              :options="HTML_POLICY_OPTIONS"
             />
 
             <p class="control-note">

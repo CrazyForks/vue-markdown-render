@@ -6,7 +6,7 @@ export declare const EXTENDED_STANDARD_HTML_TAG_NAMES: readonly ["address", "aud
 export declare const DANGEROUS_HTML_ATTR_NAMES: readonly ["onclick", "onerror", "onload", "onmouseover", "onmouseout", "onmousedown", "onmouseup", "onkeydown", "onkeyup", "onfocus", "onblur", "onsubmit", "onreset", "onchange", "onselect", "ondblclick", "ontouchstart", "ontouchend", "ontouchmove", "ontouchcancel", "onwheel", "onscroll", "oncopy", "oncut", "onpaste", "oninput", "oninvalid", "onsearch", "srcdoc", "ping"];
 export declare const URL_HTML_ATTR_NAMES: readonly ["action", "data", "href", "src", "srcset", "poster", "xlink:href", "formaction"];
 export declare const BLOCKED_HTML_TAG_NAMES: readonly ["script"];
-export declare const NON_STRUCTURING_HTML_TAG_NAMES: readonly ["pre", "script", "style", "table", "tbody", "td", "tfoot", "th", "thead", "textarea", "tr", "title"];
+export declare const NON_STRUCTURING_HTML_TAG_NAMES: readonly ["pre", "iframe", "script", "style", "table", "tbody", "td", "tfoot", "th", "thead", "textarea", "tr", "title", "video"];
 export declare const VOID_HTML_TAGS: Set<string>;
 export declare const STANDARD_BLOCK_HTML_TAGS: Set<string>;
 export declare const STANDARD_HTML_TAGS: Set<string>;
