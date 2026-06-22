@@ -12,6 +12,7 @@ on:
       - playground-shared/**
       - scripts/benchmark-1-0.mjs
       - scripts/e2e-*-performance.mjs
+      - scripts/web-vitals-budget-checks.mjs
       - package.json
       - pnpm-lock.yaml
       - .github/workflows/benchmark-1-0.yml
@@ -24,6 +25,7 @@ on:
       - playground-shared/**
       - scripts/benchmark-1-0.mjs
       - scripts/e2e-*-performance.mjs
+      - scripts/web-vitals-budget-checks.mjs
       - package.json
       - pnpm-lock.yaml
       - .github/workflows/benchmark-1-0.yml

@@ -109,6 +109,7 @@ describe('release dependency gates', () => {
 
     expect(workflow).toContain('MARKSTREAM_RELEASE_GATE: \'1\'')
     expect(workflow).toContain('run: pnpm benchmark:1.0')
+    expect(workflow.match(/scripts\/web-vitals-budget-checks\.mjs/g)).toHaveLength(2)
     expect(webVitalsScript).toContain('\'million-scripted-scroll\': {')
     expect(webVitalsScript).toContain('longTaskTotalMs: 9000')
     expect(webVitalsScript).toContain('frameP95Ms: 800')
@@ -155,6 +156,8 @@ describe('release dependency gates', () => {
     expect(webVitalsScript).toContain('.filter(([key]) => key.startsWith(\'interaction:\'))')
     expect(webVitalsScript).toContain('interactionGroupCount: inpInteractionValues.length')
     expect(webVitalsScript).toContain('eventTimingInpCandidateMs: inpInteractionValues.length')
+    expect(webVitalsScript).toContain('eventTimingMaxInputDelayMs: inpInteractionValues.length')
+    expect(webVitalsScript).toContain('eventTimingMaxProcessingMs: inpInteractionValues.length')
     expect(webVitalsScript).toContain('topEvents: sortedEvents.slice(0, 8)')
   })
 

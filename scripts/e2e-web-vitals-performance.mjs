@@ -656,7 +656,6 @@ async function captureVitalsSnapshot(page, label, performanceDelta = null) {
       interactions.set(key, current)
     }
 
-    const interactionValues = [...interactions.values()]
     const inpInteractionValues = [...interactions.entries()]
       .filter(([key]) => key.startsWith('interaction:'))
       .map(([, value]) => value)
@@ -708,11 +707,11 @@ async function captureVitalsSnapshot(page, label, performanceDelta = null) {
       eventTimingInpCandidateMs: inpInteractionValues.length
         ? Math.max(...inpInteractionValues.map(interaction => Number(interaction.duration || 0)))
         : null,
-      eventTimingMaxInputDelayMs: interactionValues.length
-        ? Math.max(...interactionValues.map(interaction => Number(interaction.inputDelay || 0)))
+      eventTimingMaxInputDelayMs: inpInteractionValues.length
+        ? Math.max(...inpInteractionValues.map(interaction => Number(interaction.inputDelay || 0)))
         : 0,
-      eventTimingMaxProcessingMs: interactionValues.length
-        ? Math.max(...interactionValues.map(interaction => Number(interaction.processingTime || 0)))
+      eventTimingMaxProcessingMs: inpInteractionValues.length
+        ? Math.max(...inpInteractionValues.map(interaction => Number(interaction.processingTime || 0)))
         : 0,
       topEvents: sortedEvents.slice(0, 8),
       pageDomNodeCount: document.querySelectorAll('*').length,
