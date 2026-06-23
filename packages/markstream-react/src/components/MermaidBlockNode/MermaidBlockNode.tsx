@@ -1031,7 +1031,7 @@ export function MermaidBlockNode(rawProps: MermaidBlockNodeProps & MermaidBlockN
       </div>
       {modalOpen && typeof document !== 'undefined' && createPortal(
         <div
-          className="mermaid-modal-overlay"
+          className="markstream-react mermaid-modal-overlay"
           onClick={() => closeModal()}
         >
           <div

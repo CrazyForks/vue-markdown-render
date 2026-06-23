@@ -98,7 +98,7 @@ export function HtmlPreviewFrame(props: HtmlPreviewFrameProps) {
     return null
 
   return createPortal(
-    <div className={`html-preview-frame__backdrop${props.isDark ? ' html-preview-frame__backdrop--dark' : ''}`} onClick={() => props.onClose?.()}>
+    <div className={`markstream-react html-preview-frame__backdrop${props.isDark ? ' html-preview-frame__backdrop--dark' : ''}`} onClick={() => props.onClose?.()}>
       <div className={`html-preview-frame${props.isDark ? ' html-preview-frame--dark' : ''}`} onClick={e => e.stopPropagation()}>
         <div className="html-preview-frame__header">
           <div className="html-preview-frame__title">
