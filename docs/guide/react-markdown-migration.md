@@ -77,6 +77,25 @@ This means `components.h1` does not become `components.h1` again. It usually bec
 | `unwrapDisallowed` | Manual node filtering | Implement this in your node post-processing step if you need it. |
 | `urlTransform` | `parseOptions.validateLink` + custom `link` renderer | `validateLink` is for allow/deny. If you need URL rewriting, do it in a custom `link` renderer or while post-processing nodes. |
 
+## Upgrade note: custom HTML-like tags
+
+Current `markstream-react` releases no longer infer custom HTML tag names from `setCustomComponents(...)`. If your app renders model output such as `<DocumentLink id="...">title</DocumentLink>` and expects a custom component to receive `props.node`, add the tag to `customHtmlTags`:
+
+```tsx
+setCustomComponents('chat', {
+  documentlink: DocumentLink,
+})
+
+React.createElement(MarkdownRender, {
+  customId: 'chat',
+  content,
+  final: isDone,
+  customHtmlTags: ['documentlink'],
+})
+```
+
+Without `customHtmlTags`, the tag stays on the raw HTML dynamic rendering path. The component can still render, but it receives HTML-style props such as `{ id, children }` instead of `NodeComponentProps`, and it will not receive `node.loading` for streaming partial renders. This auto-inference removal was an undocumented breaking change for apps that relied on the previous behavior.
+
 ## Migrating `components`
 
 `react-markdown` custom renderers are usually written against HTML-tag names:
