@@ -178,6 +178,18 @@ function ThinkingNode(props: NodeComponentProps<{ type: 'thinking', content: str
 setCustomComponents('chat', { thinking: ThinkingNode })
 ```
 
+When rendering HTML-like tags from Markdown content, also pass the tag through `customHtmlTags`:
+
+```tsx
+React.createElement(MarkdownRender, {
+  customId: 'chat',
+  content: '<thinking>Working...</thinking>',
+  customHtmlTags: ['thinking'],
+})
+```
+
+Without `customHtmlTags`, registered tag components render through the raw HTML path and receive HTML-style props/children instead of `props.node`.
+
 ## When Not to Use It
 
 Use `react-markdown`, `marked`, or `markdown-it` when you only render short static Markdown, need the smallest possible Markdown stack, or already have a complete remark/rehype pipeline and do not need streaming mid-state handling.

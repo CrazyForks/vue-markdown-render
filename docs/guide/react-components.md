@@ -540,6 +540,54 @@ interface NodeComponentProps<TNode = unknown> {
 
 `CustomComponentMap` is the typed mapping shape accepted by `setCustomComponents(...)`.
 
+### Custom HTML-like Tags
+
+For HTML-like model output such as `<DocumentLink id="...">Rasmus Schultz</DocumentLink>`, register the component and list the tag in `customHtmlTags`. This keeps the tag on the parser-driven custom node path, so the component receives `node.content`, `node.attrs`, and streaming `node.loading`.
+
+```tsx
+import type { NodeComponentProps } from 'markstream-react'
+import MarkdownRender, { setCustomComponents } from 'markstream-react'
+
+const ASSISTANT_ID = 'assistant'
+
+function DocumentLink(props: NodeComponentProps<{
+  type: 'documentlink'
+  tag: 'documentlink'
+  content: string
+  loading?: boolean
+  attrs?: [string, string][]
+}>) {
+  const id = props.node.attrs?.find(([name]) => name === 'id')?.[1]
+
+  return (
+    <a href={`/documents/${id}`} aria-busy={props.node.loading || undefined}>
+      {props.node.content}
+    </a>
+  )
+}
+
+setCustomComponents(ASSISTANT_ID, {
+  documentlink: DocumentLink,
+})
+
+export function Message({ content, final }: { content: string, final: boolean }) {
+  return (
+    <MarkdownRender
+      customId={ASSISTANT_ID}
+      content={content}
+      final={final}
+      customHtmlTags={['documentlink']}
+    />
+  )
+}
+```
+
+If a registered tag is not included in `customHtmlTags` or `parseOptions.customHtmlTags`, it is treated as raw HTML and may be rendered by the dynamic HTML path. In that path React receives normal HTML-style props and `children`, for example `{ id, children }`, and there is no `node.loading` streaming protocol.
+
+::: warning Upgrade note
+Older `markstream-react` releases inferred custom HTML tag names from `setCustomComponents(...)`. Current releases require `customHtmlTags` explicitly for custom HTML-like tags. This was an undocumented breaking change; add `customHtmlTags` during upgrade if your component reads `props.node`.
+:::
+
 ### Example Custom Component
 
 ```tsx
