@@ -25,7 +25,7 @@ function ensureTooltipEl() {
   if (tooltipEl || typeof document === 'undefined')
     return tooltipEl
   tooltipEl = document.createElement('div')
-  tooltipEl.className = 'ms-tooltip'
+  tooltipEl.className = 'markstream-react ms-tooltip'
   tooltipEl.setAttribute('role', 'tooltip')
   tooltipEl.dataset.visible = 'false'
   tooltipEl.style.position = 'fixed'

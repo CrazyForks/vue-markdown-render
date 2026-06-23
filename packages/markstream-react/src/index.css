@@ -36,14 +36,14 @@
   --muted-foreground: 215 20.2% 65.1%;
 }
 
-.markdown-renderer {
+:where(.markstream-react).markdown-renderer {
   position: relative;
   contain: layout;
   content-visibility: auto;
   contain-intrinsic-size: 800px 600px;
 }
 
-.markdown-renderer.virtualized {
+:where(.markstream-react).markdown-renderer.virtualized {
   /* When virtualization is active, `content-visibility: auto` can keep the
      whole subtree unpainted until the scroll container dispatches a scroll
      event in some layouts (e.g. complex chat shells). The virtual window
@@ -52,42 +52,42 @@
   contain-intrinsic-size: auto;
 }
 
-.node-slot,
-.node-content {
+:where(.markstream-react) .node-slot,
+:where(.markstream-react) .node-content {
   width: 100%;
 }
 
-.node-placeholder {
+:where(.markstream-react) .node-placeholder {
   width: 100%;
   min-height: 1rem;
   margin: 0.25rem 0;
   border-radius: 0.5rem;
   background-image: linear-gradient(90deg, rgba(148, 163, 184, 0.18), rgba(148, 163, 184, 0.05), rgba(148, 163, 184, 0.18));
   background-size: 200% 100%;
-  animation: node-placeholder-shimmer 1.1s ease-in-out infinite;
+  animation: markstream-react-node-placeholder-shimmer 1.1s ease-in-out infinite;
 }
 
-.node-placeholder:first-child {
+:where(.markstream-react) .node-placeholder:first-child {
   margin-top: 0;
 }
 
-.node-spacer {
+:where(.markstream-react) .node-spacer {
   width: 100%;
 }
 
-.fade-node,
-.typewriter-node {
+:where(.markstream-react) .fade-node,
+:where(.markstream-react) .typewriter-node {
   opacity: 0;
-  animation: node-enter-fade var(--fade-duration, var(--typewriter-fade-duration, 280ms)) var(--fade-ease, var(--typewriter-fade-ease, cubic-bezier(0.33, 0, 0.67, 1))) forwards;
+  animation: markstream-react-node-enter-fade var(--fade-duration, var(--typewriter-fade-duration, 280ms)) var(--fade-ease, var(--typewriter-fade-ease, cubic-bezier(0.33, 0, 0.67, 1))) forwards;
 }
 
-.unknown-node {
+:where(.markstream-react) .unknown-node {
   color: #6a737d;
   font-style: italic;
   margin: 1rem 0;
 }
 
-.text-node {
+:where(.markstream-react) .text-node {
   display: inline;
   font-weight: inherit;
   vertical-align: baseline;
@@ -95,37 +95,37 @@
   word-break: break-word;
 }
 
-.text-node.text-node-center {
+:where(.markstream-react) .text-node.text-node-center {
   display: inline-flex;
   justify-content: center;
   width: 100%;
 }
 
-.text-node-stream-delta {
+:where(.markstream-react) .text-node-stream-delta {
   animation-duration: var(--stream-update-fade-duration, var(--fade-duration, var(--typewriter-fade-duration, 280ms)));
   animation-timing-function: var(--stream-update-fade-ease, var(--fade-ease, var(--typewriter-fade-ease, cubic-bezier(0.33, 0, 0.67, 1))));
   animation-fill-mode: both;
   will-change: opacity;
 }
 
-.text-node-stream-delta--a {
-  animation-name: text-node-stream-update-fade-a;
+:where(.markstream-react) .text-node-stream-delta--a {
+  animation-name: markstream-react-text-node-stream-update-fade-a;
 }
 
-.text-node-stream-delta--b {
-  animation-name: text-node-stream-update-fade-b;
+:where(.markstream-react) .text-node-stream-delta--b {
+  animation-name: markstream-react-text-node-stream-update-fade-b;
 }
 
-.paragraph-node {
+:where(.markstream-react) .paragraph-node {
   margin: 1.25em 0;
   line-height: 1.625;
 }
 
-li .paragraph-node {
+:where(.markstream-react) li .paragraph-node {
   margin: 0;
 }
 
-.blockquote-node {
+:where(.markstream-react) .blockquote-node {
   font-weight: 500;
   font-style: italic;
   border-left: 0.25rem solid var(--blockquote-border-color,#e2e8f0);
@@ -136,17 +136,17 @@ li .paragraph-node {
 }
 
 /* Prevent "tall but blank" placeholders when nested renderers use content-visibility. */
-.blockquote-node .markdown-renderer {
+:where(.markstream-react) .blockquote-node .markdown-renderer {
   content-visibility: visible;
   contain: content;
   contain-intrinsic-size: 0px 0px;
 }
 
-.heading-node {
+:where(.markstream-react) .heading-node {
   font-weight: 600;
 }
 
-.heading-1 {
+:where(.markstream-react) .heading-1 {
   margin-top: 0;
   margin-bottom: calc(8 / 9 * 1em);
   font-size: 2.25rem;
@@ -154,58 +154,58 @@ li .paragraph-node {
   font-weight: 800;
 }
 
-.heading-2 {
+:where(.markstream-react) .heading-2 {
   margin-top: 2rem;
   margin-bottom: 1rem;
   font-size: 1.5rem;
   line-height: calc(4 / 3 * 1);
 }
 
-.heading-3 {
+:where(.markstream-react) .heading-3 {
   margin-top: calc(8 / 5 * 1em);
   margin-bottom: calc(3 / 5 * 1em);
   font-size: 1.25rem;
   line-height: calc(5 / 3 * 1);
 }
 
-.heading-4,
-.heading-5,
-.heading-6 {
+:where(.markstream-react) .heading-4,
+:where(.markstream-react) .heading-5,
+:where(.markstream-react) .heading-6 {
   margin-top: 1.5rem;
   margin-bottom: 0.5rem;
   font-size: 1rem;
 }
 
-.heading-5,
-.heading-6 {
+:where(.markstream-react) .heading-5,
+:where(.markstream-react) .heading-6 {
   margin-top: 0;
   margin-bottom: 0;
 }
 
-.link-node {
+:where(.markstream-react) .link-node {
   color: var(--link-color, #0366d6);
   text-decoration: none;
 }
 
-.link-node:hover {
+:where(.markstream-react) .link-node:hover {
   text-decoration: underline;
   text-underline-offset: .2rem;
 }
 
-.link-loading {
+:where(.markstream-react) .link-loading {
   color: var(--link-color, #0366d6);
 }
 
-.link-loading .link-text-wrapper {
+:where(.markstream-react) .link-loading .link-text-wrapper {
   position: relative;
 }
 
-.link-loading .link-text {
+:where(.markstream-react) .link-loading .link-text {
   position: relative;
   z-index: 2;
 }
 
-.link-loading-indicator {
+:where(.markstream-react) .link-loading-indicator {
   position: absolute;
   left: 0;
   right: 0;
@@ -223,46 +223,46 @@ li .paragraph-node {
   50% { opacity: var(--underline-opacity, 0.35); }
 }
 
-@keyframes text-node-stream-update-fade-a {
+@keyframes markstream-react-text-node-stream-update-fade-a {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
-@keyframes text-node-stream-update-fade-b {
+@keyframes markstream-react-text-node-stream-update-fade-b {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .link-loading-indicator {
+  :where(.markstream-react) .link-loading-indicator {
     animation: none !important;
     opacity: var(--underline-rest-opacity, 0.18);
   }
 
-  .text-node-stream-delta {
+  :where(.markstream-react) .text-node-stream-delta {
     animation: none !important;
   }
 
-  .fade-node,
-  .typewriter-node {
+  :where(.markstream-react) .fade-node,
+:where(.markstream-react) .typewriter-node {
     animation: none !important;
     opacity: 1;
   }
 
-  .typewriter-cursor {
+  :where(.markstream-react) .typewriter-cursor {
     animation: none !important;
     opacity: 1;
   }
 }
 
-.inline-code {
+:where(.markstream-react) .inline-code {
   padding: 0.125rem 0.375rem;
   border-radius: 0.375rem;
   background: #f3f4f6;
   font-size: 0.875rem;
 }
 
-.image-node__img {
+:where(.markstream-react) .image-node__img {
   display: inline-block;
   max-width: none;
   width: auto;
@@ -274,12 +274,12 @@ li .paragraph-node {
   transition: opacity 200ms ease;
 }
 
-.image-node__img.is-loaded {
+:where(.markstream-react) .image-node__img.is-loaded {
   opacity: 1;
 }
 
-.image-node__placeholder,
-.image-node__error {
+:where(.markstream-react) .image-node__placeholder,
+:where(.markstream-react) .image-node__error {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -290,37 +290,37 @@ li .paragraph-node {
   vertical-align: middle;
 }
 
-.image-node__placeholder {
+:where(.markstream-react) .image-node__placeholder {
   background: linear-gradient(120deg, rgba(148, 163, 184, 0.2), rgba(226, 232, 240, 0.35));
   color: #475569;
   box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.2);
 }
 
-.image-node__error {
+:where(.markstream-react) .image-node__error {
   color: #dc2626;
   background: rgba(248, 113, 113, 0.08);
 }
 
-.image-node__spinner {
+:where(.markstream-react) .image-node__spinner {
   width: 1rem;
   height: 1rem;
   border-radius: 999px;
   border: 2px solid currentColor;
   border-top-color: transparent;
-  animation: spin 1s linear infinite;
+  animation: markstream-react-spin 1s linear infinite;
 }
 
-.image-node__placeholder-text {
+:where(.markstream-react) .image-node__placeholder-text {
   font-size: 0.875rem;
   color: currentColor;
 }
 
-@keyframes spin {
+@keyframes markstream-react-spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
 
-.footnote-node {
+:where(.markstream-react) .footnote-node {
   display: flex;
   margin-top: var(--ms-flow-footnote-y, 0.5em);
   margin-bottom: var(--ms-flow-footnote-y, 0.5em);
@@ -330,32 +330,32 @@ li .paragraph-node {
   line-height: 1.625;
 }
 
-.footnote-reference {
+:where(.markstream-react) .footnote-reference {
   font-size: 0.75em;
   line-height: 0;
 }
 
-.footnote-link {
+:where(.markstream-react) .footnote-link {
   color: var(--link-color, #0366d6);
   text-decoration: none;
 }
 
-.footnote-link:hover {
+:where(.markstream-react) .footnote-link:hover {
   text-decoration: underline;
 }
 
-.footnote-anchor {
+:where(.markstream-react) .footnote-anchor {
   margin-left: 0.5rem;
   color: var(--link-color, #0366d6);
   text-decoration: none;
   cursor: pointer;
 }
 
-.footnote-anchor:hover {
+:where(.markstream-react) .footnote-anchor:hover {
   text-decoration: underline;
 }
 
-.admonition-node {
+:where(.markstream-react) .admonition-node {
   border-left: 4px solid #e5e7eb;
   border-radius: 0.5rem;
   padding: 0.75rem 1rem;
@@ -363,12 +363,12 @@ li .paragraph-node {
   background: rgba(249, 250, 251, 0.9);
 }
 
-.admonition-node__title {
+:where(.markstream-react) .admonition-node__title {
   font-weight: 600;
   margin-bottom: 0.5rem;
 }
 
-.table-node-wrapper {
+:where(.markstream-react) .table-node-wrapper {
   position: relative;
   max-width: 100%;
   overflow-x: auto;
@@ -378,23 +378,23 @@ li .paragraph-node {
   scrollbar-gutter: stable;
 }
 
-.table-node {
+:where(.markstream-react) .table-node {
   width: 100%;
   border-collapse: collapse;
 }
 
-.table-node th,
-.table-node td {
+:where(.markstream-react) .table-node th,
+:where(.markstream-react) .table-node td {
   white-space: normal;
   overflow-wrap: break-word;
   word-break: normal;
 }
 
-.table-node thead th {
+:where(.markstream-react) .table-node thead th {
   position: relative;
 }
 
-.table-node__resize-handle {
+:where(.markstream-react) .table-node__resize-handle {
   position: absolute;
   top: 0;
   right: -4px;
@@ -408,7 +408,7 @@ li .paragraph-node {
   touch-action: none;
 }
 
-.table-node__resize-handle::after {
+:where(.markstream-react) .table-node__resize-handle::after {
   content: '';
   position: absolute;
   top: 0.35em;
@@ -422,31 +422,31 @@ li .paragraph-node {
   transition: opacity 0.12s ease;
 }
 
-.table-node__resize-handle:hover::after,
-.table-node__resize-handle:focus-visible::after {
+:where(.markstream-react) .table-node__resize-handle:hover::after,
+:where(.markstream-react) .table-node__resize-handle:focus-visible::after {
   opacity: 1;
 }
 
 /* Override the default `break-words` / pre-wrap text styles inside tables so
    dense tables don't turn into vertical glyph stacks. */
-.table-node .text-node,
-.table-node code {
+:where(.markstream-react) .table-node .text-node,
+:where(.markstream-react) .table-node code {
   white-space: inherit;
   overflow-wrap: inherit;
   word-break: inherit;
   max-width: none;
 }
 
-.table-node--loading tbody td {
+:where(.markstream-react) .table-node--loading tbody td {
   position: relative;
   overflow: hidden;
 }
 
-.table-node--loading tbody td > * {
+:where(.markstream-react) .table-node--loading tbody td > * {
   visibility: hidden;
 }
 
-.table-node--loading tbody td::after {
+:where(.markstream-react) .table-node--loading tbody td::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -458,11 +458,11 @@ li .paragraph-node {
     rgba(148, 163, 184, 0.16) 75%
   );
   background-size: 200% 100%;
-  animation: table-node-shimmer 1.2s linear infinite;
+  animation: markstream-react-table-node-shimmer 1.2s linear infinite;
   will-change: background-position;
 }
 
-.table-node__loading {
+:where(.markstream-react) .table-node__loading {
   position: absolute;
   inset: 0;
   display: flex;
@@ -471,38 +471,38 @@ li .paragraph-node {
   pointer-events: none;
 }
 
-.table-node__spinner {
+:where(.markstream-react) .table-node__spinner {
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 999px;
   border: 2px solid rgba(94, 104, 121, 0.25);
   border-top-color: rgba(94, 104, 121, 0.8);
-  animation: spin 1s linear infinite;
+  animation: markstream-react-spin 1s linear infinite;
   will-change: transform;
 }
 
 /* Table cells: make NodeRenderer layout-transparent to avoid block boxes in <td>. */
-.table-node .markdown-renderer {
+:where(.markstream-react) .table-node .markdown-renderer {
   display: contents;
   content-visibility: visible;
   contain: content;
   contain-intrinsic-size: 0px 0px;
 }
 
-.table-node .markdown-renderer .node-slot,
-.table-node .markdown-renderer .node-content,
-.table-node .markdown-renderer .node-space {
+:where(.markstream-react) .table-node .markdown-renderer .node-slot,
+:where(.markstream-react) .table-node .markdown-renderer .node-content,
+:where(.markstream-react) .table-node .markdown-renderer .node-space {
   display: contents;
 }
 
 /* Nested renderers (often used inside custom components like <thinking>).
    Avoid `content-visibility: auto` causing blank inner content. */
-.markdown-renderer .markdown-renderer {
+:where(.markstream-react).markdown-renderer .markdown-renderer {
   content-visibility: visible;
   contain-intrinsic-size: auto;
 }
 
-@keyframes table-node-shimmer {
+@keyframes markstream-react-table-node-shimmer {
   0% {
     background-position: 0% 0%;
   }
@@ -514,15 +514,15 @@ li .paragraph-node {
   }
 }
 
-.hr + .table-node-wrapper {
+:where(.markstream-react) .hr + .table-node-wrapper {
   margin-top: 0;
 }
 
-.hr + .table-node-wrapper .table-node {
+:where(.markstream-react) .hr + .table-node-wrapper .table-node {
   margin-top: 0;
 }
 
-.code-block-node {
+:where(.markstream-react) .code-block-node {
   background: #0f172a;
   color: #fff;
   border-radius: 0.75rem;
@@ -532,7 +532,7 @@ li .paragraph-node {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
-.code-block {
+:where(.markstream-react) .code-block {
   border-radius: 0.75rem;
   background: #0f172a;
   color: #e2e8f0;
@@ -541,11 +541,11 @@ li .paragraph-node {
   position: relative;
 }
 
-.code-block--expanded {
+:where(.markstream-react) .code-block--expanded {
   max-height: none;
 }
 
-.code-block-header {
+:where(.markstream-react) .code-block-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -554,20 +554,20 @@ li .paragraph-node {
   border-bottom: 1px solid rgba(148, 163, 184, 0.2);
 }
 
-.code-block-meta {
+:where(.markstream-react) .code-block-meta {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
-.code-block-language {
+:where(.markstream-react) .code-block-language {
   font-size: 0.825rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgba(226, 232, 240, 0.85);
 }
 
-.code-block-badge {
+:where(.markstream-react) .code-block-badge {
   font-size: 0.7rem;
   padding: 0.1rem 0.4rem;
   border-radius: 9999px;
@@ -575,12 +575,12 @@ li .paragraph-node {
   color: #bfdbfe;
 }
 
-.code-block-actions {
+:where(.markstream-react) .code-block-actions {
   display: flex;
   gap: 0.35rem;
 }
 
-.code-block-btn {
+:where(.markstream-react) .code-block-btn {
   border: 1px solid rgba(148, 163, 184, 0.4);
   background: rgba(15, 23, 42, 0.6);
   color: #f8fafc;
@@ -591,26 +591,26 @@ li .paragraph-node {
   transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
-.code-block-btn:hover {
+:where(.markstream-react) .code-block-btn:hover {
   background: rgba(59, 130, 246, 0.8);
   border-color: rgba(59, 130, 246, 0.6);
 }
 
-.code-block-body {
+:where(.markstream-react) .code-block-body {
   position: relative;
 }
 
-.code-block-body--expanded {
+:where(.markstream-react) .code-block-body--expanded {
   max-height: none;
 }
 
-.code-block-body--collapsed {
+:where(.markstream-react) .code-block-body--collapsed {
   min-height: 0;
   height: 0;
   overflow: hidden;
 }
 
-.code-block-overlay {
+:where(.markstream-react) .code-block-overlay {
   position: absolute;
   inset: 0;
   display: flex;
@@ -621,23 +621,23 @@ li .paragraph-node {
 }
 
 
-.code-block-spinner {
+:where(.markstream-react) .code-block-spinner {
   width: 2rem;
   height: 2rem;
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-top-color: rgba(255, 255, 255, 0.9);
   border-radius: 9999px;
-  animation: spin 1s linear infinite;
+  animation: markstream-react-spin 1s linear infinite;
 }
 
-.code-block-footer {
+:where(.markstream-react) .code-block-footer {
   padding: 0.35rem 0.9rem 0.7rem;
   border-top: 1px solid rgba(148, 163, 184, 0.2);
   font-size: 0.75rem;
   color: rgba(226, 232, 240, 0.8);
 }
 
-.mermaid-block {
+:where(.markstream-react) .mermaid-block {
   border: 1px solid rgba(148, 163, 184, 0.3);
   border-radius: 1rem;
   background: #fff;
@@ -646,13 +646,14 @@ li .paragraph-node {
   overflow: hidden;
 }
 
-.dark .mermaid-block {
+.dark :where(.markstream-react) .mermaid-block,
+:where(.markstream-react).dark .mermaid-block {
   background: #0f172a;
   color: #e2e8f0;
   border-color: rgba(148, 163, 184, 0.4);
 }
 
-.mermaid-modal-overlay {
+:where(.markstream-react).mermaid-modal-overlay {
   position: fixed;
   inset: 0;
   z-index: 9999;
@@ -661,7 +662,7 @@ li .paragraph-node {
   background: rgba(0, 0, 0, 0.6);
 }
 
-.mermaid-modal-panel {
+:where(.markstream-react) .mermaid-modal-panel {
   position: relative;
   width: min(64rem, calc(100% - 2rem));
   margin: 2rem auto;
@@ -672,12 +673,12 @@ li .paragraph-node {
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
 }
 
-.mermaid-modal-panel.is-dark {
+:where(.markstream-react) .mermaid-modal-panel.is-dark {
   background: #0f172a;
   color: #e2e8f0;
 }
 
-.mermaid-modal-header {
+:where(.markstream-react) .mermaid-modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -685,16 +686,16 @@ li .paragraph-node {
   border-bottom: 1px solid rgba(148, 163, 184, 0.25);
 }
 
-.mermaid-modal-panel.is-dark .mermaid-modal-header {
+:where(.markstream-react) .mermaid-modal-panel.is-dark .mermaid-modal-header {
   border-bottom-color: rgba(148, 163, 184, 0.25);
 }
 
-.mermaid-modal-title {
+:where(.markstream-react) .mermaid-modal-title {
   font-size: 0.875rem;
   font-weight: 600;
 }
 
-.mermaid-modal-close {
+:where(.markstream-react) .mermaid-modal-close {
   font-size: 0.875rem;
   padding: 0.25rem 0.5rem;
   border-radius: 0.375rem;
@@ -702,31 +703,31 @@ li .paragraph-node {
   opacity: 0.9;
 }
 
-.mermaid-modal-close:hover {
+:where(.markstream-react) .mermaid-modal-close:hover {
   opacity: 1;
   background: rgba(148, 163, 184, 0.16);
 }
 
-.mermaid-modal-body {
+:where(.markstream-react) .mermaid-modal-body {
   padding: 1rem;
   max-height: 80vh;
   overflow: auto;
 }
 
-.mermaid-modal-content {
+:where(.markstream-react) .mermaid-modal-content {
   width: 100%;
   height: 100%;
   display: flex;
   justify-content: center;
 }
 
-.fullscreen {
+:where(.markstream-react) .fullscreen {
   width: 100%;
   max-height: 100% !important;
   height: 100% !important;
 }
 
-.mermaid-header {
+:where(.markstream-react) .mermaid-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -735,25 +736,26 @@ li .paragraph-node {
   background: rgba(248, 250, 252, 0.85);
 }
 
-.dark .mermaid-header {
+.dark :where(.markstream-react) .mermaid-header,
+:where(.markstream-react).dark .mermaid-header {
   background: rgba(15, 23, 42, 0.85);
   border-color: rgba(71, 85, 105, 0.6);
 }
 
-.mermaid-title__text {
+:where(.markstream-react) .mermaid-title__text {
   font-size: 0.85rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: inherit;
 }
 
-.mermaid-actions {
+:where(.markstream-react) .mermaid-actions {
   display: flex;
   align-items: center;
   gap: 0.35rem;
 }
 
-.mermaid-btn {
+:where(.markstream-react) .mermaid-btn {
   border: 1px solid rgba(148, 163, 184, 0.4);
   background: transparent;
   color: inherit;
@@ -764,24 +766,25 @@ li .paragraph-node {
   transition: background 0.2s ease, color 0.2s ease;
 }
 
-.mermaid-btn:hover {
+:where(.markstream-react) .mermaid-btn:hover {
   background: rgba(59, 130, 246, 0.15);
   color: #1d4ed8;
 }
 
-.dark .mermaid-btn:hover {
+.dark :where(.markstream-react) .mermaid-btn:hover,
+:where(.markstream-react).dark .mermaid-btn:hover {
   background: rgba(59, 130, 246, 0.3);
   color: #bfdbfe;
 }
 
-.mermaid-toggle {
+:where(.markstream-react) .mermaid-toggle {
   display: inline-flex;
   border-radius: 9999px;
   border: 1px solid rgba(148, 163, 184, 0.3);
   overflow: hidden;
 }
 
-.mermaid-toggle-btn {
+:where(.markstream-react) .mermaid-toggle-btn {
   border: none;
   background: transparent;
   color: inherit;
@@ -791,22 +794,23 @@ li .paragraph-node {
   transition: background 0.2s ease;
 }
 
-.mermaid-toggle-btn--active {
+:where(.markstream-react) .mermaid-toggle-btn--active {
   background: rgba(59, 130, 246, 0.18);
   color: #1d4ed8;
 }
 
-.dark .mermaid-toggle-btn--active {
+.dark :where(.markstream-react) .mermaid-toggle-btn--active,
+:where(.markstream-react).dark .mermaid-toggle-btn--active {
   background: rgba(59, 130, 246, 0.3);
   color: #bfdbfe;
 }
 
-.mermaid-body {
+:where(.markstream-react) .mermaid-body {
   position: relative;
   padding: 1rem;
 }
 
-.mermaid-preview {
+:where(.markstream-react) .mermaid-preview {
   width: 100%;
   min-height: 180px;
   display: flex;
@@ -815,12 +819,12 @@ li .paragraph-node {
   text-align: center;
 }
 
-.mermaid-preview svg {
+:where(.markstream-react) .mermaid-preview svg {
   width: 100%;
   height: auto;
 }
 
-.mermaid-source {
+:where(.markstream-react) .mermaid-source {
   background: rgba(15, 23, 42, 0.95);
   color: #e2e8f0;
   border-radius: 0.5rem;
@@ -828,14 +832,14 @@ li .paragraph-node {
   overflow-x: auto;
 }
 
-.mermaid-error {
+:where(.markstream-react) .mermaid-error {
   padding: 0.85rem 1rem;
   color: #b91c1c;
   background: rgba(248, 113, 113, 0.15);
   border-top: 1px solid rgba(248, 113, 113, 0.25);
 }
 
-.mermaid-loading {
+:where(.markstream-react) .mermaid-loading {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -844,54 +848,55 @@ li .paragraph-node {
   color: rgba(15, 23, 42, 0.6);
 }
 
-.dark .mermaid-loading {
+.dark :where(.markstream-react) .mermaid-loading,
+:where(.markstream-react).dark .mermaid-loading {
   color: rgba(226, 232, 240, 0.7);
 }
 
-.mermaid-spinner {
+:where(.markstream-react) .mermaid-spinner {
   width: 1.2rem;
   height: 1.2rem;
   border: 2px solid rgba(59, 130, 246, 0.4);
   border-top-color: rgba(59, 130, 246, 0.9);
   border-radius: 9999px;
-  animation: spin 0.9s linear infinite;
+  animation: markstream-react-spin 0.9s linear infinite;
 }
 
-.math-block-node {
+:where(.markstream-react) .math-block-node {
   margin: 1rem 0;
 }
 
-.math-inline-wrapper {
+:where(.markstream-react) .math-inline-wrapper {
   position: relative;
   display: inline-block;
 }
 
-.math-inline {
+:where(.markstream-react) .math-inline {
   display: inline-block;
   vertical-align: middle;
 }
 
-.math-inline--hidden {
+:where(.markstream-react) .math-inline--hidden {
   visibility: hidden;
 }
 
-.math-inline__loading {
+:where(.markstream-react) .math-inline__loading {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
 }
 
-.math-inline__spinner {
+:where(.markstream-react) .math-inline__spinner {
   width: 1rem;
   height: 1rem;
   border-radius: 9999px;
   border: 2px solid rgba(94, 104, 121, 0.25);
   border-top-color: rgba(94, 104, 121, 0.8);
-  animation: spin 1s linear infinite;
+  animation: markstream-react-spin 1s linear infinite;
 }
 
-.math-block {
+:where(.markstream-react) .math-block {
   position: relative;
   text-align: center;
   overflow-x: auto;
@@ -899,60 +904,60 @@ li .paragraph-node {
   padding: 0.5rem;
 }
 
-.math-rendering {
+:where(.markstream-react) .math-rendering {
   opacity: 0.3;
   transition: opacity 0.2s ease;
 }
 
-.thematic-break {
+:where(.markstream-react) .thematic-break {
   margin: 3rem 0;
   border-top: 1px solid #e2e8f0;
 }
 
-.hr-node {
+:where(.markstream-react) .hr-node {
   margin: 3rem 0;
   border-top: 1px solid var(--hr-border-color, #e2e8f0);
 }
 
-.hard-break {
+:where(.markstream-react) .hard-break {
   display: block;
 }
 
-.checkbox-node {
+:where(.markstream-react) .checkbox-node {
   margin-right: 0.5rem;
   vertical-align: middle;
 }
 
-.checkbox-input {
+:where(.markstream-react) .checkbox-input {
   margin: 0;
   cursor: default;
 }
 
-.html-inline-node {
+:where(.markstream-react) .html-inline-node {
   display: inline;
 }
 
-.html-inline-node--loading {
+:where(.markstream-react) .html-inline-node--loading {
   opacity: 0.85;
 }
 
-.html-block-node__placeholder {
+:where(.markstream-react) .html-block-node__placeholder {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
   padding: 0.5rem 0;
 }
 
-.html-block-node__placeholder-bar {
+:where(.markstream-react) .html-block-node__placeholder-bar {
   display: block;
   height: 0.8rem;
   border-radius: 9999px;
   background-image: linear-gradient(90deg, rgba(148, 163, 184, 0.35), rgba(148, 163, 184, 0.1), rgba(148, 163, 184, 0.35));
   background-size: 200% 100%;
-  animation: html-block-node-shimmer 1.2s ease infinite;
+  animation: markstream-react-html-block-node-shimmer 1.2s ease infinite;
 }
 
-@keyframes html-block-node-shimmer {
+@keyframes markstream-react-html-block-node-shimmer {
   0% {
     background-position: 0% 0%;
   }
@@ -961,7 +966,7 @@ li .paragraph-node {
   }
 }
 
-.vmr-container {
+:where(.markstream-react) .vmr-container {
   border-radius: 0.5rem;
   border: 1px solid rgba(148, 163, 184, 0.35);
   padding: 1rem;
@@ -969,7 +974,7 @@ li .paragraph-node {
   border-left-width: 4px;
 }
 
-.admonition {
+:where(.markstream-react) .admonition {
   --admonition-bg: #f8f8f8;
   --admonition-border: #eaecef;
   --admonition-header-bg: rgba(0, 0, 0, 0.03);
@@ -988,7 +993,7 @@ li .paragraph-node {
   overflow: hidden;
 }
 
-.admonition-header {
+:where(.markstream-react) .admonition-header {
   padding: 0.5rem 1rem;
   font-weight: 600;
   display: flex;
@@ -997,32 +1002,32 @@ li .paragraph-node {
   color: var(--admonition-muted);
 }
 
-.admonition-icon {
+:where(.markstream-react) .admonition-icon {
   margin-right: 0.5rem;
   color: inherit;
 }
 
-.admonition-content {
+:where(.markstream-react) .admonition-content {
   padding: 0.5rem 1rem 1rem;
   color: var(--admonition-text);
 }
 
-.admonition-note { border-left-color: var(--admonition-note-color); }
-.admonition-note .admonition-header { background-color: rgba(68, 138, 255, 0.06); color: var(--admonition-note-color); }
-.admonition-info { border-left-color: var(--admonition-note-color); }
-.admonition-info .admonition-header { background-color: rgba(68, 138, 255, 0.06); color: var(--admonition-note-color); }
-.admonition-tip { border-left-color: var(--admonition-tip-color); }
-.admonition-tip .admonition-header { background-color: rgba(0, 191, 165, 0.06); color: var(--admonition-tip-color); }
-.admonition-warning { border-left-color: var(--admonition-warning-color); }
-.admonition-warning .admonition-header { background-color: rgba(255, 145, 0, 0.06); color: var(--admonition-warning-color); }
-.admonition-danger { border-left-color: var(--admonition-danger-color); }
-.admonition-danger .admonition-header { background-color: rgba(255, 82, 82, 0.06); color: var(--admonition-danger-color); }
-.admonition-error { border-left-color: var(--admonition-danger-color); }
-.admonition-error .admonition-header { background-color: rgba(255, 82, 82, 0.06); color: var(--admonition-danger-color); }
-.admonition-caution { border-left-color: var(--admonition-warning-color); }
-.admonition-caution .admonition-header { background-color: rgba(255, 145, 0, 0.06); color: var(--admonition-warning-color); }
+:where(.markstream-react) .admonition-note { border-left-color: var(--admonition-note-color); }
+:where(.markstream-react) .admonition-note .admonition-header { background-color: rgba(68, 138, 255, 0.06); color: var(--admonition-note-color); }
+:where(.markstream-react) .admonition-info { border-left-color: var(--admonition-note-color); }
+:where(.markstream-react) .admonition-info .admonition-header { background-color: rgba(68, 138, 255, 0.06); color: var(--admonition-note-color); }
+:where(.markstream-react) .admonition-tip { border-left-color: var(--admonition-tip-color); }
+:where(.markstream-react) .admonition-tip .admonition-header { background-color: rgba(0, 191, 165, 0.06); color: var(--admonition-tip-color); }
+:where(.markstream-react) .admonition-warning { border-left-color: var(--admonition-warning-color); }
+:where(.markstream-react) .admonition-warning .admonition-header { background-color: rgba(255, 145, 0, 0.06); color: var(--admonition-warning-color); }
+:where(.markstream-react) .admonition-danger { border-left-color: var(--admonition-danger-color); }
+:where(.markstream-react) .admonition-danger .admonition-header { background-color: rgba(255, 82, 82, 0.06); color: var(--admonition-danger-color); }
+:where(.markstream-react) .admonition-error { border-left-color: var(--admonition-danger-color); }
+:where(.markstream-react) .admonition-error .admonition-header { background-color: rgba(255, 82, 82, 0.06); color: var(--admonition-danger-color); }
+:where(.markstream-react) .admonition-caution { border-left-color: var(--admonition-warning-color); }
+:where(.markstream-react) .admonition-caution .admonition-header { background-color: rgba(255, 145, 0, 0.06); color: var(--admonition-warning-color); }
 
-.admonition-toggle {
+:where(.markstream-react) .admonition-toggle {
   margin-left: auto;
   background: transparent;
   border: none;
@@ -1033,12 +1038,12 @@ li .paragraph-node {
   font-size: 0.9rem;
 }
 
-.admonition-toggle:focus {
+:where(.markstream-react) .admonition-toggle:focus {
   outline: 2px solid rgba(0, 0, 0, 0.08);
   outline-offset: 2px;
 }
 
-.admonition.is-dark {
+:where(.markstream-react) .admonition.is-dark {
   --admonition-bg: #0b1220;
   --admonition-border: rgba(255, 255, 255, 0.06);
   --admonition-header-bg: rgba(255, 255, 255, 0.03);
@@ -1046,7 +1051,7 @@ li .paragraph-node {
   --admonition-muted: #cbd5e1;
 }
 
-.code-block-container {
+:where(.markstream-react) .code-block-container {
   contain: content;
   content-visibility: auto;
   contain-intrinsic-size: 320px 180px;
@@ -1117,7 +1122,7 @@ li .paragraph-node {
   --markstream-diff-removed-line-fill: rgb(255 241 241 / 0.98);
 }
 
-.code-block-container.is-dark {
+:where(.markstream-react) .code-block-container.is-dark {
   --markstream-code-fallback-bg: #111827;
   --markstream-code-fallback-fg: #e5e7eb;
   --markstream-code-border-color: rgb(55 65 81 / 0.3);
@@ -1185,94 +1190,94 @@ li .paragraph-node {
   );
 }
 
-.code-editor-container {
+:where(.markstream-react) .code-editor-container {
   transition: height 180ms ease, max-height 180ms ease;
 }
 
-.code-block-container.is-plain-text:not(.is-diff) .monaco-editor,
-.code-block-container.is-plain-text:not(.is-diff) .monaco-editor .monaco-editor-background,
-.code-block-container.is-plain-text:not(.is-diff) .monaco-editor .margin,
-.code-block-container.is-plain-text:not(.is-diff) .monaco-editor .lines-content {
+:where(.markstream-react) .code-block-container.is-plain-text:not(.is-diff) .monaco-editor,
+:where(.markstream-react) .code-block-container.is-plain-text:not(.is-diff) .monaco-editor .monaco-editor-background,
+:where(.markstream-react) .code-block-container.is-plain-text:not(.is-diff) .monaco-editor .margin,
+:where(.markstream-react) .code-block-container.is-plain-text:not(.is-diff) .monaco-editor .lines-content {
   background: var(--vscode-editor-background, var(--markstream-code-fallback-bg)) !important;
 }
 
-.code-block-container.is-plain-text:not(.is-diff) .monaco-editor,
-.code-block-container.is-plain-text:not(.is-diff) .monaco-editor .margin,
-.code-block-container.is-plain-text:not(.is-diff) .monaco-editor .view-lines,
-.code-block-container.is-plain-text:not(.is-diff) .monaco-editor .view-line,
-.code-block-container.is-plain-text:not(.is-diff) .monaco-editor .view-line span,
-.code-block-container.is-plain-text:not(.is-diff) .monaco-editor .line-numbers {
+:where(.markstream-react) .code-block-container.is-plain-text:not(.is-diff) .monaco-editor,
+:where(.markstream-react) .code-block-container.is-plain-text:not(.is-diff) .monaco-editor .margin,
+:where(.markstream-react) .code-block-container.is-plain-text:not(.is-diff) .monaco-editor .view-lines,
+:where(.markstream-react) .code-block-container.is-plain-text:not(.is-diff) .monaco-editor .view-line,
+:where(.markstream-react) .code-block-container.is-plain-text:not(.is-diff) .monaco-editor .view-line span,
+:where(.markstream-react) .code-block-container.is-plain-text:not(.is-diff) .monaco-editor .line-numbers {
   color: var(--vscode-editor-foreground, var(--markstream-code-fallback-fg)) !important;
 }
 
-.code-action-btn {
+:where(.markstream-react) .code-action-btn {
   cursor: pointer;
   opacity: 0.7;
   transition: opacity 0.2s;
 }
 
-.code-action-btn:hover {
+:where(.markstream-react) .code-action-btn:hover {
   opacity: 1;
 }
 
-.code-action-btn:disabled {
+:where(.markstream-react) .code-action-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.code-action-btn:disabled:hover {
+:where(.markstream-react) .code-action-btn:disabled:hover {
   background-color: transparent;
 }
 
 /* Ensure injected icons align consistently whether img or inline svg */
-.icon-slot {
+:where(.markstream-react) .icon-slot {
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
-.icon-slot svg,
-.icon-slot img {
+:where(.markstream-react) .icon-slot svg,
+:where(.markstream-react) .icon-slot img {
   display: block;
   width: 100%;
   height: 100%;
 }
 
-.code-editor-layer {
+:where(.markstream-react) .code-editor-layer {
   display: grid;
   min-width: 0;
 }
 
-.code-editor-layer > .code-editor-container,
-.code-editor-layer > .code-editor-fallback-surface {
+:where(.markstream-react) .code-editor-layer > .code-editor-container,
+:where(.markstream-react) .code-editor-layer > .code-editor-fallback-surface {
   grid-area: 1 / 1;
 }
 
-.code-editor-fallback-surface {
+:where(.markstream-react) .code-editor-fallback-surface {
   overflow: auto;
   padding: 1rem;
 }
 
-.code-block-container.is-diff .code-editor-fallback-surface {
+:where(.markstream-react) .code-block-container.is-diff .code-editor-fallback-surface {
   padding: 0;
   background: var(--markstream-diff-editor-bg);
 }
 
-.code-block-container.is-diff {
+:where(.markstream-react) .code-block-container.is-diff {
   background: var(--markstream-diff-shell-bg);
   box-shadow: var(--markstream-diff-shell-shadow);
   border-color: var(--markstream-diff-shell-border);
   --vscode-editor-selectionBackground: var(--markstream-diff-action-hover);
 }
 
-.code-block-container.is-diff .code-block-header {
+:where(.markstream-react) .code-block-container.is-diff .code-block-header {
   padding: 18px 20px 14px;
   color: var(--markstream-diff-shell-fg);
   background: transparent;
   border-bottom-color: var(--markstream-diff-header-border);
 }
 
-.code-block-container.is-diff .code-editor-layer {
+:where(.markstream-react) .code-block-container.is-diff .code-editor-layer {
   padding: 4px 4px 8px;
   background: var(--markstream-diff-stage-bg);
   --vscode-editor-background: var(--markstream-diff-editor-bg);
@@ -1283,12 +1288,12 @@ li .paragraph-node {
   --vscode-widget-shadow: var(--markstream-diff-widget-shadow);
 }
 
-.code-block-container .monaco-diff-editor .diffOverview {
+:where(.markstream-react) .code-block-container .monaco-diff-editor .diffOverview {
   background-color: var(--vscode-editor-background, #111827);
 }
 
-.code-block-container .stream-monaco-diff-root .monaco-diff-editor .diffOverview,
-.code-block-container .stream-monaco-diff-root .decorationsOverviewRuler {
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .monaco-diff-editor .diffOverview,
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .decorationsOverviewRuler {
   display: none !important;
   width: 0 !important;
   min-width: 0 !important;
@@ -1300,21 +1305,21 @@ li .paragraph-node {
   overflow: hidden !important;
 }
 
-.code-block-container .stream-monaco-diff-root .monaco-diff-editor {
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .monaco-diff-editor {
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
 }
 
-.code-block-container .stream-monaco-diff-root .monaco-editor .diff-hidden-lines .center:not(.stream-monaco-clickable) > *:not(a) {
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .monaco-editor .diff-hidden-lines .center:not(.stream-monaco-clickable) > *:not(a) {
   visibility: hidden !important;
 }
 
-.code-block-container .stream-monaco-diff-root .monaco-editor .diff-hidden-lines-compact .text {
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .monaco-editor .diff-hidden-lines-compact .text {
   opacity: 0 !important;
 }
 
-.code-block-container .stream-monaco-diff-root {
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root {
   --stream-monaco-gutter-gap: var(--markstream-diff-gutter-gap) !important;
   --stream-monaco-line-number: var(--markstream-diff-line-number) !important;
   --stream-monaco-line-number-active: var(--markstream-diff-line-number-active) !important;
@@ -1336,25 +1341,25 @@ li .paragraph-node {
   --stream-monaco-unchanged-fg: var(--markstream-diff-unchanged-fg) !important;
 }
 
-.code-block-container .stream-monaco-diff-root .monaco-editor .diff-hidden-lines .center:not(.stream-monaco-unchanged-bridge-source),
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge {
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .monaco-editor .diff-hidden-lines .center:not(.stream-monaco-unchanged-bridge-source),
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge {
   --stream-monaco-unchanged-bg: var(--markstream-diff-unchanged-bg) !important;
   --stream-monaco-unchanged-fg: var(--markstream-diff-unchanged-fg) !important;
   background: var(--stream-monaco-unchanged-bg) !important;
   color: var(--stream-monaco-unchanged-fg) !important;
 }
 
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge {
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge {
   right: calc(
     var(--stream-monaco-gutter-marker-width) - var(--stream-monaco-unchanged-rail-width) / 2 + (var(--stream-monaco-gutter-gap) * 2)
   ) !important;
   width: auto !important;
 }
 
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-summary,
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-summary:hover,
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-summary:focus-visible,
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-summary.stream-monaco-focus-visible {
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-summary,
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-summary:hover,
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-summary:focus-visible,
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-summary.stream-monaco-focus-visible {
   background: var(--stream-monaco-unchanged-bg) !important;
   color: var(--markstream-diff-unchanged-fg) !important;
   padding-left: calc(
@@ -1365,46 +1370,46 @@ li .paragraph-node {
   ) !important;
 }
 
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-rail,
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge.stream-monaco-diff-unchanged-bridge-line-info .stream-monaco-unchanged-rail,
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal,
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal:hover,
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal:focus-visible,
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal.stream-monaco-focus-visible {
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-rail,
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge.stream-monaco-diff-unchanged-bridge-line-info .stream-monaco-unchanged-rail,
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal,
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal:hover,
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal:focus-visible,
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal.stream-monaco-focus-visible {
   background: var(--stream-monaco-unchanged-bg) !important;
 }
 
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-rail {
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-rail {
   border-right-color: var(--markstream-diff-unchanged-divider) !important;
 }
 
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal {
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal {
   border-bottom-color: transparent !important;
 }
 
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-rail.stream-monaco-unchanged-rail-both .stream-monaco-unchanged-reveal:first-child {
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-rail.stream-monaco-unchanged-rail-both .stream-monaco-unchanged-reveal:first-child {
   border-bottom-color: var(--markstream-diff-unchanged-divider) !important;
 }
 
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-rail.stream-monaco-unchanged-rail-top-only .stream-monaco-unchanged-reveal,
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-rail.stream-monaco-unchanged-rail-bottom-only .stream-monaco-unchanged-reveal {
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-rail.stream-monaco-unchanged-rail-top-only .stream-monaco-unchanged-reveal,
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-rail.stream-monaco-unchanged-rail-bottom-only .stream-monaco-unchanged-reveal {
   border-bottom: 0 !important;
 }
 
-.code-block-container .stream-monaco-diff-root .monaco-editor .diff-hidden-lines .center .stream-monaco-unchanged-meta,
-.code-block-container .stream-monaco-diff-root .monaco-editor .diff-hidden-lines .center .stream-monaco-unchanged-count,
-.code-block-container .stream-monaco-diff-root .monaco-editor .diff-hidden-lines .center .stream-monaco-unchanged-metadata-label,
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-meta,
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-count,
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-metadata-label,
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal,
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal:hover,
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal:focus-visible,
-.code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal.stream-monaco-focus-visible {
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .monaco-editor .diff-hidden-lines .center .stream-monaco-unchanged-meta,
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .monaco-editor .diff-hidden-lines .center .stream-monaco-unchanged-count,
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .monaco-editor .diff-hidden-lines .center .stream-monaco-unchanged-metadata-label,
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-meta,
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-count,
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-metadata-label,
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal,
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal:hover,
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal:focus-visible,
+:where(.markstream-react) .code-block-container .stream-monaco-diff-root .stream-monaco-diff-unchanged-bridge .stream-monaco-unchanged-reveal.stream-monaco-focus-visible {
   color: var(--markstream-diff-unchanged-fg) !important;
 }
 
-.code-block-content {
+:where(.markstream-react) .code-block-content {
   display: grid;
   max-height: min(70vh, 500px);
   overflow: auto;
@@ -1413,25 +1418,25 @@ li .paragraph-node {
   line-height: var(--vscode-editor-line-height, 1.5);
 }
 
-.code-block-render,
-.code-fallback-plain {
+:where(.markstream-react) .code-block-render,
+:where(.markstream-react) .code-fallback-plain {
   grid-area: 1 / 1;
   min-width: 0;
 }
 
-.code-block-render {
+:where(.markstream-react) .code-block-render {
   min-height: 1px;
 }
 
-.code-block-render pre,
-.code-block-content .shiki {
+:where(.markstream-react) .code-block-render pre,
+:where(.markstream-react) .code-block-content .shiki {
   margin: 0;
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
 }
 
-.code-block-content .shiki-fallback {
+:where(.markstream-react) .code-block-content .shiki-fallback {
   margin: 0;
   padding: 1rem;
   background: inherit;
@@ -1442,7 +1447,7 @@ li .paragraph-node {
   line-height: inherit;
 }
 
-.code-fallback-plain {
+:where(.markstream-react) .code-fallback-plain {
   position: relative;
   z-index: 1;
   white-space: pre;
@@ -1455,14 +1460,14 @@ li .paragraph-node {
   font-weight: var(--vscode-editor-font-weight, 400);
 }
 
-.code-fallback-plain > code {
+:where(.markstream-react) .code-fallback-plain > code {
   font-size: inherit;
   line-height: inherit;
   font-family: inherit;
   font-weight: inherit;
 }
 
-.code-fallback-plain.markstream-pre--diff-preview {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview {
   box-sizing: border-box;
   width: 100%;
   padding-left: 0;
@@ -1495,7 +1500,7 @@ li .paragraph-node {
   --markstream-pre-diff-line-number-align: var(--markstream-diff-line-number-align, right);
 }
 
-.code-fallback-plain.markstream-pre--diff-preview.markstream-pre--diff-inline {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview.markstream-pre--diff-inline {
   --markstream-pre-diff-scrollable-left: var(
     --stream-monaco-modified-scrollable-left,
     var(--stream-monaco-original-scrollable-left)
@@ -1511,7 +1516,7 @@ li .paragraph-node {
   );
 }
 
-.code-fallback-plain.markstream-pre--diff-preview > .markstream-pre__diff-code {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview > .markstream-pre__diff-code {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   width: 100%;
@@ -1520,27 +1525,27 @@ li .paragraph-node {
   line-height: inherit;
 }
 
-.code-fallback-plain.markstream-pre--diff-preview.markstream-pre--diff-inline > .markstream-pre__diff-code {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview.markstream-pre--diff-inline > .markstream-pre__diff-code {
   grid-template-columns: max-content;
   width: max-content;
 }
 
-.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-pane {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-pane {
   min-width: 0;
   overflow: hidden;
 }
 
-.code-fallback-plain.markstream-pre--diff-preview:not(.markstream-pre--diff-inline) .markstream-pre__diff-pane {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview:not(.markstream-pre--diff-inline) .markstream-pre__diff-pane {
   overflow-x: auto;
   overflow-y: hidden;
 }
 
-.code-fallback-plain.markstream-pre--diff-preview.markstream-pre--diff-inline .markstream-pre__diff-pane {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview.markstream-pre--diff-inline .markstream-pre__diff-pane {
   min-width: max-content;
   overflow: visible;
 }
 
-.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-pane--modified {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-pane--modified {
   --markstream-pre-diff-scrollable-left: var(
     --stream-monaco-modified-scrollable-left,
     var(--stream-monaco-original-scrollable-left)
@@ -1557,11 +1562,11 @@ li .paragraph-node {
   box-shadow: inset 1px 0 var(--markstream-diff-pane-divider, rgb(148 163 184 / 0.18));
 }
 
-.code-fallback-plain.markstream-pre--diff-preview.markstream-pre--diff-inline .markstream-pre__diff-pane--modified {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview.markstream-pre--diff-inline .markstream-pre__diff-pane--modified {
   box-shadow: none;
 }
 
-.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line {
   position: relative;
   display: block;
   box-sizing: border-box;
@@ -1570,7 +1575,7 @@ li .paragraph-node {
   line-height: var(--markstream-pre-diff-line-height, 18px);
 }
 
-.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line::before {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line::before {
   content: '';
   position: absolute;
   inset-inline: 0;
@@ -1581,7 +1586,7 @@ li .paragraph-node {
   background: transparent;
 }
 
-.code-fallback-plain.markstream-pre--diff-preview.markstream-pre--diff-inline .markstream-pre__diff-line::after {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview.markstream-pre--diff-inline .markstream-pre__diff-line::after {
   content: '';
   position: absolute;
   top: 0;
@@ -1593,7 +1598,7 @@ li .paragraph-node {
   background: var(--stream-monaco-pane-divider, var(--markstream-diff-pane-divider, rgb(148 163 184 / 0.18)));
 }
 
-.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-rail {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-rail {
   position: absolute;
   z-index: 2;
   top: 0;
@@ -1603,7 +1608,7 @@ li .paragraph-node {
   height: var(--markstream-pre-diff-line-height, 18px);
 }
 
-.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-number {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-number {
   position: absolute;
   z-index: 1;
   top: 0;
@@ -1616,7 +1621,7 @@ li .paragraph-node {
   user-select: none;
 }
 
-.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-content {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-content {
   position: relative;
   z-index: 1;
   display: block;
@@ -1628,7 +1633,7 @@ li .paragraph-node {
   line-break: auto;
 }
 
-.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-content-inner {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-content-inner {
   white-space: inherit;
   overflow-wrap: inherit;
   word-break: inherit;
@@ -1637,67 +1642,67 @@ li .paragraph-node {
   box-decoration-break: clone;
 }
 
-.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--added {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--added {
   color: var(--stream-monaco-added-fg, var(--markstream-diff-added-fg, inherit));
 }
 
-.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--removed {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--removed {
   color: var(--stream-monaco-removed-fg, var(--markstream-diff-removed-fg, inherit));
 }
 
-.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--hunk {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--hunk {
   color: var(--stream-monaco-unchanged-fg, var(--markstream-diff-unchanged-fg, var(--markstream-diff-line-number, currentColor)));
 }
 
-.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--hunk::before {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--hunk::before {
   background: var(--stream-monaco-unchanged-bg, var(--markstream-diff-unchanged-bg, transparent));
 }
 
-.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--added::before {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--added::before {
   background: var(--stream-monaco-added-line-fill, var(--markstream-diff-added-line-fill, transparent));
 }
 
-.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--removed::before {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--removed::before {
   background: var(--stream-monaco-removed-line-fill, var(--markstream-diff-removed-line-fill, transparent));
 }
 
-.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--added > .markstream-pre__diff-rail {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--added > .markstream-pre__diff-rail {
   background: var(--stream-monaco-added-gutter, var(--markstream-diff-added-gutter, currentColor));
 }
 
-.code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--removed > .markstream-pre__diff-rail {
+:where(.markstream-react) .code-fallback-plain.markstream-pre--diff-preview .markstream-pre__diff-line--removed > .markstream-pre__diff-rail {
   background: var(--stream-monaco-removed-gutter, var(--markstream-diff-removed-gutter, currentColor));
 }
 
-.code-loading-placeholder {
+:where(.markstream-react) .code-loading-placeholder {
   padding: 1rem;
   min-height: 120px;
 }
 
-.loading-skeleton {
+:where(.markstream-react) .loading-skeleton {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
 
-.skeleton-line {
+:where(.markstream-react) .skeleton-line {
   height: 1rem;
   background: linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.12) 37%, rgba(0,0,0,0.06) 63%);
   background-size: 400% 100%;
-  animation: code-skeleton-shimmer 1.2s ease-in-out infinite;
+  animation: markstream-react-code-skeleton-shimmer 1.2s ease-in-out infinite;
   border-radius: 0.25rem;
 }
 
-.code-block-container.is-dark .skeleton-line {
+:where(.markstream-react) .code-block-container.is-dark .skeleton-line {
   background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.12) 37%, rgba(255,255,255,0.06) 63%);
   background-size: 400% 100%;
 }
 
-.skeleton-line.short {
+:where(.markstream-react) .skeleton-line.short {
   width: 60%;
 }
 
-@keyframes code-skeleton-shimmer {
+@keyframes markstream-react-code-skeleton-shimmer {
   0% { background-position: 100% 0; }
   100% { background-position: 0 0; }
 }
@@ -1725,7 +1730,7 @@ li .paragraph-node {
   outline-offset: 2px;
 }
 
-.html-preview-frame__backdrop {
+:where(.markstream-react).html-preview-frame__backdrop {
   position: fixed;
   inset: 0;
   background-color: rgba(0, 0, 0, 0.5);
@@ -1735,11 +1740,11 @@ li .paragraph-node {
   z-index: 50;
 }
 
-.html-preview-frame__backdrop--dark {
+:where(.markstream-react).html-preview-frame__backdrop--dark {
   background-color: rgba(15, 23, 42, 0.8);
 }
 
-.html-preview-frame {
+:where(.markstream-react) .html-preview-frame {
   width: 80vw;
   max-width: 960px;
   height: 70vh;
@@ -1751,13 +1756,13 @@ li .paragraph-node {
   flex-direction: column;
 }
 
-.html-preview-frame--dark {
+:where(.markstream-react) .html-preview-frame--dark {
   background-color: #020617;
   color: #e5e7eb;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
 }
 
-.html-preview-frame__header {
+:where(.markstream-react) .html-preview-frame__header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1765,11 +1770,11 @@ li .paragraph-node {
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
-.html-preview-frame--dark .html-preview-frame__header {
+:where(.markstream-react) .html-preview-frame--dark .html-preview-frame__header {
   border-bottom-color: rgba(148, 163, 184, 0.35);
 }
 
-.html-preview-frame__title {
+:where(.markstream-react) .html-preview-frame__title {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -1780,22 +1785,22 @@ li .paragraph-node {
   opacity: 0.85;
 }
 
-.html-preview-frame__dot {
+:where(.markstream-react) .html-preview-frame__dot {
   width: 0.5rem;
   height: 0.5rem;
   border-radius: 999px;
   background-color: #22c55e;
 }
 
-.html-preview-frame--dark .html-preview-frame__dot {
+:where(.markstream-react) .html-preview-frame--dark .html-preview-frame__dot {
   background-color: #4ade80;
 }
 
-.html-preview-frame__label {
+:where(.markstream-react) .html-preview-frame__label {
   white-space: nowrap;
 }
 
-.html-preview-frame__close {
+:where(.markstream-react) .html-preview-frame__close {
   border: none;
   background: transparent;
   font-size: 1.25rem;
@@ -1803,11 +1808,11 @@ li .paragraph-node {
   cursor: pointer;
 }
 
-.html-preview-frame__close--dark {
+:where(.markstream-react) .html-preview-frame__close--dark {
   color: #e5e7eb;
 }
 
-.html-preview-frame__iframe {
+:where(.markstream-react) .html-preview-frame__iframe {
   width: 100%;
   height: 100%;
   border: none;
@@ -1815,14 +1820,14 @@ li .paragraph-node {
 }
 
 @media (max-width: 640px) {
-  .html-preview-frame {
+  :where(.markstream-react) .html-preview-frame {
     width: 100vw;
     height: 80vh;
     border-radius: 0;
   }
 }
 
-.ms-tooltip {
+:where(.markstream-react).ms-tooltip {
   position: fixed;
   padding: 0.4rem 0.65rem;
   font-size: 0.875rem;
@@ -1836,24 +1841,24 @@ li .paragraph-node {
   transition: opacity 120ms linear, transform 220ms cubic-bezier(.16, 1, .3, 1);
 }
 
-.ms-tooltip[data-visible='true'] {
+:where(.markstream-react).ms-tooltip[data-visible='true'] {
   opacity: 1;
 }
 
-.ms-tooltip[data-dark='true'] {
+:where(.markstream-react).ms-tooltip[data-dark='true'] {
   background-color: #111827;
   color: #f9fafb;
   border-color: #374151;
 }
 
-.ms-tooltip[data-dark='false'],
-.ms-tooltip:not([data-dark='true']) {
+:where(.markstream-react).ms-tooltip[data-dark='false'],
+:where(.markstream-react).ms-tooltip:not([data-dark='true']) {
   background-color: #ffffff;
   color: #111827;
   border-color: #e5e7eb;
 }
 
-@keyframes node-placeholder-shimmer {
+@keyframes markstream-react-node-placeholder-shimmer {
   from {
     background-position: 200% 0%;
   }
@@ -1862,7 +1867,7 @@ li .paragraph-node {
   }
 }
 
-@keyframes node-enter-fade {
+@keyframes markstream-react-node-enter-fade {
   from {
     opacity: 0;
   }
@@ -1872,7 +1877,7 @@ li .paragraph-node {
 }
 
 /* Backward compat alias */
-@keyframes typewriter-fade {
+@keyframes markstream-react-typewriter-fade {
   from {
     opacity: 0;
   }
@@ -1882,7 +1887,7 @@ li .paragraph-node {
 }
 
 /* Typewriter cursor */
-.typewriter-cursor {
+:where(.markstream-react) .typewriter-cursor {
   position: absolute;
   left: 0;
   top: 0;
@@ -1893,10 +1898,10 @@ li .paragraph-node {
   vertical-align: -0.12em;
   border-right: 2px solid currentColor;
   pointer-events: none;
-  animation: typewriter-cursor-blink 1s steps(1, end) infinite;
+  animation: markstream-react-typewriter-cursor-blink 1s steps(1, end) infinite;
 }
 
-@keyframes typewriter-cursor-blink {
+@keyframes markstream-react-typewriter-cursor-blink {
   0%, 49% {
     opacity: 1;
   }
@@ -1917,62 +1922,56 @@ li .paragraph-node {
   border: 0;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.d2-block-body {
+:where(.markstream-react) .d2-block-body {
   position: relative;
 }
 
-.d2-source {
+:where(.markstream-react) .d2-source {
   font-family: var(--vscode-editor-font-family, 'Fira Code', 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace);
 }
 
-.d2-code {
+:where(.markstream-react) .d2-code {
   white-space: pre;
   font-size: 0.875rem;
   line-height: 1.5;
 }
 
-.d2-render {
+:where(.markstream-react) .d2-render {
   overflow: auto;
 }
 
-.d2-svg svg.markstream-d2-root-svg {
+:where(.markstream-react) .d2-svg svg.markstream-d2-root-svg {
   width: 100%;
   max-width: 100%;
   height: auto;
   display: block;
 }
 
-.mode-btn {
+:where(.markstream-react) .mode-btn {
   opacity: 0.7;
   transition: opacity 0.2s;
 }
 
-.mode-btn.is-active {
+:where(.markstream-react) .mode-btn.is-active {
   opacity: 1;
   font-weight: 600;
 }
 
-.d2-action-btn {
+:where(.markstream-react) .d2-action-btn {
   opacity: 0.7;
   transition: opacity 0.2s;
 }
 
-.d2-action-btn:hover {
+:where(.markstream-react) .d2-action-btn:hover {
   opacity: 1;
 }
 
-.d2-action-btn:disabled {
+:where(.markstream-react) .d2-action-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
 }
 
-.d2-error {
+:where(.markstream-react) .d2-error {
   color: #dc2626;
 }
 

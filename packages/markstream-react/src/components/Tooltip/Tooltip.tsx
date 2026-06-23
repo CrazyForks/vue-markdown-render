@@ -96,7 +96,7 @@ export function Tooltip(props: TooltipProps) {
       ref={tooltipRef}
       style={style}
       className={[
-        'ms-tooltip z-[9999] inline-block text-base py-2 px-3 rounded-md shadow-md whitespace-nowrap pointer-events-none border tooltip-element',
+        'markstream-react ms-tooltip z-[9999] inline-block text-base py-2 px-3 rounded-md shadow-md whitespace-nowrap pointer-events-none border tooltip-element',
         isDarkEffective ? 'bg-gray-900 text-white border-gray-700 is-dark' : 'bg-white text-gray-900 border-gray-200',
       ].join(' ')}
       role="tooltip"
