@@ -31,7 +31,6 @@ describe('html URL policy', () => {
 
   it('rejects unsafe absolute URL schemes', () => {
     const unsafe = [
-      'file:///etc/passwd',
       'ftp://example.com/file',
       'blob:https://example.com/id',
       'filesystem:https://example.com/id',
@@ -59,6 +58,15 @@ describe('html URL policy', () => {
 
     for (const value of safe)
       expect(sanitizeAttrs({ href: value }, 'safe', 'a').href).toBe(value)
+  })
+
+  it('allows local file URL hrefs without allowing file resources', () => {
+    const href = 'file:///Users/eric8810/dim-agent/fetch_deepseek_models.py#L62'
+
+    expect(sanitizeAttrs({ href }, 'safe', 'a').href).toBe(href)
+    expect(sanitizeAttrs({ src: href }, 'safe', 'img').src).toBeUndefined()
+    expect(sanitizeAttrs({ href: 'file://example.com/etc/passwd' }, 'safe', 'a').href).toBeUndefined()
+    expect(sanitizeAttrs({ href: 'file:////example.com/etc/passwd' }, 'safe', 'a').href).toBeUndefined()
   })
 
   it('rejects protocol-relative URLs', () => {

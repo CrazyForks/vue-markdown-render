@@ -157,6 +157,30 @@ describe('special link cases', () => {
     expect(links[0].text || links[0].children?.map((c: any) => c.content || '').join('')).toBe('[8]')
   })
 
+  it('parses local file URL links', () => {
+    const markdown = '[fetch_deepseek_models.py#L62](file:///Users/eric8810/dim-agent/fetch_deepseek_models.py#L62)'
+    const nodes = parseMarkdownToStructure(markdown, md, { final: true })
+    const links = collectByType(nodes, 'link')
+
+    expect(links).toHaveLength(1)
+    expect(links[0].href).toBe('file:///Users/eric8810/dim-agent/fetch_deepseek_models.py#L62')
+    expect(links[0].text).toBe('fetch_deepseek_models.py#L62')
+    expect(links[0].loading).toBe(false)
+  })
+
+  it('does not parse hosted file URL links', () => {
+    const cases = [
+      '[x](file://example.com/etc/passwd)',
+      '[x](file:////example.com/etc/passwd)',
+    ]
+
+    for (const markdown of cases) {
+      const nodes = parseMarkdownToStructure(markdown, md, { final: true })
+      expect(collectByType(nodes, 'link'), markdown).toHaveLength(0)
+      expect(textIncludes(nodes, 'x'), markdown).toBe(true)
+    }
+  })
+
   it('distinguishes between reference [8] and link [[8]](url)', () => {
     // Standalone [8] should be a reference
     const referenceMarkdown = '请参考 [8] 了解更多信息'

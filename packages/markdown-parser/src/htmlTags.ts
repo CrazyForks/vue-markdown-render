@@ -286,6 +286,14 @@ function getUrlScheme(normalized: string) {
   return match?.[1]?.toLowerCase() ?? ''
 }
 
+function isSafeLocalFileHref(normalized: string, tagName: string, attrName: string) {
+  if (!isLinkHrefUrlContext(tagName, attrName) || !normalized.startsWith('file:///'))
+    return false
+
+  const firstPathChar = normalized.charAt('file:///'.length)
+  return firstPathChar !== '/' && firstPathChar !== '\\'
+}
+
 function isLinkHrefUrlContext(tagName: string, attrName: string) {
   if (!tagName)
     return !attrName || attrName === 'href'
@@ -353,6 +361,9 @@ export function isUnsafeHtmlUrl(value: string, context: HtmlUrlContext = {}) {
   const scheme = getUrlScheme(normalized)
   if (!scheme)
     return false
+
+  if (scheme === 'file')
+    return !isSafeLocalFileHref(normalized, tagName, attrName)
 
   if (isLinkHrefUrlContext(tagName, attrName))
     return BLOCKED_HREF_URL_PROTOCOLS.has(scheme)

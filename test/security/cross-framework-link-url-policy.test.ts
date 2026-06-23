@@ -56,6 +56,8 @@ async function loadVueLinkNode() {
 }
 
 describe('cross-framework link URL policy', () => {
+  const localFileHref = 'file:///Users/eric8810/dim-agent/fetch_deepseek_models.py#L62'
+
   it('omits unsafe hrefs in framework renderers', () => {
     const unsafe = [
       'javascript:alert(1)',
@@ -119,6 +121,7 @@ describe('cross-framework link URL policy', () => {
       'tel:+123456789',
       '/docs',
       '#section',
+      localFileHref,
     ]
 
     for (const href of safe) {
@@ -132,7 +135,7 @@ describe('cross-framework link URL policy', () => {
       expectRelHardened(rendered)
   })
 
-  it.each(['#section', '/docs', './a', '../a', '?q=1', 'mailto:a@example.com', 'tel:+123456789'])(
+  it.each(['#section', '/docs', './a', '../a', '?q=1', 'mailto:a@example.com', 'tel:+123456789', localFileHref])(
     'does not force target blank for internal and non-http links: %s',
     (href) => {
       for (const rendered of renderAllLinkOutputs(href)) {
@@ -146,7 +149,7 @@ describe('cross-framework link URL policy', () => {
   it('does not force target blank for internal links in the Vue 3 LinkNode component path', async () => {
     const VueLinkNode = await loadVueLinkNode()
 
-    for (const href of ['#section', '/docs', './a', '../a', '?q=1', 'mailto:a@example.com', 'tel:+123456789']) {
+    for (const href of ['#section', '/docs', './a', '../a', '?q=1', 'mailto:a@example.com', 'tel:+123456789', localFileHref]) {
       const wrapper = mount(VueLinkNode as any, {
         props: {
           node: linkNode(href),

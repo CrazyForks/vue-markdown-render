@@ -2,6 +2,7 @@ import type { MathOptions } from './config'
 import type { MarkdownIt as MarkdownItInstance } from './markdown-it-types'
 import MarkdownIt from 'markdown-it-ts'
 import { getDefaultMathOptions } from './config'
+import { isUnsafeHtmlUrl } from './htmlTags'
 import { applyContainers } from './plugins/containers'
 import { applyFixHtmlInlineTokens } from './plugins/fixHtmlInline'
 import { applyFixIndentedCodeBlock } from './plugins/fixIndentedCodeBlock'
@@ -37,6 +38,7 @@ export function factory(opts: FactoryOptions = {}): MarkdownItInstance {
   const stream = Object.prototype.hasOwnProperty.call(markdownItOptions, 'stream')
     ? Boolean(markdownItOptions.stream)
     : true
+  const hasCustomValidateLink = Object.prototype.hasOwnProperty.call(markdownItOptions, 'validateLink')
 
   const md = new MarkdownIt({
     html: true,
@@ -48,6 +50,9 @@ export function factory(opts: FactoryOptions = {}): MarkdownItInstance {
       ...experimental,
     },
   }) as unknown as MarkdownItInstance
+
+  if (!hasCustomValidateLink)
+    md.set({ validateLink: (url: string) => !isUnsafeHtmlUrl(url, { tagName: 'a', attrName: 'href' }) })
 
   if (opts.enableMath ?? true) {
     const mergedMathOptions: MathOptions = { ...(getDefaultMathOptions() ?? {}), ...(opts.mathOptions ?? {}) }
