@@ -18,12 +18,12 @@
     "stream-markdown": "latest",
     "stream-markdown-parser": "workspace:*",
     "stream-monaco": "latest",
-    "svelte": "^5.56.3"
+    "svelte": "^5.56.4"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
     "monaco-editor": "^0.52.2",
-    "svelte-check": "^4.6.0",
+    "svelte-check": "^4.7.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.5",
     "vite-plugin-monaco-editor-esm": "^2.0.2"

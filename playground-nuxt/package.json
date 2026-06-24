@@ -21,6 +21,6 @@
     "nuxt": "^4.4.8",
     "stream-markdown": "latest",
     "stream-monaco": "latest",
-    "vue-i18n": "^11.4.5"
+    "vue-i18n": "^11.4.6"
   }
 }
