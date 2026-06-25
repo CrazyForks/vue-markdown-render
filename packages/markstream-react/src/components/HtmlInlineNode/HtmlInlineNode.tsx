@@ -110,6 +110,24 @@ function attrsToTokenPairs(attrs: Record<string, string>) {
   return Object.entries(attrs).map(([key, value]) => [key, value === '' ? null : value] as [string, string | null])
 }
 
+interface NodeComponentState {
+  loading: boolean
+  autoClosed: boolean
+}
+
+function getUnclosedNodeState(options: HtmlInlineRenderOptions): NodeComponentState {
+  const sourceNode = options.sourceNode as any
+  const loading = options.ctx?.final === true
+    ? false
+    : options.ctx?.final === false
+      ? true
+      : Boolean(sourceNode?.loading)
+  return {
+    loading,
+    autoClosed: loading || Boolean(sourceNode?.autoClosed),
+  }
+}
+
 function renderNodeComponent(
   tagName: string,
   attrs: Record<string, string>,
@@ -118,6 +136,7 @@ function renderNodeComponent(
   options: HtmlInlineRenderOptions,
   contentSource?: string,
   rawSource?: string,
+  state: NodeComponentState = getUnclosedNodeState(options),
 ) {
   const normalizedTag = normalizeCustomHtmlTagName(tagName)
   const content = contentSource ?? getTextContent(children)
@@ -127,8 +146,8 @@ function renderNodeComponent(
     attrs: attrsToTokenPairs(attrs),
     content,
     raw: rawSource ?? `${renderLiteralTagText(tagName, attrs)}${content}</${tagName}>`,
-    loading: Boolean((options.sourceNode as any)?.loading),
-    autoClosed: Boolean((options.sourceNode as any)?.autoClosed ?? (options.sourceNode as any)?.loading),
+    loading: state.loading,
+    autoClosed: state.autoClosed,
   } as ParsedNode
 
   if (options.ctx && options.renderNode)
@@ -185,7 +204,10 @@ function buildReactElementTree(
           stack[stack.length - 1].sourceParts.push(rawSource)
         continue
       }
-      const element = createReactElement(token.tagName!, rawAttrs, [], customComponents, `${keyPrefix}-${autoKeySeed++}`, htmlPolicy, options, '', rawSource)
+      const element = createReactElement(token.tagName!, rawAttrs, [], customComponents, `${keyPrefix}-${autoKeySeed++}`, htmlPolicy, options, '', rawSource, {
+        loading: false,
+        autoClosed: false,
+      })
       const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
       pushRenderedNode(target, element)
       if (stack.length > 0)
@@ -235,7 +257,10 @@ function buildReactElementTree(
             ]
           }
           else {
-            element = createReactElement(opening.tagName, opening.attrs || {}, opening.children, customComponents, `${keyPrefix}-${autoKeySeed++}`, htmlPolicy, options, innerSource, rawSource)
+            const state = opening.tagName.toLowerCase() === closingTag
+              ? { loading: false, autoClosed: false }
+              : getUnclosedNodeState(options)
+            element = createReactElement(opening.tagName, opening.attrs || {}, opening.children, customComponents, `${keyPrefix}-${autoKeySeed++}`, htmlPolicy, options, innerSource, rawSource, state)
           }
 
           if (stack.length > 0)
@@ -275,7 +300,7 @@ function buildReactElementTree(
       ]
     }
     else {
-      element = createReactElement(unclosed.tagName, unclosed.attrs || {}, unclosed.children, customComponents, `${keyPrefix}-${autoKeySeed++}`, htmlPolicy, options, innerSource, rawSource)
+      element = createReactElement(unclosed.tagName, unclosed.attrs || {}, unclosed.children, customComponents, `${keyPrefix}-${autoKeySeed++}`, htmlPolicy, options, innerSource, rawSource, getUnclosedNodeState(options))
     }
     pushRenderedNode(rootNodes, element)
     if (stack.length > 0 && !unclosed.hardBlocked)
@@ -299,6 +324,7 @@ function createReactElement(
   options: HtmlInlineRenderOptions,
   contentSource?: string,
   rawSource?: string,
+  state?: NodeComponentState,
 ): React.ReactNode {
   const customComponent = isCustomHtmlComponent(tagName, customComponents)
   const nodeComponent = Boolean(getNodeComponent(tagName, options))
@@ -318,7 +344,7 @@ function createReactElement(
   const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : autoKey
 
   if (nodeComponent) {
-    return renderNodeComponent(tagName, attrs, children, String(elementKey), options, contentSource, rawSource)
+    return renderNodeComponent(tagName, attrs, children, String(elementKey), options, contentSource, rawSource, state)
   }
   else if (customComponent) {
     // It's a custom React component

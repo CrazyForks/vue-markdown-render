@@ -156,6 +156,24 @@ function attrsToTokenPairs(attrs: Record<string, string>) {
   return Object.entries(attrs).map(([key, value]) => [key, value === '' ? null : value] as [string, string | null])
 }
 
+interface NodeComponentState {
+  loading: boolean
+  autoClosed: boolean
+}
+
+function getUnclosedNodeState(options: HtmlToReactOptions): NodeComponentState {
+  const sourceNode = options.sourceNode as any
+  const loading = options.ctx?.final === true
+    ? false
+    : options.ctx?.final === false
+      ? true
+      : Boolean(sourceNode?.loading)
+  return {
+    loading,
+    autoClosed: loading || Boolean(sourceNode?.autoClosed),
+  }
+}
+
 function getCustomComponentProps(
   tagName: string,
   attrs: Record<string, string>,
@@ -174,6 +192,7 @@ function renderNodeComponent(
   options: HtmlToReactOptions,
   contentSource?: string,
   rawSource?: string,
+  state: NodeComponentState = getUnclosedNodeState(options),
 ) {
   const normalizedTag = normalizeCustomHtmlTagName(tagName)
   const content = contentSource ?? getTextContent(children)
@@ -183,8 +202,8 @@ function renderNodeComponent(
     attrs: attrsToTokenPairs(attrs),
     content,
     raw: rawSource ?? `${renderLiteralTagText(tagName, attrs)}${content}</${tagName}>`,
-    loading: Boolean((options.sourceNode as any)?.loading),
-    autoClosed: Boolean((options.sourceNode as any)?.autoClosed ?? (options.sourceNode as any)?.loading),
+    loading: state.loading,
+    autoClosed: state.autoClosed,
   } as ParsedNode
 
   if (options.ctx && options.renderNode)
@@ -255,7 +274,10 @@ export function parseHtmlToReactNodes(
           : undefined
         const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
         if (nodeComponent) {
-          target.push(renderNodeComponent(token.tagName, rawAttrs, [], elementKey, options, '', rawSource))
+          target.push(renderNodeComponent(token.tagName, rawAttrs, [], elementKey, options, '', rawSource, {
+            loading: false,
+            autoClosed: false,
+          }))
         }
         else if (Comp) {
           const componentProps = getCustomComponentProps(token.tagName, attrs, options)
@@ -289,55 +311,68 @@ export function parseHtmlToReactNodes(
         continue
       }
 
-      const opening = stack.pop()
-      if (!opening || opening.hardBlocked)
+      const closingTag = token.tagName.toLowerCase()
+      let matchedIndex = -1
+      for (let i = stack.length - 1; i >= 0; i--) {
+        if (stack[i].tagName.toLowerCase() === closingTag) {
+          matchedIndex = i
+          break
+        }
+      }
+      if (matchedIndex === -1)
         continue
 
-      const innerSource = opening.sourceParts.join('')
-      const rawSource = `${renderLiteralTagText(opening.tagName, opening.attrs)}${innerSource}</${opening.tagName}>`
-      if (opening.softBlocked) {
-        const rendered = [
-          renderLiteralTagText(opening.tagName, opening.attrs),
-          ...opening.children,
-          `</${opening.tagName}>`,
-        ]
+      while (stack.length > matchedIndex) {
+        const opening = stack.pop()
+        if (!opening)
+          continue
+
+        const innerSource = opening.sourceParts.join('')
+        const rawSource = `${renderLiteralTagText(opening.tagName, opening.attrs)}${innerSource}</${opening.tagName}>`
+        let element: ReactNode | ReactNode[] | null
+        if (opening.hardBlocked) {
+          element = null
+        }
+        else if (opening.softBlocked) {
+          element = [
+            renderLiteralTagText(opening.tagName, opening.attrs),
+            ...opening.children,
+            `</${opening.tagName}>`,
+          ]
+        }
+        else {
+          const attrs = sanitizeHtmlAttrs(opening.attrs || {}, htmlPolicy, opening.tagName)
+          const explicitKey = (attrs as any).key
+          const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : `${keyPrefix}-${autoKeySeed++}`
+          const Comp = opening.customComponent
+            ? (customComponents[opening.tagName] || customComponents[opening.tagName.toLowerCase()])
+            : undefined
+          const nodeComponent = Boolean(getNodeComponent(opening.tagName, options))
+          if (nodeComponent) {
+            const state = opening.tagName.toLowerCase() === closingTag
+              ? { loading: false, autoClosed: false }
+              : getUnclosedNodeState(options)
+            element = renderNodeComponent(opening.tagName, opening.attrs || {}, opening.children, elementKey, options, innerSource, rawSource, state)
+          }
+          else if (Comp) {
+            element = React.createElement(Comp as ComponentType<Record<string, unknown>>, { ...getCustomComponentProps(opening.tagName, attrs, options), key: elementKey }, ...opening.children)
+          }
+          else {
+            element = React.createElement(opening.tagName, {
+              ...normalizeDomAttrs(attrs),
+              key: elementKey,
+              suppressHydrationWarning: true,
+            }, ...opening.children)
+          }
+        }
+
         if (stack.length > 0)
-          pushRenderedNode(stack[stack.length - 1].children, rendered)
+          pushRenderedNode(stack[stack.length - 1].children, element)
         else
-          pushRenderedNode(rootNodes, rendered)
-        if (stack.length > 0)
+          pushRenderedNode(rootNodes, element)
+        if (stack.length > 0 && !opening.hardBlocked)
           stack[stack.length - 1].sourceParts.push(rawSource)
-        continue
       }
-
-      const attrs = sanitizeHtmlAttrs(opening.attrs || {}, htmlPolicy, opening.tagName)
-      const explicitKey = (attrs as any).key
-      const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : `${keyPrefix}-${autoKeySeed++}`
-      const Comp = opening.customComponent
-        ? (customComponents[opening.tagName] || customComponents[opening.tagName.toLowerCase()])
-        : undefined
-      const nodeComponent = Boolean(getNodeComponent(opening.tagName, options))
-      let element: ReactNode
-      if (nodeComponent) {
-        element = renderNodeComponent(opening.tagName, opening.attrs || {}, opening.children, elementKey, options, innerSource, rawSource)
-      }
-      else if (Comp) {
-        element = React.createElement(Comp as ComponentType<Record<string, unknown>>, { ...getCustomComponentProps(opening.tagName, attrs, options), key: elementKey }, ...opening.children)
-      }
-      else {
-        element = React.createElement(opening.tagName, {
-          ...normalizeDomAttrs(attrs),
-          key: elementKey,
-          suppressHydrationWarning: true,
-        }, ...opening.children)
-      }
-
-      if (stack.length > 0)
-        stack[stack.length - 1].children.push(element)
-      else
-        rootNodes.push(element)
-      if (stack.length > 0)
-        stack[stack.length - 1].sourceParts.push(rawSource)
     }
 
     while (stack.length > 0) {
@@ -365,7 +400,7 @@ export function parseHtmlToReactNodes(
       const nodeComponent = Boolean(getNodeComponent(unclosed.tagName, options))
       let element: ReactNode
       if (nodeComponent) {
-        element = renderNodeComponent(unclosed.tagName, unclosed.attrs || {}, unclosed.children, elementKey, options, innerSource, rawSource)
+        element = renderNodeComponent(unclosed.tagName, unclosed.attrs || {}, unclosed.children, elementKey, options, innerSource, rawSource, getUnclosedNodeState(options))
       }
       else if (Comp) {
         element = React.createElement(Comp as ComponentType<Record<string, unknown>>, { ...getCustomComponentProps(unclosed.tagName, attrs, options), key: elementKey }, ...unclosed.children)

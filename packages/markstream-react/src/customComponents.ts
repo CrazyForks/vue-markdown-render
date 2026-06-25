@@ -32,13 +32,15 @@ export type StreamingComponentDefinitions<T extends Record<string, any>> = {
     : never
 }
 
+type ParserComponentOnlyProp = Exclude<keyof NodeComponentProps<any>, 'children' | 'node'>
+
 export type HtmlComponentDefinitions<T extends Record<string, any>> = {
   [K in keyof T]: ComponentProps<T[K]> extends infer P
     ? IsAny<P> extends true
       ? T[K]
-      : 'node' extends keyof P
-        ? never
-        : T[K]
+      : Extract<keyof P, ParserComponentOnlyProp> extends never
+        ? T[K]
+        : never
     : never
 }
 

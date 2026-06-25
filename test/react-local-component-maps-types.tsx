@@ -30,6 +30,10 @@ function Badge({ kind, children }: React.PropsWithChildren<{ kind?: string }>) {
   return <span data-kind={kind}>{children}</span>
 }
 
+function TreeNode({ node, children }: React.PropsWithChildren<{ node: string }>) {
+  return <span data-node={node}>{children}</span>
+}
+
 declare function NodeRenderer<
   TStreamingComponents extends StreamingComponentMap = StreamingComponentMap,
   THtmlComponents extends Record<string, any> = HtmlComponentMap,
@@ -44,8 +48,9 @@ const streamingComponents = {
 } satisfies StreamingComponentMap
 
 const htmlComponents = {
-  badge: Badge,
-  requiredlink: RequiredLink,
+  'badge': Badge,
+  'requiredlink': RequiredLink,
+  'tree-node': TreeNode,
 } satisfies HtmlComponentMap
 
 const definedStreamingComponents = defineStreamingComponents({
@@ -53,8 +58,9 @@ const definedStreamingComponents = defineStreamingComponents({
 })
 
 const definedHtmlComponents = defineHtmlComponents({
-  badge: Badge,
-  requiredlink: RequiredLink,
+  'badge': Badge,
+  'requiredlink': RequiredLink,
+  'tree-node': TreeNode,
 })
 
 defineStreamingComponents({

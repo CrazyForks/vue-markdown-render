@@ -73,10 +73,12 @@ function isNodeStable(prev: ParsedNode, next: ParsedNode): boolean {
   // changed the parsed output should be identical (parser is deterministic).
   if (prev.raw !== next.raw)
     return false
-  // Loading state on code blocks can flip independently of `raw`.
+  if ((prev as any).loading !== (next as any).loading)
+    return false
+  if ((prev as any).autoClosed !== (next as any).autoClosed)
+    return false
+  // Code block diff state can flip independently of `raw`.
   if (prev.type === 'code_block' || next.type === 'code_block') {
-    if ((prev as any).loading !== (next as any).loading)
-      return false
     if ((prev as any).diff !== (next as any).diff)
       return false
   }
@@ -1278,6 +1280,7 @@ export function NodeRenderer<
   const renderCtx = useMemo<RenderContext>(() => ({
     customId: props.customId,
     isDark: props.isDark,
+    final: effectiveFinal,
     indexKey: indexPrefix,
     typewriter: props.typewriter,
     fade: props.fade,
@@ -1311,6 +1314,7 @@ export function NodeRenderer<
   }), [
     props.customId,
     props.isDark,
+    effectiveFinal,
     indexPrefix,
     props.typewriter,
     props.fade,

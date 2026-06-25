@@ -208,9 +208,11 @@ function createRenderContext(
   htmlComponents: NonNullable<RenderContext['htmlComponents']>,
   indexPrefix: string,
   customHtmlTags: readonly string[],
+  final?: boolean,
 ): RenderContext {
   return {
     customId: props.customId,
+    final,
     customComponents,
     customHtmlTags,
     htmlPolicy: props.htmlPolicy ?? 'safe',
@@ -1452,6 +1454,7 @@ export function NodeRenderer<
     htmlComponents,
     indexPrefix,
     effectiveCustomHtmlTags,
+    resolvedFinal,
   )
 
   return (

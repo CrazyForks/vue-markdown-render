@@ -117,6 +117,47 @@ describe('react local component maps', () => {
     await unmountRoot(root)
   })
 
+  it('updates streaming component loading when only final changes', async () => {
+    const seen: Array<NodeComponentProps<DocumentLinkNode>> = []
+    function DocumentLink(props: NodeComponentProps<DocumentLinkNode>) {
+      seen.push(props)
+      return (
+        <span data-loading={String(props.node.loading)}>
+          {props.node.content}
+        </span>
+      )
+    }
+
+    const content = '<DocumentLink id="123">partial'
+    const streamingComponents = { documentlink: DocumentLink }
+    const { host, root } = await renderIntoRoot(
+      <NodeRenderer
+        content={content}
+        final={false}
+        smoothStreaming={false}
+        streamingComponents={streamingComponents}
+      />,
+    )
+
+    expect(host.querySelector('[data-loading="true"]')?.textContent).toBe('partial')
+    expect(seen.at(-1)?.node.loading).toBe(true)
+
+    await updateRoot(
+      root,
+      <NodeRenderer
+        content={content}
+        final
+        smoothStreaming={false}
+        streamingComponents={streamingComponents}
+      />,
+    )
+
+    expect(host.querySelector('[data-loading="false"]')?.textContent).toBe('partial')
+    expect(seen.at(-1)?.node.loading).toBe(false)
+
+    await unmountRoot(root)
+  })
+
   it('renders html components with normal props and children without registry', async () => {
     const seen: Array<React.PropsWithChildren<{ kind?: string, node?: unknown }>> = []
     function Badge(props: React.PropsWithChildren<{ kind?: string, node?: unknown }>) {
@@ -614,6 +655,53 @@ describe('react local component maps', () => {
     expect(seen.at(-1)?.node.autoClosed).toBe(true)
   })
 
+  it('keeps closed nested streamingComponents non-loading when the html wrapper is still streaming', async () => {
+    const seen: Array<NodeComponentProps<DocumentLinkNode>> = []
+    function DocumentLink(props: NodeComponentProps<DocumentLinkNode>) {
+      seen.push(props)
+      return (
+        <span
+          data-closed-nested-loading={String(props.node.loading)}
+          data-closed-nested-auto-closed={String(props.node.autoClosed)}
+        >
+          {props.node.content}
+        </span>
+      )
+    }
+
+    const content = '<span><DocumentLink id="1">complete</DocumentLink>still streaming'
+    const streamingComponents = { documentlink: DocumentLink }
+    const { host, root } = await renderIntoRoot(
+      <NodeRenderer
+        content={content}
+        final={false}
+        smoothStreaming={false}
+        streamingComponents={streamingComponents}
+      />,
+    )
+
+    expect(host.querySelector('[data-closed-nested-loading="false"]')?.textContent).toBe('complete')
+    expect(host.querySelector('[data-closed-nested-auto-closed="false"]')?.textContent).toBe('complete')
+    expect(seen.at(-1)?.node.loading).toBe(false)
+    expect(seen.at(-1)?.node.autoClosed).toBe(false)
+
+    await unmountRoot(root)
+    seen.length = 0
+
+    const ssrHost = hostFromStaticMarkup(renderToStaticMarkup(
+      <ServerNodeRenderer
+        content={content}
+        final={false}
+        streamingComponents={streamingComponents}
+      />,
+    ))
+
+    expect(ssrHost.querySelector('[data-closed-nested-loading="false"]')?.textContent).toBe('complete')
+    expect(ssrHost.querySelector('[data-closed-nested-auto-closed="false"]')?.textContent).toBe('complete')
+    expect(seen.at(-1)?.node.loading).toBe(false)
+    expect(seen.at(-1)?.node.autoClosed).toBe(false)
+  })
+
   it('preserves structured children for streamingComponents nested inside html wrappers', async () => {
     const seen: Array<NodeComponentProps<DocumentLinkNode>> = []
     function DocumentLink(props: NodeComponentProps<DocumentLinkNode>) {
@@ -727,7 +815,7 @@ describe('react local component maps', () => {
     expect(getAttr(rawSeen?.node.attrs, 'style')).toBe('color:red')
     expect(getAttr(rawSeen?.node.attrs, 'href')).toBe('javascript:alert(1)')
     expect(rawSeen?.node.content).toBe('Hello <strong>world</strong>')
-    expect(rawSeen?.node.loading).toBe(true)
+    expect(rawSeen?.node.loading).toBe(false)
     expect(structuredSeen?.node.children?.map(child => child.type)).toEqual(['text', 'html_inline'])
 
     await unmountRoot(root)
@@ -747,7 +835,7 @@ describe('react local component maps', () => {
     expect(getAttr(ssrRawSeen?.node.attrs, 'style')).toBe('color:red')
     expect(getAttr(ssrRawSeen?.node.attrs, 'href')).toBe('javascript:alert(1)')
     expect(ssrRawSeen?.node.content).toBe('Hello <strong>world</strong>')
-    expect(ssrRawSeen?.node.loading).toBe(true)
+    expect(ssrRawSeen?.node.loading).toBe(false)
     expect(ssrStructuredSeen?.node.children?.map(child => child.type)).toEqual(['text', 'html_inline'])
   })
 

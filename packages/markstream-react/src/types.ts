@@ -111,6 +111,7 @@ export interface NodeRendererProps<
 export interface RenderContext {
   customId?: string
   isDark?: boolean
+  final?: boolean
   indexKey?: string
   typewriter?: boolean
   /** Enable/disable fade animations. Default: true */
