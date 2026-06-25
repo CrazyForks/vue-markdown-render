@@ -608,6 +608,78 @@ describe('react local component maps', () => {
     ])
   })
 
+  it('passes renderer context props to streamingComponents nested inside inline html wrappers on client and server', async () => {
+    const seen: Array<{
+      customId?: string
+      fade?: boolean
+      hasCtx: boolean
+      hasRenderNode: boolean
+      indexKey?: unknown
+      isDark?: boolean
+      typewriter?: boolean
+    }> = []
+
+    function DocumentLink(props: NodeComponentProps<DocumentLinkNode>) {
+      seen.push({
+        customId: props.customId,
+        fade: props.fade,
+        hasCtx: Boolean(props.ctx),
+        hasRenderNode: Boolean(props.renderNode),
+        indexKey: props.indexKey,
+        isDark: props.isDark,
+        typewriter: props.typewriter,
+      })
+      return <span data-inline-context>{props.node.content}</span>
+    }
+
+    const content = '<span><DocumentLink id="1">Inline</DocumentLink></span>'
+    const streamingComponents = { documentlink: DocumentLink }
+    const expected = {
+      customId: 'chat',
+      fade: false,
+      hasCtx: true,
+      hasRenderNode: true,
+      isDark: true,
+      typewriter: true,
+    }
+
+    const { host, root } = await renderIntoRoot(
+      <NodeRenderer
+        content={content}
+        customId="chat"
+        fade={false}
+        final
+        isDark
+        smoothStreaming={false}
+        streamingComponents={streamingComponents}
+        typewriter
+      />,
+    )
+
+    expect(host.querySelector('[data-inline-context]')?.textContent).toBe('Inline')
+    expect(seen.at(-1)).toMatchObject(expected)
+    expect(seen.at(-1)?.indexKey).not.toBeUndefined()
+
+    await unmountRoot(root)
+    seen.length = 0
+
+    const ssrHost = hostFromStaticMarkup(renderToStaticMarkup(
+      <ServerNodeRenderer
+        content={content}
+        customId="chat"
+        fade={false}
+        final
+        isDark
+        streamingComponents={streamingComponents}
+        typewriter
+      />,
+    ))
+
+    expect(ssrHost.querySelector('[data-inline-context]')?.textContent).toBe('Inline')
+    expect(seen.at(-1)).toMatchObject(expected)
+    expect(seen.at(-1)?.indexKey).not.toBeUndefined()
+  })
+
   it('preserves loading metadata for streamingComponents nested inside structured html wrappers', async () => {
     const seen: Array<NodeComponentProps<DocumentLinkNode>> = []
     function DocumentLink(props: NodeComponentProps<DocumentLinkNode>) {

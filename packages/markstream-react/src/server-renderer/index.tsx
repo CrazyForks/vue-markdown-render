@@ -59,7 +59,6 @@ import { parseHtmlToReactNodes } from './html'
 import { renderKatexToHtml } from './katex'
 
 const fallbackMarkdown = getMarkdown()
-const warnedComponentMapConflicts = new Set<string>()
 
 function formatLanguageLabel(language: unknown) {
   const normalized = normalizeLanguageIdentifier(String(language ?? ''))
@@ -1118,6 +1117,7 @@ export function HtmlInlineNode(props: NodeComponentProps<{
     && !isHtmlTagBlocked(structuredTag, htmlPolicy)
     && props.ctx
     && props.renderNode
+    && StructuredHtmlComponent
   ) {
     const structuredContent = renderNodeChildren(
       structuredChildren,
@@ -1125,19 +1125,10 @@ export function HtmlInlineNode(props: NodeComponentProps<{
       `${String(props.indexKey ?? 'html-inline')}-structured`,
       props.renderNode,
     )
-    if (StructuredHtmlComponent) {
-      const attrs = sanitizeHtmlTokenAttrs((props.node as any)?.attrs ?? null, htmlPolicy, normalizedStructuredTag)
-      return React.createElement(
-        StructuredHtmlComponent as any,
-        convertHtmlAttrsToProps(tokenAttrsToRecord(attrs)),
-        structuredContent,
-      )
-    }
-
-    const attrs = sanitizeHtmlTokenAttrs((props.node as any)?.attrs ?? null, htmlPolicy, structuredTag)
+    const attrs = sanitizeHtmlTokenAttrs((props.node as any)?.attrs ?? null, htmlPolicy, normalizedStructuredTag)
     return React.createElement(
-      structuredTag,
-      normalizeDomAttrs((tokenAttrsToProps(attrs) as Record<string, string> | undefined) || {}),
+      StructuredHtmlComponent as any,
+      convertHtmlAttrsToProps(tokenAttrsToRecord(attrs)),
       structuredContent,
     )
   }
@@ -1388,9 +1379,9 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
     case 'reference':
       return <ReferenceNode key={key} node={node as any} ctx={ctx} typewriter={ctx.typewriter} />
     case 'html_block':
-      return <HtmlBlockNode key={key} node={node as any} ctx={ctx} renderNode={renderNode} indexKey={key} typewriter={ctx.typewriter} customId={ctx.customId} />
+      return <HtmlBlockNode key={key} node={node as any} ctx={ctx} renderNode={renderNode} indexKey={key} typewriter={ctx.typewriter} fade={ctx.fade} customId={ctx.customId} />
     case 'html_inline':
-      return <HtmlInlineNode key={key} node={node as any} ctx={ctx} typewriter={ctx.typewriter} customId={ctx.customId} />
+      return <HtmlInlineNode key={key} node={node as any} ctx={ctx} renderNode={renderNode} indexKey={key} typewriter={ctx.typewriter} fade={ctx.fade} customId={ctx.customId} />
     case 'vmr_container':
       return <VmrContainerNode key={key} node={node as any} ctx={ctx} renderNode={renderNode} indexKey={key} typewriter={ctx.typewriter} />
     case 'label_open':
@@ -1408,6 +1399,7 @@ export function NodeRenderer<
   const customComponents = getCustomNodeComponents(props.customId)
   const streamingComponents = normalizeComponentMap(props.streamingComponents)
   const htmlComponents = normalizeComponentMap(props.htmlComponents)
+  const warnedComponentMapConflicts = new Set<string>()
 
   warnComponentMapConflicts(
     streamingComponents,

@@ -6,7 +6,7 @@ import type { HtmlToken } from '../../utils/htmlToReact'
 import React, { useEffect, useRef, useState } from 'react'
 import { BLOCKED_HTML_TAGS as BLOCKED_TAGS, convertHtmlAttrsToProps, isHtmlTagBlocked, isHtmlTagHardBlocked, normalizeCustomHtmlTagName, sanitizeHtmlContent, sanitizeHtmlTokenAttrs, tokenAttrsToRecord } from 'stream-markdown-parser'
 import { getCustomComponentDisplay, getCustomNodeComponents } from '../../customComponents'
-import { renderNodeChildren, tokenAttrsToProps } from '../../renderers/renderChildren'
+import { renderNodeChildren } from '../../renderers/renderChildren'
 import {
   hasCustomHtmlComponents,
   isCustomHtmlComponent,
@@ -414,19 +414,19 @@ export function HtmlInlineNode(props: NodeComponentProps<{
   const structuredTag = React.useMemo(() => String(node.tag ?? '').trim(), [node.tag])
   const normalizedStructuredTag = React.useMemo(() => normalizeCustomHtmlTagName(structuredTag), [structuredTag])
   const structuredChildren = React.useMemo(() => Array.isArray(node.children) ? node.children : [], [node.children])
-  const structuredBoundAttrs = React.useMemo(() => {
-    const rawAttrs = tokenAttrsToProps(sanitizeHtmlTokenAttrs(node.attrs ?? undefined, htmlPolicy, structuredTag))
-    return rawAttrs ? normalizeDomAttrs(rawAttrs as Record<string, string>) : undefined
-  }, [htmlPolicy, node.attrs, structuredTag])
   const structuredHtmlComponentProps = React.useMemo(() => {
     return convertHtmlAttrsToProps(tokenAttrsToRecord(sanitizeHtmlTokenAttrs(node.attrs ?? undefined, htmlPolicy, normalizedStructuredTag)))
   }, [htmlPolicy, node.attrs, normalizedStructuredTag])
+  const StructuredHtmlComponent = normalizedStructuredTag
+    ? props.ctx?.htmlComponents?.[normalizedStructuredTag]
+    : undefined
   const isStructured = structuredChildren.length > 0
     && !!structuredTag
     && htmlPolicy !== 'escape'
     && !isHtmlTagBlocked(structuredTag, htmlPolicy)
     && !!props.ctx
     && !!props.renderNode
+    && !!StructuredHtmlComponent
   const structuredContent = React.useMemo(() => {
     if (!isStructured || !props.ctx || !props.renderNode)
       return null
@@ -437,9 +437,6 @@ export function HtmlInlineNode(props: NodeComponentProps<{
       props.renderNode,
     )
   }, [isStructured, props.ctx, props.indexKey, props.renderNode, structuredChildren])
-  const StructuredHtmlComponent = normalizedStructuredTag
-    ? props.ctx?.htmlComponents?.[normalizedStructuredTag]
-    : undefined
 
   // Computed property to determine render mode and content
   const renderMode = React.useMemo(() => {
@@ -493,18 +490,10 @@ export function HtmlInlineNode(props: NodeComponentProps<{
     )
   }
 
-  if (isStructured && StructuredHtmlComponent) {
+  if (isStructured) {
     return React.createElement(
       StructuredHtmlComponent as any,
       structuredHtmlComponentProps,
-      structuredContent,
-    )
-  }
-
-  if (isStructured) {
-    return React.createElement(
-      structuredTag,
-      structuredBoundAttrs as Record<string, unknown> | undefined,
       structuredContent,
     )
   }
