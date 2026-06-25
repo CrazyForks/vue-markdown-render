@@ -1,13 +1,14 @@
 import type React from 'react'
 import type {
   HtmlComponentMap,
-  NodeComponentProps,
   StreamingComponentMap,
-} from '../packages/markstream-react/src'
+} from '../packages/markstream-react/src/customComponents'
+import type { NodeRendererProps } from '../packages/markstream-react/src/types'
+import type { NodeComponentProps } from '../packages/markstream-react/src/types/node-component'
 import {
   defineHtmlComponents,
   defineStreamingComponents,
-} from '../packages/markstream-react/src'
+} from '../packages/markstream-react/src/customComponents'
 
 interface DocumentLinkNode {
   type: 'documentlink'
@@ -25,17 +26,19 @@ function Badge({ kind, children }: React.PropsWithChildren<{ kind?: string }>) {
   return <span data-kind={kind}>{children}</span>
 }
 
+declare const NodeRenderer: React.ComponentType<NodeRendererProps>
+
+function RequiredLink({ url, children }: React.PropsWithChildren<{ url: string }>) {
+  return <a href={url}>{children}</a>
+}
+
 const streamingComponents = {
   documentlink: DocumentLink,
 } satisfies StreamingComponentMap
 
 const htmlComponents = {
   badge: Badge,
-} satisfies HtmlComponentMap
-
-const wrongHtmlComponents = {
-  // @ts-expect-error html component maps must not require parser-backed props.node.
-  documentlink: DocumentLink,
+  requiredlink: RequiredLink,
 } satisfies HtmlComponentMap
 
 const definedStreamingComponents = defineStreamingComponents({
@@ -44,6 +47,7 @@ const definedStreamingComponents = defineStreamingComponents({
 
 const definedHtmlComponents = defineHtmlComponents({
   badge: Badge,
+  requiredlink: RequiredLink,
 })
 
 defineStreamingComponents({
@@ -56,8 +60,17 @@ defineHtmlComponents({
   documentlink: DocumentLink,
 })
 
+const rendererElement = (
+  <NodeRenderer
+    content="<DocumentLink>typed</DocumentLink>"
+    final
+    htmlComponents={htmlComponents}
+    streamingComponents={streamingComponents}
+  />
+)
+
 void streamingComponents
 void htmlComponents
-void wrongHtmlComponents
 void definedStreamingComponents
 void definedHtmlComponents
+void rendererElement

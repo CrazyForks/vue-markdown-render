@@ -27,6 +27,43 @@ export default function Page() {
 }
 ```
 
+Direct component maps contain React component functions, so keep them inside a local Client Component wrapper when you use `markstream-react/next` from an App Router Server Component. Server Components should only pass serializable props such as `content` into that wrapper, matching the [Next.js Client Component prop rules](https://nextjs.org/docs/app/api-reference/directives/use-client).
+
+```tsx
+// app/markdown-renderer.tsx
+'use client'
+
+import MarkdownRender, { defineStreamingComponents } from 'markstream-react/next'
+import type { NodeComponentProps } from 'markstream-react/next'
+
+function DocumentLink(props: NodeComponentProps<{ content: string }>) {
+  return <a>{props.node.content}</a>
+}
+
+const streamingComponents = defineStreamingComponents({
+  documentlink: DocumentLink,
+})
+
+export function ClientMarkdown({ content }: { content: string }) {
+  return (
+    <MarkdownRender
+      content={content}
+      final
+      streamingComponents={streamingComponents}
+    />
+  )
+}
+```
+
+```tsx
+// app/page.tsx
+import { ClientMarkdown } from './markdown-renderer'
+
+export default function Page() {
+  return <ClientMarkdown content="<DocumentLink>Open</DocumentLink>" />
+}
+```
+
 ## Pure Server Rendering with `markstream-react/server`
 
 ```tsx
@@ -40,6 +77,8 @@ export default function Page() {
   return <MarkdownRender content={markdown} final />
 }
 ```
+
+The pure server entry does not create a Client Component boundary, so server files can pass `streamingComponents` and `htmlComponents` directly when the render should remain server-only.
 
 ## Custom Components and Custom Tags
 

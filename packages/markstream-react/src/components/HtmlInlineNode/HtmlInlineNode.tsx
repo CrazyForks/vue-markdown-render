@@ -4,8 +4,9 @@ import type { RenderContext, RenderNodeFn } from '../../types'
 import type { NodeComponentProps } from '../../types/node-component'
 import type { HtmlToken } from '../../utils/htmlToReact'
 import React, { useEffect, useRef, useState } from 'react'
-import { BLOCKED_HTML_TAGS as BLOCKED_TAGS, convertHtmlAttrsToProps, isHtmlTagBlocked, isHtmlTagHardBlocked, normalizeCustomHtmlTagName, sanitizeHtmlContent } from 'stream-markdown-parser'
+import { BLOCKED_HTML_TAGS as BLOCKED_TAGS, convertHtmlAttrsToProps, isHtmlTagBlocked, isHtmlTagHardBlocked, normalizeCustomHtmlTagName, sanitizeHtmlContent, sanitizeHtmlTokenAttrs, tokenAttrsToRecord } from 'stream-markdown-parser'
 import { getCustomComponentDisplay, getCustomNodeComponents } from '../../customComponents'
+import { renderNodeChildren, tokenAttrsToProps } from '../../renderers/renderChildren'
 import {
   hasCustomHtmlComponents,
   isCustomHtmlComponent,
@@ -71,6 +72,7 @@ interface HtmlInlineRenderOptions {
   keyPrefix?: string
   nodeComponents?: Record<string, ComponentType<any>>
   renderNode?: RenderNodeFn
+  sourceNode?: ParsedNode
 }
 
 function getNodeComponent(tagName: string, options: HtmlInlineRenderOptions) {
@@ -79,8 +81,29 @@ function getNodeComponent(tagName: string, options: HtmlInlineRenderOptions) {
 
 function getTextContent(children: React.ReactNode[]) {
   return children
-    .map(child => typeof child === 'string' || typeof child === 'number' ? String(child) : '')
+    .map(serializeReactContent)
     .join('')
+}
+
+function serializeReactContent(child: React.ReactNode): string {
+  if (child == null || typeof child === 'boolean')
+    return ''
+  if (typeof child === 'string' || typeof child === 'number')
+    return String(child)
+  if (Array.isArray(child))
+    return child.map(serializeReactContent).join('')
+  if (!React.isValidElement(child))
+    return ''
+
+  const element = child as React.ReactElement<{ children?: React.ReactNode }>
+  if (typeof element.type !== 'string')
+    return serializeReactContent(element.props.children)
+
+  const attrs = Object.entries(element.props)
+    .filter(([name, value]) => name !== 'children' && name !== 'key' && name !== 'ref' && value != null && typeof value !== 'boolean')
+    .map(([name, value]) => ` ${name === 'className' ? 'class' : name}="${String(value)}"`)
+    .join('')
+  return `<${element.type}${attrs}>${serializeReactContent(element.props.children)}</${element.type}>`
 }
 
 function attrsToTokenPairs(attrs: Record<string, string>) {
@@ -95,12 +118,15 @@ function renderNodeComponent(
   options: HtmlInlineRenderOptions,
 ) {
   const normalizedTag = normalizeCustomHtmlTagName(tagName)
+  const content = getTextContent(children)
   const node = {
     type: normalizedTag,
     tag: normalizedTag,
     attrs: attrsToTokenPairs(attrs),
-    content: getTextContent(children),
-    loading: false,
+    content,
+    raw: `${renderLiteralTagText(tagName, attrs)}${content}</${tagName}>`,
+    loading: Boolean((options.sourceNode as any)?.loading),
+    autoClosed: Boolean((options.sourceNode as any)?.autoClosed ?? (options.sourceNode as any)?.loading),
   } as ParsedNode
 
   if (options.ctx && options.renderNode)
@@ -310,6 +336,9 @@ function parseHtmlToReactNodes(
 export function HtmlInlineNode(props: NodeComponentProps<{
   type: 'html_inline'
   content: string
+  tag?: string
+  attrs?: [string, string | null][] | null
+  children?: ParsedNode[]
   loading?: boolean
   autoClosed?: boolean
 }> & { htmlPolicy?: HtmlPolicy }) {
@@ -334,6 +363,35 @@ export function HtmlInlineNode(props: NodeComponentProps<{
     ...(props.ctx?.streamingComponents ?? {}),
   }), [customComponents, props.ctx?.streamingComponents])
   const safeHtmlContent = React.useMemo(() => sanitizeHtmlContent(node.content ?? '', htmlPolicy), [htmlPolicy, node.content])
+  const structuredTag = React.useMemo(() => String(node.tag ?? '').trim(), [node.tag])
+  const normalizedStructuredTag = React.useMemo(() => normalizeCustomHtmlTagName(structuredTag), [structuredTag])
+  const structuredChildren = React.useMemo(() => Array.isArray(node.children) ? node.children : [], [node.children])
+  const structuredBoundAttrs = React.useMemo(() => {
+    const rawAttrs = tokenAttrsToProps(sanitizeHtmlTokenAttrs(node.attrs ?? undefined, htmlPolicy, structuredTag))
+    return rawAttrs ? normalizeDomAttrs(rawAttrs as Record<string, string>) : undefined
+  }, [htmlPolicy, node.attrs, structuredTag])
+  const structuredHtmlComponentProps = React.useMemo(() => {
+    return convertHtmlAttrsToProps(tokenAttrsToRecord(sanitizeHtmlTokenAttrs(node.attrs ?? undefined, htmlPolicy, normalizedStructuredTag)))
+  }, [htmlPolicy, node.attrs, normalizedStructuredTag])
+  const isStructured = structuredChildren.length > 0
+    && !!structuredTag
+    && htmlPolicy !== 'escape'
+    && !isHtmlTagBlocked(structuredTag, htmlPolicy)
+    && !!props.ctx
+    && !!props.renderNode
+  const structuredContent = React.useMemo(() => {
+    if (!isStructured || !props.ctx || !props.renderNode)
+      return null
+    return renderNodeChildren(
+      structuredChildren,
+      props.ctx,
+      `${String(props.indexKey ?? 'html-inline')}-structured`,
+      props.renderNode,
+    )
+  }, [isStructured, props.ctx, props.indexKey, props.renderNode, structuredChildren])
+  const StructuredHtmlComponent = normalizedStructuredTag
+    ? props.ctx?.htmlComponents?.[normalizedStructuredTag]
+    : undefined
 
   // Computed property to determine render mode and content
   const renderMode = React.useMemo(() => {
@@ -354,6 +412,7 @@ export function HtmlInlineNode(props: NodeComponentProps<{
       keyPrefix: String(props.indexKey ?? 'html-inline'),
       nodeComponents: props.ctx?.streamingComponents,
       renderNode: props.renderNode,
+      sourceNode: node as ParsedNode,
     })
     if (nodes === null)
       return { mode: 'html', content } // Fallback to dangerouslySetInnerHTML if parsing fails
@@ -378,11 +437,27 @@ export function HtmlInlineNode(props: NodeComponentProps<{
   }, [renderMode.mode, isClient, safeHtmlContent])
 
   // Loading state handling
-  if (node.loading && !node.autoClosed) {
+  if (node.loading && !node.autoClosed && !isStructured && renderMode.mode !== 'dynamic') {
     return (
       <span className="html-inline-node html-inline-node--loading">
         {node.content}
       </span>
+    )
+  }
+
+  if (isStructured && StructuredHtmlComponent) {
+    return React.createElement(
+      StructuredHtmlComponent as any,
+      structuredHtmlComponentProps,
+      structuredContent,
+    )
+  }
+
+  if (isStructured) {
+    return React.createElement(
+      structuredTag,
+      structuredBoundAttrs as Record<string, unknown> | undefined,
+      structuredContent,
     )
   }
 

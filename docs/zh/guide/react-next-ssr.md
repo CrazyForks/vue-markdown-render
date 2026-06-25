@@ -27,6 +27,43 @@ export default function Page() {
 }
 ```
 
+direct component map 中包含 React 组件函数，所以当 App Router Server Component 使用 `markstream-react/next` 时，应把 map 放在本地 Client Component wrapper 内。Server Component 只向 wrapper 传 `content` 这类可序列化 props，符合 [Next.js 对 Client Component props 的要求](https://nextjs.org/docs/app/api-reference/directives/use-client)。
+
+```tsx
+// app/markdown-renderer.tsx
+'use client'
+
+import MarkdownRender, { defineStreamingComponents } from 'markstream-react/next'
+import type { NodeComponentProps } from 'markstream-react/next'
+
+function DocumentLink(props: NodeComponentProps<{ content: string }>) {
+  return <a>{props.node.content}</a>
+}
+
+const streamingComponents = defineStreamingComponents({
+  documentlink: DocumentLink,
+})
+
+export function ClientMarkdown({ content }: { content: string }) {
+  return (
+    <MarkdownRender
+      content={content}
+      final
+      streamingComponents={streamingComponents}
+    />
+  )
+}
+```
+
+```tsx
+// app/page.tsx
+import { ClientMarkdown } from './markdown-renderer'
+
+export default function Page() {
+  return <ClientMarkdown content="<DocumentLink>Open</DocumentLink>" />
+}
+```
+
 ## 使用 `markstream-react/server` 做纯服务端渲染
 
 ```tsx
@@ -40,6 +77,8 @@ export default function Page() {
   return <MarkdownRender content={markdown} final />
 }
 ```
+
+纯 server 入口不会创建 Client Component 边界，所以如果渲染路径保持 server-only，服务端文件可以直接传 `streamingComponents` 和 `htmlComponents`。
 
 ## 自定义组件与自定义标签
 

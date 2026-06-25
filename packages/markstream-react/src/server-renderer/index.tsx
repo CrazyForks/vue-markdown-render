@@ -1086,23 +1086,71 @@ export function HtmlBlockNode(props: NodeComponentProps<{
     nodeComponents: props.ctx?.streamingComponents,
     propComponents: props.ctx?.htmlComponents,
     renderNode: props.renderNode,
+    sourceNode: props.node as ParsedNode,
   })
   if (nodes == null)
     return <>{String(props.node.content ?? '')}</>
   return <>{nodes}</>
 }
 
-export function HtmlInlineNode(props: NodeComponentProps<{ type: 'html_inline', content?: string }>) {
+export function HtmlInlineNode(props: NodeComponentProps<{
+  type: 'html_inline'
+  content?: string
+  tag?: string
+  attrs?: [string, string | null][] | null
+  children?: ParsedNode[]
+}>) {
+  const htmlPolicy = props.ctx?.htmlPolicy ?? 'safe'
+  const structuredTag = String((props.node as any)?.tag ?? '').trim().toLowerCase()
+  const normalizedStructuredTag = normalizeCustomHtmlTagName(structuredTag)
+  const structuredChildren = Array.isArray((props.node as any)?.children)
+    ? ((props.node as any).children as ParsedNode[])
+    : []
+  const StructuredHtmlComponent = normalizedStructuredTag
+    ? props.ctx?.htmlComponents?.[normalizedStructuredTag]
+    : undefined
+  if (
+    structuredChildren.length > 0
+    && structuredTag
+    && htmlPolicy !== 'escape'
+    && !isHtmlTagBlocked(structuredTag, htmlPolicy)
+    && props.ctx
+    && props.renderNode
+  ) {
+    const structuredContent = renderNodeChildren(
+      structuredChildren,
+      props.ctx,
+      `${String(props.indexKey ?? 'html-inline')}-structured`,
+      props.renderNode,
+    )
+    if (StructuredHtmlComponent) {
+      const attrs = sanitizeHtmlTokenAttrs((props.node as any)?.attrs ?? null, htmlPolicy, normalizedStructuredTag)
+      return React.createElement(
+        StructuredHtmlComponent as any,
+        convertHtmlAttrsToProps(tokenAttrsToRecord(attrs)),
+        structuredContent,
+      )
+    }
+
+    const attrs = sanitizeHtmlTokenAttrs((props.node as any)?.attrs ?? null, htmlPolicy, structuredTag)
+    return React.createElement(
+      structuredTag,
+      normalizeDomAttrs((tokenAttrsToProps(attrs) as Record<string, string> | undefined) || {}),
+      structuredContent,
+    )
+  }
+
   const customComponents = {
     ...(props.ctx?.customComponents ?? getCustomNodeComponents(props.customId)),
     ...(props.ctx?.htmlComponents ?? {}),
   }
-  const nodes = parseHtmlToReactNodes(String(props.node.content ?? ''), customComponents, props.ctx?.htmlPolicy ?? 'safe', {
+  const nodes = parseHtmlToReactNodes(String(props.node.content ?? ''), customComponents, htmlPolicy, {
     ctx: props.ctx,
     keyPrefix: String(props.indexKey ?? 'html-inline'),
     nodeComponents: props.ctx?.streamingComponents,
     propComponents: props.ctx?.htmlComponents,
     renderNode: props.renderNode,
+    sourceNode: props.node as ParsedNode,
   })
   if (nodes == null)
     return <>{String(props.node.content ?? '')}</>

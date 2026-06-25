@@ -141,6 +141,7 @@ export function HtmlBlockNode(props: NodeComponentProps<{
       nodeComponents: props.ctx?.streamingComponents,
       propComponents: props.ctx?.htmlComponents,
       renderNode: props.renderNode,
+      sourceNode: node as ParsedNode,
     })
   }, [effectiveCustomComponents, htmlPolicy, node.content, props.ctx, props.indexKey, props.renderNode, useDynamic])
   const safeHtmlContent = useMemo(() => sanitizeHtmlContent(renderContent ?? '', htmlPolicy), [htmlPolicy, renderContent])

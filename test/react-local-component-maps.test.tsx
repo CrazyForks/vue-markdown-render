@@ -16,7 +16,9 @@ interface DocumentLinkNode {
   tag: 'documentlink'
   attrs?: [string, string | null][]
   content: string
+  children?: any[]
   loading?: boolean
+  autoClosed?: boolean
 }
 
 function getAttr(attrs: [string, string | null][] | undefined, name: string) {
@@ -563,6 +565,109 @@ describe('react local component maps', () => {
       ['1', 'InlineNested'],
       ['2', 'BlockNested'],
     ])
+  })
+
+  it('preserves loading metadata for streamingComponents nested inside structured html wrappers', async () => {
+    const seen: Array<NodeComponentProps<DocumentLinkNode>> = []
+    function DocumentLink(props: NodeComponentProps<DocumentLinkNode>) {
+      seen.push(props)
+      return (
+        <span
+          data-nested-loading={String(props.node.loading)}
+          data-nested-auto-closed={String(props.node.autoClosed)}
+        >
+          {props.node.content}
+        </span>
+      )
+    }
+
+    const content = '<span><DocumentLink id="1">partial'
+    const streamingComponents = { documentlink: DocumentLink }
+    const { host, root } = await renderIntoRoot(
+      <NodeRenderer
+        content={content}
+        final={false}
+        smoothStreaming={false}
+        streamingComponents={streamingComponents}
+      />,
+    )
+
+    expect(host.querySelector('[data-nested-loading="true"]')?.textContent).toBe('partial')
+    expect(host.querySelector('[data-nested-auto-closed="true"]')?.textContent).toBe('partial')
+    expect(seen.at(-1)?.node.loading).toBe(true)
+    expect(seen.at(-1)?.node.autoClosed).toBe(true)
+
+    await unmountRoot(root)
+    seen.length = 0
+
+    const ssrHost = hostFromStaticMarkup(renderToStaticMarkup(
+      <ServerNodeRenderer
+        content={content}
+        final={false}
+        streamingComponents={streamingComponents}
+      />,
+    ))
+
+    expect(ssrHost.querySelector('[data-nested-loading="true"]')?.textContent).toBe('partial')
+    expect(ssrHost.querySelector('[data-nested-auto-closed="true"]')?.textContent).toBe('partial')
+    expect(seen.at(-1)?.node.loading).toBe(true)
+    expect(seen.at(-1)?.node.autoClosed).toBe(true)
+  })
+
+  it('preserves structured children for streamingComponents nested inside html wrappers', async () => {
+    const seen: Array<NodeComponentProps<DocumentLinkNode>> = []
+    function DocumentLink(props: NodeComponentProps<DocumentLinkNode>) {
+      seen.push(props)
+      return (
+        <span
+          data-nested-id={getAttr(props.node.attrs, 'id') ?? ''}
+          data-nested-content={props.node.content}
+          data-nested-child-types={props.node.children?.map(child => child.type).join(',') ?? ''}
+        >
+          {props.node.content}
+        </span>
+      )
+    }
+
+    const content = [
+      '<span><DocumentLink id="inline">Hello <strong>world</strong></DocumentLink></span>',
+      '',
+      '<div>',
+      '',
+      '<DocumentLink id="block">Block <strong>world</strong></DocumentLink>',
+      '',
+      '</div>',
+    ].join('\n')
+    const streamingComponents = { documentlink: DocumentLink }
+    const { host, root } = await renderIntoRoot(
+      <NodeRenderer
+        content={content}
+        final
+        smoothStreaming={false}
+        streamingComponents={streamingComponents}
+      />,
+    )
+
+    expect(host.querySelector('[data-nested-id="inline"]')?.getAttribute('data-nested-content')).toBe('Hello <strong>world</strong>')
+    expect(host.querySelector('[data-nested-id="block"]')?.getAttribute('data-nested-content')).toBe('Block <strong>world</strong>')
+    expect(seen.find(props => getAttr(props.node.attrs, 'id') === 'inline')?.node.content).toBe('Hello <strong>world</strong>')
+    expect(seen.find(props => getAttr(props.node.attrs, 'id') === 'block')?.node.children?.map(child => child.type)).toEqual(['text', 'html_inline'])
+
+    await unmountRoot(root)
+    seen.length = 0
+
+    const ssrHost = hostFromStaticMarkup(renderToStaticMarkup(
+      <ServerNodeRenderer
+        content={content}
+        final
+        streamingComponents={streamingComponents}
+      />,
+    ))
+
+    expect(ssrHost.querySelector('[data-nested-id="inline"]')?.getAttribute('data-nested-content')).toBe('Hello <strong>world</strong>')
+    expect(ssrHost.querySelector('[data-nested-id="block"]')?.getAttribute('data-nested-content')).toBe('Block <strong>world</strong>')
+    expect(seen.find(props => getAttr(props.node.attrs, 'id') === 'inline')?.node.content).toBe('Hello <strong>world</strong>')
+    expect(seen.find(props => getAttr(props.node.attrs, 'id') === 'block')?.node.children?.map(child => child.type)).toEqual(['text', 'html_inline'])
   })
 
   it('keeps legacy custom component html attr contracts per render path', async () => {

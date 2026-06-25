@@ -26,6 +26,7 @@ interface HtmlToReactOptions {
   nodeComponents?: HtmlReactNodeComponentMap
   propComponents?: HtmlReactPropComponentMap
   renderNode?: RenderNodeFn
+  sourceNode?: ParsedNode
 }
 
 function normalizeCssPropName(prop: string) {
@@ -126,8 +127,29 @@ function getNodeComponent(
 
 function getTextContent(children: ReactNode[]) {
   return children
-    .map(child => typeof child === 'string' || typeof child === 'number' ? String(child) : '')
+    .map(serializeReactContent)
     .join('')
+}
+
+function serializeReactContent(child: ReactNode): string {
+  if (child == null || typeof child === 'boolean')
+    return ''
+  if (typeof child === 'string' || typeof child === 'number')
+    return String(child)
+  if (Array.isArray(child))
+    return child.map(serializeReactContent).join('')
+  if (!React.isValidElement(child))
+    return ''
+
+  const element = child as React.ReactElement<{ children?: ReactNode }>
+  if (typeof element.type !== 'string')
+    return serializeReactContent(element.props.children)
+
+  const attrs = Object.entries(element.props)
+    .filter(([name, value]) => name !== 'children' && name !== 'key' && name !== 'ref' && value != null && typeof value !== 'boolean')
+    .map(([name, value]) => ` ${name === 'className' ? 'class' : name}="${String(value)}"`)
+    .join('')
+  return `<${element.type}${attrs}>${serializeReactContent(element.props.children)}</${element.type}>`
 }
 
 function attrsToTokenPairs(attrs: Record<string, string>) {
@@ -152,12 +174,15 @@ function renderNodeComponent(
   options: HtmlToReactOptions,
 ) {
   const normalizedTag = normalizeCustomHtmlTagName(tagName)
+  const content = getTextContent(children)
   const node = {
     type: normalizedTag,
     tag: normalizedTag,
     attrs: attrsToTokenPairs(attrs),
-    content: getTextContent(children),
-    loading: false,
+    content,
+    raw: `${renderLiteralTagText(tagName, attrs)}${content}</${tagName}>`,
+    loading: Boolean((options.sourceNode as any)?.loading),
+    autoClosed: Boolean((options.sourceNode as any)?.autoClosed ?? (options.sourceNode as any)?.loading),
   } as ParsedNode
 
   if (options.ctx && options.renderNode)

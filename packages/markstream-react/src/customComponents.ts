@@ -8,10 +8,10 @@ export type MarkstreamCustomComponent<P = never> = ComponentType<P> & {
   markstreamDisplay?: CustomComponentDisplayMode
 }
 export type CustomComponentMap = Record<string, MarkstreamCustomComponent>
-export type StreamingComponent<TNode = unknown> = ComponentType<NodeComponentProps<TNode>>
-export type StreamingComponentMap<TNode = unknown> = Record<string, StreamingComponent<TNode>>
-export type HtmlComponent<P extends object = Record<string, never>> = ComponentType<PropsWithChildren<P>>
-export type HtmlComponentMap<P extends object = Record<string, never>> = Record<string, HtmlComponent<P>>
+export type StreamingComponent<TNode = any> = ComponentType<NodeComponentProps<TNode>>
+export type StreamingComponentMap = Record<string, StreamingComponent<any>>
+export type HtmlComponent<P extends object = any> = ComponentType<PropsWithChildren<P>>
+export type HtmlComponentMap = Record<string, ComponentType<any>>
 
 type StreamingComponentDefinitions<T extends Record<string, ComponentType<any>>> = {
   [K in keyof T]: T[K] extends ComponentType<infer P>
