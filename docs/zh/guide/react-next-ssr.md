@@ -33,8 +33,8 @@ direct component map 中包含 React 组件函数，所以当 App Router Server 
 // app/markdown-renderer.tsx
 'use client'
 
-import MarkdownRender, { defineStreamingComponents } from 'markstream-react/next'
 import type { NodeComponentProps } from 'markstream-react/next'
+import MarkdownRender, { defineStreamingComponents } from 'markstream-react/next'
 
 function DocumentLink(props: NodeComponentProps<{ content: string }>) {
   return <a>{props.node.content}</a>

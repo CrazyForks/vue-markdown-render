@@ -33,8 +33,8 @@ Direct component maps contain React component functions, so keep them inside a l
 // app/markdown-renderer.tsx
 'use client'
 
-import MarkdownRender, { defineStreamingComponents } from 'markstream-react/next'
 import type { NodeComponentProps } from 'markstream-react/next'
+import MarkdownRender, { defineStreamingComponents } from 'markstream-react/next'
 
 function DocumentLink(props: NodeComponentProps<{ content: string }>) {
   return <a>{props.node.content}</a>
