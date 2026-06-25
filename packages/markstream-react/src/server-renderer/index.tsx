@@ -1081,7 +1081,11 @@ export function HtmlBlockNode(props: NodeComponentProps<{
     ...(props.ctx?.htmlComponents ?? {}),
   }
   const nodes = parseHtmlToReactNodes(String(props.node.content ?? ''), customComponents, props.ctx?.htmlPolicy ?? 'safe', {
+    ctx: props.ctx,
+    keyPrefix: String(props.indexKey ?? 'html-block'),
+    nodeComponents: props.ctx?.streamingComponents,
     propComponents: props.ctx?.htmlComponents,
+    renderNode: props.renderNode,
   })
   if (nodes == null)
     return <>{String(props.node.content ?? '')}</>
@@ -1094,7 +1098,11 @@ export function HtmlInlineNode(props: NodeComponentProps<{ type: 'html_inline', 
     ...(props.ctx?.htmlComponents ?? {}),
   }
   const nodes = parseHtmlToReactNodes(String(props.node.content ?? ''), customComponents, props.ctx?.htmlPolicy ?? 'safe', {
+    ctx: props.ctx,
+    keyPrefix: String(props.indexKey ?? 'html-inline'),
+    nodeComponents: props.ctx?.streamingComponents,
     propComponents: props.ctx?.htmlComponents,
+    renderNode: props.renderNode,
   })
   if (nodes == null)
     return <>{String(props.node.content ?? '')}</>

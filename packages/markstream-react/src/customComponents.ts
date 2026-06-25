@@ -8,10 +8,26 @@ export type MarkstreamCustomComponent<P = never> = ComponentType<P> & {
   markstreamDisplay?: CustomComponentDisplayMode
 }
 export type CustomComponentMap = Record<string, MarkstreamCustomComponent>
-export type StreamingComponent<TNode = any> = ComponentType<NodeComponentProps<TNode>>
-export type StreamingComponentMap<TNode = any> = Record<string, StreamingComponent<TNode>>
-export type HtmlComponent<P extends object = any> = ComponentType<PropsWithChildren<P>>
-export type HtmlComponentMap<P extends object = any> = Record<string, HtmlComponent<P>>
+export type StreamingComponent<TNode = unknown> = ComponentType<NodeComponentProps<TNode>>
+export type StreamingComponentMap<TNode = unknown> = Record<string, StreamingComponent<TNode>>
+export type HtmlComponent<P extends object = Record<string, never>> = ComponentType<PropsWithChildren<P>>
+export type HtmlComponentMap<P extends object = Record<string, never>> = Record<string, HtmlComponent<P>>
+
+type StreamingComponentDefinitions<T extends Record<string, ComponentType<any>>> = {
+  [K in keyof T]: T[K] extends ComponentType<infer P>
+    ? P extends NodeComponentProps<any>
+      ? T[K]
+      : never
+    : never
+}
+
+type HtmlComponentDefinitions<T extends Record<string, ComponentType<any>>> = {
+  [K in keyof T]: T[K] extends ComponentType<infer P>
+    ? 'node' extends keyof P
+      ? never
+      : T[K]
+    : never
+}
 
 const GLOBAL_KEY = '__global__'
 
@@ -106,6 +122,18 @@ export function withMarkstreamComponentDisplay<T extends ComponentType<never>>(
 ) {
   ;(component as MarkstreamCustomComponent).markstreamDisplay = display
   return component as T & { markstreamDisplay: CustomComponentDisplayMode }
+}
+
+export function defineStreamingComponents<const T extends Record<string, ComponentType<any>>>(
+  components: T & StreamingComponentDefinitions<T>,
+) {
+  return components
+}
+
+export function defineHtmlComponents<const T extends Record<string, ComponentType<any>>>(
+  components: T & HtmlComponentDefinitions<T>,
+) {
+  return components
 }
 
 export function normalizeComponentMap<T>(mapping?: Record<string, T>): Record<string, T> {

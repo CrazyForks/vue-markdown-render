@@ -1,5 +1,6 @@
 import type { ComponentType, ReactNode } from 'react'
-import type { HtmlPolicy } from 'stream-markdown-parser'
+import type { HtmlPolicy, ParsedNode } from 'stream-markdown-parser'
+import type { RenderContext, RenderNodeFn } from '../types'
 import React from 'react'
 import {
   BLOCKED_HTML_TAGS as BLOCKED_TAGS,
@@ -8,6 +9,7 @@ import {
   isCustomHtmlComponentTag,
   isHtmlTagBlocked,
   isHtmlTagHardBlocked,
+  normalizeCustomHtmlTagName,
   sanitizeHtmlAttrs as sanitizeHtmlAttrsBase,
   tokenizeHtml as tokenizeHtmlBase,
 } from 'stream-markdown-parser'
@@ -16,9 +18,14 @@ export type { HtmlToken } from 'stream-markdown-parser'
 
 type HtmlReactComponentMap = Record<string, ComponentType<any>>
 type HtmlReactPropComponentMap = Record<string, ComponentType<any>>
+type HtmlReactNodeComponentMap = Record<string, ComponentType<any>>
 
 interface HtmlToReactOptions {
+  ctx?: RenderContext
+  keyPrefix?: string
+  nodeComponents?: HtmlReactNodeComponentMap
   propComponents?: HtmlReactPropComponentMap
+  renderNode?: RenderNodeFn
 }
 
 function normalizeCssPropName(prop: string) {
@@ -110,6 +117,23 @@ function shouldUseHtmlPropContract(
   return Boolean(options.propComponents?.[tagName] || options.propComponents?.[tagName.toLowerCase()])
 }
 
+function getNodeComponent(
+  tagName: string,
+  options: HtmlToReactOptions,
+) {
+  return options.nodeComponents?.[tagName] || options.nodeComponents?.[tagName.toLowerCase()]
+}
+
+function getTextContent(children: ReactNode[]) {
+  return children
+    .map(child => typeof child === 'string' || typeof child === 'number' ? String(child) : '')
+    .join('')
+}
+
+function attrsToTokenPairs(attrs: Record<string, string>) {
+  return Object.entries(attrs).map(([key, value]) => [key, value === '' ? null : value] as [string, string | null])
+}
+
 function getCustomComponentProps(
   tagName: string,
   attrs: Record<string, string>,
@@ -118,6 +142,31 @@ function getCustomComponentProps(
   return shouldUseHtmlPropContract(tagName, options)
     ? convertHtmlAttrsToProps(attrs)
     : attrs
+}
+
+function renderNodeComponent(
+  tagName: string,
+  attrs: Record<string, string>,
+  children: ReactNode[],
+  key: string,
+  options: HtmlToReactOptions,
+) {
+  const normalizedTag = normalizeCustomHtmlTagName(tagName)
+  const node = {
+    type: normalizedTag,
+    tag: normalizedTag,
+    attrs: attrsToTokenPairs(attrs),
+    content: getTextContent(children),
+    loading: false,
+  } as ParsedNode
+
+  if (options.ctx && options.renderNode)
+    return options.renderNode(node, key, options.ctx)
+
+  const component = getNodeComponent(tagName, options)
+  return component
+    ? React.createElement(component as ComponentType<Record<string, unknown>>, { key, node })
+    : null
 }
 
 export function parseHtmlToReactNodes(
@@ -134,6 +183,7 @@ export function parseHtmlToReactNodes(
   try {
     const tokens = tokenizeHtml(content)
     let autoKeySeed = 0
+    const keyPrefix = options.keyPrefix ?? 'ms-html'
     const stack: Array<{
       tagName: string
       children: ReactNode[]
@@ -155,21 +205,25 @@ export function parseHtmlToReactNodes(
 
       if (token.type === 'self_closing') {
         const customComponent = isCustomHtmlComponent(token.tagName, customComponents)
-        if (BLOCKED_TAGS.has(token.tagName.toLowerCase()) || (!customComponent && isHtmlTagHardBlocked(token.tagName, htmlPolicy)))
+        const nodeComponent = Boolean(getNodeComponent(token.tagName, options))
+        if (BLOCKED_TAGS.has(token.tagName.toLowerCase()) || (!customComponent && !nodeComponent && isHtmlTagHardBlocked(token.tagName, htmlPolicy)))
           continue
-        if (!customComponent && isHtmlTagBlocked(token.tagName, htmlPolicy)) {
+        if (!customComponent && !nodeComponent && isHtmlTagBlocked(token.tagName, htmlPolicy)) {
           const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
           target.push(renderLiteralTagText(token.tagName, token.attrs, true))
           continue
         }
         const attrs = sanitizeHtmlAttrs(token.attrs || {}, htmlPolicy, token.tagName)
         const explicitKey = (attrs as any).key
-        const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : `ms-html-${autoKeySeed++}`
+        const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : `${keyPrefix}-${autoKeySeed++}`
         const Comp = customComponent
           ? (customComponents[token.tagName] || customComponents[token.tagName.toLowerCase()])
           : undefined
         const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
-        if (Comp) {
+        if (nodeComponent) {
+          target.push(renderNodeComponent(token.tagName, attrs, [], elementKey, options))
+        }
+        else if (Comp) {
           const componentProps = getCustomComponentProps(token.tagName, attrs, options)
           target.push(React.createElement(Comp as ComponentType<Record<string, unknown>>, { ...componentProps, key: elementKey }))
         }
@@ -186,13 +240,14 @@ export function parseHtmlToReactNodes(
       if (token.type === 'tag_open') {
         const parentHardBlocked = stack.length > 0 && stack[stack.length - 1].hardBlocked
         const customComponent = isCustomHtmlComponent(token.tagName, customComponents)
+        const nodeComponent = Boolean(getNodeComponent(token.tagName, options))
         stack.push({
           tagName: token.tagName,
           children: [],
           attrs: token.attrs,
-          customComponent,
-          hardBlocked: parentHardBlocked || BLOCKED_TAGS.has(token.tagName.toLowerCase()) || (!customComponent && isHtmlTagHardBlocked(token.tagName, htmlPolicy)),
-          softBlocked: !parentHardBlocked && !customComponent && isHtmlTagBlocked(token.tagName, htmlPolicy),
+          customComponent: customComponent || nodeComponent,
+          hardBlocked: parentHardBlocked || BLOCKED_TAGS.has(token.tagName.toLowerCase()) || (!customComponent && !nodeComponent && isHtmlTagHardBlocked(token.tagName, htmlPolicy)),
+          softBlocked: !parentHardBlocked && !customComponent && !nodeComponent && isHtmlTagBlocked(token.tagName, htmlPolicy),
         })
         continue
       }
@@ -216,17 +271,25 @@ export function parseHtmlToReactNodes(
 
       const attrs = sanitizeHtmlAttrs(opening.attrs || {}, htmlPolicy, opening.tagName)
       const explicitKey = (attrs as any).key
-      const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : `ms-html-${autoKeySeed++}`
+      const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : `${keyPrefix}-${autoKeySeed++}`
       const Comp = opening.customComponent
         ? (customComponents[opening.tagName] || customComponents[opening.tagName.toLowerCase()])
         : undefined
-      const element = Comp
-        ? React.createElement(Comp as ComponentType<Record<string, unknown>>, { ...getCustomComponentProps(opening.tagName, attrs, options), key: elementKey }, ...opening.children)
-        : React.createElement(opening.tagName, {
-            ...normalizeDomAttrs(attrs),
-            key: elementKey,
-            suppressHydrationWarning: true,
-          }, ...opening.children)
+      const nodeComponent = Boolean(getNodeComponent(opening.tagName, options))
+      let element: ReactNode
+      if (nodeComponent) {
+        element = renderNodeComponent(opening.tagName, attrs, opening.children, elementKey, options)
+      }
+      else if (Comp) {
+        element = React.createElement(Comp as ComponentType<Record<string, unknown>>, { ...getCustomComponentProps(opening.tagName, attrs, options), key: elementKey }, ...opening.children)
+      }
+      else {
+        element = React.createElement(opening.tagName, {
+          ...normalizeDomAttrs(attrs),
+          key: elementKey,
+          suppressHydrationWarning: true,
+        }, ...opening.children)
+      }
 
       if (stack.length > 0)
         stack[stack.length - 1].children.push(element)
@@ -248,17 +311,25 @@ export function parseHtmlToReactNodes(
       }
       const attrs = sanitizeHtmlAttrs(unclosed.attrs || {}, htmlPolicy, unclosed.tagName)
       const explicitKey = (attrs as any).key
-      const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : `ms-html-${autoKeySeed++}`
+      const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : `${keyPrefix}-${autoKeySeed++}`
       const Comp = unclosed.customComponent
         ? (customComponents[unclosed.tagName] || customComponents[unclosed.tagName.toLowerCase()])
         : undefined
-      const element = Comp
-        ? React.createElement(Comp as ComponentType<Record<string, unknown>>, { ...getCustomComponentProps(unclosed.tagName, attrs, options), key: elementKey }, ...unclosed.children)
-        : React.createElement(unclosed.tagName, {
-            ...normalizeDomAttrs(attrs),
-            key: elementKey,
-            suppressHydrationWarning: true,
-          }, ...unclosed.children)
+      const nodeComponent = Boolean(getNodeComponent(unclosed.tagName, options))
+      let element: ReactNode
+      if (nodeComponent) {
+        element = renderNodeComponent(unclosed.tagName, attrs, unclosed.children, elementKey, options)
+      }
+      else if (Comp) {
+        element = React.createElement(Comp as ComponentType<Record<string, unknown>>, { ...getCustomComponentProps(unclosed.tagName, attrs, options), key: elementKey }, ...unclosed.children)
+      }
+      else {
+        element = React.createElement(unclosed.tagName, {
+          ...normalizeDomAttrs(attrs),
+          key: elementKey,
+          suppressHydrationWarning: true,
+        }, ...unclosed.children)
+      }
       rootNodes.push(element)
     }
 

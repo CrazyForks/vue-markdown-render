@@ -56,6 +56,8 @@ export type { TooltipPlacement, TooltipProps } from './components/Tooltip/Toolti
 export { VmrContainerNode } from './components/VmrContainerNode/VmrContainerNode'
 export {
   clearGlobalCustomComponents,
+  defineHtmlComponents,
+  defineStreamingComponents,
   getCustomComponentDisplay,
   getCustomNodeComponents,
   removeCustomComponents,

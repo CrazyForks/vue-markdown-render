@@ -5,6 +5,8 @@ export type { MarkdownCodeBlockNodeProps } from './components/MarkdownCodeBlockN
 export type { TooltipPlacement, TooltipProps } from './components/Tooltip/Tooltip'
 export {
   clearGlobalCustomComponents,
+  defineHtmlComponents,
+  defineStreamingComponents,
   getCustomComponentDisplay,
   getCustomNodeComponents,
   removeCustomComponents,

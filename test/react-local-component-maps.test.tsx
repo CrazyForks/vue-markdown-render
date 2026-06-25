@@ -508,6 +508,63 @@ describe('react local component maps', () => {
     await unmountRoot(root)
   })
 
+  it('renders streamingComponents nested inside standard html wrappers on client and server', async () => {
+    const seen: Array<NodeComponentProps<DocumentLinkNode>> = []
+    function DocumentLink(props: NodeComponentProps<DocumentLinkNode>) {
+      seen.push(props)
+      return <span data-nested-streaming={getAttr(props.node.attrs, 'id') ?? ''}>{props.node.content}</span>
+    }
+    function HtmlDocumentLink(props: React.PropsWithChildren<{ id?: string }>) {
+      return <span data-nested-html={props.id}>{props.children}</span>
+    }
+
+    const content = [
+      '<span><DocumentLink id="1">InlineNested</DocumentLink></span>',
+      '',
+      '<div><DocumentLink id="2">BlockNested</DocumentLink></div>',
+    ].join('\n')
+    const streamingComponents = { documentlink: DocumentLink }
+    const htmlComponents = { documentlink: HtmlDocumentLink }
+
+    const { host, root } = await renderIntoRoot(
+      <NodeRenderer
+        content={content}
+        final
+        htmlComponents={htmlComponents}
+        smoothStreaming={false}
+        streamingComponents={streamingComponents}
+      />,
+    )
+
+    expect(host.querySelector('[data-nested-streaming="1"]')?.textContent).toBe('InlineNested')
+    expect(host.querySelector('[data-nested-streaming="2"]')?.textContent).toBe('BlockNested')
+    expect(host.querySelector('[data-nested-html]')).toBeNull()
+    expect(seen.map(props => [getAttr(props.node.attrs, 'id'), props.node.content])).toEqual([
+      ['1', 'InlineNested'],
+      ['2', 'BlockNested'],
+    ])
+
+    await unmountRoot(root)
+    seen.length = 0
+
+    const ssrHost = hostFromStaticMarkup(renderToStaticMarkup(
+      <ServerNodeRenderer
+        content={content}
+        final
+        htmlComponents={htmlComponents}
+        streamingComponents={streamingComponents}
+      />,
+    ))
+
+    expect(ssrHost.querySelector('[data-nested-streaming="1"]')?.textContent).toBe('InlineNested')
+    expect(ssrHost.querySelector('[data-nested-streaming="2"]')?.textContent).toBe('BlockNested')
+    expect(ssrHost.querySelector('[data-nested-html]')).toBeNull()
+    expect(seen.map(props => [getAttr(props.node.attrs, 'id'), props.node.content])).toEqual([
+      ['1', 'InlineNested'],
+      ['2', 'BlockNested'],
+    ])
+  })
+
   it('keeps legacy custom component html attr contracts per render path', async () => {
     const scopeId = 'react-local-component-legacy-attrs'
     const seen: Array<{ width?: unknown, disabled?: unknown }> = []

@@ -4,6 +4,10 @@ import type {
   NodeComponentProps,
   StreamingComponentMap,
 } from '../packages/markstream-react/src'
+import {
+  defineHtmlComponents,
+  defineStreamingComponents,
+} from '../packages/markstream-react/src'
 
 interface DocumentLinkNode {
   type: 'documentlink'
@@ -29,5 +33,31 @@ const htmlComponents = {
   badge: Badge,
 } satisfies HtmlComponentMap
 
+const wrongHtmlComponents = {
+  // @ts-expect-error html component maps must not require parser-backed props.node.
+  documentlink: DocumentLink,
+} satisfies HtmlComponentMap
+
+const definedStreamingComponents = defineStreamingComponents({
+  documentlink: DocumentLink,
+})
+
+const definedHtmlComponents = defineHtmlComponents({
+  badge: Badge,
+})
+
+defineStreamingComponents({
+  // @ts-expect-error streamingComponents require parser-backed NodeComponentProps.
+  badge: Badge,
+})
+
+defineHtmlComponents({
+  // @ts-expect-error htmlComponents must not require parser-backed props.node.
+  documentlink: DocumentLink,
+})
+
 void streamingComponents
 void htmlComponents
+void wrongHtmlComponents
+void definedStreamingComponents
+void definedHtmlComponents

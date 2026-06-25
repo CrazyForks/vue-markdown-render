@@ -47,6 +47,8 @@ import { Tooltip as ClientTooltip } from './components/Tooltip/Tooltip'
 import { VmrContainerNode as ClientVmrContainerNode } from './components/VmrContainerNode/VmrContainerNode'
 import {
   clearGlobalCustomComponents,
+  defineHtmlComponents,
+  defineStreamingComponents,
   getCustomNodeComponents,
   removeCustomComponents,
   setCustomComponents,
@@ -141,6 +143,8 @@ export type { D2Loader }
 export { disableD2, enableD2, isD2Enabled, setD2Loader }
 export {
   clearGlobalCustomComponents,
+  defineHtmlComponents,
+  defineStreamingComponents,
   getCustomNodeComponents,
   removeCustomComponents,
   setCustomComponents,
