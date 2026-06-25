@@ -1,6 +1,5 @@
 import type { ComponentType } from 'react'
 import type { HtmlPolicy } from 'stream-markdown-parser'
-import type { CustomComponentMap } from '../../customComponents'
 import type { NodeComponentProps } from '../../types/node-component'
 import type { HtmlToken } from '../../utils/htmlToReact'
 import React, { useEffect, useRef, useState } from 'react'
@@ -58,7 +57,7 @@ function pushRenderedNode(target: React.ReactNode[], rendered: React.ReactNode |
  */
 function buildReactElementTree(
   tokens: HtmlToken[],
-  customComponents: CustomComponentMap,
+  customComponents: Record<string, ComponentType<any>>,
   htmlPolicy: HtmlPolicy = 'safe',
 ): React.ReactNode[] {
   let autoKeySeed = 0
@@ -184,7 +183,7 @@ function createReactElement(
   tagName: string,
   attrs: Record<string, string>,
   children: React.ReactNode[],
-  customComponents: CustomComponentMap,
+  customComponents: Record<string, ComponentType<any>>,
   autoKey: string,
   htmlPolicy: HtmlPolicy,
 ): React.ReactNode {
@@ -221,7 +220,7 @@ function createReactElement(
  */
 function parseHtmlToReactNodes(
   content: string,
-  customComponents: CustomComponentMap,
+  customComponents: Record<string, ComponentType<any>>,
   htmlPolicy: HtmlPolicy = 'safe',
 ): React.ReactNode[] | null {
   if (!content)
@@ -253,8 +252,13 @@ export function HtmlInlineNode(props: NodeComponentProps<{
     setIsClient(true)
   }, [])
 
-  // Get custom components from global registry
-  const customComponents = getCustomNodeComponents(customId)
+  const customComponents = React.useMemo(() => {
+    const legacyComponents = props.ctx?.customComponents ?? getCustomNodeComponents(customId)
+    return {
+      ...legacyComponents,
+      ...(props.ctx?.htmlComponents ?? {}),
+    }
+  }, [customId, props.ctx?.customComponents, props.ctx?.htmlComponents])
   const safeHtmlContent = React.useMemo(() => sanitizeHtmlContent(node.content ?? '', htmlPolicy), [htmlPolicy, node.content])
 
   // Computed property to determine render mode and content

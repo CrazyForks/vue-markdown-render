@@ -42,7 +42,11 @@ import {
 } from 'stream-markdown-parser'
 import { clampInfographicPreviewHeight, estimateInfographicPreviewHeight, parsePositiveNumber as parsePositiveInfographicNumber } from '../components/InfographicBlockNode/height'
 import { clampMermaidPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber as parsePositiveMermaidNumber } from '../components/MermaidBlockNode/height'
-import { getCustomNodeComponents } from '../customComponents'
+import {
+  getCustomNodeComponents,
+  normalizeComponentMap,
+  warnComponentMapConflicts,
+} from '../customComponents'
 import { getCodeBlockExtraProps } from '../renderers/codeBlockExtraProps'
 import { BLOCK_LEVEL_TYPES, renderInline, renderNodeChildren, tokenAttrsToProps } from '../renderers/renderChildren'
 import { isParagraphBreakingCustomHtmlNode, resolveCustomHtmlTag } from '../utils/customHtmlTag'
@@ -52,6 +56,7 @@ import { parseHtmlToReactNodes } from './html'
 import { renderKatexToHtml } from './katex'
 
 const fallbackMarkdown = getMarkdown()
+const warnedComponentMapConflicts = new Set<string>()
 
 function formatLanguageLabel(language: unknown) {
   const normalized = normalizeLanguageIdentifier(String(language ?? ''))
@@ -167,6 +172,8 @@ function renderSpecialCodeBlockComponent(
 function createRenderContext(
   props: NodeRendererProps,
   customComponents: CustomComponentMap,
+  streamingComponents: NonNullable<RenderContext['streamingComponents']>,
+  htmlComponents: NonNullable<RenderContext['htmlComponents']>,
   indexPrefix: string,
   customHtmlTags: readonly string[],
 ): RenderContext {
@@ -179,6 +186,8 @@ function createRenderContext(
     indexKey: indexPrefix,
     typewriter: props.typewriter,
     showTooltips: props.showTooltips,
+    streamingComponents,
+    htmlComponents,
     renderCodeBlocksAsPre: props.renderCodeBlocksAsPre,
     codeBlockStream: props.codeBlockStream,
     codeBlockProps: {
@@ -413,6 +422,10 @@ export function ParagraphNode(props: NodeComponentProps<{ type: 'paragraph', chi
 
   const nodeChildren = node.children ?? []
   const customComponents = ctx.customComponents ?? getCustomNodeComponents(ctx.customId)
+  const streamingAndLegacyComponents = {
+    ...customComponents,
+    ...(ctx.streamingComponents ?? {}),
+  }
   const parts: React.ReactNode[] = []
   const inlineBuffer: ParsedNode[] = []
 
@@ -429,7 +442,7 @@ export function ParagraphNode(props: NodeComponentProps<{ type: 'paragraph', chi
   }
 
   nodeChildren.forEach((child, childIndex) => {
-    if (BLOCK_LEVEL_TYPES.has(child.type) || isParagraphBreakingCustomHtmlNode(child, customComponents, ctx.customHtmlTags)) {
+    if (BLOCK_LEVEL_TYPES.has(child.type) || isParagraphBreakingCustomHtmlNode(child, streamingAndLegacyComponents, ctx.customHtmlTags)) {
       flushInline()
       parts.push(
         <React.Fragment key={`${String(indexKey ?? 'paragraph')}-block-${childIndex}`}>
@@ -1013,7 +1026,10 @@ export function HtmlBlockNode(props: NodeComponentProps<{
     )
   }
 
-  const customComponents = getCustomNodeComponents(props.customId)
+  const customComponents = {
+    ...(props.ctx?.customComponents ?? getCustomNodeComponents(props.customId)),
+    ...(props.ctx?.htmlComponents ?? {}),
+  }
   const nodes = parseHtmlToReactNodes(String(props.node.content ?? ''), customComponents, props.ctx?.htmlPolicy ?? 'safe')
   if (nodes == null)
     return <>{String(props.node.content ?? '')}</>
@@ -1021,7 +1037,10 @@ export function HtmlBlockNode(props: NodeComponentProps<{
 }
 
 export function HtmlInlineNode(props: NodeComponentProps<{ type: 'html_inline', content?: string }>) {
-  const customComponents = getCustomNodeComponents(props.customId)
+  const customComponents = {
+    ...(props.ctx?.customComponents ?? getCustomNodeComponents(props.customId)),
+    ...(props.ctx?.htmlComponents ?? {}),
+  }
   const nodes = parseHtmlToReactNodes(String(props.node.content ?? ''), customComponents, props.ctx?.htmlPolicy ?? 'safe')
   if (nodes == null)
     return <>{String(props.node.content ?? '')}</>
@@ -1075,9 +1094,25 @@ export function FallbackComponent(props: NodeComponentProps<{ type: string }>) {
 
 export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext) {
   const customComponents = ctx.customComponents ?? getCustomNodeComponents(ctx.customId)
+  const streamingComponents = ctx.streamingComponents ?? {}
+  const streamingCustom = node.type === 'code_block'
+    ? null
+    : (streamingComponents as Record<string, any>)[node.type]
   const custom = node.type === 'code_block'
     ? null
     : (customComponents as Record<string, any>)[node.type]
+  if (streamingCustom) {
+    return React.createElement(streamingCustom, {
+      key,
+      node,
+      customId: ctx.customId,
+      isDark: ctx.isDark,
+      ctx,
+      renderNode,
+      indexKey: key,
+      typewriter: ctx.typewriter,
+    })
+  }
   if (custom) {
     return React.createElement(custom, {
       key,
@@ -1092,7 +1127,11 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
   }
 
   if (node.type === 'html_block' || node.type === 'html_inline') {
-    const resolvedCustomTag = resolveCustomHtmlTag(node as any, customComponents as any, ctx.customHtmlTags)
+    const streamingAndLegacyComponents = {
+      ...(customComponents as Record<string, any>),
+      ...(streamingComponents as Record<string, any>),
+    }
+    const resolvedCustomTag = resolveCustomHtmlTag(node as any, streamingAndLegacyComponents as any, ctx.customHtmlTags)
     const tag = resolvedCustomTag?.tag ?? ''
     const isWhitelisted = resolvedCustomTag?.isWhitelisted ?? false
     const customForTag = resolvedCustomTag?.component ?? null
@@ -1242,12 +1281,21 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
 
 export function NodeRenderer(props: NodeRendererProps) {
   const customComponents = getCustomNodeComponents(props.customId)
+  const streamingComponents = normalizeComponentMap(props.streamingComponents)
+  const htmlComponents = normalizeComponentMap(props.htmlComponents)
+
+  warnComponentMapConflicts(
+    streamingComponents,
+    htmlComponents,
+    warnedComponentMapConflicts,
+  )
 
   const baseParseOptions = props.parseOptions ?? {}
   const optionTags = (baseParseOptions as any).customHtmlTags ?? []
   const effectiveCustomHtmlTags = mergeCustomHtmlTags(
     props.customHtmlTags,
     Array.isArray(optionTags) ? optionTags : [],
+    Object.keys(streamingComponents),
   )
 
   const instanceMsgId = props.customId
@@ -1274,7 +1322,14 @@ export function NodeRenderer(props: NodeRendererProps) {
       : []
 
   const indexPrefix = props.indexKey != null ? String(props.indexKey) : 'markdown-renderer'
-  const renderCtx = createRenderContext(props, customComponents, indexPrefix, effectiveCustomHtmlTags)
+  const renderCtx = createRenderContext(
+    props,
+    customComponents,
+    streamingComponents,
+    htmlComponents,
+    indexPrefix,
+    effectiveCustomHtmlTags,
+  )
 
   return (
     <div

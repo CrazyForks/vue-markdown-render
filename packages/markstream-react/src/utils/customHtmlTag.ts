@@ -1,30 +1,31 @@
+import type { ComponentType } from 'react'
 import type { ParsedNode } from 'stream-markdown-parser'
-import type { CustomComponentDisplayMode, CustomComponentMap, MarkstreamCustomComponent } from '../customComponents'
-import { getHtmlTagFromContent } from 'stream-markdown-parser'
+import type { CustomComponentDisplayMode } from '../customComponents'
+import { getHtmlTagFromContent, normalizeCustomHtmlTagName } from 'stream-markdown-parser'
 import { getCustomComponentDisplay } from '../customComponents'
 
 export interface ResolvedCustomHtmlTag {
   tag: string
   isWhitelisted: boolean
-  component: MarkstreamCustomComponent | null
+  component: ComponentType<any> | null
   display: CustomComponentDisplayMode | undefined
 }
 
 export function resolveCustomHtmlTag(
   node: Pick<ParsedNode, 'type'> & { tag?: string | null, content?: unknown },
-  customComponents: CustomComponentMap,
+  customComponents: Record<string, ComponentType<any>>,
   customHtmlTags?: readonly string[],
 ): ResolvedCustomHtmlTag | null {
-  const normalizedType = String(node.type ?? '').trim().toLowerCase()
-  const normalizedTags = (customHtmlTags ?? []).map(tag => tag.toLowerCase())
+  const normalizedType = normalizeCustomHtmlTagName(node.type)
+  const normalizedTags = (customHtmlTags ?? []).map(tag => normalizeCustomHtmlTagName(tag)).filter(Boolean)
   const taggedNode = normalizedType === 'html_inline' || normalizedType === 'html_block'
 
   if (!taggedNode && !normalizedTags.includes(normalizedType))
     return null
 
   const tag = taggedNode
-    ? (String(node.tag ?? '').trim().toLowerCase() || getHtmlTagFromContent(node.content))
-    : (String(node.tag ?? '').trim().toLowerCase() || normalizedType)
+    ? (normalizeCustomHtmlTagName(node.tag) || getHtmlTagFromContent(node.content))
+    : (normalizeCustomHtmlTagName(node.tag) || normalizedType)
   if (!tag)
     return null
 
@@ -35,13 +36,13 @@ export function resolveCustomHtmlTag(
     tag,
     isWhitelisted,
     component,
-    display: getCustomComponentDisplay(component),
+    display: getCustomComponentDisplay(component as any),
   }
 }
 
 export function isParagraphBreakingCustomHtmlNode(
   node: Pick<ParsedNode, 'type'> & { tag?: string | null, content?: unknown },
-  customComponents: CustomComponentMap,
+  customComponents: Record<string, ComponentType<any>>,
   customHtmlTags?: readonly string[],
 ) {
   return resolveCustomHtmlTag(node, customComponents, customHtmlTags)?.display === 'block'

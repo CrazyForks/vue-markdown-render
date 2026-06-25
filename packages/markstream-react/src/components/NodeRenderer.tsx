@@ -11,7 +11,13 @@ import {
 import { SmoothStreamingContext } from '../context/smoothStreaming'
 import { StreamStateRefContext } from '../context/streamState'
 import { useViewportPriority, ViewportPriorityProvider } from '../context/viewportPriority'
-import { getCustomComponentsRevision, getCustomNodeComponents, subscribeCustomComponents } from '../customComponents'
+import {
+  getCustomComponentsRevision,
+  getCustomNodeComponents,
+  normalizeComponentMap,
+  subscribeCustomComponents,
+  warnComponentMapConflicts,
+} from '../customComponents'
 import { useSmoothMarkdownStream } from '../hooks/useSmoothMarkdownStream'
 import { renderNode } from '../renderers/renderNode'
 import { normalizeLanguageIdentifier } from '../utils/languageIcon'
@@ -793,6 +799,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
   const previousRenderVersionSourceRef = useRef<unknown>(null)
   const smoothStream = useSmoothMarkdownStream(props.smoothStreamingOptions)
   const parentSmoothStreaming = React.useContext(SmoothStreamingContext)
+  const warnedComponentMapConflictsRef = useRef(new Set<string>())
   const [hasMountedForSmoothStreaming, setHasMountedForSmoothStreaming] = useState(
     () => props.smoothStreaming === true,
   )
@@ -983,6 +990,20 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
   const customComponents = useMemo(() => {
     return getCustomNodeComponents(props.customId)
   }, [props.customId, customComponentsRevision])
+  const streamingComponents = useMemo(() => {
+    return normalizeComponentMap(props.streamingComponents)
+  }, [props.streamingComponents])
+  const htmlComponents = useMemo(() => {
+    return normalizeComponentMap(props.htmlComponents)
+  }, [props.htmlComponents])
+
+  useEffect(() => {
+    warnComponentMapConflicts(
+      streamingComponents,
+      htmlComponents,
+      warnedComponentMapConflictsRef.current,
+    )
+  }, [htmlComponents, streamingComponents])
 
   const instanceMsgId = useMemo(() => {
     return props.customId
@@ -996,12 +1017,14 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     return mergeCustomHtmlTags(
       props.customHtmlTags,
       Array.isArray(optionTags) ? optionTags : [],
+      Object.keys(streamingComponents),
     )
   }, [
     props.customId,
     props.customHtmlTags,
     props.parseOptions,
     customComponentsRevision,
+    streamingComponents,
   ])
 
   const mdBase = useMemo(() => {
@@ -1245,6 +1268,8 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     textStreamState: textStreamStateRef.current,
     streamRenderVersion: streamRenderVersionRef.current,
     customComponents,
+    streamingComponents,
+    htmlComponents,
     customHtmlTags: effectiveCustomHtmlTags,
     htmlPolicy: props.htmlPolicy ?? 'safe',
     showTooltips: props.showTooltips,
@@ -1292,6 +1317,8 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     props.onCopy,
     props.onHandleArtifactClick,
     customComponents,
+    streamingComponents,
+    htmlComponents,
   ])
 
   // Keep stream version and text state up-to-date via mutation so the

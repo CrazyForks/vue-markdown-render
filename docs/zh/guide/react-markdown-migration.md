@@ -67,15 +67,77 @@ export function Article({ markdown }: { markdown: string }) {
 | `react-markdown` | `markstream-react` | 说明 |
 |---|---|---|
 | `children` | `content` | Markdown 字符串通过 `content` 传入。 |
-| `components` | `setCustomComponents(id?, mapping)` | `react-markdown` 的 key 是 HTML tag；`markstream-react` 的 key 是节点类型，如 `heading`、`link`、`paragraph`、`image`、`code_block`、`inline_code`。 |
+| `components` | `streamingComponents`、`htmlComponents` 或 `setCustomComponents(id?, mapping)` | HTML-like 自定义标签优先使用渲染器本地 map。需要 parser-backed `NodeComponentProps` 时用 `streamingComponents`；需要普通 React props 和 `children` 时用 `htmlComponents`。已有节点覆盖继续用 `setCustomComponents`。 |
 | `remarkPlugins` | `customMarkdownIt` | 改用 `markdown-it` 插件，而不是 `remark` 插件。很多常见 Markdown 能力本身已经内建。 |
 | `remarkPlugins={[remarkGfm]}` | 很多时候可以删掉 | 表格、任务列表、删除线、代码围栏等常见语法解析器本身已经支持。若你依赖某些边缘行为，删掉前请回归验证。 |
 | `rehypePlugins` | 没有直接等价物 | `markstream-react` 没有公开的 `rehype` 阶段。请改用自定义节点渲染器、`customHtmlTags`、`parseOptions` 或对 `nodes` 做后处理。 |
-| `rehypeRaw` | 通常不再需要 | HTML-like 标签本来就会被解析。如果是自定义标签，优先使用 `customHtmlTags={['thinking']}` + `setCustomComponents`。 |
+| `rehypeRaw` | 通常不再需要 | HTML-like 标签本来就会被解析。自定义标签按需要的 props 合约选择 `streamingComponents` 或 `htmlComponents`。 |
 | `skipHtml` | 没有直接 prop | HTML 节点默认会渲染，但内置 HTML 渲染器会拦截危险标签/属性和不安全 URL。如果你必须彻底禁用 HTML，请自行在输入阶段或节点阶段过滤。 |
 | `allowedElements` / `disallowedElements` / `allowElement` | 没有直接 prop | 需要你自己过滤 `nodes` 树，或者替换指定节点的渲染器。 |
 | `unwrapDisallowed` | 手动做节点过滤 | 如果你需要“去掉外层标签但保留子节点”的行为，需要在节点后处理阶段自己实现。 |
 | `urlTransform` | `parseOptions.validateLink` + 自定义 `link` 渲染器 | `validateLink` 适合做放行/拦截；如果你要改写 URL，请在自定义 `link` 渲染器或节点后处理里完成。 |
+
+## 升级提示：自定义 HTML-like 标签
+
+新的应用建议用渲染器本地 map 来处理 HTML-like 自定义标签：
+
+```tsx
+import type { NodeComponentProps } from 'markstream-react'
+import type React from 'react'
+import MarkdownRender from 'markstream-react'
+
+function DocumentLink({ node }: NodeComponentProps<any>) {
+  return <span>{node.content}</span>
+}
+
+function Badge({ kind, children }: React.PropsWithChildren<{ kind?: string }>) {
+  return <span data-kind={kind}>{children}</span>
+}
+
+const renderer = (
+  <MarkdownRender
+    content={content}
+    final={isDone}
+    streamingComponents={{ documentlink: DocumentLink }}
+    htmlComponents={{ badge: Badge }}
+  />
+)
+```
+
+`streamingComponents` 选择 parser-backed streaming-node 合约。它的 key 会加入 parser 的有效 `customHtmlTags`，因此不完整标签也能以 `node.attrs`、`node.content`、`node.loading` 渲染。
+
+`htmlComponents` 选择 raw/dynamic HTML 合约。组件接收普通 React props 和 `children`，不会收到 `props.node`。
+
+`customHtmlTags` 仍可作为更底层的 parser 选项使用。`setCustomComponents` 和 `customId` 也继续支持，用于兼容旧代码、应用级共享注册，以及内置节点覆盖。
+
+迁移示例：
+
+```tsx
+// Before
+setCustomComponents('chat', {
+  documentlink: DocumentLink,
+})
+
+const before = (
+  <MarkdownRender
+    customId="chat"
+    customHtmlTags={['documentlink']}
+    content={content}
+  />
+)
+
+// After
+const after = (
+  <MarkdownRender
+    content={content}
+    streamingComponents={{
+      documentlink: DocumentLink,
+    }}
+  />
+)
+```
+
+当前 `markstream-react` 不再从 `setCustomComponents(...)` 推断自定义 HTML 标签名。如果没有 `customHtmlTags` 或 `streamingComponents`，完整的自定义外观标签会留在 raw HTML dynamic 路径，并接收 `{ id, children }` 这类 HTML-style props。这对依赖旧行为的应用来说曾是一个未记录的 breaking change；新的本地 map 会在类型层把合约明确表达出来。
 
 ## 迁移 `components`
 
@@ -148,7 +210,7 @@ export function Article({ markdown }: { markdown: string }) {
 - `p` -> `paragraph`
 - `img` -> `image`
 - `code` / `pre` -> `code_block` 或 `inline_code`
-- 自定义 HTML-like 标签 -> `customHtmlTags` + `setCustomComponents`
+- 自定义 HTML-like 标签 -> 需要 `NodeComponentProps` 时用 `streamingComponents`，需要普通 props/children 时用 `htmlComponents`
 
 ## 迁移代码高亮
 
@@ -222,24 +284,23 @@ export function Article({ markdown }: { markdown: string }) {
 
 ```tsx
 import type { NodeComponentProps } from 'markstream-react'
-import MarkdownRender, { setCustomComponents } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 
 function ThinkingNode({ node }: NodeComponentProps<any>) {
   return <aside className="thinking-box">{node.content}</aside>
 }
 
-setCustomComponents('chat', { thinking: ThinkingNode })
-
 export function Message({ markdown }: { markdown: string }) {
   return (
     <MarkdownRender
-      customId="chat"
       content={markdown}
-      customHtmlTags={['thinking']}
+      streamingComponents={{ thinking: ThinkingNode }}
     />
   )
 }
 ```
+
+这个 API 拆分解决的是可发现性和类型表达问题。HTML 安全仍由 `htmlPolicy` 和现有 sanitization 规则负责；不要把组件 map 拆分当作安全边界。
 
 ## 流式升级路径
 
@@ -274,7 +335,7 @@ export function Message() {
 
 - 把 `<Markdown>{markdown}</Markdown>` 改成 `<MarkdownRender content={markdown} />`
 - 引入 `markstream-react/index.css`
-- 把 `components` 覆盖迁到 `setCustomComponents(customId, mapping)`
+- 把 HTML-like 自定义标签迁到 `streamingComponents` 或 `htmlComponents`；已有节点覆盖和共享注册继续使用 `setCustomComponents(customId, mapping)`
 - 先删除已经冗余的插件，再按需补回真正还需要的能力
 - 重新检查任何依赖 `rehype` 的 HTML 过滤或变换逻辑
 - 如果你的应用要渲染增量输出，先评估 `content` + smooth streaming；需要 AST 控制或外部解析时再升级到 `nodes`

@@ -73,6 +73,10 @@ export function ParagraphNode(props: NodeComponentProps<{ type: 'paragraph', chi
 
   const nodeChildren = node.children ?? []
   const customComponents = ctx.customComponents ?? getCustomNodeComponents(ctx.customId)
+  const streamingAndLegacyComponents = {
+    ...customComponents,
+    ...(ctx.streamingComponents ?? {}),
+  }
   const parts: React.ReactNode[] = []
   const inlineBuffer: ParsedNode[] = []
 
@@ -89,7 +93,7 @@ export function ParagraphNode(props: NodeComponentProps<{ type: 'paragraph', chi
   }
 
   nodeChildren.forEach((child, childIndex) => {
-    if (BLOCK_LEVEL_TYPES.has(child.type) || isParagraphBreakingCustomHtmlNode(child, customComponents, ctx.customHtmlTags)) {
+    if (BLOCK_LEVEL_TYPES.has(child.type) || isParagraphBreakingCustomHtmlNode(child, streamingAndLegacyComponents, ctx.customHtmlTags)) {
       flushInline()
       parts.push(
         <React.Fragment key={`${String(indexKey ?? 'paragraph')}-block-${childIndex}`}>

@@ -44,9 +44,20 @@ export function HtmlBlockNode(props: NodeComponentProps<{
   )
 
   const effectiveCustomComponents = useMemo(() => {
-    // Allow explicit injection (primarily for tests), otherwise fall back to global store.
-    return props.customComponents ?? getCustomNodeComponents(customId)
-  }, [customId, props.customComponents, customComponentsRevision])
+    const legacyComponents = props.customComponents
+      ?? props.ctx?.customComponents
+      ?? getCustomNodeComponents(customId)
+    return {
+      ...legacyComponents,
+      ...(props.ctx?.htmlComponents ?? {}),
+    }
+  }, [
+    customId,
+    props.ctx?.customComponents,
+    props.ctx?.htmlComponents,
+    props.customComponents,
+    customComponentsRevision,
+  ])
 
   useEffect(() => {
     if (typeof window === 'undefined') {

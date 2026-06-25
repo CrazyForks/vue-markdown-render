@@ -11,7 +11,14 @@ export {
   setCustomComponents,
   withMarkstreamComponentDisplay,
 } from './customComponents'
-export type { CustomComponentDisplayMode, MarkstreamCustomComponent } from './customComponents'
+export type {
+  CustomComponentDisplayMode,
+  HtmlComponent,
+  HtmlComponentMap,
+  MarkstreamCustomComponent,
+  StreamingComponent,
+  StreamingComponentMap,
+} from './customComponents'
 export { AdmonitionNode } from './server-renderer'
 export { BlockquoteNode } from './server-renderer'
 export { CheckboxNode } from './server-renderer'

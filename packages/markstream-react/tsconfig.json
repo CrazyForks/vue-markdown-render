@@ -14,6 +14,6 @@
     "allowJs": false,
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "../../test/react-local-component-maps-types.tsx"],
   "exclude": ["dist", "node_modules"]
 }

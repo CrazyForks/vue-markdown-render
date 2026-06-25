@@ -67,11 +67,11 @@ This means `components.h1` does not become `components.h1` again. It usually bec
 | `react-markdown` | `markstream-react` | Notes |
 |---|---|---|
 | `children` | `content` | Pass the Markdown string through `content`. |
-| `components` | `setCustomComponents(id?, mapping)` | `react-markdown` keys are HTML tags; `markstream-react` keys are node types such as `heading`, `link`, `paragraph`, `image`, `code_block`, `inline_code`. |
+| `components` | `streamingComponents`, `htmlComponents`, or `setCustomComponents(id?, mapping)` | For HTML-like custom tags, prefer renderer-local maps. Use `streamingComponents` for parser-backed `NodeComponentProps`; use `htmlComponents` for normal React props and `children`. Legacy node overrides still use `setCustomComponents`. |
 | `remarkPlugins` | `customMarkdownIt` | Use `markdown-it` plugins instead of `remark` plugins. Many common Markdown features already work without extra plugins. |
 | `remarkPlugins={[remarkGfm]}` | Often removable | Tables, task checkboxes, strikethrough, code fences, and other common constructs are already supported by the parser. Re-check edge cases before deleting plugin code. |
 | `rehypePlugins` | No direct equivalent | There is no public `rehype` stage. Use custom node renderers, `customHtmlTags`, `parseOptions`, or post-process `nodes` instead. |
-| `rehypeRaw` | Usually not needed | HTML-like tags are already parsed. For custom tags, prefer `customHtmlTags={['thinking']}` plus `setCustomComponents`. |
+| `rehypeRaw` | Usually not needed | HTML-like tags are already parsed. For custom tags, prefer `streamingComponents` or `htmlComponents` depending on the prop contract you need. |
 | `skipHtml` | No direct prop | HTML nodes render by default, with built-in blocking of dangerous attributes/tags and unsafe URLs in the HTML renderers. If you must remove HTML entirely, prefilter the input or parsed nodes yourself. |
 | `allowedElements` / `disallowedElements` / `allowElement` | No direct prop | Filter the parsed `nodes` tree yourself, or replace specific node renderers. |
 | `unwrapDisallowed` | Manual node filtering | Implement this in your node post-processing step if you need it. |
@@ -79,22 +79,65 @@ This means `components.h1` does not become `components.h1` again. It usually bec
 
 ## Upgrade note: custom HTML-like tags
 
-Current `markstream-react` releases no longer infer custom HTML tag names from `setCustomComponents(...)`. If your app renders model output such as `<DocumentLink id="...">title</DocumentLink>` and expects a custom component to receive `props.node`, add the tag to `customHtmlTags`:
+New applications should use renderer-local maps for HTML-like custom tags:
 
 ```tsx
+import type { NodeComponentProps } from 'markstream-react'
+import type React from 'react'
+import MarkdownRender from 'markstream-react'
+
+function DocumentLink({ node }: NodeComponentProps<any>) {
+  return <span>{node.content}</span>
+}
+
+function Badge({ kind, children }: React.PropsWithChildren<{ kind?: string }>) {
+  return <span data-kind={kind}>{children}</span>
+}
+
+const renderer = (
+  <MarkdownRender
+    content={content}
+    final={isDone}
+    streamingComponents={{ documentlink: DocumentLink }}
+    htmlComponents={{ badge: Badge }}
+  />
+)
+```
+
+`streamingComponents` selects the parser-backed streaming-node contract. Its keys are added to the parser's effective `customHtmlTags`, so incomplete tags can render with `node.attrs`, `node.content`, and `node.loading`.
+
+`htmlComponents` selects the raw/dynamic HTML contract. Components receive normal React props plus `children`, not `props.node`.
+
+`customHtmlTags` remains available as a lower-level parser option. `setCustomComponents` and `customId` remain supported for compatibility, shared application-level registration, and built-in node overrides.
+
+Migration example:
+
+```tsx
+// Before
 setCustomComponents('chat', {
   documentlink: DocumentLink,
 })
 
-React.createElement(MarkdownRender, {
-  customId: 'chat',
-  content,
-  final: isDone,
-  customHtmlTags: ['documentlink'],
-})
+const before = (
+  <MarkdownRender
+    customId="chat"
+    customHtmlTags={['documentlink']}
+    content={content}
+  />
+)
+
+// After
+const after = (
+  <MarkdownRender
+    content={content}
+    streamingComponents={{
+      documentlink: DocumentLink,
+    }}
+  />
+)
 ```
 
-Without `customHtmlTags`, the tag stays on the raw HTML dynamic rendering path. The component can still render, but it receives HTML-style props such as `{ id, children }` instead of `NodeComponentProps`, and it will not receive `node.loading` for streaming partial renders. This auto-inference removal was an undocumented breaking change for apps that relied on the previous behavior.
+Current `markstream-react` releases no longer infer custom HTML tag names from `setCustomComponents(...)`. Without `customHtmlTags` or `streamingComponents`, a complete custom-looking tag stays on the raw HTML dynamic rendering path and receives HTML-style props such as `{ id, children }`. This auto-inference removal was an undocumented breaking change for apps that relied on the previous behavior. The new local maps make that contract explicit in types.
 
 ## Migrating `components`
 
@@ -167,7 +210,7 @@ Useful node-type translations:
 - `p` -> `paragraph`
 - `img` -> `image`
 - `code` / `pre` -> `code_block` or `inline_code`
-- Custom HTML-like tags -> `customHtmlTags` + `setCustomComponents`
+- Custom HTML-like tags -> `streamingComponents` for `NodeComponentProps`, or `htmlComponents` for normal props/children
 
 ## Migrating code highlighting
 
@@ -241,24 +284,23 @@ If your old `rehypeRaw` usage was mainly there to support custom tags such as `<
 
 ```tsx
 import type { NodeComponentProps } from 'markstream-react'
-import MarkdownRender, { setCustomComponents } from 'markstream-react'
+import MarkdownRender from 'markstream-react'
 
 function ThinkingNode({ node }: NodeComponentProps<any>) {
   return <aside className="thinking-box">{node.content}</aside>
 }
 
-setCustomComponents('chat', { thinking: ThinkingNode })
-
 export function Message({ markdown }: { markdown: string }) {
   return (
     <MarkdownRender
-      customId="chat"
       content={markdown}
-      customHtmlTags={['thinking']}
+      streamingComponents={{ thinking: ThinkingNode }}
     />
   )
 }
 ```
+
+This API split is about discoverability and typing. HTML safety is still handled by `htmlPolicy` and the existing sanitization rules; do not treat the component-map split as a security boundary.
 
 ## Streaming upgrade path
 
@@ -293,7 +335,7 @@ For most chat streams, the simpler `content` + smooth streaming path is the firs
 
 - Replace `<Markdown>{markdown}</Markdown>` with `<MarkdownRender content={markdown} />`.
 - Import `markstream-react/index.css`.
-- Move `components` overrides into `setCustomComponents(customId, mapping)`.
+- Move custom HTML-like tags into `streamingComponents` or `htmlComponents`; keep `setCustomComponents(customId, mapping)` for existing node overrides and shared registrations.
 - Remove plugins that are now redundant before re-adding custom ones.
 - Re-check any `rehype`-based HTML filtering or transformation logic.
 - If your app renders incremental output, evaluate `content` + smooth streaming first; upgrade to `nodes` when you need AST control or external parsing.

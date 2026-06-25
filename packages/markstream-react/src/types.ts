@@ -1,6 +1,6 @@
 import type React from 'react'
 import type { BaseNode, HtmlPolicy, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
-import type { CustomComponentMap } from './customComponents'
+import type { CustomComponentMap, HtmlComponentMap, StreamingComponentMap } from './customComponents'
 import type { SmoothMarkdownStreamOptions } from './hooks/useSmoothMarkdownStream'
 import type {
   CodeBlockMonacoOptions,
@@ -35,6 +35,8 @@ export interface NodeRendererProps {
   final?: boolean
   parseOptions?: ParseOptions
   customMarkdownIt?: (md: MarkdownIt) => MarkdownIt
+  streamingComponents?: StreamingComponentMap
+  htmlComponents?: HtmlComponentMap
   /** Log parse/render timing stats (dev only). */
   debugPerformance?: boolean
   /**
@@ -112,6 +114,8 @@ export interface RenderContext {
   textStreamState?: Map<string, string>
   streamRenderVersion?: number
   customComponents?: CustomComponentMap
+  streamingComponents?: StreamingComponentMap
+  htmlComponents?: HtmlComponentMap
   customHtmlTags?: readonly string[]
   htmlPolicy?: HtmlPolicy
   codeBlockProps?: NodeRendererCodeBlockProps

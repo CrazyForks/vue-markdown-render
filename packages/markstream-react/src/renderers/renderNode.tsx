@@ -259,9 +259,26 @@ function renderCodeBlock(
 
 export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext) {
   const customComponents = ctx.customComponents ?? getCustomNodeComponents(ctx.customId)
+  const streamingComponents = ctx.streamingComponents ?? {}
+  const streamingCustom = node.type === 'code_block'
+    ? null
+    : (streamingComponents as Record<string, any>)[node.type]
   const custom = node.type === 'code_block'
     ? null
     : (customComponents as Record<string, any>)[node.type]
+  if (streamingCustom) {
+    return React.createElement(streamingCustom, {
+      key,
+      node,
+      customId: ctx.customId,
+      isDark: ctx.isDark,
+      ctx,
+      renderNode,
+      indexKey: key,
+      typewriter: ctx.typewriter,
+      fade: ctx.fade,
+    })
+  }
   if (custom) {
     return React.createElement(custom, {
       key,
@@ -277,7 +294,11 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
   }
 
   if (node.type === 'html_block' || node.type === 'html_inline') {
-    const resolvedCustomTag = resolveCustomHtmlTag(node as any, customComponents as any, ctx.customHtmlTags)
+    const streamingAndLegacyComponents = {
+      ...(customComponents as Record<string, any>),
+      ...(streamingComponents as Record<string, any>),
+    }
+    const resolvedCustomTag = resolveCustomHtmlTag(node as any, streamingAndLegacyComponents as any, ctx.customHtmlTags)
     const fallbackTag = String((node as any).tag ?? '').trim().toLowerCase() || getHtmlTagFromContent((node as any).content)
     const tag = resolvedCustomTag?.tag ?? fallbackTag
     if (tag) {
