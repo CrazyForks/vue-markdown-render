@@ -110,6 +110,22 @@ function stabilizeParsedNodes(newNodes: ParsedNode[], prevNodes: ParsedNode[]): 
   return result
 }
 
+function componentMapsEqual<T>(prev: Record<string, T>, next: Record<string, T>) {
+  const prevKeys = Object.keys(prev)
+  const nextKeys = Object.keys(next)
+  if (prevKeys.length !== nextKeys.length)
+    return false
+  return prevKeys.every(key => prev[key] === next[key])
+}
+
+function useStableNormalizedComponentMap<T>(mapping?: Record<string, T>) {
+  const normalized = useMemo(() => normalizeComponentMap(mapping), [mapping])
+  const stableRef = useRef(normalized)
+  if (!componentMapsEqual(stableRef.current, normalized))
+    stableRef.current = normalized
+  return stableRef.current
+}
+
 // ---------------------------------------------------------------------------
 // NodeSlotContent – memoized wrapper around renderNode
 // ---------------------------------------------------------------------------
@@ -990,12 +1006,8 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
   const customComponents = useMemo(() => {
     return getCustomNodeComponents(props.customId)
   }, [props.customId, customComponentsRevision])
-  const streamingComponents = useMemo(() => {
-    return normalizeComponentMap(props.streamingComponents)
-  }, [props.streamingComponents])
-  const htmlComponents = useMemo(() => {
-    return normalizeComponentMap(props.htmlComponents)
-  }, [props.htmlComponents])
+  const streamingComponents = useStableNormalizedComponentMap(props.streamingComponents)
+  const htmlComponents = useStableNormalizedComponentMap(props.htmlComponents)
 
   useEffect(() => {
     warnComponentMapConflicts(

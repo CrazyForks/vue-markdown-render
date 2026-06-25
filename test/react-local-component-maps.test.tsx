@@ -54,6 +54,12 @@ async function unmountRoot(root: ReturnType<typeof createRoot>) {
   })
 }
 
+function hostFromStaticMarkup(html: string) {
+  const host = document.createElement('div')
+  host.innerHTML = html
+  return host
+}
+
 describe('react local component maps', () => {
   beforeEach(() => {
     vi.stubGlobal('IntersectionObserver', class {
@@ -267,6 +273,241 @@ describe('react local component maps', () => {
     expect(host.querySelector('[data-normalized-type="documentlink"]')?.textContent).toBe('Case')
 
     await unmountRoot(root)
+  })
+
+  it('does not let streamingComponents replace built-in markdown node types', async () => {
+    function TextTag(props: NodeComponentProps<{ content: string }>) {
+      return <span data-streaming-text>{props.node.content}</span>
+    }
+    function HeadingTag(props: NodeComponentProps<{ content: string }>) {
+      return <span data-streaming-heading>{props.node.content}</span>
+    }
+
+    const content = [
+      '# Native heading',
+      '',
+      '<text>Custom text</text>',
+      '',
+      '<heading>Custom heading</heading>',
+    ].join('\n')
+    const streamingComponents = {
+      text: TextTag,
+      heading: HeadingTag,
+    }
+
+    const { host, root } = await renderIntoRoot(
+      <NodeRenderer
+        content={content}
+        final
+        smoothStreaming={false}
+        streamingComponents={streamingComponents}
+      />,
+    )
+
+    expect(host.querySelector('h1')?.textContent).toBe('Native heading')
+    expect(host.querySelector('h1 [data-streaming-text]')).toBeNull()
+    expect(Array.from(host.querySelectorAll('[data-streaming-text]')).map(el => el.textContent)).toEqual(['Custom text'])
+    expect(host.querySelector('[data-streaming-heading]')?.textContent).toBe('Custom heading')
+
+    await unmountRoot(root)
+
+    const ssrHost = hostFromStaticMarkup(renderToStaticMarkup(
+      <ServerNodeRenderer
+        content={content}
+        final
+        streamingComponents={streamingComponents}
+      />,
+    ))
+
+    expect(ssrHost.querySelector('h1')?.textContent).toBe('Native heading')
+    expect(ssrHost.querySelector('h1 [data-streaming-text]')).toBeNull()
+    expect(Array.from(ssrHost.querySelectorAll('[data-streaming-text]')).map(el => el.textContent)).toEqual(['Custom text'])
+    expect(ssrHost.querySelector('[data-streaming-heading]')?.textContent).toBe('Custom heading')
+  })
+
+  it('uses htmlComponents for tags parsed through customHtmlTags and parseOptions', async () => {
+    function Badge(props: React.PropsWithChildren<{ kind?: string, node?: unknown }>) {
+      return <span data-direct-badge={props.kind}>{props.children}</span>
+    }
+    function Callout(props: React.PropsWithChildren<{ tone?: string, node?: unknown }>) {
+      return <section data-option-callout={props.tone}>{props.children}</section>
+    }
+
+    const content = [
+      '<badge kind="direct">Direct</badge>',
+      '',
+      '<callout tone="option">Option</callout>',
+    ].join('\n')
+
+    const { host, root } = await renderIntoRoot(
+      <NodeRenderer
+        content={content}
+        customHtmlTags={['badge']}
+        final
+        htmlComponents={{ badge: Badge, callout: Callout }}
+        parseOptions={{ customHtmlTags: ['callout'] }}
+        smoothStreaming={false}
+      />,
+    )
+
+    expect(host.querySelector('[data-direct-badge="direct"]')?.textContent).toBe('Direct')
+    expect(host.querySelector('[data-option-callout="option"]')?.textContent).toBe('Option')
+
+    await unmountRoot(root)
+
+    const ssrHost = hostFromStaticMarkup(renderToStaticMarkup(
+      <ServerNodeRenderer
+        content={content}
+        customHtmlTags={['badge']}
+        final
+        htmlComponents={{ badge: Badge, callout: Callout }}
+        parseOptions={{ customHtmlTags: ['callout'] }}
+      />,
+    ))
+
+    expect(ssrHost.querySelector('[data-direct-badge="direct"]')?.textContent).toBe('Direct')
+    expect(ssrHost.querySelector('[data-option-callout="option"]')?.textContent).toBe('Option')
+  })
+
+  it('prefers htmlComponents before trusted structured html wrappers', async () => {
+    function Card(props: React.PropsWithChildren<{ tone?: string }>) {
+      return <section data-card={props.tone}>{props.children}</section>
+    }
+
+    const content = '<card tone="warm">\n\n- item\n\n</card>'
+    const { host, root } = await renderIntoRoot(
+      <NodeRenderer
+        content={content}
+        final
+        htmlComponents={{ card: Card }}
+        htmlPolicy="trusted"
+        smoothStreaming={false}
+      />,
+    )
+
+    expect(host.querySelector('[data-card="warm"] li')?.textContent).toBe('item')
+    expect(host.querySelector('card')).toBeNull()
+
+    await unmountRoot(root)
+
+    const ssrHost = hostFromStaticMarkup(renderToStaticMarkup(
+      <ServerNodeRenderer
+        content={content}
+        final
+        htmlComponents={{ card: Card }}
+        htmlPolicy="trusted"
+      />,
+    ))
+
+    expect(ssrHost.querySelector('[data-card="warm"] li')?.textContent).toBe('item')
+    expect(ssrHost.querySelector('card')).toBeNull()
+  })
+
+  it('matches underscore html component tags on client and server', async () => {
+    function UnderscoreTag(props: React.PropsWithChildren<{ kind?: string }>) {
+      return <span data-underscore={props.kind}>{props.children}</span>
+    }
+
+    const content = '<div><my_component kind="ok">Under</my_component></div>'
+    const htmlComponents = { my_component: UnderscoreTag }
+    const { host, root } = await renderIntoRoot(
+      <NodeRenderer
+        content={content}
+        final
+        htmlComponents={htmlComponents}
+        smoothStreaming={false}
+      />,
+    )
+
+    expect(host.querySelector('[data-underscore="ok"]')?.textContent).toBe('Under')
+
+    await unmountRoot(root)
+
+    const ssrHost = hostFromStaticMarkup(renderToStaticMarkup(
+      <ServerNodeRenderer
+        content={content}
+        final
+        htmlComponents={htmlComponents}
+      />,
+    ))
+
+    expect(ssrHost.querySelector('[data-underscore="ok"]')?.textContent).toBe('Under')
+  })
+
+  it('keeps normalized inline component maps stable across renders', async () => {
+    let renders = 0
+    function DocumentLink(props: NodeComponentProps<DocumentLinkNode>) {
+      renders++
+      return <span data-stable-map>{props.node.content}</span>
+    }
+
+    const content = '<DocumentLink>Stable</DocumentLink>'
+    const { host, root } = await renderIntoRoot(
+      <NodeRenderer
+        content={content}
+        final
+        smoothStreaming={false}
+        streamingComponents={{ DocumentLink }}
+      />,
+    )
+
+    expect(host.querySelector('[data-stable-map]')?.textContent).toBe('Stable')
+    expect(renders).toBe(1)
+
+    await updateRoot(
+      root,
+      <NodeRenderer
+        content={content}
+        final
+        smoothStreaming={false}
+        streamingComponents={{ DocumentLink }}
+      />,
+    )
+
+    expect(renders).toBe(1)
+
+    await unmountRoot(root)
+  })
+
+  it('does not coerce legacy custom component html attrs', async () => {
+    const scopeId = 'react-local-component-legacy-attrs'
+    const seen: Array<{ width?: unknown }> = []
+    function LegacyBadge(props: React.PropsWithChildren<{ width?: unknown }>) {
+      seen.push(props)
+      return <span data-legacy-width={String(props.width)}>{props.children}</span>
+    }
+
+    setCustomComponents(scopeId, { legacybadge: LegacyBadge as any })
+    try {
+      const { host, root } = await renderIntoRoot(
+        <NodeRenderer
+          customId={scopeId}
+          content={'<legacybadge width="001">Legacy</legacybadge>'}
+          final
+          smoothStreaming={false}
+        />,
+      )
+
+      expect(host.querySelector('[data-legacy-width="001"]')?.textContent).toBe('Legacy')
+      expect(seen.at(-1)?.width).toBe('001')
+
+      await unmountRoot(root)
+      seen.length = 0
+
+      const ssrHtml = renderToStaticMarkup(
+        <ServerNodeRenderer
+          customId={scopeId}
+          content={'<legacybadge width="001">Legacy</legacybadge>'}
+          final
+        />,
+      )
+
+      expect(ssrHtml).toContain('data-legacy-width="001"')
+      expect(seen.at(-1)?.width).toBe('001')
+    }
+    finally {
+      removeCustomComponents(scopeId)
+    }
   })
 
   it('supports streamingComponents and htmlComponents during SSR without registry', () => {

@@ -15,6 +15,11 @@ import {
 export type { HtmlToken } from 'stream-markdown-parser'
 
 type HtmlReactComponentMap = Record<string, ComponentType<any>>
+type HtmlReactPropComponentMap = Record<string, ComponentType<any>>
+
+interface HtmlToReactOptions {
+  propComponents?: HtmlReactPropComponentMap
+}
 
 function normalizeCssPropName(prop: string) {
   if (prop.startsWith('--'))
@@ -98,10 +103,28 @@ function pushRenderedNode(target: ReactNode[], rendered: ReactNode | ReactNode[]
     target.push(rendered)
 }
 
+function shouldUseHtmlPropContract(
+  tagName: string,
+  options: HtmlToReactOptions,
+) {
+  return Boolean(options.propComponents?.[tagName] || options.propComponents?.[tagName.toLowerCase()])
+}
+
+function getCustomComponentProps(
+  tagName: string,
+  attrs: Record<string, string>,
+  options: HtmlToReactOptions,
+) {
+  return shouldUseHtmlPropContract(tagName, options)
+    ? convertHtmlAttrsToProps(attrs)
+    : attrs
+}
+
 export function parseHtmlToReactNodes(
   content: string,
   customComponents: HtmlReactComponentMap,
   htmlPolicy: HtmlPolicy = 'safe',
+  options: HtmlToReactOptions = {},
 ): ReactNode[] | null {
   if (!content)
     return []
@@ -147,7 +170,8 @@ export function parseHtmlToReactNodes(
           : undefined
         const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
         if (Comp) {
-          target.push(React.createElement(Comp as ComponentType<Record<string, unknown>>, { ...convertHtmlAttrsToProps(attrs), key: elementKey }))
+          const componentProps = getCustomComponentProps(token.tagName, attrs, options)
+          target.push(React.createElement(Comp as ComponentType<Record<string, unknown>>, { ...componentProps, key: elementKey }))
         }
         else {
           target.push(React.createElement(token.tagName, {
@@ -197,7 +221,7 @@ export function parseHtmlToReactNodes(
         ? (customComponents[opening.tagName] || customComponents[opening.tagName.toLowerCase()])
         : undefined
       const element = Comp
-        ? React.createElement(Comp as ComponentType<Record<string, unknown>>, { ...convertHtmlAttrsToProps(attrs), key: elementKey }, ...opening.children)
+        ? React.createElement(Comp as ComponentType<Record<string, unknown>>, { ...getCustomComponentProps(opening.tagName, attrs, options), key: elementKey }, ...opening.children)
         : React.createElement(opening.tagName, {
             ...normalizeDomAttrs(attrs),
             key: elementKey,
@@ -229,7 +253,7 @@ export function parseHtmlToReactNodes(
         ? (customComponents[unclosed.tagName] || customComponents[unclosed.tagName.toLowerCase()])
         : undefined
       const element = Comp
-        ? React.createElement(Comp as ComponentType<Record<string, unknown>>, { ...convertHtmlAttrsToProps(attrs), key: elementKey }, ...unclosed.children)
+        ? React.createElement(Comp as ComponentType<Record<string, unknown>>, { ...getCustomComponentProps(unclosed.tagName, attrs, options), key: elementKey }, ...unclosed.children)
         : React.createElement(unclosed.tagName, {
             ...normalizeDomAttrs(attrs),
             key: elementKey,

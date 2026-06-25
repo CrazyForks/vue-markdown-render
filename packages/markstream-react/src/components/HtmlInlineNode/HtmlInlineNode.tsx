@@ -31,10 +31,6 @@ function logError(message: string, err: unknown) {
     console.error(message, err)
 }
 
-function convertAttrsToProps(attrs: Record<string, string>): Record<string, any> {
-  return convertHtmlAttrsToProps(attrs)
-}
-
 function renderLiteralTagText(tagName: string, attrs?: Record<string, string>, isSelfClosing = false) {
   const pairs = Object.entries(attrs ?? {})
   const serializedAttrs = pairs.length > 0
@@ -52,6 +48,23 @@ function pushRenderedNode(target: React.ReactNode[], rendered: React.ReactNode |
     target.push(rendered)
 }
 
+function shouldUseHtmlPropContract(
+  tagName: string,
+  propComponents?: Record<string, ComponentType<any>>,
+) {
+  return Boolean(propComponents?.[tagName] || propComponents?.[tagName.toLowerCase()])
+}
+
+function getCustomComponentProps(
+  tagName: string,
+  attrs: Record<string, string>,
+  propComponents?: Record<string, ComponentType<any>>,
+) {
+  return shouldUseHtmlPropContract(tagName, propComponents)
+    ? convertHtmlAttrsToProps(attrs)
+    : attrs
+}
+
 /**
  * Build React element tree from tokens
  */
@@ -59,6 +72,7 @@ function buildReactElementTree(
   tokens: HtmlToken[],
   customComponents: Record<string, ComponentType<any>>,
   htmlPolicy: HtmlPolicy = 'safe',
+  propComponents?: Record<string, ComponentType<any>>,
 ): React.ReactNode[] {
   let autoKeySeed = 0
   const stack: Array<{
@@ -87,7 +101,7 @@ function buildReactElementTree(
         target.push(renderLiteralTagText(token.tagName!, token.attrs || {}, true))
         continue
       }
-      const element = createReactElement(token.tagName!, token.attrs || {}, [], customComponents, `ms-html-${autoKeySeed++}`, htmlPolicy)
+      const element = createReactElement(token.tagName!, token.attrs || {}, [], customComponents, `ms-html-${autoKeySeed++}`, htmlPolicy, propComponents)
       const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
       pushRenderedNode(target, element)
     }
@@ -131,7 +145,7 @@ function buildReactElementTree(
             ]
           }
           else {
-            element = createReactElement(opening.tagName, opening.attrs || {}, opening.children, customComponents, `ms-html-${autoKeySeed++}`, htmlPolicy)
+            element = createReactElement(opening.tagName, opening.attrs || {}, opening.children, customComponents, `ms-html-${autoKeySeed++}`, htmlPolicy, propComponents)
           }
 
           if (stack.length > 0)
@@ -167,7 +181,7 @@ function buildReactElementTree(
       ]
     }
     else {
-      element = createReactElement(unclosed.tagName, unclosed.attrs || {}, unclosed.children, customComponents, `ms-html-${autoKeySeed++}`, htmlPolicy)
+      element = createReactElement(unclosed.tagName, unclosed.attrs || {}, unclosed.children, customComponents, `ms-html-${autoKeySeed++}`, htmlPolicy, propComponents)
     }
     pushRenderedNode(rootNodes, element)
     warn(`Auto-closing unclosed tag: <${unclosed.tagName}>`)
@@ -186,6 +200,7 @@ function createReactElement(
   customComponents: Record<string, ComponentType<any>>,
   autoKey: string,
   htmlPolicy: HtmlPolicy,
+  propComponents?: Record<string, ComponentType<any>>,
 ): React.ReactNode {
   const customComponent = isCustomHtmlComponent(tagName, customComponents)
   if (BLOCKED_TAGS.has(tagName.toLowerCase()) || (!customComponent && isHtmlTagHardBlocked(tagName, htmlPolicy)))
@@ -206,8 +221,8 @@ function createReactElement(
   if (customComponent) {
     // It's a custom React component
     const component = customComponents[tagName] || customComponents[tagName.toLowerCase()]
-    const convertedAttrs = convertAttrsToProps(sanitizedAttrs)
-    return React.createElement(component as ComponentType<Record<string, unknown>>, { ...convertedAttrs, key: elementKey }, ...children)
+    const componentProps = getCustomComponentProps(tagName, sanitizedAttrs, propComponents)
+    return React.createElement(component as ComponentType<Record<string, unknown>>, { ...componentProps, key: elementKey }, ...children)
   }
   else {
     // It's a standard HTML element
@@ -222,13 +237,14 @@ function parseHtmlToReactNodes(
   content: string,
   customComponents: Record<string, ComponentType<any>>,
   htmlPolicy: HtmlPolicy = 'safe',
+  propComponents?: Record<string, ComponentType<any>>,
 ): React.ReactNode[] | null {
   if (!content)
     return []
 
   try {
     const tokens = tokenizeHtml(content)
-    const nodes = buildReactElementTree(tokens, customComponents, htmlPolicy)
+    const nodes = buildReactElementTree(tokens, customComponents, htmlPolicy, propComponents)
     return nodes
   }
   catch (error) {
@@ -275,7 +291,7 @@ export function HtmlInlineNode(props: NodeComponentProps<{
       return { mode: 'html', content }
 
     // Parse and build React element tree
-    const nodes = parseHtmlToReactNodes(content, customComponents, htmlPolicy)
+    const nodes = parseHtmlToReactNodes(content, customComponents, htmlPolicy, props.ctx?.htmlComponents)
     if (nodes === null)
       return { mode: 'html', content } // Fallback to dangerouslySetInnerHTML if parsing fails
 

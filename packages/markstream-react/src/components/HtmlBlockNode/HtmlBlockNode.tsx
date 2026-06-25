@@ -2,7 +2,7 @@ import type { HtmlPolicy, ParsedNode } from 'stream-markdown-parser'
 import type { CustomComponentMap } from '../../customComponents'
 import type { NodeComponentProps } from '../../types/node-component'
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { isHtmlTagBlocked, NON_STRUCTURING_HTML_TAGS, sanitizeHtmlContent, sanitizeHtmlTokenAttrs } from 'stream-markdown-parser'
+import { convertHtmlAttrsToProps, isHtmlTagBlocked, NON_STRUCTURING_HTML_TAGS, normalizeCustomHtmlTagName, sanitizeHtmlContent, sanitizeHtmlTokenAttrs, tokenAttrsToRecord } from 'stream-markdown-parser'
 import { useViewportPriority } from '../../context/viewportPriority'
 import { getCustomComponentsRevision, getCustomNodeComponents, subscribeCustomComponents } from '../../customComponents'
 import { renderNodeChildren, tokenAttrsToProps } from '../../renderers/renderChildren'
@@ -101,10 +101,14 @@ export function HtmlBlockNode(props: NodeComponentProps<{
     return rawAttrs ? normalizeDomAttrs(rawAttrs as Record<string, string>) : undefined
   }, [htmlPolicy, node.attrs])
   const structuredTag = useMemo(() => String(node.tag ?? '').trim(), [node.tag])
+  const normalizedStructuredTag = useMemo(() => normalizeCustomHtmlTagName(structuredTag), [structuredTag])
   const structuredBoundAttrs = useMemo(() => {
     const rawAttrs = tokenAttrsToProps(sanitizeHtmlTokenAttrs(node.attrs ?? undefined, htmlPolicy, structuredTag))
     return rawAttrs ? normalizeDomAttrs(rawAttrs as Record<string, string>) : undefined
   }, [htmlPolicy, node.attrs, structuredTag])
+  const structuredHtmlComponentProps = useMemo(() => {
+    return convertHtmlAttrsToProps(tokenAttrsToRecord(sanitizeHtmlTokenAttrs(node.attrs ?? undefined, htmlPolicy, normalizedStructuredTag)))
+  }, [htmlPolicy, node.attrs, normalizedStructuredTag])
   const structuredChildren = useMemo(() => Array.isArray(node.children) ? node.children : [], [node.children])
   const isStructured = structuredChildren.length > 0
     && !!structuredTag
@@ -127,8 +131,10 @@ export function HtmlBlockNode(props: NodeComponentProps<{
   const reactNodes = useMemo(() => {
     if (!useDynamic || !node.content)
       return null
-    return parseHtmlToReactNodes(node.content, effectiveCustomComponents, htmlPolicy)
-  }, [effectiveCustomComponents, htmlPolicy, node.content, useDynamic])
+    return parseHtmlToReactNodes(node.content, effectiveCustomComponents, htmlPolicy, {
+      propComponents: props.ctx?.htmlComponents,
+    })
+  }, [effectiveCustomComponents, htmlPolicy, node.content, props.ctx?.htmlComponents, useDynamic])
   const safeHtmlContent = useMemo(() => sanitizeHtmlContent(renderContent ?? '', htmlPolicy), [htmlPolicy, renderContent])
   const structuredContent = useMemo(() => {
     if (!isStructured || !props.ctx || !props.renderNode)
@@ -140,6 +146,9 @@ export function HtmlBlockNode(props: NodeComponentProps<{
       props.renderNode,
     )
   }, [isStructured, props.ctx, props.indexKey, props.renderNode, structuredChildren])
+  const StructuredHtmlComponent = normalizedStructuredTag
+    ? props.ctx?.htmlComponents?.[normalizedStructuredTag]
+    : undefined
 
   const placeholderNode = (
     <div className="html-block-node__placeholder">
@@ -152,6 +161,14 @@ export function HtmlBlockNode(props: NodeComponentProps<{
       )}
     </div>
   )
+
+  if (isStructured && StructuredHtmlComponent) {
+    return React.createElement(
+      StructuredHtmlComponent as any,
+      structuredHtmlComponentProps,
+      structuredContent,
+    )
+  }
 
   if (isStructured) {
     return React.createElement(

@@ -92,8 +92,6 @@ export const SAFE_ALLOWED_HTML_TAGS = new Set<string>([
   'ul',
 ])
 
-const CUSTOM_TAG_REGEX = /<([a-z][a-z0-9-]*)\b[^>]*>/gi
-
 function hasOwn(obj: Record<string, unknown>, key: string) {
   return Object.prototype.hasOwnProperty.call(obj, key)
 }
@@ -539,10 +537,8 @@ export function hasCustomHtmlComponents(
     return false
   if (!customComponents || Object.keys(customComponents).length === 0)
     return false
-  CUSTOM_TAG_REGEX.lastIndex = 0
-  let match: RegExpExecArray | null
-  while ((match = CUSTOM_TAG_REGEX.exec(content)) !== null) {
-    if (isCustomHtmlComponentTag(match[1], customComponents))
+  for (const token of tokenizeHtml(content)) {
+    if ((token.type === 'tag_open' || token.type === 'self_closing') && isCustomHtmlComponentTag(token.tagName ?? '', customComponents))
       return true
   }
   return false
