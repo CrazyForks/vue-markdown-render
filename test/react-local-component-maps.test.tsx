@@ -369,6 +369,45 @@ describe('react local component maps', () => {
     expect(ssrHost.querySelector('[data-option-callout="option"]')?.textContent).toBe('Option')
   })
 
+  it('passes empty children to self-closing parser-backed htmlComponents', async () => {
+    const seen: Array<React.PropsWithChildren<{ kind?: string }>> = []
+    function Badge(props: React.PropsWithChildren<{ kind?: string }>) {
+      seen.push(props)
+      return <span data-self-closing-badge={props.kind}>{Array.isArray(props.children) ? props.children.length : String(props.children ?? '')}</span>
+    }
+
+    const element = (
+      <NodeRenderer
+        content={'<badge kind="info" />'}
+        customHtmlTags={['badge']}
+        final
+        htmlComponents={{ badge: Badge }}
+        smoothStreaming={false}
+      />
+    )
+    const { host, root } = await renderIntoRoot(element)
+
+    expect(host.querySelector('[data-self-closing-badge="info"]')?.textContent).toBe('')
+    expect(seen.at(-1)?.children).toBe('')
+    expect(seen.at(-1)?.children).not.toBe('<badge kind="info" />')
+
+    await unmountRoot(root)
+    seen.length = 0
+
+    const ssrHtml = renderToStaticMarkup(
+      <ServerNodeRenderer
+        content={'<badge kind="info" />'}
+        customHtmlTags={['badge']}
+        final
+        htmlComponents={{ badge: Badge }}
+      />,
+    )
+
+    expect(ssrHtml).toContain('data-self-closing-badge="info"')
+    expect(seen.at(-1)?.children).toBe('')
+    expect(seen.at(-1)?.children).not.toBe('<badge kind="info" />')
+  })
+
   it('prefers htmlComponents before trusted structured html wrappers', async () => {
     function Card(props: React.PropsWithChildren<{ tone?: string }>) {
       return <section data-card={props.tone}>{props.children}</section>
@@ -571,6 +610,42 @@ describe('react local component maps', () => {
     expect(ssrHost.querySelector('p [data-html-card]')).toBeNull()
     expect(ssrHost.querySelectorAll('p.paragraph-node')[0]?.textContent.trim()).toBe('before')
     expect(ssrHost.querySelectorAll('p.paragraph-node')[1]?.textContent.trim()).toBe('after')
+  })
+
+  it('does not let htmlComponents block display split escaped raw html nodes', async () => {
+    const Card = withMarkstreamComponentDisplay((props: React.PropsWithChildren) => (
+      <div data-escape-card>{props.children}</div>
+    ), 'block')
+    const content = 'before <card>content</card> after'
+    const htmlComponents = { card: Card }
+    const { host, root } = await renderIntoRoot(
+      <NodeRenderer
+        content={content}
+        final
+        htmlComponents={htmlComponents}
+        htmlPolicy="escape"
+        smoothStreaming={false}
+      />,
+    )
+
+    expect(host.querySelectorAll('p.paragraph-node')).toHaveLength(1)
+    expect(host.querySelector('[data-escape-card]')).toBeNull()
+    expect(host.querySelector('p.paragraph-node')?.textContent).toBe(content)
+
+    await unmountRoot(root)
+
+    const ssrHost = hostFromStaticMarkup(renderToStaticMarkup(
+      <ServerNodeRenderer
+        content={content}
+        final
+        htmlComponents={htmlComponents}
+        htmlPolicy="escape"
+      />,
+    ))
+
+    expect(ssrHost.querySelectorAll('p.paragraph-node')).toHaveLength(1)
+    expect(ssrHost.querySelector('[data-escape-card]')).toBeNull()
+    expect(ssrHost.querySelector('p.paragraph-node')?.textContent).toBe(content)
   })
 
   it('passes fade to server-side streaming and coerced custom components', () => {

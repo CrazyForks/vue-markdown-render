@@ -163,7 +163,7 @@ function renderHtmlComponentForCustomTagNode(
 ) {
   const attrs = sanitizeHtmlTokenAttrs((node as any).attrs ?? undefined, ctx.htmlPolicy ?? 'safe', tag)
   const props = convertHtmlAttrsToProps(tokenAttrsToRecord(attrs))
-  const children = Array.isArray((node as any).children) && (node as any).children.length > 0
+  const children = Array.isArray((node as any).children)
     ? renderNodeChildren((node as any).children, ctx, `${String(key)}-html`, renderNode)
     : ((node as any).content ?? null)
 

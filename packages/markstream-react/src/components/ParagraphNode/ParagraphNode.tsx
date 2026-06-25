@@ -94,7 +94,9 @@ export function ParagraphNode(props: NodeComponentProps<{ type: 'paragraph', chi
   }
 
   nodeChildren.forEach((child, childIndex) => {
-    if (BLOCK_LEVEL_TYPES.has(child.type) || isParagraphBreakingCustomHtmlNode(child, displayComponents, ctx.customHtmlTags)) {
+    const canUseHtmlDisplayMetadata = (ctx.htmlPolicy ?? 'safe') !== 'escape'
+      || (child.type !== 'html_inline' && child.type !== 'html_block')
+    if (BLOCK_LEVEL_TYPES.has(child.type) || (canUseHtmlDisplayMetadata && isParagraphBreakingCustomHtmlNode(child, displayComponents, ctx.customHtmlTags))) {
       flushInline()
       parts.push(
         <React.Fragment key={`${String(indexKey ?? 'paragraph')}-block-${childIndex}`}>

@@ -17,6 +17,8 @@ export interface HtmlToken {
   content?: string
 }
 
+const HTML_TOKEN_TAG_NAME_RE = /^([a-z][\w-]*)(?=[\t\n\f\r />]|$)/i
+
 const SAFE_BLOCKED_HTML_TAGS = new Set<string>([
   ...BLOCKED_HTML_TAGS,
   'base',
@@ -155,6 +157,21 @@ function serializeAttrs(attrs: Record<string, string>): string {
   return pairs
     .map(([name, value]) => value === '' ? ` ${name}` : ` ${name}="${escapeAttr(value)}"`)
     .join('')
+}
+
+function parseHtmlTokenTag(rawContent: string) {
+  const isClosing = rawContent.startsWith('/')
+  const source = isClosing ? rawContent.slice(1) : rawContent
+  const match = source.match(HTML_TOKEN_TAG_NAME_RE)
+  if (!match)
+    return null
+
+  return {
+    attrsStr: isClosing ? '' : source.slice(match[0].length).trimStart(),
+    isClosing,
+    isSelfClosing: !isClosing && rawContent.trimEnd().endsWith('/'),
+    tagName: match[1],
+  }
 }
 
 function isUnsafeSrcset(value: string, tagName?: string) {
@@ -368,32 +385,25 @@ export function tokenizeHtml(html: string): HtmlToken[] {
     if (tagEnd === -1)
       break
 
-    const tagContent = html.slice(tagStart + 1, tagEnd).trim()
-    const isClosingTag = tagContent.startsWith('/')
-    const isSelfClosing = tagContent.endsWith('/')
+    const tagContent = html.slice(tagStart + 1, tagEnd)
+    const parsedTag = parseHtmlTokenTag(tagContent)
+    if (!parsedTag) {
+      const rawTag = html.slice(tagStart, tagEnd + 1)
+      if (isMeaningfulText(rawTag))
+        tokens.push({ type: 'text', content: rawTag })
+      pos = tagEnd + 1
+      continue
+    }
 
-    if (isClosingTag) {
-      const tagName = tagContent.slice(1).trim()
-      tokens.push({ type: 'tag_close', tagName })
+    if (parsedTag.isClosing) {
+      tokens.push({ type: 'tag_close', tagName: parsedTag.tagName })
     }
     else {
-      const spaceIndex = tagContent.indexOf(' ')
-      let tagName: string
-      let attrsStr = ''
-
-      if (spaceIndex === -1) {
-        tagName = isSelfClosing ? tagContent.slice(0, -1).trim() : tagContent.trim()
-      }
-      else {
-        tagName = tagContent.slice(0, spaceIndex).trim()
-        attrsStr = tagContent.slice(spaceIndex + 1)
-      }
-
       const attrs: Record<string, string> = {}
-      if (attrsStr) {
+      if (parsedTag.attrsStr) {
         const attrRegex = /([^\s=]+)(?:=(?:"([^"]*)"|'([^']*)'|(\S*)))?/g
         let attrMatch: RegExpExecArray | null
-        while ((attrMatch = attrRegex.exec(attrsStr)) !== null) {
+        while ((attrMatch = attrRegex.exec(parsedTag.attrsStr)) !== null) {
           const name = attrMatch[1]
           const value = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? ''
           if (name && !name.endsWith('/'))
@@ -402,8 +412,8 @@ export function tokenizeHtml(html: string): HtmlToken[] {
       }
 
       tokens.push({
-        type: isSelfClosing || VOID_HTML_TAGS.has(tagName.toLowerCase()) ? 'self_closing' : 'tag_open',
-        tagName,
+        type: parsedTag.isSelfClosing || VOID_HTML_TAGS.has(parsedTag.tagName.toLowerCase()) ? 'self_closing' : 'tag_open',
+        tagName: parsedTag.tagName,
         attrs,
       })
     }
@@ -461,38 +471,25 @@ function tokenizeHtmlPreservingText(html: string): HtmlToken[] {
     if (tagEnd === -1)
       break
 
-    const tagContent = html.slice(tagStart + 1, tagEnd).trim()
-    if (!tagContent) {
+    const tagContent = html.slice(tagStart + 1, tagEnd)
+    const parsedTag = parseHtmlTokenTag(tagContent)
+    if (!parsedTag) {
+      tokens.push({ type: 'text', content: html.slice(tagStart, tagEnd + 1) })
       pos = tagEnd + 1
       continue
     }
 
-    const isClosingTag = tagContent.startsWith('/')
-    const isSelfClosing = tagContent.endsWith('/')
-
-    if (isClosingTag) {
-      const tagName = tagContent.slice(1).trim()
-      tokens.push({ type: 'tag_close', tagName })
+    if (parsedTag.isClosing) {
+      tokens.push({ type: 'tag_close', tagName: parsedTag.tagName })
       pos = tagEnd + 1
       continue
-    }
-
-    const spaceIndex = tagContent.indexOf(' ')
-    let tagName = ''
-    let attrsStr = ''
-    if (spaceIndex === -1) {
-      tagName = isSelfClosing ? tagContent.slice(0, -1).trim() : tagContent.trim()
-    }
-    else {
-      tagName = tagContent.slice(0, spaceIndex).trim()
-      attrsStr = tagContent.slice(spaceIndex + 1)
     }
 
     const attrs: Record<string, string> = {}
-    if (attrsStr) {
+    if (parsedTag.attrsStr) {
       const attrRegex = /([^\s=]+)(?:=(?:"([^"]*)"|'([^']*)'|(\S*)))?/g
       let attrMatch: RegExpExecArray | null
-      while ((attrMatch = attrRegex.exec(attrsStr)) !== null) {
+      while ((attrMatch = attrRegex.exec(parsedTag.attrsStr)) !== null) {
         const name = attrMatch[1]
         const value = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? ''
         if (name && !name.endsWith('/'))
@@ -501,8 +498,8 @@ function tokenizeHtmlPreservingText(html: string): HtmlToken[] {
     }
 
     tokens.push({
-      type: isSelfClosing || VOID_HTML_TAGS.has(tagName.toLowerCase()) ? 'self_closing' : 'tag_open',
-      tagName,
+      type: parsedTag.isSelfClosing || VOID_HTML_TAGS.has(parsedTag.tagName.toLowerCase()) ? 'self_closing' : 'tag_open',
+      tagName: parsedTag.tagName,
       attrs,
     })
 

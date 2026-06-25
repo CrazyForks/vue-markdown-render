@@ -191,7 +191,7 @@ function renderHtmlComponentForCustomTagNode(
 ) {
   const attrs = sanitizeHtmlTokenAttrs((node as any).attrs ?? undefined, ctx.htmlPolicy ?? 'safe', tag)
   const props = convertHtmlAttrsToProps(tokenAttrsToRecord(attrs))
-  const children = Array.isArray((node as any).children) && (node as any).children.length > 0
+  const children = Array.isArray((node as any).children)
     ? renderNodeChildren((node as any).children, ctx, `${String(key)}-html`, renderNode)
     : ((node as any).content ?? null)
 
@@ -476,7 +476,9 @@ export function ParagraphNode(props: NodeComponentProps<{ type: 'paragraph', chi
   }
 
   nodeChildren.forEach((child, childIndex) => {
-    if (BLOCK_LEVEL_TYPES.has(child.type) || isParagraphBreakingCustomHtmlNode(child, displayComponents, ctx.customHtmlTags)) {
+    const canUseHtmlDisplayMetadata = (ctx.htmlPolicy ?? 'safe') !== 'escape'
+      || (child.type !== 'html_inline' && child.type !== 'html_block')
+    if (BLOCK_LEVEL_TYPES.has(child.type) || (canUseHtmlDisplayMetadata && isParagraphBreakingCustomHtmlNode(child, displayComponents, ctx.customHtmlTags))) {
       flushInline()
       parts.push(
         <React.Fragment key={`${String(indexKey ?? 'paragraph')}-block-${childIndex}`}>
