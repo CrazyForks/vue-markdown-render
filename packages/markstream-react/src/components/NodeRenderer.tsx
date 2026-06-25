@@ -1,6 +1,7 @@
 import type { ParsedNode } from 'stream-markdown-parser'
 import type { StreamStateRef } from '../context/streamState'
 import type { VisibilityHandle } from '../context/viewportPriority'
+import type { HtmlComponentMap, StreamingComponentMap } from '../customComponents'
 import type { NodeRendererProps, RenderContext } from '../types'
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
@@ -806,7 +807,10 @@ function areNodeRendererInnerPropsEqual(prev: NodeRendererInnerProps, next: Node
 
 const MemoNodeRendererInner = React.memo(NodeRendererInner, areNodeRendererInnerPropsEqual)
 
-export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
+export function NodeRenderer<
+  TStreamingComponents extends StreamingComponentMap = StreamingComponentMap,
+  THtmlComponents extends Record<string, any> = HtmlComponentMap,
+>(rawProps: NodeRendererProps<TStreamingComponents, THtmlComponents>) {
   const props = { ...DEFAULT_PROPS, ...rawProps } as ResolvedProps
   const containerRef = useRef<HTMLDivElement | null>(null)
   const desiredThemeKeyRef = useRef<string | null>(null)

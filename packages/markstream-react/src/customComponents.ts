@@ -13,19 +13,32 @@ export type StreamingComponentMap = Record<string, StreamingComponent<any>>
 export type HtmlComponent<P extends object = any> = ComponentType<PropsWithChildren<P>>
 export type HtmlComponentMap = Record<string, ComponentType<any>>
 
-type StreamingComponentDefinitions<T extends Record<string, ComponentType<any>>> = {
-  [K in keyof T]: T[K] extends ComponentType<infer P>
-    ? P extends NodeComponentProps<any>
+type IsAny<T> = 0 extends (1 & T) ? true : false
+type ComponentProps<T> = T extends ComponentType<infer P>
+  ? P
+  : T extends (props: infer P) => any
+    ? P
+    : never
+
+export type StreamingComponentDefinitions<T extends Record<string, any>> = {
+  [K in keyof T]: ComponentProps<T[K]> extends infer P
+    ? IsAny<P> extends true
       ? T[K]
-      : never
+      : P extends NodeComponentProps<any>
+        ? NodeComponentProps<any> extends P
+          ? T[K]
+          : never
+        : never
     : never
 }
 
-type HtmlComponentDefinitions<T extends Record<string, ComponentType<any>>> = {
-  [K in keyof T]: T[K] extends ComponentType<infer P>
-    ? 'node' extends keyof P
-      ? never
-      : T[K]
+export type HtmlComponentDefinitions<T extends Record<string, any>> = {
+  [K in keyof T]: ComponentProps<T[K]> extends infer P
+    ? IsAny<P> extends true
+      ? T[K]
+      : 'node' extends keyof P
+        ? never
+        : T[K]
     : never
 }
 

@@ -161,7 +161,7 @@ function App() {
 ```tsx
 import type { NodeComponentProps } from 'markstream-react'
 import type React from 'react'
-import MarkdownRender from 'markstream-react'
+import MarkdownRender, { defineHtmlComponents, defineStreamingComponents } from 'markstream-react'
 
 interface DocumentLinkNode {
   type: 'documentlink'
@@ -190,12 +190,24 @@ function Badge({ kind, children }: React.PropsWithChildren<{ kind?: string }>) {
   return <span data-kind={kind}>{children}</span>
 }
 
-<MarkdownRender
-  content={content}
-  final={isDone}
-  streamingComponents={{ documentlink: DocumentLink }}
-  htmlComponents={{ badge: Badge }}
-/>
+const streamingComponents = defineStreamingComponents({
+  documentlink: DocumentLink,
+})
+
+const htmlComponents = defineHtmlComponents({
+  badge: Badge,
+})
+
+function App({ content, isDone }: { content: string, isDone: boolean }) {
+  return (
+    <MarkdownRender
+      content={content}
+      final={isDone}
+      streamingComponents={streamingComponents}
+      htmlComponents={htmlComponents}
+    />
+  )
+}
 ```
 
 `customHtmlTags` 仍然可以作为更底层的 parser 选项使用。`setCustomComponents` 和 `customId` 也继续支持，用于兼容旧代码、应用级共享注册，以及已有 AST 节点覆盖。如果同一个归一化 tag 同时出现在 `streamingComponents` 和 `htmlComponents` 中，`streamingComponents` 会胜出，并在开发环境只告警一次。

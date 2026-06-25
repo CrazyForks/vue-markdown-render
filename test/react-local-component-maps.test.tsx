@@ -670,6 +670,87 @@ describe('react local component maps', () => {
     expect(seen.find(props => getAttr(props.node.attrs, 'id') === 'block')?.node.children?.map(child => child.type)).toEqual(['text', 'html_inline'])
   })
 
+  it('preserves raw attrs and source for streamingComponents nested inside pre-parsed html nodes', async () => {
+    const seen: Array<NodeComponentProps<DocumentLinkNode>> = []
+    function DocumentLink(props: NodeComponentProps<DocumentLinkNode>) {
+      seen.push(props)
+      return (
+        <span
+          data-preparsed-streaming={getAttr(props.node.attrs, 'id') ?? ''}
+          data-preparsed-content={props.node.content}
+        >
+          {props.node.content}
+        </span>
+      )
+    }
+
+    const inlineNode = {
+      type: 'html_inline',
+      content: '<span><DocumentLink id="raw" style="color:red" href="javascript:alert(1)">Hello <strong>world</strong></DocumentLink></span>',
+      loading: true,
+    } as any
+    const structuredBlockNode = {
+      type: 'html_block',
+      tag: 'div',
+      content: '<div><DocumentLink id="structured">Structured <strong>world</strong></DocumentLink></div>',
+      children: [
+        {
+          type: 'documentlink',
+          tag: 'documentlink',
+          attrs: [['id', 'structured']],
+          content: 'Structured <strong>world</strong>',
+          children: [
+            { type: 'text', content: 'Structured ' },
+            {
+              type: 'html_inline',
+              tag: 'strong',
+              content: '<strong>world</strong>',
+              children: [{ type: 'text', content: 'world' }],
+            },
+          ],
+        },
+      ],
+    } as any
+    const streamingComponents = { documentlink: DocumentLink }
+    const { host, root } = await renderIntoRoot(
+      <NodeRenderer
+        final={false}
+        nodes={[inlineNode, structuredBlockNode]}
+        smoothStreaming={false}
+        streamingComponents={streamingComponents}
+      />,
+    )
+
+    const rawSeen = seen.find(props => getAttr(props.node.attrs, 'id') === 'raw')
+    const structuredSeen = seen.find(props => getAttr(props.node.attrs, 'id') === 'structured')
+    expect(host.querySelector('[data-preparsed-streaming="raw"]')?.getAttribute('data-preparsed-content')).toBe('Hello <strong>world</strong>')
+    expect(getAttr(rawSeen?.node.attrs, 'style')).toBe('color:red')
+    expect(getAttr(rawSeen?.node.attrs, 'href')).toBe('javascript:alert(1)')
+    expect(rawSeen?.node.content).toBe('Hello <strong>world</strong>')
+    expect(rawSeen?.node.loading).toBe(true)
+    expect(structuredSeen?.node.children?.map(child => child.type)).toEqual(['text', 'html_inline'])
+
+    await unmountRoot(root)
+    seen.length = 0
+
+    const ssrHost = hostFromStaticMarkup(renderToStaticMarkup(
+      <ServerNodeRenderer
+        final={false}
+        nodes={[inlineNode, structuredBlockNode]}
+        streamingComponents={streamingComponents}
+      />,
+    ))
+
+    const ssrRawSeen = seen.find(props => getAttr(props.node.attrs, 'id') === 'raw')
+    const ssrStructuredSeen = seen.find(props => getAttr(props.node.attrs, 'id') === 'structured')
+    expect(ssrHost.querySelector('[data-preparsed-streaming="raw"]')?.getAttribute('data-preparsed-content')).toBe('Hello <strong>world</strong>')
+    expect(getAttr(ssrRawSeen?.node.attrs, 'style')).toBe('color:red')
+    expect(getAttr(ssrRawSeen?.node.attrs, 'href')).toBe('javascript:alert(1)')
+    expect(ssrRawSeen?.node.content).toBe('Hello <strong>world</strong>')
+    expect(ssrRawSeen?.node.loading).toBe(true)
+    expect(ssrStructuredSeen?.node.children?.map(child => child.type)).toEqual(['text', 'html_inline'])
+  })
+
   it('keeps legacy custom component html attr contracts per render path', async () => {
     const scopeId = 'react-local-component-legacy-attrs'
     const seen: Array<{ width?: unknown, disabled?: unknown }> = []

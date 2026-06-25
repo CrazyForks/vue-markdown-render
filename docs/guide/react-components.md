@@ -161,7 +161,7 @@ Use `htmlComponents` when the component should render through the raw/dynamic HT
 ```tsx
 import type { NodeComponentProps } from 'markstream-react'
 import type React from 'react'
-import MarkdownRender from 'markstream-react'
+import MarkdownRender, { defineHtmlComponents, defineStreamingComponents } from 'markstream-react'
 
 interface DocumentLinkNode {
   type: 'documentlink'
@@ -190,12 +190,24 @@ function Badge({ kind, children }: React.PropsWithChildren<{ kind?: string }>) {
   return <span data-kind={kind}>{children}</span>
 }
 
-<MarkdownRender
-  content={content}
-  final={isDone}
-  streamingComponents={{ documentlink: DocumentLink }}
-  htmlComponents={{ badge: Badge }}
-/>
+const streamingComponents = defineStreamingComponents({
+  documentlink: DocumentLink,
+})
+
+const htmlComponents = defineHtmlComponents({
+  badge: Badge,
+})
+
+function App({ content, isDone }: { content: string, isDone: boolean }) {
+  return (
+    <MarkdownRender
+      content={content}
+      final={isDone}
+      streamingComponents={streamingComponents}
+      htmlComponents={htmlComponents}
+    />
+  )
+}
 ```
 
 `customHtmlTags` remains available as a lower-level parser option. `setCustomComponents` and `customId` remain supported for compatibility, shared application-level registration, and existing node overrides. If the same normalized tag appears in both `streamingComponents` and `htmlComponents`, `streamingComponents` wins and a development warning is emitted once.

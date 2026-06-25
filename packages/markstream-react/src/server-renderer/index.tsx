@@ -11,7 +11,7 @@ import type {
 import type { HtmlPreviewFrameProps } from '../components/CodeBlockNode/HtmlPreviewFrame'
 import type { MarkdownCodeBlockNodeProps } from '../components/MarkdownCodeBlockNode/MarkdownCodeBlockNode'
 import type { TooltipProps } from '../components/Tooltip/Tooltip'
-import type { CustomComponentMap } from '../customComponents'
+import type { CustomComponentMap, HtmlComponentMap, StreamingComponentMap } from '../customComponents'
 import type { NodeRendererProps, RenderContext } from '../types'
 import type {
   CodeBlockNodeProps,
@@ -1399,7 +1399,10 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
   }
 }
 
-export function NodeRenderer(props: NodeRendererProps) {
+export function NodeRenderer<
+  TStreamingComponents extends StreamingComponentMap = StreamingComponentMap,
+  THtmlComponents extends Record<string, any> = HtmlComponentMap,
+>(props: NodeRendererProps<TStreamingComponents, THtmlComponents>) {
   const customComponents = getCustomNodeComponents(props.customId)
   const streamingComponents = normalizeComponentMap(props.streamingComponents)
   const htmlComponents = normalizeComponentMap(props.htmlComponents)

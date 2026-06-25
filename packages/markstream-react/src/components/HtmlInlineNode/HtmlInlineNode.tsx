@@ -116,15 +116,17 @@ function renderNodeComponent(
   children: React.ReactNode[],
   key: string,
   options: HtmlInlineRenderOptions,
+  contentSource?: string,
+  rawSource?: string,
 ) {
   const normalizedTag = normalizeCustomHtmlTagName(tagName)
-  const content = getTextContent(children)
+  const content = contentSource ?? getTextContent(children)
   const node = {
     type: normalizedTag,
     tag: normalizedTag,
     attrs: attrsToTokenPairs(attrs),
     content,
-    raw: `${renderLiteralTagText(tagName, attrs)}${content}</${tagName}>`,
+    raw: rawSource ?? `${renderLiteralTagText(tagName, attrs)}${content}</${tagName}>`,
     loading: Boolean((options.sourceNode as any)?.loading),
     autoClosed: Boolean((options.sourceNode as any)?.autoClosed ?? (options.sourceNode as any)?.loading),
   } as ParsedNode
@@ -154,6 +156,7 @@ function buildReactElementTree(
     children: React.ReactNode[]
     attrs?: Record<string, string>
     hardBlocked?: boolean
+    sourceParts: string[]
     softBlocked?: boolean
     customComponent?: boolean
   }> = []
@@ -165,20 +168,28 @@ function buildReactElementTree(
         continue
       const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
       target.push(token.content!)
+      if (stack.length > 0)
+        stack[stack.length - 1].sourceParts.push(token.content!)
     }
     else if (token.type === 'self_closing') {
+      const rawAttrs = token.attrs || {}
+      const rawSource = renderLiteralTagText(token.tagName!, rawAttrs, true)
       const customComponent = isCustomHtmlComponent(token.tagName!, customComponents)
       const nodeComponent = Boolean(getNodeComponent(token.tagName!, options))
       if (BLOCKED_TAGS.has(token.tagName!.toLowerCase()) || (!customComponent && !nodeComponent && isHtmlTagHardBlocked(token.tagName, htmlPolicy)))
         continue
       if (!customComponent && !nodeComponent && isHtmlTagBlocked(token.tagName, htmlPolicy)) {
         const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
-        target.push(renderLiteralTagText(token.tagName!, token.attrs || {}, true))
+        target.push(rawSource)
+        if (stack.length > 0)
+          stack[stack.length - 1].sourceParts.push(rawSource)
         continue
       }
-      const element = createReactElement(token.tagName!, token.attrs || {}, [], customComponents, `${keyPrefix}-${autoKeySeed++}`, htmlPolicy, options)
+      const element = createReactElement(token.tagName!, rawAttrs, [], customComponents, `${keyPrefix}-${autoKeySeed++}`, htmlPolicy, options, '', rawSource)
       const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
       pushRenderedNode(target, element)
+      if (stack.length > 0)
+        stack[stack.length - 1].sourceParts.push(rawSource)
     }
     else if (token.type === 'tag_open') {
       const parentHardBlocked = stack.length > 0 && stack[stack.length - 1].hardBlocked
@@ -188,6 +199,7 @@ function buildReactElementTree(
         tagName: token.tagName!,
         children: [],
         attrs: token.attrs,
+        sourceParts: [],
         customComponent: customComponent || nodeComponent,
         hardBlocked: parentHardBlocked || BLOCKED_TAGS.has(token.tagName!.toLowerCase()) || (!customComponent && !nodeComponent && isHtmlTagHardBlocked(token.tagName, htmlPolicy)),
         softBlocked: !parentHardBlocked && !customComponent && !nodeComponent && isHtmlTagBlocked(token.tagName, htmlPolicy),
@@ -209,6 +221,8 @@ function buildReactElementTree(
         // Pop all tags until the matched one (auto-closing intermediate tags)
         while (stack.length > matchedIndex) {
           const opening = stack.pop()!
+          const innerSource = opening.sourceParts.join('')
+          const rawSource = `${renderLiteralTagText(opening.tagName, opening.attrs || {})}${innerSource}</${opening.tagName}>`
           let element: React.ReactNode | React.ReactNode[] | null
           if (opening.hardBlocked) {
             element = null
@@ -221,13 +235,15 @@ function buildReactElementTree(
             ]
           }
           else {
-            element = createReactElement(opening.tagName, opening.attrs || {}, opening.children, customComponents, `${keyPrefix}-${autoKeySeed++}`, htmlPolicy, options)
+            element = createReactElement(opening.tagName, opening.attrs || {}, opening.children, customComponents, `${keyPrefix}-${autoKeySeed++}`, htmlPolicy, options, innerSource, rawSource)
           }
 
           if (stack.length > 0)
             pushRenderedNode(stack[stack.length - 1].children, element)
           else
             pushRenderedNode(rootNodes, element)
+          if (stack.length > 0 && !opening.hardBlocked)
+            stack[stack.length - 1].sourceParts.push(rawSource)
 
           // Warn if auto-closing tags
           if (opening.tagName.toLowerCase() !== closingTag && stack.length > matchedIndex) {
@@ -245,6 +261,8 @@ function buildReactElementTree(
   // Handle any remaining unclosed tags
   while (stack.length > 0) {
     const unclosed = stack.pop()!
+    const innerSource = unclosed.sourceParts.join('')
+    const rawSource = `${renderLiteralTagText(unclosed.tagName, unclosed.attrs || {})}${innerSource}`
     let element: React.ReactNode | React.ReactNode[] | null
     if (unclosed.hardBlocked) {
       element = null
@@ -257,9 +275,11 @@ function buildReactElementTree(
       ]
     }
     else {
-      element = createReactElement(unclosed.tagName, unclosed.attrs || {}, unclosed.children, customComponents, `${keyPrefix}-${autoKeySeed++}`, htmlPolicy, options)
+      element = createReactElement(unclosed.tagName, unclosed.attrs || {}, unclosed.children, customComponents, `${keyPrefix}-${autoKeySeed++}`, htmlPolicy, options, innerSource, rawSource)
     }
     pushRenderedNode(rootNodes, element)
+    if (stack.length > 0 && !unclosed.hardBlocked)
+      stack[stack.length - 1].sourceParts.push(rawSource)
     warn(`Auto-closing unclosed tag: <${unclosed.tagName}>`)
   }
 
@@ -277,6 +297,8 @@ function createReactElement(
   autoKey: string,
   htmlPolicy: HtmlPolicy,
   options: HtmlInlineRenderOptions,
+  contentSource?: string,
+  rawSource?: string,
 ): React.ReactNode {
   const customComponent = isCustomHtmlComponent(tagName, customComponents)
   const nodeComponent = Boolean(getNodeComponent(tagName, options))
@@ -296,7 +318,7 @@ function createReactElement(
   const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : autoKey
 
   if (nodeComponent) {
-    return renderNodeComponent(tagName, sanitizedAttrs, children, String(elementKey), options)
+    return renderNodeComponent(tagName, attrs, children, String(elementKey), options, contentSource, rawSource)
   }
   else if (customComponent) {
     // It's a custom React component

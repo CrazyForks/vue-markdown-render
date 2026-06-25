@@ -22,11 +22,18 @@ function DocumentLink(props: NodeComponentProps<DocumentLinkNode>) {
   return <span>{props.node.content}</span>
 }
 
+function TenantDocumentLink(props: NodeComponentProps<DocumentLinkNode> & { tenantId: string }) {
+  return <span data-tenant-id={props.tenantId}>{props.node.content}</span>
+}
+
 function Badge({ kind, children }: React.PropsWithChildren<{ kind?: string }>) {
   return <span data-kind={kind}>{children}</span>
 }
 
-declare const NodeRenderer: React.ComponentType<NodeRendererProps>
+declare function NodeRenderer<
+  TStreamingComponents extends StreamingComponentMap = StreamingComponentMap,
+  THtmlComponents extends Record<string, any> = HtmlComponentMap,
+>(props: NodeRendererProps<TStreamingComponents, THtmlComponents>): React.ReactElement | null
 
 function RequiredLink({ url, children }: React.PropsWithChildren<{ url: string }>) {
   return <a href={url}>{children}</a>
@@ -55,6 +62,11 @@ defineStreamingComponents({
   badge: Badge,
 })
 
+defineStreamingComponents({
+  // @ts-expect-error streamingComponents cannot require props the renderer never supplies.
+  documentlink: TenantDocumentLink,
+})
+
 defineHtmlComponents({
   // @ts-expect-error htmlComponents must not require parser-backed props.node.
   documentlink: DocumentLink,
@@ -69,8 +81,32 @@ const rendererElement = (
   />
 )
 
+const wrongHtmlRendererElement = (
+  <NodeRenderer
+    content="<DocumentLink>typed</DocumentLink>"
+    final
+    htmlComponents={{
+      // @ts-expect-error htmlComponents must not receive parser-backed NodeComponentProps.
+      documentlink: DocumentLink,
+    }}
+  />
+)
+
+const wrongStreamingRendererElement = (
+  <NodeRenderer
+    content="<DocumentLink>typed</DocumentLink>"
+    final
+    streamingComponents={{
+      // @ts-expect-error streamingComponents cannot require props the renderer never supplies.
+      documentlink: TenantDocumentLink,
+    }}
+  />
+)
+
 void streamingComponents
 void htmlComponents
 void definedStreamingComponents
 void definedHtmlComponents
 void rendererElement
+void wrongHtmlRendererElement
+void wrongStreamingRendererElement

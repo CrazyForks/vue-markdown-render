@@ -172,15 +172,17 @@ function renderNodeComponent(
   children: ReactNode[],
   key: string,
   options: HtmlToReactOptions,
+  contentSource?: string,
+  rawSource?: string,
 ) {
   const normalizedTag = normalizeCustomHtmlTagName(tagName)
-  const content = getTextContent(children)
+  const content = contentSource ?? getTextContent(children)
   const node = {
     type: normalizedTag,
     tag: normalizedTag,
     attrs: attrsToTokenPairs(attrs),
     content,
-    raw: `${renderLiteralTagText(tagName, attrs)}${content}</${tagName}>`,
+    raw: rawSource ?? `${renderLiteralTagText(tagName, attrs)}${content}</${tagName}>`,
     loading: Boolean((options.sourceNode as any)?.loading),
     autoClosed: Boolean((options.sourceNode as any)?.autoClosed ?? (options.sourceNode as any)?.loading),
   } as ParsedNode
@@ -214,6 +216,7 @@ export function parseHtmlToReactNodes(
       children: ReactNode[]
       attrs?: Record<string, string>
       hardBlocked?: boolean
+      sourceParts: string[]
       softBlocked?: boolean
       customComponent?: boolean
     }> = []
@@ -225,20 +228,26 @@ export function parseHtmlToReactNodes(
           continue
         const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
         target.push(token.content ?? '')
+        if (stack.length > 0)
+          stack[stack.length - 1].sourceParts.push(token.content ?? '')
         continue
       }
 
       if (token.type === 'self_closing') {
+        const rawAttrs = token.attrs || {}
+        const rawSource = renderLiteralTagText(token.tagName, rawAttrs, true)
         const customComponent = isCustomHtmlComponent(token.tagName, customComponents)
         const nodeComponent = Boolean(getNodeComponent(token.tagName, options))
         if (BLOCKED_TAGS.has(token.tagName.toLowerCase()) || (!customComponent && !nodeComponent && isHtmlTagHardBlocked(token.tagName, htmlPolicy)))
           continue
         if (!customComponent && !nodeComponent && isHtmlTagBlocked(token.tagName, htmlPolicy)) {
           const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
-          target.push(renderLiteralTagText(token.tagName, token.attrs, true))
+          target.push(rawSource)
+          if (stack.length > 0)
+            stack[stack.length - 1].sourceParts.push(rawSource)
           continue
         }
-        const attrs = sanitizeHtmlAttrs(token.attrs || {}, htmlPolicy, token.tagName)
+        const attrs = sanitizeHtmlAttrs(rawAttrs, htmlPolicy, token.tagName)
         const explicitKey = (attrs as any).key
         const elementKey = explicitKey != null && explicitKey !== '' ? explicitKey : `${keyPrefix}-${autoKeySeed++}`
         const Comp = customComponent
@@ -246,7 +255,7 @@ export function parseHtmlToReactNodes(
           : undefined
         const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
         if (nodeComponent) {
-          target.push(renderNodeComponent(token.tagName, attrs, [], elementKey, options))
+          target.push(renderNodeComponent(token.tagName, rawAttrs, [], elementKey, options, '', rawSource))
         }
         else if (Comp) {
           const componentProps = getCustomComponentProps(token.tagName, attrs, options)
@@ -259,6 +268,8 @@ export function parseHtmlToReactNodes(
             suppressHydrationWarning: true,
           }))
         }
+        if (stack.length > 0)
+          stack[stack.length - 1].sourceParts.push(rawSource)
         continue
       }
 
@@ -270,6 +281,7 @@ export function parseHtmlToReactNodes(
           tagName: token.tagName,
           children: [],
           attrs: token.attrs,
+          sourceParts: [],
           customComponent: customComponent || nodeComponent,
           hardBlocked: parentHardBlocked || BLOCKED_TAGS.has(token.tagName.toLowerCase()) || (!customComponent && !nodeComponent && isHtmlTagHardBlocked(token.tagName, htmlPolicy)),
           softBlocked: !parentHardBlocked && !customComponent && !nodeComponent && isHtmlTagBlocked(token.tagName, htmlPolicy),
@@ -281,6 +293,8 @@ export function parseHtmlToReactNodes(
       if (!opening || opening.hardBlocked)
         continue
 
+      const innerSource = opening.sourceParts.join('')
+      const rawSource = `${renderLiteralTagText(opening.tagName, opening.attrs)}${innerSource}</${opening.tagName}>`
       if (opening.softBlocked) {
         const rendered = [
           renderLiteralTagText(opening.tagName, opening.attrs),
@@ -291,6 +305,8 @@ export function parseHtmlToReactNodes(
           pushRenderedNode(stack[stack.length - 1].children, rendered)
         else
           pushRenderedNode(rootNodes, rendered)
+        if (stack.length > 0)
+          stack[stack.length - 1].sourceParts.push(rawSource)
         continue
       }
 
@@ -303,7 +319,7 @@ export function parseHtmlToReactNodes(
       const nodeComponent = Boolean(getNodeComponent(opening.tagName, options))
       let element: ReactNode
       if (nodeComponent) {
-        element = renderNodeComponent(opening.tagName, attrs, opening.children, elementKey, options)
+        element = renderNodeComponent(opening.tagName, opening.attrs || {}, opening.children, elementKey, options, innerSource, rawSource)
       }
       else if (Comp) {
         element = React.createElement(Comp as ComponentType<Record<string, unknown>>, { ...getCustomComponentProps(opening.tagName, attrs, options), key: elementKey }, ...opening.children)
@@ -320,18 +336,24 @@ export function parseHtmlToReactNodes(
         stack[stack.length - 1].children.push(element)
       else
         rootNodes.push(element)
+      if (stack.length > 0)
+        stack[stack.length - 1].sourceParts.push(rawSource)
     }
 
     while (stack.length > 0) {
       const unclosed = stack.pop()
       if (!unclosed || unclosed.hardBlocked)
         continue
+      const innerSource = unclosed.sourceParts.join('')
+      const rawSource = `${renderLiteralTagText(unclosed.tagName, unclosed.attrs)}${innerSource}`
       if (unclosed.softBlocked) {
         pushRenderedNode(rootNodes, [
           renderLiteralTagText(unclosed.tagName, unclosed.attrs),
           ...unclosed.children,
           `</${unclosed.tagName}>`,
         ])
+        if (stack.length > 0)
+          stack[stack.length - 1].sourceParts.push(rawSource)
         continue
       }
       const attrs = sanitizeHtmlAttrs(unclosed.attrs || {}, htmlPolicy, unclosed.tagName)
@@ -343,7 +365,7 @@ export function parseHtmlToReactNodes(
       const nodeComponent = Boolean(getNodeComponent(unclosed.tagName, options))
       let element: ReactNode
       if (nodeComponent) {
-        element = renderNodeComponent(unclosed.tagName, attrs, unclosed.children, elementKey, options)
+        element = renderNodeComponent(unclosed.tagName, unclosed.attrs || {}, unclosed.children, elementKey, options, innerSource, rawSource)
       }
       else if (Comp) {
         element = React.createElement(Comp as ComponentType<Record<string, unknown>>, { ...getCustomComponentProps(unclosed.tagName, attrs, options), key: elementKey }, ...unclosed.children)
@@ -356,6 +378,8 @@ export function parseHtmlToReactNodes(
         }, ...unclosed.children)
       }
       rootNodes.push(element)
+      if (stack.length > 0)
+        stack[stack.length - 1].sourceParts.push(rawSource)
     }
 
     return rootNodes
