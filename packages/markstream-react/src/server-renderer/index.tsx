@@ -154,6 +154,7 @@ function renderCustomCodeBlockComponent(
     renderNode,
     indexKey: key,
     typewriter: ctx.typewriter,
+    fade: ctx.fade,
   })
 }
 
@@ -216,6 +217,7 @@ function createRenderContext(
     isDark: props.isDark,
     indexKey: indexPrefix,
     typewriter: props.typewriter,
+    fade: props.fade,
     showTooltips: props.showTooltips,
     streamingComponents,
     htmlComponents,
@@ -453,8 +455,9 @@ export function ParagraphNode(props: NodeComponentProps<{ type: 'paragraph', chi
 
   const nodeChildren = node.children ?? []
   const customComponents = ctx.customComponents ?? getCustomNodeComponents(ctx.customId)
-  const streamingAndLegacyComponents = {
+  const displayComponents = {
     ...customComponents,
+    ...(ctx.htmlComponents ?? {}),
     ...(ctx.streamingComponents ?? {}),
   }
   const parts: React.ReactNode[] = []
@@ -473,7 +476,7 @@ export function ParagraphNode(props: NodeComponentProps<{ type: 'paragraph', chi
   }
 
   nodeChildren.forEach((child, childIndex) => {
-    if (BLOCK_LEVEL_TYPES.has(child.type) || isParagraphBreakingCustomHtmlNode(child, streamingAndLegacyComponents, ctx.customHtmlTags)) {
+    if (BLOCK_LEVEL_TYPES.has(child.type) || isParagraphBreakingCustomHtmlNode(child, displayComponents, ctx.customHtmlTags)) {
       flushInline()
       parts.push(
         <React.Fragment key={`${String(indexKey ?? 'paragraph')}-block-${childIndex}`}>
@@ -1165,6 +1168,7 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
       renderNode,
       indexKey: key,
       typewriter: ctx.typewriter,
+      fade: ctx.fade,
     })
   }
   if (htmlCustom)
@@ -1179,6 +1183,7 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
       renderNode,
       indexKey: key,
       typewriter: ctx.typewriter,
+      fade: ctx.fade,
     })
   }
 
@@ -1207,6 +1212,7 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
         renderNode,
         indexKey: key,
         typewriter: ctx.typewriter,
+        fade: ctx.fade,
       })
     }
     const rawContent = String((node as any).content ?? (node as any).raw ?? '')

@@ -30,7 +30,8 @@ export function resolveCustomHtmlTag(
     return null
 
   const isWhitelisted = normalizedTags.includes(tag)
-  const component = isWhitelisted ? (customComponents[tag] ?? customComponents[normalizedType] ?? null) : null
+  const registeredComponent = customComponents[tag] ?? customComponents[normalizedType] ?? null
+  const component = (isWhitelisted || taggedNode) ? registeredComponent : null
 
   return {
     tag,

@@ -4,7 +4,7 @@ import type { NodeComponentProps } from '../../types/node-component'
 import type { HtmlToken } from '../../utils/htmlToReact'
 import React, { useEffect, useRef, useState } from 'react'
 import { BLOCKED_HTML_TAGS as BLOCKED_TAGS, convertHtmlAttrsToProps, isHtmlTagBlocked, isHtmlTagHardBlocked, sanitizeHtmlContent } from 'stream-markdown-parser'
-import { getCustomNodeComponents } from '../../customComponents'
+import { getCustomComponentDisplay, getCustomNodeComponents } from '../../customComponents'
 import {
   hasCustomHtmlComponents,
   isCustomHtmlComponent,
@@ -48,21 +48,21 @@ function pushRenderedNode(target: React.ReactNode[], rendered: React.ReactNode |
     target.push(rendered)
 }
 
-function shouldUseHtmlPropContract(
-  tagName: string,
-  propComponents?: Record<string, ComponentType<any>>,
+function hasBlockCustomHtmlComponent(
+  content: string,
+  customComponents: Record<string, ComponentType<any>>,
 ) {
-  return Boolean(propComponents?.[tagName] || propComponents?.[tagName.toLowerCase()])
-}
-
-function getCustomComponentProps(
-  tagName: string,
-  attrs: Record<string, string>,
-  propComponents?: Record<string, ComponentType<any>>,
-) {
-  return shouldUseHtmlPropContract(tagName, propComponents)
-    ? convertHtmlAttrsToProps(attrs)
-    : attrs
+  for (const token of tokenizeHtml(content)) {
+    if (token.type !== 'tag_open' && token.type !== 'self_closing')
+      continue
+    const tagName = token.tagName ?? ''
+    if (!isCustomHtmlComponent(tagName, customComponents))
+      continue
+    const component = customComponents[tagName] || customComponents[tagName.toLowerCase()]
+    if (getCustomComponentDisplay(component as any) === 'block')
+      return true
+  }
+  return false
 }
 
 /**
@@ -72,7 +72,6 @@ function buildReactElementTree(
   tokens: HtmlToken[],
   customComponents: Record<string, ComponentType<any>>,
   htmlPolicy: HtmlPolicy = 'safe',
-  propComponents?: Record<string, ComponentType<any>>,
 ): React.ReactNode[] {
   let autoKeySeed = 0
   const stack: Array<{
@@ -101,7 +100,7 @@ function buildReactElementTree(
         target.push(renderLiteralTagText(token.tagName!, token.attrs || {}, true))
         continue
       }
-      const element = createReactElement(token.tagName!, token.attrs || {}, [], customComponents, `ms-html-${autoKeySeed++}`, htmlPolicy, propComponents)
+      const element = createReactElement(token.tagName!, token.attrs || {}, [], customComponents, `ms-html-${autoKeySeed++}`, htmlPolicy)
       const target = stack.length > 0 ? stack[stack.length - 1].children : rootNodes
       pushRenderedNode(target, element)
     }
@@ -145,7 +144,7 @@ function buildReactElementTree(
             ]
           }
           else {
-            element = createReactElement(opening.tagName, opening.attrs || {}, opening.children, customComponents, `ms-html-${autoKeySeed++}`, htmlPolicy, propComponents)
+            element = createReactElement(opening.tagName, opening.attrs || {}, opening.children, customComponents, `ms-html-${autoKeySeed++}`, htmlPolicy)
           }
 
           if (stack.length > 0)
@@ -181,7 +180,7 @@ function buildReactElementTree(
       ]
     }
     else {
-      element = createReactElement(unclosed.tagName, unclosed.attrs || {}, unclosed.children, customComponents, `ms-html-${autoKeySeed++}`, htmlPolicy, propComponents)
+      element = createReactElement(unclosed.tagName, unclosed.attrs || {}, unclosed.children, customComponents, `ms-html-${autoKeySeed++}`, htmlPolicy)
     }
     pushRenderedNode(rootNodes, element)
     warn(`Auto-closing unclosed tag: <${unclosed.tagName}>`)
@@ -200,7 +199,6 @@ function createReactElement(
   customComponents: Record<string, ComponentType<any>>,
   autoKey: string,
   htmlPolicy: HtmlPolicy,
-  propComponents?: Record<string, ComponentType<any>>,
 ): React.ReactNode {
   const customComponent = isCustomHtmlComponent(tagName, customComponents)
   if (BLOCKED_TAGS.has(tagName.toLowerCase()) || (!customComponent && isHtmlTagHardBlocked(tagName, htmlPolicy)))
@@ -221,7 +219,7 @@ function createReactElement(
   if (customComponent) {
     // It's a custom React component
     const component = customComponents[tagName] || customComponents[tagName.toLowerCase()]
-    const componentProps = getCustomComponentProps(tagName, sanitizedAttrs, propComponents)
+    const componentProps = convertHtmlAttrsToProps(sanitizedAttrs)
     return React.createElement(component as ComponentType<Record<string, unknown>>, { ...componentProps, key: elementKey }, ...children)
   }
   else {
@@ -237,14 +235,13 @@ function parseHtmlToReactNodes(
   content: string,
   customComponents: Record<string, ComponentType<any>>,
   htmlPolicy: HtmlPolicy = 'safe',
-  propComponents?: Record<string, ComponentType<any>>,
 ): React.ReactNode[] | null {
   if (!content)
     return []
 
   try {
     const tokens = tokenizeHtml(content)
-    const nodes = buildReactElementTree(tokens, customComponents, htmlPolicy, propComponents)
+    const nodes = buildReactElementTree(tokens, customComponents, htmlPolicy)
     return nodes
   }
   catch (error) {
@@ -291,11 +288,15 @@ export function HtmlInlineNode(props: NodeComponentProps<{
       return { mode: 'html', content }
 
     // Parse and build React element tree
-    const nodes = parseHtmlToReactNodes(content, customComponents, htmlPolicy, props.ctx?.htmlComponents)
+    const nodes = parseHtmlToReactNodes(content, customComponents, htmlPolicy)
     if (nodes === null)
       return { mode: 'html', content } // Fallback to dangerouslySetInnerHTML if parsing fails
 
-    return { mode: 'dynamic', nodes }
+    return {
+      mode: 'dynamic',
+      block: hasBlockCustomHtmlComponent(content, customComponents),
+      nodes,
+    }
   }, [customComponents, htmlPolicy, node.content])
 
   // Use DOM manipulation for pure HTML (mode: 'html')
@@ -321,6 +322,9 @@ export function HtmlInlineNode(props: NodeComponentProps<{
 
   // Dynamic rendering for custom components
   if (renderMode.mode === 'dynamic') {
+    if (renderMode.block)
+      return <>{renderMode.nodes}</>
+
     return (
       <span
         className="html-inline-node"

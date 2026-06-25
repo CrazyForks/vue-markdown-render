@@ -8,7 +8,7 @@ import { createRoot } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NodeRenderer } from '../packages/markstream-react/src/components/NodeRenderer'
-import { removeCustomComponents, setCustomComponents } from '../packages/markstream-react/src/customComponents'
+import { removeCustomComponents, setCustomComponents, withMarkstreamComponentDisplay } from '../packages/markstream-react/src/customComponents'
 import { NodeRenderer as ServerNodeRenderer } from '../packages/markstream-react/src/server-renderer'
 
 interface DocumentLinkNode {
@@ -469,12 +469,19 @@ describe('react local component maps', () => {
     await unmountRoot(root)
   })
 
-  it('does not coerce legacy custom component html attrs', async () => {
+  it('keeps legacy custom component html attr contracts per render path', async () => {
     const scopeId = 'react-local-component-legacy-attrs'
-    const seen: Array<{ width?: unknown }> = []
-    function LegacyBadge(props: React.PropsWithChildren<{ width?: unknown }>) {
+    const seen: Array<{ width?: unknown, disabled?: unknown }> = []
+    function LegacyBadge(props: React.PropsWithChildren<{ disabled?: unknown, width?: unknown }>) {
       seen.push(props)
-      return <span data-legacy-width={String(props.width)}>{props.children}</span>
+      return (
+        <span
+          data-legacy-disabled={String(props.disabled)}
+          data-legacy-width={String(props.width)}
+        >
+          {props.children}
+        </span>
+      )
     }
 
     setCustomComponents(scopeId, { legacybadge: LegacyBadge as any })
@@ -494,6 +501,22 @@ describe('react local component maps', () => {
       await unmountRoot(root)
       seen.length = 0
 
+      const inline = await renderIntoRoot(
+        <NodeRenderer
+          customId={scopeId}
+          content={'before <legacybadge width="001" disabled>Inline</legacybadge> after'}
+          final
+          smoothStreaming={false}
+        />,
+      )
+
+      expect(inline.host.querySelector('[data-legacy-width="1"]')?.textContent).toBe('Inline')
+      expect(seen.at(-1)?.width).toBe(1)
+      expect(seen.at(-1)?.disabled).toBe(true)
+
+      await unmountRoot(inline.root)
+      seen.length = 0
+
       const ssrHtml = renderToStaticMarkup(
         <ServerNodeRenderer
           customId={scopeId}
@@ -504,6 +527,107 @@ describe('react local component maps', () => {
 
       expect(ssrHtml).toContain('data-legacy-width="001"')
       expect(seen.at(-1)?.width).toBe('001')
+    }
+    finally {
+      removeCustomComponents(scopeId)
+    }
+  })
+
+  it('lets block-marked htmlComponents break out of paragraph wrappers on client and server', async () => {
+    const Card = withMarkstreamComponentDisplay((props: React.PropsWithChildren) => (
+      <div data-html-card>{props.children}</div>
+    ), 'block')
+
+    const content = 'before <card>content</card> after'
+    const htmlComponents = { card: Card }
+    const { host, root } = await renderIntoRoot(
+      <NodeRenderer
+        content={content}
+        final
+        htmlComponents={htmlComponents}
+        smoothStreaming={false}
+      />,
+    )
+
+    expect(host.querySelector('[data-html-card]')?.textContent).toBe('content')
+    expect(host.querySelectorAll('p.paragraph-node')).toHaveLength(2)
+    expect(host.querySelector('p [data-html-card]')).toBeNull()
+    expect(host.querySelector('span.html-inline-node [data-html-card]')).toBeNull()
+    expect(host.querySelectorAll('p.paragraph-node')[0]?.textContent.trim()).toBe('before')
+    expect(host.querySelectorAll('p.paragraph-node')[1]?.textContent.trim()).toBe('after')
+
+    await unmountRoot(root)
+
+    const ssrHost = hostFromStaticMarkup(renderToStaticMarkup(
+      <ServerNodeRenderer
+        content={content}
+        final
+        htmlComponents={htmlComponents}
+      />,
+    ))
+
+    expect(ssrHost.querySelector('[data-html-card]')?.textContent).toBe('content')
+    expect(ssrHost.querySelectorAll('p.paragraph-node')).toHaveLength(2)
+    expect(ssrHost.querySelector('p [data-html-card]')).toBeNull()
+    expect(ssrHost.querySelectorAll('p.paragraph-node')[0]?.textContent.trim()).toBe('before')
+    expect(ssrHost.querySelectorAll('p.paragraph-node')[1]?.textContent.trim()).toBe('after')
+  })
+
+  it('passes fade to server-side streaming and coerced custom components', () => {
+    const scopeId = 'react-local-component-ssr-fade'
+    const seen: Array<{ fade?: boolean, type?: string }> = []
+    function DirectTag(props: NodeComponentProps<{ content?: string, type: string }>) {
+      seen.push({ fade: props.fade, type: props.node.type })
+      return <span data-direct-fade={props.fade === false ? 'off' : 'on'}>{props.node.content}</span>
+    }
+    function CoercedTag(props: NodeComponentProps<{ content?: string, type: string }>) {
+      seen.push({ fade: props.fade, type: props.node.type })
+      return <span data-coerced-fade={props.fade === false ? 'off' : 'on'}>{props.node.content}</span>
+    }
+
+    setCustomComponents(scopeId, {
+      coercedblock: CoercedTag,
+      coercedinline: CoercedTag,
+    } as any)
+    try {
+      const directHtml = renderToStaticMarkup(
+        <ServerNodeRenderer
+          content="<DirectTag>Direct</DirectTag>"
+          fade={false}
+          final
+          streamingComponents={{ directtag: DirectTag }}
+        />,
+      )
+      const coercedHtml = renderToStaticMarkup(
+        <ServerNodeRenderer
+          customHtmlTags={['coercedblock', 'coercedinline']}
+          customId={scopeId}
+          fade={false}
+          final
+          nodes={[
+            {
+              type: 'html_inline',
+              tag: 'coercedinline',
+              content: '<coercedinline>Inline</coercedinline>',
+              raw: '<coercedinline>Inline</coercedinline>',
+            } as any,
+            {
+              type: 'html_block',
+              tag: 'coercedblock',
+              content: '<coercedblock>Block</coercedblock>',
+              raw: '<coercedblock>Block</coercedblock>',
+            } as any,
+          ]}
+        />,
+      )
+
+      expect(directHtml).toContain('data-direct-fade="off"')
+      expect(coercedHtml).toContain('data-coerced-fade="off"')
+      expect(seen).toEqual([
+        { fade: false, type: 'directtag' },
+        { fade: false, type: 'coercedinline' },
+        { fade: false, type: 'coercedblock' },
+      ])
     }
     finally {
       removeCustomComponents(scopeId)
