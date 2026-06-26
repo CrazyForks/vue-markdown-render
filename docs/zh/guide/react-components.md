@@ -158,6 +158,8 @@ function App() {
 
 当组件应该走 raw/dynamic HTML 路径并接收普通 React props 与 `children` 时，使用 `htmlComponents`。这类组件仍可能随着 streaming 内容重渲染，但不会收到 `node.loading` 或 parser 节点合约。
 
+定义带类型的组件 map 时，优先使用 `defineStreamingComponents(...)` 和 `defineHtmlComponents(...)`。`StreamingComponentMap` 与 `HtmlComponentMap` 描述的是渲染器可接收的宽运行时 map 形状；逐项 props 合约校验由 helper 完成，可以捕获把 parser-backed `NodeComponentProps` 组件放进 HTML props 路径这类误用。
+
 ```tsx
 import type { NodeComponentProps } from 'markstream-react'
 import type React from 'react'
@@ -210,7 +212,7 @@ function App({ content, isDone }: { content: string, isDone: boolean }) {
 }
 ```
 
-`customHtmlTags` 仍然可以作为更底层的 parser 选项使用。`setCustomComponents` 和 `customId` 也继续支持，用于兼容旧代码、应用级共享注册，以及已有 AST 节点覆盖。如果同一个归一化 tag 同时出现在 `streamingComponents` 和 `htmlComponents` 中，`streamingComponents` 会胜出，并在开发环境只告警一次。
+`customHtmlTags` 仍然可以作为更底层的 parser 选项使用。`htmlComponents` 也可以处理列在 `customHtmlTags` 中的标签，但它仍然接收普通 props 与 `children`；只有 `streamingComponents` 会收到 `NodeComponentProps`。`setCustomComponents` 和 `customId` 也继续支持，用于兼容旧代码、应用级共享注册，以及已有 AST 节点覆盖。如果同一个归一化 tag 同时出现在 `streamingComponents` 和 `htmlComponents` 中，`streamingComponents` 会胜出，并在开发环境只告警一次。
 
 这个 API 拆分解决的是可发现性和类型表达问题。HTML 安全仍由 `htmlPolicy` 和现有 sanitization 规则负责；这不是一个安全边界。
 

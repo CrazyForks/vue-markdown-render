@@ -11,7 +11,7 @@ export type CustomComponentMap = Record<string, MarkstreamCustomComponent>
 export type StreamingComponent<TNode = any> = ComponentType<NodeComponentProps<TNode>>
 export type StreamingComponentMap = Record<string, StreamingComponent<any>>
 export type HtmlComponent<P extends object = any> = ComponentType<PropsWithChildren<P>>
-export type HtmlComponentMap = Record<string, ComponentType<any>>
+export type HtmlComponentMap = Record<string, HtmlComponent<any>>
 
 type IsAny<T> = 0 extends (1 & T) ? true : false
 type ComponentProps<T> = T extends ComponentType<infer P>

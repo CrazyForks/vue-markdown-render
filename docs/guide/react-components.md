@@ -158,6 +158,8 @@ Use `streamingComponents` when the component needs the parser-backed streaming n
 
 Use `htmlComponents` when the component should render through the raw/dynamic HTML path and receive normal React props plus `children`. These components may still rerender while content streams, but they do not receive `node.loading` or the parser node contract.
 
+For typed component definitions, prefer `defineStreamingComponents(...)` and `defineHtmlComponents(...)`. `StreamingComponentMap` and `HtmlComponentMap` describe the broad runtime map shape accepted by the renderer; the helper functions perform the per-entry contract checks that catch mixing parser-backed `NodeComponentProps` components into the HTML props path.
+
 ```tsx
 import type { NodeComponentProps } from 'markstream-react'
 import type React from 'react'
@@ -210,7 +212,7 @@ function App({ content, isDone }: { content: string, isDone: boolean }) {
 }
 ```
 
-`customHtmlTags` remains available as a lower-level parser option. `setCustomComponents` and `customId` remain supported for compatibility, shared application-level registration, and existing node overrides. If the same normalized tag appears in both `streamingComponents` and `htmlComponents`, `streamingComponents` wins and a development warning is emitted once.
+`customHtmlTags` remains available as a lower-level parser option. `htmlComponents` can also handle tags listed in `customHtmlTags`, but it still receives normal props and `children`; only `streamingComponents` receives `NodeComponentProps`. `setCustomComponents` and `customId` remain supported for compatibility, shared application-level registration, and existing node overrides. If the same normalized tag appears in both `streamingComponents` and `htmlComponents`, `streamingComponents` wins and a development warning is emitted once.
 
 This API split fixes discoverability and typing around the two component contracts. HTML safety is still handled by `htmlPolicy` and the existing sanitization rules; the split is not a security boundary.
 

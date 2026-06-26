@@ -1,5 +1,30 @@
-import type { ComponentType } from 'react'
+import type { ComponentType, PropsWithChildren, ReactNode } from 'react'
 import type { BaseNode } from 'stream-markdown-parser'
+
+export type RenderNodeFn = (node: BaseNode, key: string | number, ctx: RenderContext) => ReactNode
+
+export interface RenderContext {
+  customId?: string
+  isDark?: boolean
+  final?: boolean
+}
+
+export interface NodeComponentProps<TNode = unknown> {
+  node: TNode
+  ctx?: RenderContext
+  renderNode?: RenderNodeFn
+  indexKey?: string | number
+  customId?: string
+  isDark?: boolean
+  typewriter?: boolean
+  fade?: boolean
+  children?: ReactNode
+}
+
+export type StreamingComponent<TNode = any> = ComponentType<NodeComponentProps<TNode>>
+export type StreamingComponentMap = Record<string, StreamingComponent<any>>
+export type HtmlComponent<P extends object = any> = ComponentType<PropsWithChildren<P>>
+export type HtmlComponentMap = Record<string, HtmlComponent<any>>
 
 export interface NodeRendererProps {
   content?: string
@@ -14,6 +39,8 @@ export interface NodeRendererProps {
 
 export declare const MarkdownRender: ComponentType<NodeRendererProps>
 export declare const NodeRenderer: ComponentType<NodeRendererProps>
+export declare function defineStreamingComponents<const T extends Record<string, ComponentType<any>>>(components: T): T
+export declare function defineHtmlComponents<const T extends Record<string, ComponentType<any>>>(components: T): T
 export declare function setMermaidWorker(worker: Worker): void
 export declare function setKaTeXWorker(worker: Worker): void
 export declare function enableMermaid(): void
