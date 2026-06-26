@@ -213,6 +213,37 @@ describe('react local component maps', () => {
     await unmountRoot(root)
   })
 
+  it('keeps same-tag htmlComponents isolated per renderer instance', async () => {
+    function FirstBadge(props: React.PropsWithChildren) {
+      return <span data-owner="first">{props.children}</span>
+    }
+    function SecondBadge(props: React.PropsWithChildren) {
+      return <span data-owner="second">{props.children}</span>
+    }
+
+    const { host, root } = await renderIntoRoot(
+      <div>
+        <NodeRenderer
+          content="<badge>One</badge>"
+          final
+          htmlComponents={{ badge: FirstBadge }}
+          smoothStreaming={false}
+        />
+        <NodeRenderer
+          content="<badge>Two</badge>"
+          final
+          htmlComponents={{ badge: SecondBadge }}
+          smoothStreaming={false}
+        />
+      </div>,
+    )
+
+    expect(host.querySelector('[data-owner="first"]')?.textContent).toBe('One')
+    expect(host.querySelector('[data-owner="second"]')?.textContent).toBe('Two')
+
+    await unmountRoot(root)
+  })
+
   it('prefers streamingComponents over the legacy scoped registry', async () => {
     const scopeId = 'react-local-component-precedence'
     function LegacyDocumentLink(props: NodeComponentProps<DocumentLinkNode>) {
