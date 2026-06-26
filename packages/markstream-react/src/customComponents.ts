@@ -1,10 +1,48 @@
-import type { ComponentType } from 'react'
+import type { ComponentType, PropsWithChildren } from 'react'
+import type { NodeComponentProps } from './types/node-component'
+import { normalizeCustomHtmlTagName } from 'stream-markdown-parser'
+import { isDevEnvironment } from './utils/devEnv'
 
 export type CustomComponentDisplayMode = 'inline' | 'block'
 export type MarkstreamCustomComponent<P = never> = ComponentType<P> & {
   markstreamDisplay?: CustomComponentDisplayMode
 }
 export type CustomComponentMap = Record<string, MarkstreamCustomComponent>
+export type StreamingComponent<TNode = any> = ComponentType<NodeComponentProps<TNode>>
+export type StreamingComponentMap = Record<string, StreamingComponent<any>>
+export type HtmlComponent<P extends object = any> = ComponentType<PropsWithChildren<P>>
+export type HtmlComponentMap = Record<string, HtmlComponent<any>>
+
+type IsAny<T> = 0 extends (1 & T) ? true : false
+type ComponentProps<T> = T extends ComponentType<infer P>
+  ? P
+  : T extends (props: infer P) => any
+    ? P
+    : never
+
+export type StreamingComponentDefinitions<T extends Record<string, any>> = {
+  [K in keyof T]: ComponentProps<T[K]> extends infer P
+    ? IsAny<P> extends true
+      ? T[K]
+      : P extends NodeComponentProps<any>
+        ? NodeComponentProps<any> extends P
+          ? T[K]
+          : never
+        : never
+    : never
+}
+
+type ParserComponentOnlyProp = Exclude<keyof NodeComponentProps<any>, 'children' | 'node'>
+
+export type HtmlComponentDefinitions<T extends Record<string, any>> = {
+  [K in keyof T]: ComponentProps<T[K]> extends infer P
+    ? IsAny<P> extends true
+      ? T[K]
+      : Extract<keyof P, ParserComponentOnlyProp> extends never
+        ? T[K]
+        : never
+    : never
+}
 
 const GLOBAL_KEY = '__global__'
 
@@ -99,4 +137,48 @@ export function withMarkstreamComponentDisplay<T extends ComponentType<never>>(
 ) {
   ;(component as MarkstreamCustomComponent).markstreamDisplay = display
   return component as T & { markstreamDisplay: CustomComponentDisplayMode }
+}
+
+export function defineStreamingComponents<const T extends Record<string, ComponentType<any>>>(
+  components: T & StreamingComponentDefinitions<T>,
+) {
+  return components
+}
+
+export function defineHtmlComponents<const T extends Record<string, ComponentType<any>>>(
+  components: T & HtmlComponentDefinitions<T>,
+) {
+  return components
+}
+
+export function normalizeComponentMap<T>(mapping?: Record<string, T>): Record<string, T> {
+  if (!mapping)
+    return {}
+
+  const normalized: Record<string, T> = {}
+  for (const [rawKey, component] of Object.entries(mapping)) {
+    const key = normalizeCustomHtmlTagName(rawKey)
+    if (key)
+      normalized[key] = component
+  }
+  return normalized
+}
+
+export function warnComponentMapConflicts(
+  streamingComponents: StreamingComponentMap,
+  htmlComponents: HtmlComponentMap,
+  warnedTags: Set<string>,
+) {
+  if (!isDevEnvironment())
+    return
+
+  for (const tag of Object.keys(streamingComponents)) {
+    if (!htmlComponents[tag] || warnedTags.has(tag))
+      continue
+    warnedTags.add(tag)
+    console.warn(
+      `[markstream-react] "${tag}" was provided in both streamingComponents and htmlComponents. `
+      + 'The streamingComponents entry will be used for parser-backed rendering.',
+    )
+  }
 }

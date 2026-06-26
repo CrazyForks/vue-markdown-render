@@ -5,13 +5,22 @@ export type { MarkdownCodeBlockNodeProps } from './components/MarkdownCodeBlockN
 export type { TooltipPlacement, TooltipProps } from './components/Tooltip/Tooltip'
 export {
   clearGlobalCustomComponents,
+  defineHtmlComponents,
+  defineStreamingComponents,
   getCustomComponentDisplay,
   getCustomNodeComponents,
   removeCustomComponents,
   setCustomComponents,
   withMarkstreamComponentDisplay,
 } from './customComponents'
-export type { CustomComponentDisplayMode, MarkstreamCustomComponent } from './customComponents'
+export type {
+  CustomComponentDisplayMode,
+  HtmlComponent,
+  HtmlComponentMap,
+  MarkstreamCustomComponent,
+  StreamingComponent,
+  StreamingComponentMap,
+} from './customComponents'
 export { AdmonitionNode } from './server-renderer'
 export { BlockquoteNode } from './server-renderer'
 export { CheckboxNode } from './server-renderer'

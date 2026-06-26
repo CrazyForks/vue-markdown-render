@@ -316,6 +316,16 @@ function assertRawHtml(html, version, router) {
     assertIncludes(html, `data-ssr-export="${name}"`, `${name} export marker`)
 }
 
+function assertDirectMapsHtml(html) {
+  assertIncludes(html, 'data-next-direct-map="page"', 'direct map page')
+  assertIncludes(html, 'data-next-direct-map="streaming"', 'direct streaming map')
+  assertIncludes(html, 'data-next-direct-map-id="app-router"', 'direct streaming attrs')
+  assertIncludes(html, 'Streaming Map', 'direct streaming text')
+  assertIncludes(html, 'data-next-direct-map="html"', 'direct html map')
+  assertIncludes(html, 'data-next-direct-map-tone="warm"', 'direct html attrs')
+  assertIncludes(html, 'HTML Map', 'direct html text')
+}
+
 async function waitForHydration(page, route) {
   await page.goto(route, { waitUntil: 'domcontentloaded' })
   await page.waitForSelector('[data-ssr-case="hydration"][data-ssr-entry="next"][data-ssr-status="enhanced"]', { timeout: 90000 })
@@ -404,6 +414,10 @@ async function runBrowserChecks(baseUrl) {
     await waitForHydration(page, pagesRoute)
     await assertHydratedUi(page)
 
+    await page.goto(`${baseUrl}/direct-maps`, { waitUntil: 'domcontentloaded' })
+    await page.waitForSelector('[data-next-direct-map="streaming"][data-next-direct-map-id="app-router"]', { timeout: 90000 })
+    await page.waitForSelector('[data-next-direct-map="html"][data-next-direct-map-tone="warm"]', { timeout: 90000 })
+
     await waitForHydration(page, appRoute)
     await assertHydratedUi(page)
 
@@ -429,8 +443,10 @@ async function runMode({ playgroundDir, version, mode }) {
 
     const appHtml = await fetchText(`${baseUrl}/app-ssr-lab`)
     const pagesHtml = await fetchText(`${baseUrl}/pages-ssr-lab`)
+    const directMapsHtml = await fetchText(`${baseUrl}/direct-maps`)
     assertRawHtml(appHtml, version, 'app')
     assertRawHtml(pagesHtml, version, 'pages')
+    assertDirectMapsHtml(directMapsHtml)
     await runBrowserChecks(baseUrl)
   }
   catch (error) {

@@ -165,30 +165,55 @@ module.exports = {
 
 ## Custom Components
 
-Register custom renderers with `setCustomComponents`. Custom tag-like blocks are exposed as nodes with `type` equal to the tag name when the parser is configured for that tag.
+For HTML-like custom tags in new React code, prefer renderer-local component maps:
+
+- `streamingComponents` receives parser-backed `NodeComponentProps`, including `node.attrs`, `node.content`, and `node.loading`.
+- `htmlComponents` renders through the raw/dynamic HTML path and receives normal React props plus `children`.
 
 ```tsx
 import type { NodeComponentProps } from 'markstream-react'
-import MarkdownRender, { setCustomComponents } from 'markstream-react'
+import type React from 'react'
+import MarkdownRender from 'markstream-react'
 
-function ThinkingNode(props: NodeComponentProps<{ type: 'thinking', content: string }>) {
-  return <MarkdownRender content={props.node.content} fade={false} />
+function DocumentLink(props: NodeComponentProps<{ type: 'documentlink', content: string, loading?: boolean }>) {
+  return <span aria-busy={props.node.loading || undefined}>{props.node.content}</span>
 }
 
-setCustomComponents('chat', { thinking: ThinkingNode })
+function Badge({ kind, children }: React.PropsWithChildren<{ kind?: string }>) {
+  return <span data-kind={kind}>{children}</span>
+}
+
+const renderer = (
+  <MarkdownRender
+    content={content}
+    final={isDone}
+    streamingComponents={{ documentlink: DocumentLink }}
+    htmlComponents={{ badge: Badge }}
+  />
+)
 ```
 
-When rendering HTML-like tags from Markdown content, also pass the tag through `customHtmlTags`:
+`streamingComponents` keys are normalized and automatically added to the parser's effective `customHtmlTags`, so incomplete tags can render while content is streaming.
+
+`customHtmlTags` remains available as a lower-level parser option. `setCustomComponents` and `customId` also remain supported for compatibility, shared application-level registration, and existing node overrides:
 
 ```tsx
-React.createElement(MarkdownRender, {
-  customId: 'chat',
-  content: '<thinking>Working...</thinking>',
-  customHtmlTags: ['thinking'],
+import MarkdownRender, { setCustomComponents } from 'markstream-react'
+
+setCustomComponents('chat', {
+  documentlink: DocumentLink,
 })
+
+const legacyRenderer = (
+  <MarkdownRender
+    customId="chat"
+    customHtmlTags={['documentlink']}
+    content={content}
+  />
+)
 ```
 
-Without `customHtmlTags`, registered tag components render through the raw HTML path and receive HTML-style props/children instead of `props.node`.
+Without `customHtmlTags` or `streamingComponents`, registered tag components render through the raw HTML path and receive HTML-style props/children instead of `props.node`. HTML safety is still handled by `htmlPolicy` and sanitization; the API split is not a security boundary.
 
 ## When Not to Use It
 
@@ -196,7 +221,7 @@ Use `react-markdown`, `marked`, or `markdown-it` when you only render short stat
 
 ## Type Exports
 
-The package root exports the public component and renderer types, including `NodeRendererProps`, `NodeComponentProps`, `RenderContext`, `RenderNodeFn`, `CustomComponentMap`, and code-block option types.
+The package root exports the public component and renderer types, including `NodeRendererProps`, `NodeComponentProps`, `StreamingComponentMap`, `HtmlComponentMap`, `RenderContext`, `RenderNodeFn`, `CustomComponentMap`, and code-block option types.
 
 ## Development
 

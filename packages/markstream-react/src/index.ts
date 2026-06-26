@@ -56,6 +56,8 @@ export type { TooltipPlacement, TooltipProps } from './components/Tooltip/Toolti
 export { VmrContainerNode } from './components/VmrContainerNode/VmrContainerNode'
 export {
   clearGlobalCustomComponents,
+  defineHtmlComponents,
+  defineStreamingComponents,
   getCustomComponentDisplay,
   getCustomNodeComponents,
   removeCustomComponents,
@@ -64,7 +66,11 @@ export {
 } from './customComponents'
 export type {
   CustomComponentDisplayMode,
+  HtmlComponent,
+  HtmlComponentMap,
   MarkstreamCustomComponent,
+  StreamingComponent,
+  StreamingComponentMap,
 } from './customComponents'
 export { useSmoothMarkdownStream } from './hooks/useSmoothMarkdownStream'
 export type {

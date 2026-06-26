@@ -88,7 +88,7 @@
     "build:dts": "rollup -c ./scripts/rollup.dts.config.mjs && node ./scripts/clean-dts.cjs",
     "check:exports": "node ../../scripts/check-react-package-exports.mjs",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p ../../test/react-local-component-maps-types.tsconfig.json --noEmit",
     "size:check": "node ../../scripts/check-package-size.mjs",
     "check:core-published": "node ../../scripts/check-core-published.mjs --package-json package.json --core-package-json ../markstream-core/package.json",
     "check:workspace-deps-published": "node ../../scripts/check-workspace-deps-published.mjs --package-json package.json",

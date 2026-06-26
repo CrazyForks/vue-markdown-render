@@ -47,6 +47,8 @@ import { Tooltip as ClientTooltip } from './components/Tooltip/Tooltip'
 import { VmrContainerNode as ClientVmrContainerNode } from './components/VmrContainerNode/VmrContainerNode'
 import {
   clearGlobalCustomComponents,
+  defineHtmlComponents,
+  defineStreamingComponents,
   getCustomNodeComponents,
   removeCustomComponents,
   setCustomComponents,
@@ -141,6 +143,8 @@ export type { D2Loader }
 export { disableD2, enableD2, isD2Enabled, setD2Loader }
 export {
   clearGlobalCustomComponents,
+  defineHtmlComponents,
+  defineStreamingComponents,
   getCustomNodeComponents,
   removeCustomComponents,
   setCustomComponents,
@@ -151,6 +155,14 @@ export type { LinkNodeStyleProps } from './components/LinkNode/LinkNode'
 export type { ListItemNodeProps } from './components/ListItemNode/ListItemNode'
 export type { MarkdownCodeBlockNodeProps } from './components/MarkdownCodeBlockNode/MarkdownCodeBlockNode'
 export type { TooltipPlacement, TooltipProps } from './components/Tooltip/Tooltip'
+export type {
+  CustomComponentDisplayMode,
+  HtmlComponent,
+  HtmlComponentMap,
+  MarkstreamCustomComponent,
+  StreamingComponent,
+  StreamingComponentMap,
+} from './customComponents'
 export * from './i18n/useSafeI18n'
 export * from './renderers/renderNode'
 export type { NodeRendererCodeBlockProps, NodeRendererProps } from './types'

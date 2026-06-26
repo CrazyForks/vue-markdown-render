@@ -1,6 +1,7 @@
 import type React from 'react'
+import type { ComponentType } from 'react'
 import type { BaseNode, HtmlPolicy, MarkdownIt, ParsedNode, ParseOptions } from 'stream-markdown-parser'
-import type { CustomComponentMap } from './customComponents'
+import type { CustomComponentMap, HtmlComponentDefinitions, HtmlComponentMap, StreamingComponentDefinitions, StreamingComponentMap } from './customComponents'
 import type { SmoothMarkdownStreamOptions } from './hooks/useSmoothMarkdownStream'
 import type {
   CodeBlockMonacoOptions,
@@ -25,7 +26,10 @@ export type NodeRendererCodeBlockProps
     }
     & Record<string, unknown>
 
-export interface NodeRendererProps {
+export interface NodeRendererProps<
+  TStreamingComponents extends Record<string, ComponentType<any>> = StreamingComponentMap,
+  THtmlComponents extends Record<string, any> = HtmlComponentMap,
+> {
   content?: string
   nodes?: readonly BaseNode[] | null
   /**
@@ -35,6 +39,8 @@ export interface NodeRendererProps {
   final?: boolean
   parseOptions?: ParseOptions
   customMarkdownIt?: (md: MarkdownIt) => MarkdownIt
+  streamingComponents?: TStreamingComponents & StreamingComponentDefinitions<TStreamingComponents>
+  htmlComponents?: THtmlComponents & HtmlComponentDefinitions<THtmlComponents>
   /** Log parse/render timing stats (dev only). */
   debugPerformance?: boolean
   /**
@@ -105,6 +111,7 @@ export interface NodeRendererProps {
 export interface RenderContext {
   customId?: string
   isDark?: boolean
+  final?: boolean
   indexKey?: string
   typewriter?: boolean
   /** Enable/disable fade animations. Default: true */
@@ -112,6 +119,8 @@ export interface RenderContext {
   textStreamState?: Map<string, string>
   streamRenderVersion?: number
   customComponents?: CustomComponentMap
+  streamingComponents?: StreamingComponentMap
+  htmlComponents?: HtmlComponentMap
   customHtmlTags?: readonly string[]
   htmlPolicy?: HtmlPolicy
   codeBlockProps?: NodeRendererCodeBlockProps

@@ -2,7 +2,7 @@
 
 markstream-react 提供与 markstream-vue 相同强大的组件，但专为 React 构建。所有组件都支持 React 18+ 并包含完整的 TypeScript 支持。
 
-根入口、`markstream-react/next`、`markstream-react/server` 现在都会产出独立声明文件。像 `NodeRendererProps`、`NodeRendererCodeBlockProps`、`NodeComponentProps`、`RenderContext`、`RenderNodeFn`、`CustomComponentMap`、`CodeBlockMonacoOptions`、`MarkdownCodeBlockNodeProps`、`ListItemNodeProps`、`HtmlPreviewFrameProps`、`TooltipProps`、`TooltipPlacement`、`LinkNodeStyleProps` 这类共享渲染器与组件类型，都可以直接从你实际使用的入口导入。
+根入口、`markstream-react/next`、`markstream-react/server` 现在都会产出独立声明文件。像 `NodeRendererProps`、`NodeRendererCodeBlockProps`、`NodeComponentProps`、`StreamingComponentMap`、`HtmlComponentMap`、`RenderContext`、`RenderNodeFn`、`CustomComponentMap`、`CodeBlockMonacoOptions`、`MarkdownCodeBlockNodeProps`、`ListItemNodeProps`、`HtmlPreviewFrameProps`、`TooltipProps`、`TooltipPlacement`、`LinkNodeStyleProps` 这类共享渲染器与组件类型，都可以直接从你实际使用的入口导入。
 ## 主组件：MarkdownRender
 
 在 React 中渲染 markdown 内容的主要组件。
@@ -21,6 +21,8 @@ markstream-react 提供与 markstream-vue 相同强大的组件，但专为 Reac
 | `final` | `boolean` | `false` | 标记输入结束，停止输出 streaming `loading` 节点 |
 | `parseOptions` | `ParseOptions` | - | 解析选项与 token hooks（仅在传入 `content` 时生效） |
 | `customHtmlTags` | `readonly string[]` | - | 作为自定义节点输出的 HTML-like 标签（如 `thinking`） |
+| `streamingComponents` | `StreamingComponentMap` | - | 渲染器实例本地的 HTML-like 标签组件，接收 `NodeComponentProps`，并会自动加入 parser 的有效 `customHtmlTags` |
+| `htmlComponents` | `HtmlComponentMap` | - | 渲染器实例本地的 HTML-like 标签组件，走 raw/dynamic HTML 路径；组件接收清洗后的 HTML 属性和 `children` |
 | `htmlPolicy` | `'safe' \| 'escape' \| 'trusted'` | `'safe'` | 控制 `html_block` / `html_inline` 渲染。`safe` 阻止 active/embed/form 标签，`escape` 显示原始 HTML 文本，`trusted` 恢复更宽松的受信 HTML 行为但仍会剥离脚本和不安全属性。 |
 | `customMarkdownIt` | `(md: MarkdownIt) => MarkdownIt` | - | 自定义 MarkdownIt 实例 |
 | `debugPerformance` | `boolean` | `false` | 输出解析/渲染耗时与虚拟化统计（仅 dev） |
@@ -147,6 +149,72 @@ function App() {
   )
 }
 ```
+
+## 自定义 HTML-like 组件
+
+新的 React 代码如果要渲染 HTML-like 自定义标签，优先使用渲染器实例本地的组件 map。
+
+当组件需要 parser 支持的流式节点合约时，使用 `streamingComponents`。它的 key 会按 `customHtmlTags` 的规则归一化，并自动加入 parser 的有效自定义标签列表，因此不完整标签在 streaming 过程中也能渲染。
+
+当组件应该走 raw/dynamic HTML 路径并接收清洗后的 HTML 属性与 `children` 时，使用 `htmlComponents`。属性值会转换成 primitive prop 值，但属性名会保留源 HTML 写法，例如 `class` 仍然是 `class`。这类组件仍可能随着 streaming 内容重渲染，但不会收到 `node.loading` 或 parser 节点合约。
+
+定义带类型的组件 map 时，优先使用 `defineStreamingComponents(...)` 和 `defineHtmlComponents(...)`。`StreamingComponentMap` 与 `HtmlComponentMap` 描述的是渲染器可接收的宽运行时 map 形状；逐项 props 合约校验由 helper 完成，可以捕获把 parser-backed `NodeComponentProps` 组件放进 HTML props 路径这类误用。
+
+```tsx
+import type { NodeComponentProps } from 'markstream-react'
+import type React from 'react'
+import MarkdownRender, { defineHtmlComponents, defineStreamingComponents } from 'markstream-react'
+
+interface DocumentLinkNode {
+  type: 'documentlink'
+  tag: 'documentlink'
+  attrs?: [string, string][]
+  content: string
+  loading?: boolean
+}
+
+function getAttr(attrs: [string, string][] | undefined, name: string) {
+  return attrs?.find(([key]) => key === name)?.[1]
+}
+
+function DocumentLink({ node }: NodeComponentProps<DocumentLinkNode>) {
+  return (
+    <a
+      href={`/documents/${getAttr(node.attrs, 'id')}`}
+      aria-busy={node.loading || undefined}
+    >
+      {node.content}
+    </a>
+  )
+}
+
+function Badge({ kind, children }: React.PropsWithChildren<{ kind?: string }>) {
+  return <span data-kind={kind}>{children}</span>
+}
+
+const streamingComponents = defineStreamingComponents({
+  documentlink: DocumentLink,
+})
+
+const htmlComponents = defineHtmlComponents({
+  badge: Badge,
+})
+
+function App({ content, isDone }: { content: string, isDone: boolean }) {
+  return (
+    <MarkdownRender
+      content={content}
+      final={isDone}
+      streamingComponents={streamingComponents}
+      htmlComponents={htmlComponents}
+    />
+  )
+}
+```
+
+`customHtmlTags` 仍然可以作为更底层的 parser 选项使用。`htmlComponents` 也可以处理列在 `customHtmlTags` 中的标签，但它仍然接收清洗后的 HTML 属性与 `children`；只有 `streamingComponents` 会收到 `NodeComponentProps`。`setCustomComponents` 和 `customId` 也继续支持，用于兼容旧代码、应用级共享注册，以及已有 AST 节点覆盖。如果同一个归一化 tag 同时出现在 `streamingComponents` 和 `htmlComponents` 中，`streamingComponents` 会胜出，并在开发环境只告警一次。
+
+这个 API 拆分解决的是可发现性和类型表达问题。HTML 安全仍由 `htmlPolicy` 和现有 sanitization 规则负责；这不是一个安全边界。
 
 ## 代码块组件
 

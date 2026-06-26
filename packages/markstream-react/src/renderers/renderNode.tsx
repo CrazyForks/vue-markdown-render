@@ -2,7 +2,7 @@ import type { ParsedNode } from 'stream-markdown-parser'
 import type { RenderContext } from '../types'
 import { normalizeShikiLanguage } from 'markstream-core'
 import React from 'react'
-import { getHtmlTagFromContent, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper } from 'stream-markdown-parser'
+import { convertHtmlAttrsToProps, getHtmlTagFromContent, normalizeCustomHtmlTagName, sanitizeHtmlTokenAttrs, shouldRenderUnknownHtmlTagAsText, stripCustomHtmlWrapper, tokenAttrsToRecord } from 'stream-markdown-parser'
 import { AdmonitionNode } from '../components/AdmonitionNode/AdmonitionNode'
 import { BlockquoteNode } from '../components/BlockquoteNode/BlockquoteNode'
 import { CheckboxNode } from '../components/CheckboxNode/CheckboxNode'
@@ -145,6 +145,34 @@ function renderSpecialCodeBlockComponent(
   })
 }
 
+function getParserCustomTagNodeTag(node: ParsedNode) {
+  if (node.type === 'html_block' || node.type === 'html_inline')
+    return ''
+
+  const type = normalizeCustomHtmlTagName(node.type)
+  const tag = normalizeCustomHtmlTagName((node as any).tag)
+  return type && tag && type === tag ? type : ''
+}
+
+function renderHtmlComponentForCustomTagNode(
+  component: React.ComponentType<any>,
+  node: ParsedNode,
+  key: React.Key,
+  ctx: RenderContext,
+  tag: string,
+) {
+  const attrs = sanitizeHtmlTokenAttrs((node as any).attrs ?? undefined, ctx.htmlPolicy ?? 'safe', tag)
+  const props = convertHtmlAttrsToProps(tokenAttrsToRecord(attrs))
+  const children = Array.isArray((node as any).children)
+    ? renderNodeChildren((node as any).children, ctx, `${String(key)}-html`, renderNode)
+    : ((node as any).content ?? null)
+
+  return React.createElement(component, {
+    ...props,
+    key,
+  }, children)
+}
+
 function getMermaidRenderProps(node: any, ctx: RenderContext) {
   const next = { ...(ctx.mermaidProps || {}) } as Record<string, any>
   if (parsePositiveMermaidNumber(next.estimatedPreviewHeightPx) == null) {
@@ -259,9 +287,33 @@ function renderCodeBlock(
 
 export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext) {
   const customComponents = ctx.customComponents ?? getCustomNodeComponents(ctx.customId)
+  const streamingComponents = ctx.streamingComponents ?? {}
+  const htmlComponents = ctx.htmlComponents ?? {}
+  const parserCustomTag = getParserCustomTagNodeTag(node)
+  const streamingCustom = parserCustomTag
+    ? (streamingComponents as Record<string, any>)[parserCustomTag]
+    : null
+  const htmlCustom = parserCustomTag && !streamingCustom
+    ? (htmlComponents as Record<string, any>)[parserCustomTag]
+    : null
   const custom = node.type === 'code_block'
     ? null
     : (customComponents as Record<string, any>)[node.type]
+  if (streamingCustom) {
+    return React.createElement(streamingCustom, {
+      key,
+      node,
+      customId: ctx.customId,
+      isDark: ctx.isDark,
+      ctx,
+      renderNode,
+      indexKey: key,
+      typewriter: ctx.typewriter,
+      fade: ctx.fade,
+    })
+  }
+  if (htmlCustom)
+    return renderHtmlComponentForCustomTagNode(htmlCustom, node, key, ctx, parserCustomTag)
   if (custom) {
     return React.createElement(custom, {
       key,
@@ -277,7 +329,11 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
   }
 
   if (node.type === 'html_block' || node.type === 'html_inline') {
-    const resolvedCustomTag = resolveCustomHtmlTag(node as any, customComponents as any, ctx.customHtmlTags)
+    const streamingAndLegacyComponents = {
+      ...(customComponents as Record<string, any>),
+      ...(streamingComponents as Record<string, any>),
+    }
+    const resolvedCustomTag = resolveCustomHtmlTag(node as any, streamingAndLegacyComponents as any, ctx.customHtmlTags)
     const fallbackTag = String((node as any).tag ?? '').trim().toLowerCase() || getHtmlTagFromContent((node as any).content)
     const tag = resolvedCustomTag?.tag ?? fallbackTag
     if (tag) {
@@ -430,7 +486,7 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
     case 'html_inline':
       return node.type === 'html_block'
         ? <HtmlBlockNode key={key} node={node as any} ctx={ctx} renderNode={renderNode} indexKey={key} typewriter={ctx.typewriter} fade={ctx.fade} customId={ctx.customId} />
-        : <HtmlInlineNode key={key} node={node as any} ctx={ctx} typewriter={ctx.typewriter} fade={ctx.fade} customId={ctx.customId} />
+        : <HtmlInlineNode key={key} node={node as any} ctx={ctx} renderNode={renderNode} indexKey={key} typewriter={ctx.typewriter} fade={ctx.fade} customId={ctx.customId} />
     case 'vmr_container':
       return <VmrContainerNode key={key} node={node as any} ctx={ctx} renderNode={renderNode} indexKey={key} typewriter={ctx.typewriter} fade={ctx.fade} />
     case 'label_open':

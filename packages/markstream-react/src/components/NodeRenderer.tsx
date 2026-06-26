@@ -1,6 +1,7 @@
 import type { ParsedNode } from 'stream-markdown-parser'
 import type { StreamStateRef } from '../context/streamState'
 import type { VisibilityHandle } from '../context/viewportPriority'
+import type { HtmlComponentMap, StreamingComponentMap } from '../customComponents'
 import type { NodeRendererProps, RenderContext } from '../types'
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
@@ -11,7 +12,13 @@ import {
 import { SmoothStreamingContext } from '../context/smoothStreaming'
 import { StreamStateRefContext } from '../context/streamState'
 import { useViewportPriority, ViewportPriorityProvider } from '../context/viewportPriority'
-import { getCustomComponentsRevision, getCustomNodeComponents, subscribeCustomComponents } from '../customComponents'
+import {
+  getCustomComponentsRevision,
+  getCustomNodeComponents,
+  normalizeComponentMap,
+  subscribeCustomComponents,
+  warnComponentMapConflicts,
+} from '../customComponents'
 import { useSmoothMarkdownStream } from '../hooks/useSmoothMarkdownStream'
 import { renderNode } from '../renderers/renderNode'
 import { normalizeLanguageIdentifier } from '../utils/languageIcon'
@@ -66,10 +73,12 @@ function isNodeStable(prev: ParsedNode, next: ParsedNode): boolean {
   // changed the parsed output should be identical (parser is deterministic).
   if (prev.raw !== next.raw)
     return false
-  // Loading state on code blocks can flip independently of `raw`.
+  if ((prev as any).loading !== (next as any).loading)
+    return false
+  if ((prev as any).autoClosed !== (next as any).autoClosed)
+    return false
+  // Code block diff state can flip independently of `raw`.
   if (prev.type === 'code_block' || next.type === 'code_block') {
-    if ((prev as any).loading !== (next as any).loading)
-      return false
     if ((prev as any).diff !== (next as any).diff)
       return false
   }
@@ -102,6 +111,22 @@ function stabilizeParsedNodes(newNodes: ParsedNode[], prevNodes: ParsedNode[]): 
   if (identical)
     return prevNodes
   return result
+}
+
+function componentMapsEqual<T>(prev: Record<string, T>, next: Record<string, T>) {
+  const prevKeys = Object.keys(prev)
+  const nextKeys = Object.keys(next)
+  if (prevKeys.length !== nextKeys.length)
+    return false
+  return prevKeys.every(key => prev[key] === next[key])
+}
+
+function useStableNormalizedComponentMap<T>(mapping?: Record<string, T>) {
+  const normalized = useMemo(() => normalizeComponentMap(mapping), [mapping])
+  const stableRef = useRef(normalized)
+  if (!componentMapsEqual(stableRef.current, normalized))
+    stableRef.current = normalized
+  return stableRef.current
 }
 
 // ---------------------------------------------------------------------------
@@ -784,7 +809,10 @@ function areNodeRendererInnerPropsEqual(prev: NodeRendererInnerProps, next: Node
 
 const MemoNodeRendererInner = React.memo(NodeRendererInner, areNodeRendererInnerPropsEqual)
 
-export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
+export function NodeRenderer<
+  TStreamingComponents extends StreamingComponentMap = StreamingComponentMap,
+  THtmlComponents extends Record<string, any> = HtmlComponentMap,
+>(rawProps: NodeRendererProps<TStreamingComponents, THtmlComponents>) {
   const props = { ...DEFAULT_PROPS, ...rawProps } as ResolvedProps
   const containerRef = useRef<HTMLDivElement | null>(null)
   const desiredThemeKeyRef = useRef<string | null>(null)
@@ -793,6 +821,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
   const previousRenderVersionSourceRef = useRef<unknown>(null)
   const smoothStream = useSmoothMarkdownStream(props.smoothStreamingOptions)
   const parentSmoothStreaming = React.useContext(SmoothStreamingContext)
+  const warnedComponentMapConflictsRef = useRef(new Set<string>())
   const [hasMountedForSmoothStreaming, setHasMountedForSmoothStreaming] = useState(
     () => props.smoothStreaming === true,
   )
@@ -983,6 +1012,16 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
   const customComponents = useMemo(() => {
     return getCustomNodeComponents(props.customId)
   }, [props.customId, customComponentsRevision])
+  const streamingComponents = useStableNormalizedComponentMap(props.streamingComponents)
+  const htmlComponents = useStableNormalizedComponentMap(props.htmlComponents)
+
+  useEffect(() => {
+    warnComponentMapConflicts(
+      streamingComponents,
+      htmlComponents,
+      warnedComponentMapConflictsRef.current,
+    )
+  }, [htmlComponents, streamingComponents])
 
   const instanceMsgId = useMemo(() => {
     return props.customId
@@ -996,12 +1035,14 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     return mergeCustomHtmlTags(
       props.customHtmlTags,
       Array.isArray(optionTags) ? optionTags : [],
+      Object.keys(streamingComponents),
     )
   }, [
     props.customId,
     props.customHtmlTags,
     props.parseOptions,
     customComponentsRevision,
+    streamingComponents,
   ])
 
   const mdBase = useMemo(() => {
@@ -1239,12 +1280,15 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
   const renderCtx = useMemo<RenderContext>(() => ({
     customId: props.customId,
     isDark: props.isDark,
+    final: effectiveFinal,
     indexKey: indexPrefix,
     typewriter: props.typewriter,
     fade: props.fade,
     textStreamState: textStreamStateRef.current,
     streamRenderVersion: streamRenderVersionRef.current,
     customComponents,
+    streamingComponents,
+    htmlComponents,
     customHtmlTags: effectiveCustomHtmlTags,
     htmlPolicy: props.htmlPolicy ?? 'safe',
     showTooltips: props.showTooltips,
@@ -1270,6 +1314,7 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
   }), [
     props.customId,
     props.isDark,
+    effectiveFinal,
     indexPrefix,
     props.typewriter,
     props.fade,
@@ -1292,6 +1337,8 @@ export const NodeRenderer: React.FC<NodeRendererProps> = (rawProps) => {
     props.onCopy,
     props.onHandleArtifactClick,
     customComponents,
+    streamingComponents,
+    htmlComponents,
   ])
 
   // Keep stream version and text state up-to-date via mutation so the

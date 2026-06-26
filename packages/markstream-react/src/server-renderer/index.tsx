@@ -11,7 +11,7 @@ import type {
 import type { HtmlPreviewFrameProps } from '../components/CodeBlockNode/HtmlPreviewFrame'
 import type { MarkdownCodeBlockNodeProps } from '../components/MarkdownCodeBlockNode/MarkdownCodeBlockNode'
 import type { TooltipProps } from '../components/Tooltip/Tooltip'
-import type { CustomComponentMap } from '../customComponents'
+import type { CustomComponentMap, HtmlComponentMap, StreamingComponentMap } from '../customComponents'
 import type { NodeRendererProps, RenderContext } from '../types'
 import type {
   CodeBlockNodeProps,
@@ -28,10 +28,12 @@ import type { NodeComponentProps } from '../types/node-component'
 import { normalizeShikiLanguage } from 'markstream-core'
 import React from 'react'
 import {
+  convertHtmlAttrsToProps,
   getMarkdown,
   isHtmlTagBlocked,
   mergeCustomHtmlTags,
   NON_STRUCTURING_HTML_TAGS,
+  normalizeCustomHtmlTagName,
   parseMarkdownToStructure,
   sanitizeHtmlAttrs,
   sanitizeHtmlTokenAttrs,
@@ -39,10 +41,15 @@ import {
   shouldOpenLinkInNewTab,
   shouldRenderUnknownHtmlTagAsText,
   stripCustomHtmlWrapper,
+  tokenAttrsToRecord,
 } from 'stream-markdown-parser'
 import { clampInfographicPreviewHeight, estimateInfographicPreviewHeight, parsePositiveNumber as parsePositiveInfographicNumber } from '../components/InfographicBlockNode/height'
 import { clampMermaidPreviewHeight, estimateMermaidPreviewHeight, parsePositiveNumber as parsePositiveMermaidNumber } from '../components/MermaidBlockNode/height'
-import { getCustomNodeComponents } from '../customComponents'
+import {
+  getCustomNodeComponents,
+  normalizeComponentMap,
+  warnComponentMapConflicts,
+} from '../customComponents'
 import { getCodeBlockExtraProps } from '../renderers/codeBlockExtraProps'
 import { BLOCK_LEVEL_TYPES, renderInline, renderNodeChildren, tokenAttrsToProps } from '../renderers/renderChildren'
 import { isParagraphBreakingCustomHtmlNode, resolveCustomHtmlTag } from '../utils/customHtmlTag'
@@ -146,6 +153,7 @@ function renderCustomCodeBlockComponent(
     renderNode,
     indexKey: key,
     typewriter: ctx.typewriter,
+    fade: ctx.fade,
   })
 }
 
@@ -164,21 +172,56 @@ function renderSpecialCodeBlockComponent(
   })
 }
 
+function getParserCustomTagNodeTag(node: ParsedNode) {
+  if (node.type === 'html_block' || node.type === 'html_inline')
+    return ''
+
+  const type = normalizeCustomHtmlTagName(node.type)
+  const tag = normalizeCustomHtmlTagName((node as any).tag)
+  return type && tag && type === tag ? type : ''
+}
+
+function renderHtmlComponentForCustomTagNode(
+  component: React.ComponentType<any>,
+  node: ParsedNode,
+  key: React.Key,
+  ctx: RenderContext,
+  tag: string,
+) {
+  const attrs = sanitizeHtmlTokenAttrs((node as any).attrs ?? undefined, ctx.htmlPolicy ?? 'safe', tag)
+  const props = convertHtmlAttrsToProps(tokenAttrsToRecord(attrs))
+  const children = Array.isArray((node as any).children)
+    ? renderNodeChildren((node as any).children, ctx, `${String(key)}-html`, renderNode)
+    : ((node as any).content ?? null)
+
+  return React.createElement(component, {
+    ...props,
+    key,
+  }, children)
+}
+
 function createRenderContext(
   props: NodeRendererProps,
   customComponents: CustomComponentMap,
+  streamingComponents: NonNullable<RenderContext['streamingComponents']>,
+  htmlComponents: NonNullable<RenderContext['htmlComponents']>,
   indexPrefix: string,
   customHtmlTags: readonly string[],
+  final?: boolean,
 ): RenderContext {
   return {
     customId: props.customId,
+    final,
     customComponents,
     customHtmlTags,
     htmlPolicy: props.htmlPolicy ?? 'safe',
     isDark: props.isDark,
     indexKey: indexPrefix,
     typewriter: props.typewriter,
+    fade: props.fade,
     showTooltips: props.showTooltips,
+    streamingComponents,
+    htmlComponents,
     renderCodeBlocksAsPre: props.renderCodeBlocksAsPre,
     codeBlockStream: props.codeBlockStream,
     codeBlockProps: {
@@ -413,6 +456,11 @@ export function ParagraphNode(props: NodeComponentProps<{ type: 'paragraph', chi
 
   const nodeChildren = node.children ?? []
   const customComponents = ctx.customComponents ?? getCustomNodeComponents(ctx.customId)
+  const displayComponents = {
+    ...customComponents,
+    ...(ctx.htmlComponents ?? {}),
+    ...(ctx.streamingComponents ?? {}),
+  }
   const parts: React.ReactNode[] = []
   const inlineBuffer: ParsedNode[] = []
 
@@ -429,7 +477,9 @@ export function ParagraphNode(props: NodeComponentProps<{ type: 'paragraph', chi
   }
 
   nodeChildren.forEach((child, childIndex) => {
-    if (BLOCK_LEVEL_TYPES.has(child.type) || isParagraphBreakingCustomHtmlNode(child, customComponents, ctx.customHtmlTags)) {
+    const canUseHtmlDisplayMetadata = (ctx.htmlPolicy ?? 'safe') !== 'escape'
+      || (child.type !== 'html_inline' && child.type !== 'html_block')
+    if (BLOCK_LEVEL_TYPES.has(child.type) || (canUseHtmlDisplayMetadata && isParagraphBreakingCustomHtmlNode(child, displayComponents, ctx.customHtmlTags))) {
       flushInline()
       parts.push(
         <React.Fragment key={`${String(indexKey ?? 'paragraph')}-block-${childIndex}`}>
@@ -990,9 +1040,13 @@ export function HtmlBlockNode(props: NodeComponentProps<{
   children?: ParsedNode[]
 }>) {
   const structuredTag = String((props.node as any)?.tag ?? '').trim().toLowerCase()
+  const normalizedStructuredTag = normalizeCustomHtmlTagName(structuredTag)
   const structuredChildren = Array.isArray((props.node as any)?.children)
     ? ((props.node as any).children as ParsedNode[])
     : []
+  const StructuredHtmlComponent = normalizedStructuredTag
+    ? props.ctx?.htmlComponents?.[normalizedStructuredTag]
+    : undefined
   if (
     structuredChildren.length > 0
     && structuredTag
@@ -1001,28 +1055,96 @@ export function HtmlBlockNode(props: NodeComponentProps<{
     && props.ctx
     && props.renderNode
   ) {
+    const structuredContent = renderNodeChildren(
+      structuredChildren,
+      props.ctx,
+      `${String(props.indexKey ?? 'html-block')}-structured`,
+      props.renderNode,
+    )
+    if (StructuredHtmlComponent) {
+      const attrs = sanitizeHtmlTokenAttrs((props.node as any)?.attrs ?? null, props.ctx?.htmlPolicy ?? 'safe', normalizedStructuredTag)
+      return React.createElement(
+        StructuredHtmlComponent as any,
+        convertHtmlAttrsToProps(tokenAttrsToRecord(attrs)),
+        structuredContent,
+      )
+    }
+
     return React.createElement(
       structuredTag,
       mergeHtmlBlockWrapperProps((props.node as any)?.attrs ?? null, props.ctx?.htmlPolicy ?? 'safe', structuredTag),
-      renderNodeChildren(
-        structuredChildren,
-        props.ctx,
-        `${String(props.indexKey ?? 'html-block')}-structured`,
-        props.renderNode,
-      ),
+      structuredContent,
     )
   }
 
-  const customComponents = getCustomNodeComponents(props.customId)
-  const nodes = parseHtmlToReactNodes(String(props.node.content ?? ''), customComponents, props.ctx?.htmlPolicy ?? 'safe')
+  const customComponents = {
+    ...(props.ctx?.customComponents ?? getCustomNodeComponents(props.customId)),
+    ...(props.ctx?.htmlComponents ?? {}),
+  }
+  const nodes = parseHtmlToReactNodes(String(props.node.content ?? ''), customComponents, props.ctx?.htmlPolicy ?? 'safe', {
+    ctx: props.ctx,
+    keyPrefix: String(props.indexKey ?? 'html-block'),
+    nodeComponents: props.ctx?.streamingComponents,
+    propComponents: props.ctx?.htmlComponents,
+    renderNode: props.renderNode,
+    sourceNode: props.node as ParsedNode,
+  })
   if (nodes == null)
     return <>{String(props.node.content ?? '')}</>
   return <>{nodes}</>
 }
 
-export function HtmlInlineNode(props: NodeComponentProps<{ type: 'html_inline', content?: string }>) {
-  const customComponents = getCustomNodeComponents(props.customId)
-  const nodes = parseHtmlToReactNodes(String(props.node.content ?? ''), customComponents, props.ctx?.htmlPolicy ?? 'safe')
+export function HtmlInlineNode(props: NodeComponentProps<{
+  type: 'html_inline'
+  content?: string
+  tag?: string
+  attrs?: [string, string | null][] | null
+  children?: ParsedNode[]
+}>) {
+  const htmlPolicy = props.ctx?.htmlPolicy ?? 'safe'
+  const structuredTag = String((props.node as any)?.tag ?? '').trim().toLowerCase()
+  const normalizedStructuredTag = normalizeCustomHtmlTagName(structuredTag)
+  const structuredChildren = Array.isArray((props.node as any)?.children)
+    ? ((props.node as any).children as ParsedNode[])
+    : []
+  const StructuredHtmlComponent = normalizedStructuredTag
+    ? props.ctx?.htmlComponents?.[normalizedStructuredTag]
+    : undefined
+  if (
+    structuredChildren.length > 0
+    && structuredTag
+    && htmlPolicy !== 'escape'
+    && !isHtmlTagBlocked(structuredTag, htmlPolicy)
+    && props.ctx
+    && props.renderNode
+    && StructuredHtmlComponent
+  ) {
+    const structuredContent = renderNodeChildren(
+      structuredChildren,
+      props.ctx,
+      `${String(props.indexKey ?? 'html-inline')}-structured`,
+      props.renderNode,
+    )
+    const attrs = sanitizeHtmlTokenAttrs((props.node as any)?.attrs ?? null, htmlPolicy, normalizedStructuredTag)
+    return React.createElement(
+      StructuredHtmlComponent as any,
+      convertHtmlAttrsToProps(tokenAttrsToRecord(attrs)),
+      structuredContent,
+    )
+  }
+
+  const customComponents = {
+    ...(props.ctx?.customComponents ?? getCustomNodeComponents(props.customId)),
+    ...(props.ctx?.htmlComponents ?? {}),
+  }
+  const nodes = parseHtmlToReactNodes(String(props.node.content ?? ''), customComponents, htmlPolicy, {
+    ctx: props.ctx,
+    keyPrefix: String(props.indexKey ?? 'html-inline'),
+    nodeComponents: props.ctx?.streamingComponents,
+    propComponents: props.ctx?.htmlComponents,
+    renderNode: props.renderNode,
+    sourceNode: props.node as ParsedNode,
+  })
   if (nodes == null)
     return <>{String(props.node.content ?? '')}</>
   return <>{nodes}</>
@@ -1075,9 +1197,33 @@ export function FallbackComponent(props: NodeComponentProps<{ type: string }>) {
 
 export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext) {
   const customComponents = ctx.customComponents ?? getCustomNodeComponents(ctx.customId)
+  const streamingComponents = ctx.streamingComponents ?? {}
+  const htmlComponents = ctx.htmlComponents ?? {}
+  const parserCustomTag = getParserCustomTagNodeTag(node)
+  const streamingCustom = parserCustomTag
+    ? (streamingComponents as Record<string, any>)[parserCustomTag]
+    : null
+  const htmlCustom = parserCustomTag && !streamingCustom
+    ? (htmlComponents as Record<string, any>)[parserCustomTag]
+    : null
   const custom = node.type === 'code_block'
     ? null
     : (customComponents as Record<string, any>)[node.type]
+  if (streamingCustom) {
+    return React.createElement(streamingCustom, {
+      key,
+      node,
+      customId: ctx.customId,
+      isDark: ctx.isDark,
+      ctx,
+      renderNode,
+      indexKey: key,
+      typewriter: ctx.typewriter,
+      fade: ctx.fade,
+    })
+  }
+  if (htmlCustom)
+    return renderHtmlComponentForCustomTagNode(htmlCustom, node, key, ctx, parserCustomTag)
   if (custom) {
     return React.createElement(custom, {
       key,
@@ -1088,11 +1234,16 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
       renderNode,
       indexKey: key,
       typewriter: ctx.typewriter,
+      fade: ctx.fade,
     })
   }
 
   if (node.type === 'html_block' || node.type === 'html_inline') {
-    const resolvedCustomTag = resolveCustomHtmlTag(node as any, customComponents as any, ctx.customHtmlTags)
+    const streamingAndLegacyComponents = {
+      ...(customComponents as Record<string, any>),
+      ...(streamingComponents as Record<string, any>),
+    }
+    const resolvedCustomTag = resolveCustomHtmlTag(node as any, streamingAndLegacyComponents as any, ctx.customHtmlTags)
     const tag = resolvedCustomTag?.tag ?? ''
     const isWhitelisted = resolvedCustomTag?.isWhitelisted ?? false
     const customForTag = resolvedCustomTag?.component ?? null
@@ -1112,6 +1263,7 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
         renderNode,
         indexKey: key,
         typewriter: ctx.typewriter,
+        fade: ctx.fade,
       })
     }
     const rawContent = String((node as any).content ?? (node as any).raw ?? '')
@@ -1227,9 +1379,9 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
     case 'reference':
       return <ReferenceNode key={key} node={node as any} ctx={ctx} typewriter={ctx.typewriter} />
     case 'html_block':
-      return <HtmlBlockNode key={key} node={node as any} ctx={ctx} renderNode={renderNode} indexKey={key} typewriter={ctx.typewriter} customId={ctx.customId} />
+      return <HtmlBlockNode key={key} node={node as any} ctx={ctx} renderNode={renderNode} indexKey={key} typewriter={ctx.typewriter} fade={ctx.fade} customId={ctx.customId} />
     case 'html_inline':
-      return <HtmlInlineNode key={key} node={node as any} ctx={ctx} typewriter={ctx.typewriter} customId={ctx.customId} />
+      return <HtmlInlineNode key={key} node={node as any} ctx={ctx} renderNode={renderNode} indexKey={key} typewriter={ctx.typewriter} fade={ctx.fade} customId={ctx.customId} />
     case 'vmr_container':
       return <VmrContainerNode key={key} node={node as any} ctx={ctx} renderNode={renderNode} indexKey={key} typewriter={ctx.typewriter} />
     case 'label_open':
@@ -1240,14 +1392,27 @@ export function renderNode(node: ParsedNode, key: React.Key, ctx: RenderContext)
   }
 }
 
-export function NodeRenderer(props: NodeRendererProps) {
+export function NodeRenderer<
+  TStreamingComponents extends StreamingComponentMap = StreamingComponentMap,
+  THtmlComponents extends Record<string, any> = HtmlComponentMap,
+>(props: NodeRendererProps<TStreamingComponents, THtmlComponents>) {
   const customComponents = getCustomNodeComponents(props.customId)
+  const streamingComponents = normalizeComponentMap(props.streamingComponents)
+  const htmlComponents = normalizeComponentMap(props.htmlComponents)
+  const warnedComponentMapConflicts = new Set<string>()
+
+  warnComponentMapConflicts(
+    streamingComponents,
+    htmlComponents,
+    warnedComponentMapConflicts,
+  )
 
   const baseParseOptions = props.parseOptions ?? {}
   const optionTags = (baseParseOptions as any).customHtmlTags ?? []
   const effectiveCustomHtmlTags = mergeCustomHtmlTags(
     props.customHtmlTags,
     Array.isArray(optionTags) ? optionTags : [],
+    Object.keys(streamingComponents),
   )
 
   const instanceMsgId = props.customId
@@ -1274,7 +1439,15 @@ export function NodeRenderer(props: NodeRendererProps) {
       : []
 
   const indexPrefix = props.indexKey != null ? String(props.indexKey) : 'markdown-renderer'
-  const renderCtx = createRenderContext(props, customComponents, indexPrefix, effectiveCustomHtmlTags)
+  const renderCtx = createRenderContext(
+    props,
+    customComponents,
+    streamingComponents,
+    htmlComponents,
+    indexPrefix,
+    effectiveCustomHtmlTags,
+    resolvedFinal,
+  )
 
   return (
     <div

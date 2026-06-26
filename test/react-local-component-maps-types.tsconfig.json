@@ -1,0 +1,17 @@
+{
+  "extends": "../packages/markstream-react/tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "noEmit": true,
+    "strict": true,
+    "paths": {
+      "markstream-core": ["packages/markstream-core/src/index.ts"],
+      "markstream-core/*": ["packages/markstream-core/src/*"],
+      "stream-markdown-parser": ["test/stream-markdown-parser-type-shim.d.ts"]
+    }
+  },
+  "include": [
+    "./react-local-component-maps-types.tsx",
+    "./stream-markdown-parser-type-shim.d.ts"
+  ]
+}
