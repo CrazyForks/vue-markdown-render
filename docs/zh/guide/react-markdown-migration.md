@@ -67,7 +67,7 @@ export function Article({ markdown }: { markdown: string }) {
 | `react-markdown` | `markstream-react` | 说明 |
 |---|---|---|
 | `children` | `content` | Markdown 字符串通过 `content` 传入。 |
-| `components` | `streamingComponents`、`htmlComponents` 或 `setCustomComponents(id?, mapping)` | HTML-like 自定义标签优先使用渲染器本地 map。需要 parser-backed `NodeComponentProps` 时用 `streamingComponents`；需要普通 React props 和 `children` 时用 `htmlComponents`。已有节点覆盖继续用 `setCustomComponents`。 |
+| `components` | `streamingComponents`、`htmlComponents` 或 `setCustomComponents(id?, mapping)` | HTML-like 自定义标签优先使用渲染器本地 map。需要 parser-backed `NodeComponentProps` 时用 `streamingComponents`；需要清洗后的 HTML 属性和 `children` 时用 `htmlComponents`。已有节点覆盖继续用 `setCustomComponents`。 |
 | `remarkPlugins` | `customMarkdownIt` | 改用 `markdown-it` 插件，而不是 `remark` 插件。很多常见 Markdown 能力本身已经内建。 |
 | `remarkPlugins={[remarkGfm]}` | 很多时候可以删掉 | 表格、任务列表、删除线、代码围栏等常见语法解析器本身已经支持。若你依赖某些边缘行为，删掉前请回归验证。 |
 | `rehypePlugins` | 没有直接等价物 | `markstream-react` 没有公开的 `rehype` 阶段。请改用自定义节点渲染器、`customHtmlTags`、`parseOptions` 或对 `nodes` 做后处理。 |
@@ -106,7 +106,7 @@ const renderer = (
 
 `streamingComponents` 选择 parser-backed streaming-node 合约。它的 key 会加入 parser 的有效 `customHtmlTags`，因此不完整标签也能以 `node.attrs`、`node.content`、`node.loading` 渲染。
 
-`htmlComponents` 选择 raw/dynamic HTML 合约。组件接收普通 React props 和 `children`，不会收到 `props.node`。
+`htmlComponents` 选择 raw/dynamic HTML 合约。组件接收清洗后的 HTML 属性和 `children`，不会收到 `props.node`。属性值会转换成 primitive prop 值，但属性名会保留源 HTML 写法，例如 `class` 仍然是 `class`。
 
 `customHtmlTags` 仍可作为更底层的 parser 选项使用。`setCustomComponents` 和 `customId` 也继续支持，用于兼容旧代码、应用级共享注册，以及内置节点覆盖。
 
@@ -210,7 +210,7 @@ export function Article({ markdown }: { markdown: string }) {
 - `p` -> `paragraph`
 - `img` -> `image`
 - `code` / `pre` -> `code_block` 或 `inline_code`
-- 自定义 HTML-like 标签 -> 需要 `NodeComponentProps` 时用 `streamingComponents`，需要普通 props/children 时用 `htmlComponents`
+- 自定义 HTML-like 标签 -> 需要 `NodeComponentProps` 时用 `streamingComponents`，需要清洗后的 HTML 属性/children 时用 `htmlComponents`
 
 ## 迁移代码高亮
 

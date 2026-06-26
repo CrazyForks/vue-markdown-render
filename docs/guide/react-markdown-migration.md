@@ -67,7 +67,7 @@ This means `components.h1` does not become `components.h1` again. It usually bec
 | `react-markdown` | `markstream-react` | Notes |
 |---|---|---|
 | `children` | `content` | Pass the Markdown string through `content`. |
-| `components` | `streamingComponents`, `htmlComponents`, or `setCustomComponents(id?, mapping)` | For HTML-like custom tags, prefer renderer-local maps. Use `streamingComponents` for parser-backed `NodeComponentProps`; use `htmlComponents` for normal React props and `children`. Legacy node overrides still use `setCustomComponents`. |
+| `components` | `streamingComponents`, `htmlComponents`, or `setCustomComponents(id?, mapping)` | For HTML-like custom tags, prefer renderer-local maps. Use `streamingComponents` for parser-backed `NodeComponentProps`; use `htmlComponents` for sanitized HTML attributes and `children`. Legacy node overrides still use `setCustomComponents`. |
 | `remarkPlugins` | `customMarkdownIt` | Use `markdown-it` plugins instead of `remark` plugins. Many common Markdown features already work without extra plugins. |
 | `remarkPlugins={[remarkGfm]}` | Often removable | Tables, task checkboxes, strikethrough, code fences, and other common constructs are already supported by the parser. Re-check edge cases before deleting plugin code. |
 | `rehypePlugins` | No direct equivalent | There is no public `rehype` stage. Use custom node renderers, `customHtmlTags`, `parseOptions`, or post-process `nodes` instead. |
@@ -106,7 +106,7 @@ const renderer = (
 
 `streamingComponents` selects the parser-backed streaming-node contract. Its keys are added to the parser's effective `customHtmlTags`, so incomplete tags can render with `node.attrs`, `node.content`, and `node.loading`.
 
-`htmlComponents` selects the raw/dynamic HTML contract. Components receive normal React props plus `children`, not `props.node`.
+`htmlComponents` selects the raw/dynamic HTML contract. Components receive sanitized HTML attributes plus `children`, not `props.node`. Attribute values are converted to primitive prop values, but names are preserved from source HTML, so `class` stays `class`.
 
 `customHtmlTags` remains available as a lower-level parser option. `setCustomComponents` and `customId` remain supported for compatibility, shared application-level registration, and built-in node overrides.
 
@@ -210,7 +210,7 @@ Useful node-type translations:
 - `p` -> `paragraph`
 - `img` -> `image`
 - `code` / `pre` -> `code_block` or `inline_code`
-- Custom HTML-like tags -> `streamingComponents` for `NodeComponentProps`, or `htmlComponents` for normal props/children
+- Custom HTML-like tags -> `streamingComponents` for `NodeComponentProps`, or `htmlComponents` for sanitized HTML attributes/children
 
 ## Migrating code highlighting
 

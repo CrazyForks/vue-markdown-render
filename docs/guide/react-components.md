@@ -22,7 +22,7 @@ The primary component for rendering markdown content in React.
 | `parseOptions` | `ParseOptions` | - | Parser options and token hooks (only when `content` is provided) |
 | `customHtmlTags` | `readonly string[]` | - | HTML-like tags emitted as custom nodes (e.g. `thinking`) |
 | `streamingComponents` | `StreamingComponentMap` | - | Renderer-local HTML-like tag components that receive `NodeComponentProps` and are automatically added to the parser's effective `customHtmlTags` |
-| `htmlComponents` | `HtmlComponentMap` | - | Renderer-local HTML-like tag components for the raw/dynamic HTML path; components receive normal React props and `children` |
+| `htmlComponents` | `HtmlComponentMap` | - | Renderer-local HTML-like tag components for the raw/dynamic HTML path; components receive sanitized HTML attributes and `children` |
 | `htmlPolicy` | `'safe' \| 'escape' \| 'trusted'` | `'safe'` | Controls `html_block` / `html_inline` rendering. `safe` blocks active/embed/form tags, `escape` shows literal HTML text, and `trusted` restores the broader trusted HTML behavior while still stripping scripts and unsafe attrs. |
 | `customMarkdownIt` | `(md: MarkdownIt) => MarkdownIt` | - | Customize the internal MarkdownIt instance |
 | `debugPerformance` | `boolean` | `false` | Log parse/render timing and virtualization stats (dev only) |
@@ -156,7 +156,7 @@ For new React code, prefer renderer-local component maps when your content conta
 
 Use `streamingComponents` when the component needs the parser-backed streaming node contract. Keys are normalized like `customHtmlTags`, automatically added to the parser's effective custom tag list, and work with incomplete tags while content is streaming.
 
-Use `htmlComponents` when the component should render through the raw/dynamic HTML path and receive normal React props plus `children`. These components may still rerender while content streams, but they do not receive `node.loading` or the parser node contract.
+Use `htmlComponents` when the component should render through the raw/dynamic HTML path and receive sanitized HTML attributes plus `children`. Attribute values are converted to primitive prop values, but attribute names are preserved from the source HTML, so `class` remains `class`. These components may still rerender while content streams, but they do not receive `node.loading` or the parser node contract.
 
 For typed component definitions, prefer `defineStreamingComponents(...)` and `defineHtmlComponents(...)`. `StreamingComponentMap` and `HtmlComponentMap` describe the broad runtime map shape accepted by the renderer; the helper functions perform the per-entry contract checks that catch mixing parser-backed `NodeComponentProps` components into the HTML props path.
 
@@ -212,7 +212,7 @@ function App({ content, isDone }: { content: string, isDone: boolean }) {
 }
 ```
 
-`customHtmlTags` remains available as a lower-level parser option. `htmlComponents` can also handle tags listed in `customHtmlTags`, but it still receives normal props and `children`; only `streamingComponents` receives `NodeComponentProps`. `setCustomComponents` and `customId` remain supported for compatibility, shared application-level registration, and existing node overrides. If the same normalized tag appears in both `streamingComponents` and `htmlComponents`, `streamingComponents` wins and a development warning is emitted once.
+`customHtmlTags` remains available as a lower-level parser option. `htmlComponents` can also handle tags listed in `customHtmlTags`, but it still receives sanitized HTML attributes and `children`; only `streamingComponents` receives `NodeComponentProps`. `setCustomComponents` and `customId` remain supported for compatibility, shared application-level registration, and existing node overrides. If the same normalized tag appears in both `streamingComponents` and `htmlComponents`, `streamingComponents` wins and a development warning is emitted once.
 
 This API split fixes discoverability and typing around the two component contracts. HTML safety is still handled by `htmlPolicy` and the existing sanitization rules; the split is not a security boundary.
 
