@@ -467,7 +467,7 @@ export function HtmlInlineNode(props: NodeComponentProps<{
       block: hasBlockCustomHtmlComponent(content, dynamicCustomComponents),
       nodes,
     }
-  }, [customComponents, dynamicCustomComponents, htmlPolicy, node.content, props.ctx, props.indexKey, props.renderNode])
+  }, [customComponents, dynamicCustomComponents, htmlPolicy, node.autoClosed, node.content, node.loading, props.ctx, props.indexKey, props.renderNode])
 
   // Use DOM manipulation for pure HTML (mode: 'html')
   useEffect(() => {

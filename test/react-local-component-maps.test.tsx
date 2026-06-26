@@ -805,6 +805,69 @@ describe('react local component maps', () => {
     expect(seen.at(-1)?.node.autoClosed).toBe(false)
   })
 
+  it('updates nested streamingComponents loading when pre-parsed html node state changes without content changes', async () => {
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+
+    function DocumentLink(props: NodeComponentProps<DocumentLinkNode>) {
+      return (
+        <span
+          data-preparsed-loading-id={getAttr(props.node.attrs, 'id') ?? ''}
+          data-preparsed-loading={String(props.node.loading)}
+          data-preparsed-auto-closed={String(props.node.autoClosed)}
+        >
+          {props.node.content}
+        </span>
+      )
+    }
+
+    const nodes = [
+      {
+        type: 'html_inline',
+        content: '<span><DocumentLink id="inline">partial',
+        loading: true,
+      },
+      {
+        type: 'html_block',
+        content: '<span><DocumentLink id="block">partial',
+        loading: true,
+      },
+    ] as any[]
+    const streamingComponents = { documentlink: DocumentLink }
+    const { host, root } = await renderIntoRoot(
+      <NodeRenderer
+        nodes={nodes}
+        smoothStreaming={false}
+        streamingComponents={streamingComponents}
+        viewportPriority={false}
+      />,
+    )
+
+    expect(host.querySelector('[data-preparsed-loading-id="inline"]')?.getAttribute('data-preparsed-loading')).toBe('true')
+    expect(host.querySelector('[data-preparsed-loading-id="block"]')?.getAttribute('data-preparsed-loading')).toBe('true')
+
+    nodes[0] = { ...nodes[0], autoClosed: false, loading: false }
+    nodes[1] = { ...nodes[1], autoClosed: false, loading: false }
+
+    await updateRoot(
+      root,
+      <NodeRenderer
+        // Re-clone the same nodes array without changing renderCtx, so this exercises HtmlInlineNode/HtmlBlockNode memo deps.
+        debugPerformance
+        nodes={nodes}
+        smoothStreaming={false}
+        streamingComponents={streamingComponents}
+        viewportPriority={false}
+      />,
+    )
+
+    expect(host.querySelector('[data-preparsed-loading-id="inline"]')?.getAttribute('data-preparsed-loading')).toBe('false')
+    expect(host.querySelector('[data-preparsed-loading-id="inline"]')?.getAttribute('data-preparsed-auto-closed')).toBe('false')
+    expect(host.querySelector('[data-preparsed-loading-id="block"]')?.getAttribute('data-preparsed-loading')).toBe('false')
+    expect(host.querySelector('[data-preparsed-loading-id="block"]')?.getAttribute('data-preparsed-auto-closed')).toBe('false')
+
+    await unmountRoot(root)
+  })
+
   it('preserves structured children for streamingComponents nested inside html wrappers', async () => {
     const seen: Array<NodeComponentProps<DocumentLinkNode>> = []
     function DocumentLink(props: NodeComponentProps<DocumentLinkNode>) {

@@ -143,7 +143,7 @@ export function HtmlBlockNode(props: NodeComponentProps<{
       renderNode: props.renderNode,
       sourceNode: node as ParsedNode,
     })
-  }, [effectiveCustomComponents, htmlPolicy, node.content, props.ctx, props.indexKey, props.renderNode, useDynamic])
+  }, [effectiveCustomComponents, htmlPolicy, (node as any).autoClosed, node.content, (node as any).loading, props.ctx, props.indexKey, props.renderNode, useDynamic])
   const safeHtmlContent = useMemo(() => sanitizeHtmlContent(renderContent ?? '', htmlPolicy), [htmlPolicy, renderContent])
   const structuredContent = useMemo(() => {
     if (!isStructured || !props.ctx || !props.renderNode)
