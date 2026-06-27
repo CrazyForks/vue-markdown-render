@@ -107,6 +107,22 @@ function updateLockedMinHeight(height: number) {
   if (!Number.isFinite(height) || height <= 0)
     return
 
+  // Once KaTeX has successfully rendered, drop the min-height lock.
+  // The real DOM height is authoritative; keeping a transiently large
+  // min-height from loading/fallback states causes permanent excessive
+  // whitespace (e.g. raw LaTeX fallback is much taller than the rendered
+  // formula). Use 0 so the scoped CSS fallback (--ms-size-math-min-height)
+  // still applies, but the oversized transient value does not stick.
+  if (renderedHtml.value) {
+    if (lockedMinHeight.value === 0)
+      return
+    lockedMinHeight.value = 0
+    const cacheKey = getHeightCacheKey()
+    if (cacheKey)
+      minHeightCacheContext?.cache.set(cacheKey, 0)
+    return
+  }
+
   const nextMinHeight = Math.max(lockedMinHeight.value, height)
   if (nextMinHeight === lockedMinHeight.value)
     return
