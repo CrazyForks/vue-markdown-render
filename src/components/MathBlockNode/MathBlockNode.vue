@@ -103,25 +103,27 @@ function resolveCachedMinHeight() {
   return cacheKey ? (minHeightCacheContext?.cache.get(cacheKey) ?? 0) : 0
 }
 
-function updateLockedMinHeight(height: number) {
-  if (!Number.isFinite(height) || height <= 0)
+function clearLockedMinHeight() {
+  if (lockedMinHeight.value === 0)
     return
 
-  // Once KaTeX has successfully rendered, drop the min-height lock.
-  // The real DOM height is authoritative; keeping a transiently large
-  // min-height from loading/fallback states causes permanent excessive
-  // whitespace (e.g. raw LaTeX fallback is much taller than the rendered
-  // formula). Use 0 so the scoped CSS fallback (--ms-size-math-min-height)
-  // still applies, but the oversized transient value does not stick.
+  lockedMinHeight.value = 0
+  const cacheKey = getHeightCacheKey()
+  if (cacheKey)
+    minHeightCacheContext?.cache.set(cacheKey, 0)
+}
+
+if (initialState.html)
+  clearLockedMinHeight()
+
+function updateLockedMinHeight(height: number) {
   if (renderedHtml.value) {
-    if (lockedMinHeight.value === 0)
-      return
-    lockedMinHeight.value = 0
-    const cacheKey = getHeightCacheKey()
-    if (cacheKey)
-      minHeightCacheContext?.cache.set(cacheKey, 0)
+    clearLockedMinHeight()
     return
   }
+
+  if (!Number.isFinite(height) || height <= 0)
+    return
 
   const nextMinHeight = Math.max(lockedMinHeight.value, height)
   if (nextMinHeight === lockedMinHeight.value)
@@ -245,6 +247,7 @@ async function renderMath() {
       renderedText.value = ''
       hasRenderedOnce = true
       renderingLoading.value = false
+      clearLockedMinHeight()
       captureHeight()
     })
     .catch(async (err: any) => {
@@ -280,6 +283,7 @@ async function renderMath() {
             renderedText.value = ''
             hasRenderedOnce = true
             renderingLoading.value = false
+            clearLockedMinHeight()
             captureHeight()
             // populate worker client cache so future calls hit cache
             setKaTeXCache(mathContent.value, true, html)
