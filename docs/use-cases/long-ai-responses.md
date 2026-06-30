@@ -1,6 +1,20 @@
 ---
 title: Long AI responses — Markdown rendering and virtualization
 description: Use Markstream's virtualized rendering for long AI responses (50 KB+). Bounded live nodes, viewport-aware heavy blocks, and predictable memory usage.
+keywords:
+  - long AI response renderer
+  - virtualized Markdown renderer
+  - large Markdown document rendering
+  - long context LLM Markdown
+  - viewport-aware Markdown
+  - bounded live nodes
+faq:
+  - question: When does a long AI answer need Markdown virtualization?
+    answer: Enable virtualization when responses regularly exceed tens of kilobytes, contain many blocks, or cause scroll and layout work to become visible.
+  - question: Is virtual-scroll required for a single long message?
+    answer: Usually no. Use node-level virtualization first; virtual-scroll is for outer timeline virtualizers that coordinate many messages.
+  - question: Do offscreen Mermaid or Monaco blocks still render immediately?
+    answer: Not when viewport-priority and defer-until-visible paths are enabled. Heavy blocks can stay idle until they approach the viewport.
 ---
 # Long AI responses
 
