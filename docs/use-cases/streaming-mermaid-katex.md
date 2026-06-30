@@ -1,6 +1,20 @@
 ---
 title: Streaming Mermaid and KaTeX in AI-generated Markdown
 description: Use Markstream to render progressive Mermaid diagrams and KaTeX math during AI streaming. Diagrams render incrementally, math defers until expressions are complete.
+keywords:
+  - streaming Mermaid renderer
+  - streaming KaTeX Markdown
+  - AI generated Mermaid
+  - progressive diagram rendering
+  - worker Mermaid rendering
+  - worker KaTeX rendering
+faq:
+  - question: Can Mermaid diagrams render before the full code fence closes?
+    answer: Yes. Markstream can progressively parse renderable Mermaid prefixes so users see useful diagram output before the final chunk arrives.
+  - question: Why does KaTeX sometimes wait during streaming?
+    answer: Partial math often is not valid KaTeX yet, so Markstream defers rendering until the inline or block expression is complete.
+  - question: Do Mermaid and KaTeX peers have to be installed together?
+    answer: No. Install only the optional peers your AI output needs, and configure workers only for the heavy blocks you enable.
 ---
 # Streaming Mermaid and KaTeX
 

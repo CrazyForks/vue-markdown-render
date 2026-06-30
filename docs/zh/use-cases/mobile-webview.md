@@ -1,6 +1,19 @@
 ---
 title: 移动端 WebView AI Markdown 渲染
 description: 在 iOS WKWebView 和 Android WebView 中使用 Markstream 渲染 AI Markdown、处理字体缩放、长回答、Mermaid 和代码块性能。
+keywords:
+  - 移动端 WebView Markdown
+  - iOS WKWebView Markdown
+  - Android WebView Markdown
+  - AI 聊天 WebView Markdown
+  - px CSS Markdown 渲染
+faq:
+  - question: 移动端 WebView 为什么建议使用 index.px.css？
+    answer: px CSS 能避免宿主 App 或系统字体缩放改变根字号后，Markstream 内部尺寸被 rem 连带放大或缩小。
+  - question: 移动端聊天界面应该默认启用 Monaco 吗？
+    answer: 通常不建议。移动端优先使用 pre 或轻量高亮，只有明确需要编辑器能力时再启用 Monaco。
+  - question: 移动端什么时候需要开启虚拟化？
+    answer: 当 AI 回复超过约 10 KB，或者包含多个代码块、图表、数学公式时，就应该比桌面端更早启用虚拟化。
 ---
 
 # 移动端 WebView AI Markdown 渲染

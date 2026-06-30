@@ -1,6 +1,19 @@
 ---
 title: SSE 与 WebSocket Markdown 流式渲染
 description: 使用 Markstream 渲染来自 Server-Sent Events 和 WebSocket 的 Markdown 流，覆盖 AI 输出、批处理、未闭合语法和长内容性能。
+keywords:
+  - SSE Markdown 渲染器
+  - WebSocket Markdown 渲染器
+  - 实时 AI Markdown
+  - token 流批处理
+  - 未闭合 Markdown 渲染
+faq:
+  - question: SSE 或 WebSocket 应该每个 token 都触发一次 Markdown 渲染吗？
+    answer: 不建议。先把小 chunk 缓冲到一帧或一小批，再提交给渲染器，可以减少解析和 DOM 更新次数。
+  - question: Markstream 只支持 SSE 吗？
+    answer: 不是。Markstream 接收 Markdown content 或 nodes，因此 SSE、WebSocket、fetch stream 或自定义传输都能走同一套渲染路径。
+  - question: 服务端发送最终 chunk 时需要做什么？
+    answer: 把消息标记为 final，让未闭合代码块、表格、数学公式等流式中间态稳定成最终渲染。
 ---
 
 # SSE 与 WebSocket Markdown 流式渲染
