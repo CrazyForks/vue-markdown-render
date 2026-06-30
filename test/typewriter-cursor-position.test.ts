@@ -36,6 +36,266 @@ describe('typewriter cursor position', () => {
     vi.unstubAllGlobals()
   })
 
+  it('simple mode shows the CSS cursor without range positioning', async () => {
+    const requestAnimationFrameSpy = vi.fn()
+    vi.stubGlobal('requestAnimationFrame', requestAnimationFrameSpy as unknown as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', vi.fn() as unknown as typeof cancelAnimationFrame)
+    const createRangeSpy = vi.spyOn(document, 'createRange')
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        typewriter: 'simple',
+        smoothStreaming: false,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+
+    await wrapper.setProps({ content: 'hello world' })
+    await flushAll()
+
+    expect(wrapper.classes()).toContain('typewriter-simple-cursor')
+    expect(wrapper.find('.typewriter-cursor').exists()).toBe(false)
+    expect(createRangeSpy).not.toHaveBeenCalled()
+    expect(requestAnimationFrameSpy).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
+  it('marks one simple cursor target for nested inline text', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        typewriter: 'simple',
+        smoothStreaming: false,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+
+    await wrapper.setProps({ content: 'hello **world**' })
+    await flushAll()
+
+    const targets = wrapper.findAll('.typewriter-simple-cursor-target')
+    expect(targets).toHaveLength(1)
+    expect(targets[0].classes()).toContain('text-node')
+    expect(targets[0].text()).toBe('world')
+
+    wrapper.unmount()
+  })
+
+  it('marks a simple cursor target when node virtualization adds spacers', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        typewriter: 'simple',
+        nodeVirtual: true,
+        smoothStreaming: false,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+
+    await wrapper.setProps({ content: 'first\n\nsecond' })
+    await flushAll()
+
+    expect(wrapper.classes()).toContain('virtualized')
+    expect(wrapper.find('.node-spacer').exists()).toBe(true)
+
+    const targets = wrapper.findAll('.typewriter-simple-cursor-target')
+    expect(targets).toHaveLength(1)
+    expect(targets[0].classes()).toContain('text-node')
+    expect(targets[0].text()).toBe('second')
+
+    wrapper.unmount()
+  })
+
+  it('treats static string true as precise cursor mode', async () => {
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        typewriter: 'true' as any,
+        smoothStreaming: false,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+
+    await wrapper.setProps({ content: 'hello world' })
+    await flushAll()
+
+    expect(wrapper.classes()).not.toContain('typewriter-simple-cursor')
+    expect(wrapper.find('.typewriter-cursor').exists()).toBe(true)
+    expect(queuedFrames).toHaveLength(1)
+
+    wrapper.unmount()
+  })
+
+  it('treats static string false as disabled cursor mode', async () => {
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        typewriter: 'false' as any,
+        smoothStreaming: false,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+
+    await wrapper.setProps({ content: 'hello world' })
+    await flushAll()
+
+    expect(wrapper.classes()).not.toContain('typewriter-simple-cursor')
+    expect(wrapper.find('.typewriter-cursor').exists()).toBe(false)
+    expect(wrapper.findAll('.typewriter-simple-cursor-target')).toHaveLength(0)
+    expect(queuedFrames).toHaveLength(0)
+
+    wrapper.unmount()
+  })
+
+  it('clears simple cursor target when stream becomes final', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        typewriter: 'simple',
+        smoothStreaming: false,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+
+    await wrapper.setProps({ content: 'hello **world**' })
+    await flushAll()
+
+    expect(wrapper.findAll('.typewriter-simple-cursor-target')).toHaveLength(1)
+
+    await wrapper.setProps({ final: true })
+    await flushAll()
+
+    expect(wrapper.classes()).not.toContain('typewriter-simple-cursor')
+    expect(wrapper.findAll('.typewriter-simple-cursor-target')).toHaveLength(0)
+
+    wrapper.unmount()
+  })
+
+  it('syncs cursor when switching from simple to precise while visible', async () => {
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        typewriter: 'simple',
+        smoothStreaming: false,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+
+    await wrapper.setProps({ content: 'hello **world**' })
+    await flushAll()
+
+    expect(wrapper.findAll('.typewriter-simple-cursor-target')).toHaveLength(1)
+    expect(queuedFrames).toHaveLength(0)
+
+    await wrapper.setProps({ typewriter: 'precise' })
+    await flushAll()
+
+    expect(wrapper.find('.typewriter-cursor').exists()).toBe(true)
+    expect(wrapper.findAll('.typewriter-simple-cursor-target')).toHaveLength(0)
+    expect(queuedFrames).toHaveLength(1)
+
+    wrapper.unmount()
+  })
+
+  it('syncs cursor when switching from precise to simple while visible', async () => {
+    const queuedFrames: Array<{ id: number, cb: FrameRequestCallback }> = []
+    const cancelAnimationFrameSpy = vi.fn((id: number) => {
+      const index = queuedFrames.findIndex(frame => frame.id === id)
+      if (index >= 0)
+        queuedFrames.splice(index, 1)
+    })
+    let nextFrameId = 1
+
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      const id = nextFrameId++
+      queuedFrames.push({ id, cb })
+      return id
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', cancelAnimationFrameSpy as typeof cancelAnimationFrame)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        typewriter: 'precise',
+        smoothStreaming: false,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+
+    await wrapper.setProps({ content: 'hello **world**' })
+    await flushAll()
+
+    expect(wrapper.find('.typewriter-cursor').exists()).toBe(true)
+    expect(queuedFrames).toHaveLength(1)
+
+    const cursorFrameId = queuedFrames[0].id
+    await wrapper.setProps({ typewriter: 'simple' })
+    await flushAll()
+
+    expect(wrapper.find('.typewriter-cursor').exists()).toBe(false)
+    expect(wrapper.findAll('.typewriter-simple-cursor-target')).toHaveLength(1)
+    expect(wrapper.get('.typewriter-simple-cursor-target').text()).toBe('world')
+    expect(cancelAnimationFrameSpy).toHaveBeenCalledWith(cursorFrameId)
+    expect(queuedFrames).toHaveLength(0)
+
+    wrapper.unmount()
+  })
+
   it('repositions while smooth visible content catches up after the source stops growing', async () => {
     const queuedFrames: FrameRequestCallback[] = []
     const frameIds = new WeakMap<FrameRequestCallback, number>()

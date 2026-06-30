@@ -31,6 +31,7 @@ import type {
   MathOptions,
   MermaidBlockNodeProps,
   NodeRendererProps,
+  NodeRendererTypewriter,
   ShikiCodeBlockProps,
   SmoothMarkdownStreamOptions,
 } from 'markstream-vue'
@@ -103,6 +104,16 @@ const props: NodeRendererProps = {
     enabled: true,
     sessionKey: 'public-api-session',
   },
+}
+const simpleTypewriter: NodeRendererTypewriter = 'simple'
+const preciseTypewriter: NodeRendererTypewriter = 'precise'
+const nodeRendererSimpleTypewriterProps: NodeRendererProps = {
+  content: 'hello',
+  typewriter: simpleTypewriter,
+}
+const nodeRendererPreciseTypewriterProps: NodeRendererProps = {
+  content: 'hello',
+  typewriter: preciseTypewriter,
 }
 
 const options: SmoothMarkdownStreamOptions = {}
@@ -366,6 +377,8 @@ void plugin
 void pluginOptions
 void plugin
 void props
+void nodeRendererSimpleTypewriterProps
+void nodeRendererPreciseTypewriterProps
 void scopedComponents
 void katexEnabled
 void mermaidEnabled

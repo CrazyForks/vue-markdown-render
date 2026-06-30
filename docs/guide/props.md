@@ -31,13 +31,15 @@ Experimental/internal props: `indexKey`, `renderAsFragment`, `debugPerformance`,
 | `dom-mode` | `'full' \| 'minimal'` | `'full'` | Best-effort DOM structure mode. `minimal` skips per-node `.node-slot` / `.node-content` wrappers only when wrappers are not needed; it falls back to `full` for fade, batching, deferral, virtualization, host virtual-scroll, typewriter, or custom components. Disable those features explicitly when you need stable minimal output. |
 | `custom-markdown-it` | `(md: MarkdownIt) => MarkdownIt` | – | Customize the internal MarkdownIt instance (add plugins, tweak options). |
 | `debug-performance` | `boolean` | `false` | Logs parse/render timing, virtualization stats, and `parse(stream)` details such as `streamMode` / `streamDelta` (dev only). |
-| `typewriter` | `boolean` | `false` | Shows the blinking typewriter cursor while streamed content grows. |
-| `smooth-streaming` | `boolean \| 'auto'` | `'auto'` | Enables built-in pacing for streaming `content` updates. `'auto'` only enables when `typewriter=true` or `max-live-nodes<=0`. Set `true` to force-enable, `false` to render with raw chunk cadence. |
+| `typewriter` | `boolean \| 'simple' \| 'precise'` | `false` | Shows the blinking typewriter cursor while streamed content grows. `true` / `'precise'` uses Range-based precise positioning; `'simple'` uses a lightweight CSS cursor. |
+| `smooth-streaming` | `boolean \| 'auto'` | `'auto'` | Enables built-in pacing for streaming `content` updates. `'auto'` enables when `typewriter` is `true`, `'simple'`, `'precise'`, or `max-live-nodes<=0`. Set `true` to force-enable, `false` to render with raw chunk cadence. |
 | `smooth-streaming-options` | `SmoothMarkdownStreamOptions` | – | Options for built-in stream pacing (`minCharsPerSecond`, `maxCharsPerSecond`, `targetLatencyMs`, `catchUpLatencyMs`, `catchUpThreshold`, `maxCommitFps`, `startDelayMs`, `maxCharsPerCommit`, `flushOnFinish`). Read when the renderer is created; recreate the renderer with a different `key` if you need to change them dynamically. |
 | `parse-coalesce-ms` | `number` | `80` | Performance tuning knob for the minimum interval between parse commits while built-in smooth streaming coalesces character-only updates. It does not throttle raw `content` prop updates when `smooth-streaming=false` and has no effect in `nodes` mode. Set `0` to parse every smooth-stream commit. Default scheduling may be optimized in future releases. |
 | `fade` | `boolean` | `true` | Enables non-code-node enter fade and appended-text fade. Disable if you need zero animation for SSR snapshots. |
 | `node-virtual` | `boolean \| 'auto'` | `'auto'` | Controls node-level virtualization inside this Markdown document only. It does not virtualize a chat or timeline list. |
 | `virtual-scroll` | `MarkstreamVirtualScrollOptions` | – | Advanced host virtual-scroll coordination. Use this when an outer timeline virtualizer needs logical `totalHeight`, restore state, and settle/final events instead of reading the current DOM height. When `enabled=true`, pass a stable `sessionKey`. |
+
+Use `typewriter="simple"` for high-frequency streaming or performance-sensitive chat surfaces. Use `typewriter="precise"` when the cursor must closely follow complex inline layout.
 
 ::: tip SSR and smooth streaming
 For SSR with static initial content, prefer `smooth-streaming="auto"` (the default). The `auto` mode includes a mounted gate that prevents pacing initial content from blank on the first client render. Use `smooth-streaming=true` only when you explicitly want to pace the first client-side content as well — this can cause a hydration mismatch or a first-paint flash of empty content in SSR setups.
@@ -168,7 +170,7 @@ Use `html-policy="escape"` when you want literal HTML text to stay visible inste
 | `max-live-nodes` | `220` | Virtualization threshold; set `0` to disable virtualization (renders everything). |
 | `live-node-buffer` | `60` | Overscan window (how many nodes to keep before/after the focus range). |
 | `batch-rendering` | `true` | Incremental rendering batches (only when `max-live-nodes <= 0`). |
-| `smooth-streaming` | `'auto'` | Built-in stream pacing in typewriter/incremental mode (`typewriter` or `max-live-nodes <= 0`). Set `true` to force-enable, `false` for raw chunk cadence. |
+| `smooth-streaming` | `'auto'` | Built-in stream pacing in typewriter/incremental mode (`typewriter=true`, `typewriter='simple'`, `typewriter='precise'`, or `max-live-nodes <= 0`). Set `true` to force-enable, `false` for raw chunk cadence. |
 | `smooth-streaming-options` | – | Fine-tune pacing: `minCharsPerSecond`, `maxCharsPerSecond`, `targetLatencyMs`, `catchUpLatencyMs`, `catchUpThreshold`, `maxCommitFps`, `startDelayMs`, `maxCharsPerCommit`, `flushOnFinish`. Read once when the renderer is created; use a different component `key` to apply new options dynamically. |
 | `initial-render-batch-size` | `40` | How many nodes render immediately before batching begins. |
 | `render-batch-size` | `80` | How many nodes render per batch tick. |

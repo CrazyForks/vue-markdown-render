@@ -154,6 +154,7 @@ export type {
   NodeRendererDomMode,
   NodeRendererMode,
   NodeRendererProps,
+  NodeRendererTypewriter,
 } from './types/node-renderer-props'
 // Export centralized props interfaces so they appear in package d.ts
 export * from './utils'
