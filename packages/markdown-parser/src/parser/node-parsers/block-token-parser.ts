@@ -5,6 +5,7 @@ import { buildAllowedHtmlTagSet } from '../index'
 import { parseInlineTokens } from '../inline-parsers'
 import { parseFenceToken } from '../inline-parsers/fence-parser'
 import { createLinkifyDemotionContextTracker } from '../linkifyHeuristics'
+import { applyNodeSourceMap } from '../node-source-map'
 import { parseBlockquote } from './blockquote-parser'
 import { parseCodeBlock } from './code-block-parser'
 import { parseDefinitionList } from './definition-list-parser'
@@ -342,19 +343,35 @@ export function parseBasicBlockToken(
   options?: InternalParseOptions,
 ): [ParsedNode, number] | null {
   const token = tokens[index]
+  const includeSourceMap = options?.includeSourceMap === true
   switch (token.type) {
-    case 'heading_open':
-      return [parseHeading(tokens, index, options), index + 3]
-
-    case 'code_block': {
-      return [parseCodeBlock(token), index + 1]
+    case 'heading_open': {
+      const node = parseHeading(tokens, index, options)
+      if (includeSourceMap)
+        applyNodeSourceMap(node, token, options)
+      return [node, index + 3]
     }
 
-    case 'fence':
-      return [parseFenceToken(token), index + 1]
+    case 'code_block': {
+      const node = parseCodeBlock(token)
+      if (includeSourceMap)
+        applyNodeSourceMap(node, token, options)
+      return [node, index + 1]
+    }
 
-    case 'math_block':
-      return [parseMathBlock(token), index + 1]
+    case 'fence': {
+      const node = parseFenceToken(token)
+      if (includeSourceMap)
+        applyNodeSourceMap(node, token, options)
+      return [node, index + 1]
+    }
+
+    case 'math_block': {
+      const node = parseMathBlock(token)
+      if (includeSourceMap)
+        applyNodeSourceMap(node, token, options)
+      return [node, index + 1]
+    }
 
     case 'html_block': {
       const htmlBlockNode = parseHtmlBlock(token)
@@ -367,6 +384,8 @@ export function parseBasicBlockToken(
           children: content ? [{ type: 'text', content, raw: content }] : [],
           raw: content,
         }
+        if (includeSourceMap)
+          applyNodeSourceMap(paragraphNode, token, options)
         return [
           paragraphNode,
           index + 1,
@@ -428,38 +447,54 @@ export function parseBasicBlockToken(
 
         const loading = !options?.final && !selfClosing && closeRange == null
 
+        const customNode = {
+          type: tag,
+          tag,
+          content: stripWrapperNewlines(inner),
+          raw: String(fromSource?.raw ?? htmlBlockNode.raw ?? rawHtml),
+          loading,
+          attrs: attrs.length ? attrs : undefined,
+        } as ParsedNode
+
+        if (includeSourceMap)
+          applyNodeSourceMap(customNode, token, options)
         return [
-          {
-            type: tag,
-            tag,
-            content: stripWrapperNewlines(inner),
-            raw: String(fromSource?.raw ?? htmlBlockNode.raw ?? rawHtml),
-            loading,
-            attrs: attrs.length ? attrs : undefined,
-          } as ParsedNode,
+          customNode,
           index + 1,
         ]
       }
+      if (includeSourceMap)
+        applyNodeSourceMap(htmlBlockNode, token, options)
       return [htmlBlockNode, index + 1]
     }
 
     case 'table_open': {
       const [tableNode, newIndex] = parseTable(tokens, index, options)
+      if (includeSourceMap)
+        applyNodeSourceMap(tableNode, token, options)
       return [tableNode, newIndex]
     }
 
     case 'dl_open': {
       const [definitionListNode, newIndex] = parseDefinitionList(tokens, index, options)
+      if (includeSourceMap)
+        applyNodeSourceMap(definitionListNode, token, options)
       return [definitionListNode, newIndex]
     }
 
     case 'footnote_open': {
       const [footnoteNode, newIndex] = parseFootnote(tokens, index, options)
+      if (includeSourceMap)
+        applyNodeSourceMap(footnoteNode, token, options)
       return [footnoteNode, newIndex]
     }
 
-    case 'hr':
-      return [parseThematicBreak(), index + 1]
+    case 'hr': {
+      const node = parseThematicBreak()
+      if (includeSourceMap)
+        applyNodeSourceMap(node, token, options)
+      return [node, index + 1]
+    }
     default:
       break
   }
@@ -493,6 +528,7 @@ export function parseCommonBlockToken(
     return basicResult
 
   const token = tokens[index]
+  const includeSourceMap = options?.includeSourceMap === true
   switch (token.type) {
     case 'container_warning_open':
     case 'container_info_open':
@@ -501,22 +537,32 @@ export function parseCommonBlockToken(
     case 'container_danger_open':
     case 'container_caution_open':
     case 'container_error_open': {
-      if (handlers?.parseContainer)
-        return handlers.parseContainer(tokens, index, options)
+      if (handlers?.parseContainer) {
+        const result = handlers.parseContainer(tokens, index, options)
+        if (includeSourceMap)
+          applyNodeSourceMap(result[0], token, options)
+        return result
+      }
       break
     }
 
     case 'container_open': {
       if (handlers?.matchAdmonition) {
         const result = handlers.matchAdmonition(tokens, index, options)
-        if (result)
+        if (result) {
+          if (includeSourceMap)
+            applyNodeSourceMap(result[0], token, options)
           return result
+        }
       }
       break
     }
 
     case 'vmr_container_open': {
-      return parseVmrContainer(tokens, index, options)
+      const result = parseVmrContainer(tokens, index, options)
+      if (includeSourceMap)
+        applyNodeSourceMap(result[0], token, options)
+      return result
     }
     default:
       break

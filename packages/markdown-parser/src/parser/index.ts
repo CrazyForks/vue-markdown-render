@@ -17,6 +17,7 @@ import { parseHardBreak } from './node-parsers/hardbreak-parser'
 import { parseHtmlBlock } from './node-parsers/html-block-parser'
 import { parseList } from './node-parsers/list-parser'
 import { parseParagraph } from './node-parsers/paragraph-parser'
+import { applyNodeSourceMap } from './node-source-map'
 import { cloneTokenWithMutableChildren } from './token-copy'
 
 type ParsedNodeWithFields = ParsedNode & {
@@ -1424,6 +1425,57 @@ function stripDanglingHtmlLikeTail(markdown: string) {
   return s.slice(0, lastLt)
 }
 
+function createSourceLineMapper(source: string, parsedSource: string) {
+  if (source === parsedSource)
+    return undefined
+
+  const sourceLines = source.split(/\r?\n/)
+  const parsedLines = parsedSource.split(/\r?\n/)
+  const mappedLines: number[] = []
+  let sourceCursor = 0
+
+  for (let parsedLine = 0; parsedLine < parsedLines.length; parsedLine++) {
+    const line = parsedLines[parsedLine] ?? ''
+
+    if (sourceLines[sourceCursor] === line) {
+      mappedLines[parsedLine] = sourceCursor
+      sourceCursor++
+      continue
+    }
+
+    let found = -1
+    if (line !== '') {
+      const searchEnd = Math.min(sourceLines.length, sourceCursor + 80)
+      for (let sourceLine = sourceCursor; sourceLine < searchEnd; sourceLine++) {
+        if (sourceLines[sourceLine] === line) {
+          found = sourceLine
+          break
+        }
+      }
+    }
+
+    if (found !== -1) {
+      mappedLines[parsedLine] = found
+      sourceCursor = found + 1
+      continue
+    }
+
+    mappedLines[parsedLine] = Math.min(
+      Math.max(0, sourceLines.length - 1),
+      Math.max(0, sourceCursor - 1),
+    )
+  }
+
+  return (line: number) => {
+    const index = Number.isFinite(line) ? Math.max(0, Math.trunc(line)) : 0
+    if (index < mappedLines.length)
+      return mappedLines[index] ?? 0
+
+    const lastMapped = mappedLines[mappedLines.length - 1] ?? Math.max(0, sourceLines.length - 1)
+    return Math.min(sourceLines.length, lastMapped + index - mappedLines.length + 1)
+  }
+}
+
 function ensureBlankLineBeforeInlineMultilineCustomHtmlBlocks(markdown: string, tags: string[]) {
   if (!markdown || !tags.length)
     return markdown
@@ -2323,7 +2375,8 @@ export function parseMarkdownToStructure(
   const isFinal = !!options.final
   // Ensure markdown is a string — guard against null/undefined inputs from callers
   // todo: 下面的特殊 math 其实应该更精确匹配到() 或者 $$ $$ 或者 \[ \] 内部的内容
-  let safeMarkdown = (markdown ?? '').toString().replace(/([^\\])\r(ight|ho)/g, '$1\\r$2').replace(/([^\\])\n(abla|eq|ot|exists)/g, '$1\\n$2')
+  const sourceMarkdown = (markdown ?? '').toString()
+  let safeMarkdown = sourceMarkdown.replace(/([^\\])\r(ight|ho)/g, '$1\\r$2').replace(/([^\\])\n(abla|eq|ot|exists)/g, '$1\\n$2')
 
   if (shouldResetTopLevelStreamCacheForFinalAutoParse(md, options)) {
     md.stream!.reset!()
@@ -2487,6 +2540,9 @@ export function parseMarkdownToStructure(
     ...options,
     validateLink,
     __markdownIt: md,
+    __sourceLineMapper: options.includeSourceMap === true
+      ? createSourceLineMapper(sourceMarkdown, safeMarkdown)
+      : undefined,
     __sourceMarkdown: safeMarkdown,
     __customHtmlBlockCursor: 0,
   }
@@ -2502,7 +2558,11 @@ export function parseMarkdownToStructure(
       const first = (postResult as unknown[])[0] as unknown
       const firstType = (first as Record<string, unknown>)?.type
       if (first && typeof firstType === 'string') {
-        result = processTokensWithTiming(postResult as unknown as MarkdownToken[], undefined, timing)
+        const postProcessOptions: InternalParseOptions = {
+          ...internalOptions,
+          __customHtmlBlockCursor: 0,
+        }
+        result = processTokensWithTiming(postResult as unknown as MarkdownToken[], postProcessOptions, timing)
       }
       else {
         // Otherwise assume it returned ParsedNode[] and use it as-is
@@ -2555,6 +2615,7 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
 
   const result: ParsedNode[] = []
   const linkifyContext = createLinkifyDemotionContextTracker(options)
+  const includeSourceMap = options?.includeSourceMap === true
   let i = 0
   // Note: table token normalization is applied during markdown-it parsing
   // via the `applyFixTableTokens` plugin (core.ruler.after('block')).
@@ -2576,6 +2637,8 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
       {
         const paragraphRaw = String(tokens[i + 1]?.content ?? '')
         const paragraphNode = parseParagraph(tokens, i, linkifyContext.options(paragraphRaw)) as ParsedNode
+        if (includeSourceMap)
+          applyNodeSourceMap(paragraphNode, token, options)
         const promoted = maybePromoteCustomNodeFromParagraph(paragraphNode, options)
         if (promoted)
           result.push(...promoted)
@@ -2589,6 +2652,8 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
       case 'bullet_list_open':
       case 'ordered_list_open': {
         const [listNode, newIndex] = parseList(tokens, i, linkifyContext.options())
+        if (includeSourceMap)
+          applyNodeSourceMap(listNode, token, options)
         result.push(listNode)
         linkifyContext.remember(listNode.raw)
         i = newIndex
@@ -2597,6 +2662,8 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
 
       case 'blockquote_open': {
         const [blockquoteNode, newIndex] = parseBlockquote(tokens, i, linkifyContext.options())
+        if (includeSourceMap)
+          applyNodeSourceMap(blockquoteNode, token, options)
         result.push(blockquoteNode)
         linkifyContext.remember(blockquoteNode.raw)
         i = newIndex
@@ -2606,11 +2673,14 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
       case 'footnote_anchor':{
         const meta = (token.meta ?? {}) as Record<string, unknown>
         const id = String(meta.label ?? token.content ?? '')
-        result.push({
+        const footnoteAnchorNode = {
           type: 'footnote_anchor',
           id,
           raw: String(token.content ?? ''),
-        } as ParsedNode)
+        } as ParsedNode
+        if (includeSourceMap)
+          applyNodeSourceMap(footnoteAnchorNode, token, options)
+        result.push(footnoteAnchorNode)
         linkifyContext.remember(String(token.content ?? ''))
 
         i++
@@ -2628,13 +2698,16 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
         // In stream mode, markdown-it can occasionally emit a root-level `text`
         // token (e.g. immediately after an HTML/custom block closes). Treat it
         // as a normal paragraph so the content isn't dropped.
-        result.push({
+        const paragraphNode = {
           type: 'paragraph',
           raw: content,
           children: content
             ? [{ type: 'text', content, raw: content } as ParsedNode]
             : [],
-        } as ParsedNode)
+        } as ParsedNode
+        if (includeSourceMap)
+          applyNodeSourceMap(paragraphNode, token, options)
+        result.push(paragraphNode)
         linkifyContext.remember(content)
         i++
         break
@@ -2666,6 +2739,8 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
               raw,
               children: parsed,
             } as ParsedNode
+            if (includeSourceMap)
+              applyNodeSourceMap(paragraphNode, token, options)
             const promoted = maybePromoteCustomNodeFromParagraph(paragraphNode, options)
             if (promoted)
               result.push(...promoted)
