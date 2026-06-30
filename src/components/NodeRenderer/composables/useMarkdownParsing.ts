@@ -173,6 +173,7 @@ function stableParseKey(
     validateLink: getIdentityKey(options.validateLink),
     preTransformTokens: getIdentityKey(options.preTransformTokens),
     postTransformTokens: getIdentityKey(options.postTransformTokens),
+    postTransformNodes: getIdentityKey(options.postTransformNodes),
   }
 
   if (includeFinal)

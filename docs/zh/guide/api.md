@@ -75,8 +75,9 @@ const md = '![demo](https://example.com/demo.png)'
 
 - `preTransformTokens(tokens)` — 生成节点前预处理 token。
 - `postTransformTokens(tokens)` — 在默认处理后继续调整。
+- `postTransformNodes(nodes)` — 在最终 AST 返回或渲染前处理节点。
 
-如需改造 AST，可在 `parseMarkdownToStructure` 返回后自行处理，再通过 `MarkdownRender` 的 `nodes` 传入。
+当同一个 AST patch 需要作用于 `MarkdownRender` 的 `content` 路径时，使用 `postTransformNodes`。只有应用已经在组件外自行解析时，才需要改用 `nodes`。
 
 示例：把 AI “thinking” 标签直接渲染成自定义组件（无需钩子）
 

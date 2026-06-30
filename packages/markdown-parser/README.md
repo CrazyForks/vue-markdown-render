@@ -267,6 +267,7 @@ ParseOptions supports the following hooks and flags:
 interface ParseOptions {
   preTransformTokens?: (tokens: Token[]) => Token[]
   postTransformTokens?: (tokens: Token[]) => Token[]
+  postTransformNodes?: (nodes: ParsedNode[]) => ParsedNode[]
   // Custom HTML-like tags to emit as custom nodes (e.g. ['thinking'])
   // Use tag-like names such as 'thinking', 'answer-box', or 'my_component'.
   customHtmlTags?: string[]

@@ -443,6 +443,57 @@ describe('react local component maps', () => {
     expect(ssrHost.querySelector('[data-option-callout="option"]')?.textContent).toBe('Option')
   })
 
+  it('does not reuse stale transformed nodes when postTransformNodes changes', async () => {
+    const scopeId = 'react-post-transform-nodes'
+    const seen: any[] = []
+    function Paragraph(props: NodeComponentProps<any>) {
+      seen.push(props.node)
+      return <p data-marker={props.node.data?.marker}>{props.node.children?.[0]?.content}</p>
+    }
+
+    setCustomComponents(scopeId, { paragraph: Paragraph })
+    try {
+      const { host, root } = await renderIntoRoot(
+        <NodeRenderer
+          content="hello"
+          customId={scopeId}
+          final
+          parseOptions={{
+            postTransformNodes: nodes => nodes.map(node => ({ ...node, data: { marker: 'first' } })),
+          }}
+          smoothStreaming={false}
+        />,
+      )
+      const first = seen.at(-1)
+
+      expect(host.querySelector('[data-marker="first"]')?.textContent).toBe('hello')
+      expect(first?.data).toEqual({ marker: 'first' })
+
+      await updateRoot(
+        root,
+        <NodeRenderer
+          content="hello"
+          customId={scopeId}
+          final
+          parseOptions={{
+            postTransformNodes: nodes => nodes.map(node => ({ ...node, data: { marker: 'second' } })),
+          }}
+          smoothStreaming={false}
+        />,
+      )
+
+      const second = seen.at(-1)
+      expect(host.querySelector('[data-marker="second"]')?.textContent).toBe('hello')
+      expect(second).not.toBe(first)
+      expect(second?.data).toEqual({ marker: 'second' })
+
+      await unmountRoot(root)
+    }
+    finally {
+      removeCustomComponents(scopeId)
+    }
+  })
+
   it('passes empty children to self-closing parser-backed htmlComponents', async () => {
     const seen: Array<React.PropsWithChildren<{ kind?: string }>> = []
     function Badge(props: React.PropsWithChildren<{ kind?: string }>) {

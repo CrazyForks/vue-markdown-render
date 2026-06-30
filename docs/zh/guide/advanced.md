@@ -13,8 +13,9 @@
 
 - `preTransformTokens?: (tokens: MarkdownToken[]) => MarkdownToken[]` — 在 `markdown-it` 解析后立即变换 tokens
 - `postTransformTokens?: (tokens: MarkdownToken[]) => MarkdownToken[]` — 进一步变换 tokens
+- `postTransformNodes?: (nodes: ParsedNode[]) => ParsedNode[]` — 在内置节点归一化之后改造解析后的 AST
 
-如需改造 AST，可在 `parseMarkdownToStructure` 返回后自行处理 `ParsedNode[]`，再通过 `MarkdownRender` 的 `nodes` 传入。
+当改造需要作用在 `MarkdownRender` 的 `content` 路径内部时，使用 `postTransformNodes`。只有当你的应用已经在组件外部自行解析时，才使用 `nodes` 传入已有节点。
 
 ### 示例：自定义 HTML‑like 标签（推荐）
 对于 `<thinking>...</thinking>` 这类简单自定义标签，现在不再需要先正则换行或重写 token。只要把标签加入白名单并注册组件即可：
@@ -41,21 +42,21 @@ setCustomComponents('docs', { thinking: ThinkingNode })
 ## 自定义组件解析示例
 
 上面的内置白名单 + 自定义节点管线已覆盖大多数“组件式”标签（内联或块级）。
-当你需要进一步改造节点（例如剥掉包裹、合并分段、手动映射 attrs）时，再使用钩子：
+当你需要在正常 `content` 路径内进一步改造节点（例如剥掉包裹、合并分段、手动映射 attrs）时，再使用钩子：
 
 ```ts
 import { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
 
-function preTransformTokens(tokens: MarkdownToken[]) {
-  return tokens.map((t) => {
-    if (t.type === 'html_block' && t.tag === 'thinking')
-      return { ...t, content: String(t.content ?? '').replace(/<\/?thinking[^>]*>/g, '').trim() }
-    return t
+function postTransformNodes(nodes: ParsedNode[]) {
+  return nodes.map((node) => {
+    if (node.type === 'thinking')
+      return { ...node, data: { role: 'reasoning' } }
+    return node
   })
 }
 
 const md = getMarkdown()
-const nodes = parseMarkdownToStructure(markdown, md, { preTransformTokens })
+const nodes = parseMarkdownToStructure(markdown, md, { postTransformNodes })
 ```
 
 其他可选方案（按复杂度递增）：

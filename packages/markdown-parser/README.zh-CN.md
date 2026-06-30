@@ -265,6 +265,7 @@ ParseOptions 支持以下钩子与标志：
 interface ParseOptions {
   preTransformTokens?: (tokens: Token[]) => Token[]
   postTransformTokens?: (tokens: Token[]) => Token[]
+  postTransformNodes?: (nodes: ParsedNode[]) => ParsedNode[]
   // 自定义 HTML 类标签，作为自定义节点输出（如 ['thinking']）
   // 请传标签式名字，比如 'thinking'、'answer-box'、'my_component'
   customHtmlTags?: string[]

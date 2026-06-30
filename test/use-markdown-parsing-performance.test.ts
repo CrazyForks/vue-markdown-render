@@ -570,6 +570,28 @@ describe('useMarkdownParsing performance behavior', () => {
     scope.stop()
   })
 
+  it('does not reuse stale ParsedNode references when postTransformNodes changes', () => {
+    const content = ref('hello')
+    const { props, scope, state } = createParsingState(content, ref(false), {
+      parseOptions: {
+        postTransformNodes: nodes => nodes.map(node => ({ ...node, data: { marker: 'first' } })),
+      },
+    })
+    const first = state.parsedNodes.value[0] as any
+    const reset = vi.spyOn((state.mdInstance.value as any).stream, 'reset')
+
+    props.parseOptions = {
+      postTransformNodes: nodes => nodes.map(node => ({ ...node, data: { marker: 'second' } })),
+    }
+    const second = state.parsedNodes.value[0] as any
+
+    expect(second).not.toBe(first)
+    expect(second?.data).toEqual({ marker: 'second' })
+    expect(reset).toHaveBeenCalled()
+
+    scope.stop()
+  })
+
   it('does not reuse stale ParsedNode references when customMarkdownIt changes', () => {
     const content = ref('[x](https://example.com)')
     const { props, scope, state } = createParsingState(content)

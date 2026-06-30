@@ -87,3 +87,72 @@ describe('parseMarkdownToStructure - duplicate question rendering', () => {
     })
   }
 })
+
+describe('parseMarkdownToStructure - node transforms', () => {
+  it('applies postTransformNodes to the parsed AST', () => {
+    const md = getMarkdown()
+
+    const nodes = parseMarkdownToStructure('# Title', md, {
+      postTransformNodes(nodes) {
+        expect(nodes.map(node => node.type)).toEqual(['heading'])
+
+        return nodes.map(node => ({
+          ...node,
+          data: {
+            patched: true,
+          },
+        }))
+      },
+    }) as any[]
+
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0].type).toBe('heading')
+    expect(nodes[0].data).toEqual({ patched: true })
+  })
+
+  it('runs token transforms before postTransformNodes', () => {
+    const md = getMarkdown()
+    const order: string[] = []
+
+    const nodes = parseMarkdownToStructure('Hello', md, {
+      preTransformTokens(tokens) {
+        order.push('pre')
+        return tokens
+      },
+      postTransformTokens(tokens) {
+        order.push('post-tokens')
+        return tokens
+      },
+      postTransformNodes(nodes) {
+        order.push('post-nodes')
+        return nodes.map(node => ({
+          ...node,
+          raw: `${node.raw}:patched`,
+        }))
+      },
+    })
+
+    expect(order).toEqual(['pre', 'post-tokens', 'post-nodes'])
+    expect(nodes[0]?.raw).toBe('Hello:patched')
+  })
+
+  it('applies postTransformNodes to standalone HTML document parses', () => {
+    const md = getMarkdown()
+
+    const nodes = parseMarkdownToStructure('<!doctype html>\n<html><body>Hello</body></html>', md, {
+      postTransformNodes(nodes) {
+        return nodes.map(node => ({
+          ...node,
+          data: {
+            standalone: true,
+          },
+        }))
+      },
+    }) as any[]
+
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0].type).toBe('html_block')
+    expect(nodes[0].tag).toBe('html')
+    expect(nodes[0].data).toEqual({ standalone: true })
+  })
+})
