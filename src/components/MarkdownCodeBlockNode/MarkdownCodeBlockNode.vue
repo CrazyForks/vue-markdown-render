@@ -7,17 +7,18 @@ import {
   normalizeShikiLanguage,
   registerHighlightOnce,
 } from 'markstream-core'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import { isDevEnvironment } from '../../utils/devEnv'
 import {
-  getLanguageIcon,
   languageIconsRevision,
   languageMap,
   normalizeLanguageIdentifier,
 } from '../../utils/languageIcon'
+import { MARKSTREAM_LANGUAGE_ICON_RESOLVER_KEY } from '../../utils/languageIconContext'
+import { resolveLanguageIcon } from '../../utils/resolveLanguageIcon'
 import CodeBlockShell from '../CodeBlockNode/CodeBlockShell.vue'
 
 interface MarkdownCodeBlockNodeProps extends ShikiCodeBlockProps {
@@ -80,6 +81,7 @@ const emits = defineEmits<{
   (e: 'copy', code: string): void
 }>()
 const { t } = useSafeI18n()
+const appLanguageIconResolver = inject(MARKSTREAM_LANGUAGE_ICON_RESOLVER_KEY, undefined)
 
 const codeLanguage = ref<string>(resolveStreamingCodeLanguage(props.node.language, props.node.code, isCodeBlockLoading()))
 const copyText = ref(false)
@@ -164,7 +166,7 @@ const displayLanguage = computed(() => {
 const languageIcon = computed(() => {
   void languageIconsRevision.value
   const lang = codeLanguage.value.trim().toLowerCase()
-  return getLanguageIcon(lang.split(':')[0])
+  return resolveLanguageIcon(lang.split(':')[0], appLanguageIconResolver)
 })
 
 // Check if the language is previewable (HTML or SVG)

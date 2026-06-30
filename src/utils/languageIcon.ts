@@ -103,7 +103,7 @@ export async function preloadExtendedLanguageIcons() {
 }
 
 export function getLanguageIcon(lang: string): string {
-  // 1. User custom resolver always wins (backward compat)
+  // 1. User custom resolver is process-global (backward compat).
   if (userLanguageIconResolver) {
     const hit = userLanguageIconResolver(lang)
     if (hit != null && hit !== '')

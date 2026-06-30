@@ -1,9 +1,11 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent } from 'vue'
+import { createSSRApp, defineComponent } from 'vue'
 import { createI18n } from 'vue-i18n'
+import { renderToString } from 'vue/server-renderer'
 import { useSafeI18n as useVue2SafeI18n } from '../packages/markstream-vue2/src/composables/useSafeI18n'
 import { useSafeI18n } from '../src/composables/useSafeI18n'
+import { VueRendererMarkdown } from '../src/exports'
 
 const TestComponent = defineComponent({
   setup() {
@@ -65,6 +67,54 @@ describe('useSafeI18n', () => {
 
     expect(wrapper.text()).toBe('Copy')
     expect(warn).not.toHaveBeenCalled()
+  })
+
+  it('keeps plugin fallback maps scoped to each app', () => {
+    const first = mount(TestComponent, {
+      global: {
+        plugins: [[VueRendererMarkdown, {
+          defaultI18nMap: {
+            'common.copy': 'Copy A',
+          },
+        }]],
+      },
+    })
+    const second = mount(TestComponent, {
+      global: {
+        plugins: [[VueRendererMarkdown, {
+          defaultI18nMap: {
+            'common.copy': 'Copy B',
+          },
+        }]],
+      },
+    })
+    const globalFallback = mount(TestComponent)
+
+    expect(first.text()).toBe('Copy A')
+    expect(second.text()).toBe('Copy B')
+    expect(globalFallback.text()).toBe('Copy')
+  })
+
+  it('keeps plugin fallback maps scoped during SSR', async () => {
+    const renderApp = async (label: string) => {
+      const app = createSSRApp(TestComponent)
+      app.use(VueRendererMarkdown, {
+        defaultI18nMap: {
+          'common.copy': label,
+        },
+      })
+      return renderToString(app)
+    }
+
+    const first = await renderApp('SSR Copy A')
+    const second = await renderApp('SSR Copy B')
+    const globalFallback = await renderToString(createSSRApp(TestComponent))
+
+    expect(first).toContain('SSR Copy A')
+    expect(first).not.toContain('SSR Copy B')
+    expect(second).toContain('SSR Copy B')
+    expect(second).not.toContain('SSR Copy A')
+    expect(globalFallback).toContain('Copy')
   })
 
   it('still supports an explicitly provided global vue-i18n hook', () => {
