@@ -13,7 +13,6 @@ import type {
   MarkstreamVirtualPhase,
   MarkstreamVirtualReason,
   MarkstreamVirtualState,
-  NodeRendererCodeRenderer,
   NodeRendererDomMode,
   NodeRendererMode,
   NodeRendererProps,
@@ -90,6 +89,7 @@ import FallbackComponent from './FallbackComponent.vue'
 import HeightEstimationProbes from './HeightEstimationProbes.vue'
 import { InfographicBlockNodeLoading } from './InfographicBlockNodeLoading'
 import { MermaidBlockNodeLoading } from './MermaidBlockNodeLoading'
+import { normalizeRendererMode, RENDERER_MODE_DEFAULTS, resolveNodeRendererCodeRenderer } from './rendererModeDefaults'
 
 type RuntimeCodeBlockNode = ParsedNode & {
   type: 'code_block'
@@ -161,97 +161,17 @@ function resolveRendererProp<K extends keyof NodeRendererProps>(key: K): NodeRen
 
 const isDevEnv = isDevEnvironment()
 
-const RENDERER_MODE_DEFAULTS: Record<NodeRendererMode, Pick<
-  NodeRendererProps,
-  | 'showTooltips'
-  | 'fade'
-  | 'batchRendering'
-  | 'initialRenderBatchSize'
-  | 'renderBatchSize'
-  | 'renderBatchDelay'
-  | 'renderBatchBudgetMs'
-  | 'renderBatchIdleTimeoutMs'
-  | 'deferNodesUntilVisible'
-  | 'maxLiveNodes'
-  | 'liveNodeBuffer'
-  | 'nodeVirtual'
->> = {
-  docs: {
-    showTooltips: true,
-    fade: true,
-    batchRendering: true,
-    initialRenderBatchSize: 40,
-    renderBatchSize: 80,
-    renderBatchDelay: 16,
-    renderBatchBudgetMs: 6,
-    renderBatchIdleTimeoutMs: 120,
-    deferNodesUntilVisible: true,
-    maxLiveNodes: 220,
-    liveNodeBuffer: 60,
-    nodeVirtual: 'auto',
-  },
-  chat: {
-    showTooltips: false,
-    fade: false,
-    batchRendering: true,
-    initialRenderBatchSize: 16,
-    renderBatchSize: 16,
-    renderBatchDelay: 8,
-    renderBatchBudgetMs: 4,
-    renderBatchIdleTimeoutMs: 120,
-    deferNodesUntilVisible: true,
-    maxLiveNodes: 0,
-    liveNodeBuffer: 0,
-    nodeVirtual: 'auto',
-  },
-  minimal: {
-    showTooltips: false,
-    fade: false,
-    batchRendering: true,
-    initialRenderBatchSize: 16,
-    renderBatchSize: 16,
-    renderBatchDelay: 8,
-    renderBatchBudgetMs: 4,
-    renderBatchIdleTimeoutMs: 120,
-    deferNodesUntilVisible: true,
-    maxLiveNodes: 0,
-    liveNodeBuffer: 0,
-    nodeVirtual: 'auto',
-  },
-}
-
-function normalizeRendererMode(value: unknown): NodeRendererMode {
-  return value === 'chat' || value === 'minimal' || value === 'docs'
-    ? value
-    : 'docs'
-}
-
 function normalizeRendererDomMode(value: unknown): NodeRendererDomMode {
   return value === 'minimal' ? 'minimal' : 'full'
 }
 
 const resolvedMode = computed<NodeRendererMode>(() => normalizeRendererMode(resolveRendererProp('mode')))
 const resolvedDomMode = computed<NodeRendererDomMode>(() => normalizeRendererDomMode(resolveRendererProp('domMode')))
-const resolvedCodeRenderer = computed<NodeRendererCodeRenderer>(() => {
-  const renderCodeBlocksAsPre = resolveRendererProp('renderCodeBlocksAsPre')
-  const codeRenderer = resolveRendererProp('codeRenderer')
-
-  if (renderCodeBlocksAsPre === true)
-    return 'pre'
-
-  if (
-    codeRenderer === 'pre'
-    || codeRenderer === 'shiki'
-    || codeRenderer === 'monaco'
-  ) {
-    return codeRenderer
-  }
-
-  if (renderCodeBlocksAsPre === false)
-    return 'monaco'
-
-  return resolvedMode.value === 'docs' ? 'monaco' : 'pre'
-})
+const resolvedCodeRenderer = computed(() => resolveNodeRendererCodeRenderer({
+  mode: resolvedMode.value,
+  codeRenderer: resolveRendererProp('codeRenderer'),
+  renderCodeBlocksAsPre: resolveRendererProp('renderCodeBlocksAsPre'),
+}))
 const resolvedModeDefaults = computed(() => RENDERER_MODE_DEFAULTS[resolvedMode.value])
 const resolvedShowTooltipsProp = computed(() => resolveRendererProp('showTooltips') ?? resolvedModeDefaults.value.showTooltips)
 const resolvedFade = computed(() => resolveRendererProp('fade') ?? resolvedModeDefaults.value.fade)
