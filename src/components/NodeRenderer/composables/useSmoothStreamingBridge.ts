@@ -2,6 +2,7 @@ import type { ComputedRef } from 'vue'
 import type { NodeRendererProps } from '../../../types/node-renderer-props'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useSmoothMarkdownStream } from '../../../composables/useSmoothMarkdownStream'
+import { isTypewriterEnabled } from '../../../utils/typewriter'
 
 type RendererParseOptions = NonNullable<NodeRendererProps['parseOptions']>
 
@@ -40,11 +41,7 @@ export function useSmoothStreamingBridge(
       return true
 
     // auto mode: enable only for typewriter or incremental mode.
-    const typewriter = props.typewriter as unknown
-    return typewriter === true
-      || typewriter === 'true'
-      || typewriter === 'simple'
-      || typewriter === 'precise'
+    return isTypewriterEnabled(props.typewriter)
       || (props.maxLiveNodes ?? 0) <= 0
   })
 

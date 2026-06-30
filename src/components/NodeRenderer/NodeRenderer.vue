@@ -67,6 +67,7 @@ import { normalizeLanguageIdentifier } from '../../utils/languageIcon'
 import { isReservedNodeComponentKey, useCustomNodeComponents } from '../../utils/nodeComponents'
 import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import { setNormalizedElementScrollTop } from '../../utils/normalizedScroll'
+import { normalizeTypewriterCursorMode } from '../../utils/typewriter'
 import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode/HtmlInlineNode.vue'
 import { createMathBlockMinHeightCache, provideMathBlockMinHeightCache } from '../MathBlockNode/minHeightCache'
@@ -160,14 +161,6 @@ function resolveRendererProp<K extends keyof NodeRendererProps>(key: K): NodeRen
 }
 
 const isDevEnv = isDevEnvironment()
-
-function normalizeTypewriterCursorMode(value: unknown) {
-  if (value === 'simple')
-    return 'simple'
-  if (value === true || value === 'true' || value === 'precise')
-    return 'precise'
-  return 'off'
-}
 
 function normalizeRendererDomMode(value: unknown): NodeRendererDomMode {
   return value === 'minimal' ? 'minimal' : 'full'

@@ -153,6 +153,36 @@ describe('node renderer smooth streaming', () => {
     wrapper.unmount()
   })
 
+  it('smoothStreaming="auto" does not enable with static string false typewriter mode', async () => {
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        typewriter: 'false' as any,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await nextTick()
+    queuedFrames.length = 0
+
+    await wrapper.setProps({ content: 'Static false typewriter auto pacing' })
+    await nextTick()
+
+    expect(wrapper.text()).toContain('Static false typewriter auto pacing')
+    expect(queuedFrames).toHaveLength(0)
+
+    wrapper.unmount()
+  })
+
   it('smoothStreaming=true force-enables without requiring typewriter', async () => {
     const queuedFrames: FrameRequestCallback[] = []
     vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {

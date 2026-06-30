@@ -151,6 +151,66 @@ describe('typewriter cursor position', () => {
     wrapper.unmount()
   })
 
+  it('treats static string false as disabled cursor mode', async () => {
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        typewriter: 'false' as any,
+        smoothStreaming: false,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+
+    await wrapper.setProps({ content: 'hello world' })
+    await flushAll()
+
+    expect(wrapper.classes()).not.toContain('typewriter-simple-cursor')
+    expect(wrapper.find('.typewriter-cursor').exists()).toBe(false)
+    expect(wrapper.findAll('.typewriter-simple-cursor-target')).toHaveLength(0)
+    expect(queuedFrames).toHaveLength(0)
+
+    wrapper.unmount()
+  })
+
+  it('clears simple cursor target when stream becomes final', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        typewriter: 'simple',
+        smoothStreaming: false,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+
+    await wrapper.setProps({ content: 'hello **world**' })
+    await flushAll()
+
+    expect(wrapper.findAll('.typewriter-simple-cursor-target')).toHaveLength(1)
+
+    await wrapper.setProps({ final: true })
+    await flushAll()
+
+    expect(wrapper.classes()).not.toContain('typewriter-simple-cursor')
+    expect(wrapper.findAll('.typewriter-simple-cursor-target')).toHaveLength(0)
+
+    wrapper.unmount()
+  })
+
   it('syncs cursor when switching from simple to precise while visible', async () => {
     const queuedFrames: FrameRequestCallback[] = []
     vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {

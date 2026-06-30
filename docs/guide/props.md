@@ -39,6 +39,8 @@ Experimental/internal props: `indexKey`, `renderAsFragment`, `debugPerformance`,
 | `node-virtual` | `boolean \| 'auto'` | `'auto'` | Controls node-level virtualization inside this Markdown document only. It does not virtualize a chat or timeline list. |
 | `virtual-scroll` | `MarkstreamVirtualScrollOptions` | – | Advanced host virtual-scroll coordination. Use this when an outer timeline virtualizer needs logical `totalHeight`, restore state, and settle/final events instead of reading the current DOM height. When `enabled=true`, pass a stable `sessionKey`. |
 
+Use `typewriter="simple"` for high-frequency streaming or performance-sensitive chat surfaces. Use `typewriter="precise"` when the cursor must closely follow complex inline layout.
+
 ::: tip SSR and smooth streaming
 For SSR with static initial content, prefer `smooth-streaming="auto"` (the default). The `auto` mode includes a mounted gate that prevents pacing initial content from blank on the first client render. Use `smooth-streaming=true` only when you explicitly want to pace the first client-side content as well — this can cause a hydration mismatch or a first-paint flash of empty content in SSR setups.
 :::
