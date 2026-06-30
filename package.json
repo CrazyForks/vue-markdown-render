@@ -300,7 +300,7 @@
     }
   },
   "dependencies": {
-    "@chenglou/pretext": "^0.0.5",
+    "@chenglou/pretext": "^0.0.8",
     "@floating-ui/dom": "^1.7.6",
     "markstream-core": "workspace:*",
     "stream-markdown-parser": "workspace:*"
