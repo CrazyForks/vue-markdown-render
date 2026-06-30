@@ -1,3 +1,4 @@
+import type { InjectionKey } from 'vue'
 import { getCurrentInstance } from 'vue'
 
 function humanizeKey(key: string) {
@@ -30,6 +31,9 @@ const defaultMap: Record<string, string> = {
   'image.loading': 'Loading image...',
 
 }
+
+export type MarkstreamI18nMap = Partial<Record<string, string>>
+export const MARKSTREAM_I18N_FALLBACK_KEY: InjectionKey<MarkstreamI18nMap> = Symbol('markstreamI18nFallback')
 
 /**
  * Replace default fallback translations.
@@ -71,24 +75,42 @@ function resolveComponentTranslator() {
   return null
 }
 
-const fallbackT = (key: string) => defaultMap[key] ?? humanizeKey(key)
+function resolveAppFallbackMap(): MarkstreamI18nMap | null {
+  try {
+    const instance = getCurrentInstance()
+    const key = MARKSTREAM_I18N_FALLBACK_KEY as symbol
+    const provides = (instance as unknown as { provides?: Record<symbol, unknown> } | null)?.provides
+    const appProvides = instance?.appContext?.provides as Record<symbol, unknown> | undefined
+    return (provides?.[key] ?? appProvides?.[key] ?? null) as MarkstreamI18nMap | null
+  }
+  catch {}
+  return null
+}
 
-function withFallback(translator: Translator) {
+function resolveFallbackValue(key: string, appFallbackMap?: MarkstreamI18nMap | null) {
+  return appFallbackMap?.[key] ?? defaultMap[key]
+}
+
+const fallbackT = (key: string, appFallbackMap?: MarkstreamI18nMap | null) => resolveFallbackValue(key, appFallbackMap) ?? humanizeKey(key)
+
+function withFallback(translator: Translator, appFallbackMap?: MarkstreamI18nMap | null) {
   return {
     t(key: string) {
-      if (translator.te && defaultMap[key] && !translator.te(key))
-        return fallbackT(key)
+      const fallback = resolveFallbackValue(key, appFallbackMap)
+      if (translator.te && fallback != null && !translator.te(key))
+        return fallbackT(key, appFallbackMap)
 
       const translated = translator.t(key)
-      return translated === key && defaultMap[key] ? fallbackT(key) : translated
+      return translated === key && fallback != null ? fallbackT(key, appFallbackMap) : translated
     },
   }
 }
 
 export function useSafeI18n() {
+  const appFallbackMap = resolveAppFallbackMap()
   const translator = resolveComponentTranslator()
   if (translator)
-    return withFallback(translator)
+    return withFallback(translator, appFallbackMap)
 
   // Synchronous fallback in case `vue-i18n` is not installed.
   try {
@@ -104,7 +126,7 @@ export function useSafeI18n() {
           return withFallback({
             t: (i18n.t as any).bind(i18n),
             te: typeof i18n.te === 'function' ? (i18n.te as any).bind(i18n) : undefined,
-          })
+          }, appFallbackMap)
         }
       }
       catch {}
@@ -112,5 +134,5 @@ export function useSafeI18n() {
   }
   catch {}
 
-  return { t: fallbackT }
+  return { t: (key: string) => fallbackT(key, appFallbackMap) }
 }

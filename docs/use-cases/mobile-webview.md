@@ -1,3 +1,22 @@
+---
+title: Mobile WebView Markdown rendering for AI apps
+description: Use Markstream in iOS WKWebView and Android WebView surfaces with px CSS, mobile-friendly code blocks, virtualization, and worker-aware heavy block rendering.
+keywords:
+  - mobile WebView Markdown renderer
+  - iOS WKWebView Markdown
+  - Android WebView Markdown
+  - AI chat WebView Markdown
+  - px CSS Markdown renderer
+  - mobile streaming Markdown
+faq:
+  - question: Why should mobile WebViews use index.px.css?
+    answer: px CSS keeps Markstream internal sizing stable when the host app or operating system changes the root font size.
+  - question: Should mobile chat surfaces use Monaco code blocks?
+    answer: Usually no. Use pre or lightweight highlighting on mobile WebViews unless the user explicitly needs an editor.
+  - question: When should virtualization be enabled on mobile?
+    answer: Enable it earlier than desktop, especially when AI responses exceed about 10 KB or include multiple code, diagram, or math blocks.
+---
+
 # Mobile WebView Markdown Rendering
 
 Render streaming Markdown in mobile app WebViews with proper font scaling and performance.

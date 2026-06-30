@@ -1,6 +1,20 @@
 ---
 title: SSE and WebSocket Markdown streaming — use Markstream for real-time AI output
 description: Render Markdown from SSE and WebSocket streams in Vue, React, Svelte, and Angular. Patterns for token-by-token rendering, batched updates, and graceful incomplete states.
+keywords:
+  - SSE Markdown renderer
+  - WebSocket Markdown renderer
+  - real-time AI Markdown
+  - streaming Markdown transport
+  - token stream batching
+  - incomplete Markdown rendering
+faq:
+  - question: Should an SSE or WebSocket app update Markdown on every token?
+    answer: No. Buffer tiny chunks and commit at animation-frame or small batch cadence so the renderer parses fewer intermediate states.
+  - question: Does Markstream require SSE specifically?
+    answer: No. Markstream receives Markdown content or nodes, so the same rendering path works for SSE, WebSocket, fetch streams, or custom transports.
+  - question: What should happen when the server sends the final chunk?
+    answer: Mark the message as final so incomplete fences, tables, math, and other streaming mid-states can settle into their final rendering.
 ---
 # SSE and WebSocket Markdown streaming
 

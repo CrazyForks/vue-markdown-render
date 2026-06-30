@@ -14,9 +14,11 @@ import type {
   MarkstreamVirtualReason,
   MarkstreamVirtualState,
   NodeRendererCodeRenderer,
+  NodeRendererDomMode,
   NodeRendererMode,
   NodeRendererProps,
 } from '../../types/node-renderer-props'
+import type { VirtualHeightSummary } from './composables/useHeightModel'
 import { normalizeShikiLanguage } from 'markstream-core'
 import { computed, defineAsyncComponent, getCurrentInstance, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
@@ -74,6 +76,7 @@ import { useBatchRenderingScheduler } from './composables/useBatchRenderingSched
 import { useBatchRenderingState } from './composables/useBatchRenderingState'
 import { useFocusSyncScheduler } from './composables/useFocusSyncScheduler'
 import { useHeightMeasurements } from './composables/useHeightMeasurements'
+import { getHeightCacheWidthBucket, UNKNOWN_HEIGHT_CACHE_WIDTH_BUCKET, useHeightModel } from './composables/useHeightModel'
 import { useLiveRangeState } from './composables/useLiveRangeState'
 import { useMarkdownParsing } from './composables/useMarkdownParsing'
 import { useNodeVisibilityState } from './composables/useNodeVisibilityState'
@@ -84,6 +87,7 @@ import { useScrollRestore } from './composables/useScrollRestore'
 import { useSmoothStreamingBridge } from './composables/useSmoothStreamingBridge'
 import { useViewportRoot } from './composables/useViewportRoot'
 import FallbackComponent from './FallbackComponent.vue'
+import HeightEstimationProbes from './HeightEstimationProbes.vue'
 import { InfographicBlockNodeLoading } from './InfographicBlockNodeLoading'
 import { MermaidBlockNodeLoading } from './MermaidBlockNodeLoading'
 import { buildVirtualMeasurementKey, buildVirtualRendererLayoutKey, stringifyVirtualToken } from './virtualLayoutKey'
@@ -223,7 +227,12 @@ function normalizeRendererMode(value: unknown): NodeRendererMode {
     : 'docs'
 }
 
+function normalizeRendererDomMode(value: unknown): NodeRendererDomMode {
+  return value === 'minimal' ? 'minimal' : 'full'
+}
+
 const resolvedMode = computed<NodeRendererMode>(() => normalizeRendererMode(resolveRendererProp('mode')))
+const resolvedDomMode = computed<NodeRendererDomMode>(() => normalizeRendererDomMode(resolveRendererProp('domMode')))
 const resolvedCodeRenderer = computed<NodeRendererCodeRenderer>(() => {
   const renderCodeBlocksAsPre = resolveRendererProp('renderCodeBlocksAsPre')
   const codeRenderer = resolveRendererProp('codeRenderer')
@@ -267,6 +276,7 @@ const rendererProps = {
   get debugPerformance() { return props.debugPerformance },
   get customHtmlTags() { return resolveRendererProp('customHtmlTags') },
   get mode() { return resolveRendererProp('mode') },
+  get domMode() { return resolvedDomMode.value },
   get htmlPolicy() { return resolveRendererProp('htmlPolicy') },
   get viewportPriority() { return resolveRendererProp('viewportPriority') },
   get codeBlockStream() { return resolveRendererProp('codeBlockStream') },
@@ -332,8 +342,6 @@ const MAX_DEFERRED_NODE_COUNT = 900
 const MAX_VIEWPORT_OBSERVER_TARGETS = 640
 const VIEWPORT_PRIORITY_RECOVERY_COUNT = 200
 const CONTENT_STREAMING_TAIL_IDLE_MS = 1200
-const HEIGHT_CACHE_WIDTH_BUCKET_PX = 32
-const UNKNOWN_HEIGHT_CACHE_WIDTH_BUCKET = -1
 const BOTTOM_ANCHOR_CAPTURE_MAX_DISTANCE_PX = 160
 const BOTTOM_ANCHOR_SCROLL_ROOT_MAX_DISTANCE_PX = 64
 const BOTTOM_ANCHOR_RELEASE_THRESHOLD_PX = 32
@@ -671,6 +679,7 @@ const nestedRendererProps = computed<Partial<NodeRendererProps>>(() => ({
   htmlPolicy: resolvedHtmlPolicy.value,
   viewportPriority: rendererProps.viewportPriority,
   mode: resolvedMode.value,
+  domMode: rendererProps.domMode,
   codeRenderer: resolvedCodeRenderer.value,
   codeBlockStream: rendererProps.codeBlockStream,
   codeBlockDarkTheme: rendererProps.codeBlockDarkTheme,
@@ -709,17 +718,21 @@ const heightExperimentConfig = computed(() => {
   void heightEstimationExperimentRevision.value
   return getHeightEstimationExperiment(rendererProps.customId)
 })
-const heightExperimentEnabled = computed(() => Boolean(
-  isClient
-  && !renderAsFragment.value
+const heightExperimentDomRequired = computed(() => Boolean(
+  !renderAsFragment.value
   && rendererProps.customId
   && !isNestedListItemRenderer
   && heightExperimentConfig.value?.enabled,
+))
+const heightExperimentEnabled = computed(() => Boolean(
+  isClient
+  && heightExperimentDomRequired.value,
 ))
 const virtualScrollRequested = computed(() => Boolean(
   !renderAsFragment.value
   && props.virtualScroll?.enabled,
 ))
+const hostVirtualScrollDomRequired = computed(() => virtualScrollRequested.value)
 const virtualScrollMounted = ref(false)
 onMounted(() => {
   virtualScrollMounted.value = true
@@ -782,6 +795,19 @@ const viewportPriorityEnabled = computed(() => {
     return false
   return true
 })
+const deferNodesDomRequired = computed(() => {
+  if (renderAsFragment.value)
+    return false
+  if (rendererProps.deferNodesUntilVisible === false)
+    return false
+  if ((rendererProps.maxLiveNodes ?? 0) <= 0)
+    return false
+  if (virtualizationEnabled.value)
+    return false
+  if (parsedNodes.value.length > MAX_DEFERRED_NODE_COUNT)
+    return false
+  return rendererProps.viewportPriority !== false
+})
 // Provide viewport-priority registrar so heavy nodes can defer work until visible
 const registerNodeVisibility = provideViewportPriority(
   target => resolveViewportRoot(target ?? containerRef.value ?? null),
@@ -808,6 +834,13 @@ const {
   isClient,
   isTestEnv,
   renderAsFragment,
+})
+const incrementalRenderingDomRequired = computed(() => {
+  return !renderAsFragment.value
+    && rendererProps.batchRendering !== false
+    && resolvedBatchSize.value > 0
+    && !isTestEnv
+    && (rendererProps.maxLiveNodes ?? 0) <= 0
 })
 const nodeSlotElements = new Map<number, HTMLElement | null>()
 const nodeContentResizeObserverTargets = new Map<number, HTMLElement>()
@@ -848,6 +881,33 @@ function consumeVirtualBottomProgrammaticScrollGuard(box: { scrollTop: number })
 
   return guarded
 }
+
+let heightModel: ReturnType<typeof useHeightModel>
+
+function markFallbackHeightPrefixDirty() {
+  heightModel.markFallbackHeightPrefixDirty()
+}
+
+function getFallbackNodeHeight(index: number) {
+  return heightModel.getFallbackNodeHeight(index)
+}
+
+function estimateHeightRange(start: number, end: number) {
+  return heightModel.estimateHeightRange(start, end)
+}
+
+function estimateIndexForOffset(offsetPx: number) {
+  return heightModel.estimateIndexForOffset(offsetPx)
+}
+
+function estimateIndexForOffsetFromEnd(offsetPx: number) {
+  return heightModel.estimateIndexForOffsetFromEnd(offsetPx)
+}
+
+function getEstimatedNodeHeightCount() {
+  return heightModel.getEstimatedNodeHeightCount()
+}
+
 const {
   activeRestoreAnchor,
   getRelativeScrollTopWithinContainer,
@@ -965,22 +1025,7 @@ function importHeightCache(
   seedCurrentNodeHeightSignatures()
 }
 const deferNodes = computed(() => {
-  if (renderAsFragment.value)
-    return false
-  if (rendererProps.deferNodesUntilVisible === false)
-    return false
-  // In the incremental/batched mode (`maxLiveNodes <= 0`), placeholders are
-  // driven by the batch scheduler rather than viewport deferral.
-  if ((rendererProps.maxLiveNodes ?? 0) <= 0)
-    return false
-  // When virtualization is active, the virtual window already limits DOM work.
-  // Keep rendering immediate within that window (no placeholders).
-  if (virtualizationEnabled.value)
-    return false
-  // Avoid registering too many observer targets in non-virtualized mode.
-  if (parsedNodes.value.length > MAX_DEFERRED_NODE_COUNT)
-    return false
-  return viewportPriorityEnabled.value
+  return deferNodesDomRequired.value && viewportPriorityEnabled.value
 })
 const shouldObserveSlots = computed(() => !!registerNodeVisibility && (deferNodes.value || virtualizationEnabled.value))
 const scrollListenerEnabled = computed(() => virtualizationEnabled.value || virtualScrollEnabled.value)
@@ -1028,13 +1073,6 @@ const pendingAsyncNodeCount = computed(() => {
   return total
 })
 let heightMeasurementRaf: number | null = null
-let fallbackHeightPrefixDirty = true
-let fallbackHeightPrefixCache: number[] = [0]
-let fallbackHeightPrefixCacheKey = ''
-
-function markFallbackHeightPrefixDirty() {
-  fallbackHeightPrefixDirty = true
-}
 
 const desiredRenderedCount = computed(() => {
   if (!virtualizationEnabled.value)
@@ -1150,8 +1188,16 @@ function ensureExperimentProbeNodes() {
   headingProbeNodes.value = headings
 }
 
-function getHeadingProbeNode(level: number) {
-  return headingProbeNodes.value?.[level] ?? null
+function setParagraphProbeWrapper(el: HTMLElement | null) {
+  paragraphProbeWrapperRef.value = el
+}
+
+function setListItemProbeWrapper(el: HTMLElement | null) {
+  listItemProbeWrapperRef.value = el
+}
+
+function setListProbeWrapper(el: HTMLElement | null) {
+  listProbeWrapperRef.value = el
 }
 
 const {
@@ -1493,212 +1539,38 @@ const estimatedNodeHeights = computed(() => {
   })
 })
 
-function getFallbackNodeHeight(index: number) {
-  const measured = nodeHeights[index]
-  if (Number.isFinite(measured) && measured > 0)
-    return measured
+heightModel = useHeightModel({
+  parsedNodes,
+  nodeHeights,
+  heightStats,
+  heightTreeSize,
+  heightSumTree,
+  heightKnownTree,
+  averageNodeHeight,
+  heightEstimationActive,
+  estimatedNodeHeights,
+  getContainerWidth: getMeasuredContainerWidth,
+  getPrefixCacheKeyParts: () => {
+    const width = experimentContainerWidth.value || readLayout('getFallbackHeightPrefix.clientWidth', () => containerRef.value?.clientWidth || 0)
+    const widthBucket = getHeightCacheWidthBucket(width)
+    const measurementKey = props.virtualScroll?.measurementKey == null
+      ? ''
+      : String(props.virtualScroll.measurementKey)
 
-  const estimated = estimatedNodeHeights.value[index]?.height
-  if (Number.isFinite(estimated) && estimated > 0)
-    return estimated
-
-  return Math.max(
-    averageNodeHeight.value,
-    getStaticNodeHeightFallback(index),
-  )
-}
-
-function getStaticNodeHeightFallback(index: number) {
-  const node = parsedNodes.value[index] as any
-  if (!node || typeof node !== 'object')
-    return 32
-
-  const type = String(node.type ?? '')
-  const width = getMeasuredContainerWidth() || 640
-
-  switch (type) {
-    case 'heading':
-      return 44
-
-    case 'paragraph':
-      return estimateTextFallbackHeight(
-        String(node.raw ?? node.content ?? ''),
-        width,
-        34,
-      )
-
-    case 'list': {
-      const items = Array.isArray(node.items) ? node.items.length : 1
-      return Math.max(48, items * 30 + 12)
-    }
-
-    case 'list_item':
-      return estimateTextFallbackHeight(
-        String(node.raw ?? node.content ?? ''),
-        width,
-        34,
-      )
-
-    case 'blockquote':
-      return estimateTextFallbackHeight(
-        String(node.raw ?? node.content ?? ''),
-        width,
-        56,
-      )
-
-    case 'table': {
-      const rowCount = Array.isArray(node.rows)
-        ? node.rows.length
-        : Array.isArray(node.children)
-          ? node.children.length
-          : 3
-      return Math.max(120, rowCount * 38 + 48)
-    }
-
-    case 'code_block':
-      return estimateTextFallbackHeight(
-        String(node.code ?? node.raw ?? ''),
-        width,
-        96,
-        20,
-      )
-
-    case 'math_block':
-      return 72
-
-    case 'image':
-      return 220
-
-    case 'admonition':
-    case 'vmr_container':
-    case 'html_block':
-      return estimateTextFallbackHeight(
-        String(node.raw ?? node.content ?? ''),
-        width,
-        96,
-      )
-
-    case 'thematic_break':
-      return 24
-
-    default:
-      return estimateTextFallbackHeight(
-        String(node.raw ?? node.content ?? ''),
-        width,
-        40,
-      )
-  }
-}
-
-function estimateTextFallbackHeight(
-  text: string,
-  width: number,
-  minHeight: number,
-  lineHeight = 22,
-) {
-  const source = String(text ?? '')
-  if (!source)
-    return minHeight
-
-  const charsPerLine = Math.max(18, Math.floor(Math.max(320, width) / 8))
-  const hardLines = source.split(/\r?\n/).length
-  const softLines = Math.ceil(source.length / charsPerLine)
-  const lines = Math.max(1, hardLines, softLines)
-
-  return Math.max(minHeight, Math.ceil(lines * lineHeight + 12))
-}
-
-function getHeightCacheWidthBucket(width: unknown) {
-  const numeric = Number(width)
-  if (!Number.isFinite(numeric) || numeric <= 0)
-    return UNKNOWN_HEIGHT_CACHE_WIDTH_BUCKET
-
-  return Math.round(numeric / HEIGHT_CACHE_WIDTH_BUCKET_PX)
-}
-
-function getFallbackHeightPrefix() {
-  const total = parsedNodes.value.length
-  const width = experimentContainerWidth.value || readLayout('getFallbackHeightPrefix.clientWidth', () => containerRef.value?.clientWidth || 0)
-  const widthBucket = getHeightCacheWidthBucket(width)
-  const measurementKey = props.virtualScroll?.measurementKey == null
-    ? ''
-    : String(props.virtualScroll.measurementKey)
-  const key = [
-    total,
-    heightStats.count,
-    Math.round(heightStats.total),
-    Math.round(averageNodeHeight.value * 100),
-    measurementKey,
-    widthBucket,
-    heightEstimationActive.value ? 1 : 0,
-    heightEstimationExperimentRevision.value,
-    streamRenderVersion.value,
-  ].join(':')
-
-  if (!fallbackHeightPrefixDirty && fallbackHeightPrefixCacheKey === key)
-    return fallbackHeightPrefixCache
-
-  const prefix = new Array<number>(total + 1)
-  prefix[0] = 0
-
-  for (let i = 0; i < total; i++) {
-    prefix[i + 1] = prefix[i] + (
-      heightEstimationActive.value
-        ? getFallbackNodeHeight(i)
-        : (nodeHeights[i] ?? averageNodeHeight.value)
-    )
-  }
-
-  fallbackHeightPrefixCache = prefix
-  fallbackHeightPrefixCacheKey = key
-  fallbackHeightPrefixDirty = false
-
-  return prefix
-}
-
-function estimateHeightRangeFromPrefix(start: number, end: number) {
-  const total = parsedNodes.value.length
-  const boundedStart = clamp(Math.trunc(start), 0, total)
-  const boundedEnd = clamp(Math.trunc(end), boundedStart, total)
-  if (boundedStart >= boundedEnd)
-    return 0
-
-  const prefix = getFallbackHeightPrefix()
-  return (prefix[boundedEnd] ?? 0) - (prefix[boundedStart] ?? 0)
-}
-
-function estimateIndexForOffsetFromPrefix(offsetPx: number) {
-  const nodes = parsedNodes.value
-  const total = nodes.length
-  if (total <= 0)
-    return 0
-  if (offsetPx <= 0)
-    return 0
-
-  const prefix = getFallbackHeightPrefix()
-  const totalHeight = prefix[total] ?? 0
-  if (offsetPx >= totalHeight)
-    return total - 1
-
-  let low = 0
-  let high = total - 1
-  let answer = total - 1
-
-  while (low <= high) {
-    const mid = (low + high) >> 1
-    const midEnd = prefix[mid + 1] ?? 0
-
-    if (midEnd >= offsetPx) {
-      answer = mid
-      high = mid - 1
-    }
-    else {
-      low = mid + 1
-    }
-  }
-
-  return answer
-}
+    return [
+      parsedNodes.value.length,
+      heightStats.count,
+      Math.round(heightStats.total),
+      Math.round(averageNodeHeight.value * 100),
+      measurementKey,
+      widthBucket,
+      heightEstimationActive.value ? 1 : 0,
+      heightEstimationExperimentRevision.value,
+      streamRenderVersion.value,
+    ]
+  },
+  fenwickRangeSum,
+})
 
 watch(
   () => parsedNodes.value.length,
@@ -1715,32 +1587,6 @@ watch(
   },
   { immediate: true },
 )
-
-function estimateHeightRange(start: number, end: number) {
-  if (start >= end)
-    return 0
-  if (heightEstimationActive.value) {
-    return estimateHeightRangeFromPrefix(start, end)
-  }
-  if (heightTreeSize.value !== parsedNodes.value.length) {
-    let total = 0
-    for (let i = start; i < end; i++)
-      total += nodeHeights[i] ?? averageNodeHeight.value
-    return total
-  }
-  const sumTree = heightSumTree.value
-  const countTree = heightKnownTree.value
-  if (!sumTree.length || !countTree.length) {
-    let total = 0
-    for (let i = start; i < end; i++)
-      total += nodeHeights[i] ?? averageNodeHeight.value
-    return total
-  }
-  const sumKnown = fenwickRangeSum(sumTree, start, end)
-  const countKnown = fenwickRangeSum(countTree, start, end)
-  const unknownCount = (end - start) - countKnown
-  return sumKnown + unknownCount * averageNodeHeight.value
-}
 
 const visibleNodes = computed(() => {
   // Use the full `parsedNodes` list to build the visible window so that
@@ -1776,49 +1622,12 @@ const bottomSpacerHeight = computed(() => {
   return estimateHeightRange(end, total)
 })
 
-interface VirtualHeightSummary {
-  totalNodes: number
-  measuredCount: number
-  estimatedCount: number
-  averageNodeHeight: number
-  topSpacerHeight: number
-  bottomSpacerHeight: number
-  estimatedTotalHeight: number
-  width: number
-}
-
-function getEstimatedNodeHeightCount() {
-  if (!heightEstimationActive.value)
-    return 0
-
-  let count = 0
-  const estimates = estimatedNodeHeights.value
-  for (let i = 0; i < estimates.length; i++) {
-    if (!estimates[i])
-      continue
-
-    const measuredHeight = nodeHeights[i]
-    if (Number.isFinite(measuredHeight) && measuredHeight > 0)
-      continue
-
-    count++
-  }
-  return count
-}
-
 function buildVirtualHeightSummary(): VirtualHeightSummary {
-  const totalNodes = parsedNodes.value.length
-
-  return {
-    totalNodes,
-    measuredCount: heightStats.count,
-    estimatedCount: getEstimatedNodeHeightCount(),
-    averageNodeHeight: averageNodeHeight.value,
+  return heightModel.buildVirtualHeightSummary({
     topSpacerHeight: topSpacerHeight.value,
     bottomSpacerHeight: bottomSpacerHeight.value,
-    estimatedTotalHeight: estimateHeightRange(0, totalNodes),
     width: getCurrentVirtualWidth(),
-  }
+  })
 }
 
 function buildExperimentReport() {
@@ -1892,16 +1701,18 @@ function isSameVirtualThreadKey(threadKey: string | undefined) {
 }
 
 function getVirtualRendererLayoutKey() {
+  const renderer = resolvedCodeRenderer.value
+
   return buildVirtualRendererLayoutKey({
-    renderer: resolvedCodeRenderer.value,
+    renderer,
     isDark: rendererProps.isDark,
     codeBlockStream: rendererProps.codeBlockStream,
     codeBlockMinWidth: rendererProps.codeBlockMinWidth,
     codeBlockMaxWidth: rendererProps.codeBlockMaxWidth,
-    codeBlockMonacoOptions: rendererProps.codeBlockMonacoOptions,
+    codeBlockMonacoOptions: renderer === 'monaco' ? rendererProps.codeBlockMonacoOptions : undefined,
     codeBlockProps: rendererProps.codeBlockProps,
-    themes: rendererProps.themes,
-    langs: rendererProps.langs,
+    themes: renderer === 'shiki' ? rendererProps.themes : undefined,
+    langs: renderer === 'shiki' ? rendererProps.langs : undefined,
   })
 }
 
@@ -3950,76 +3761,6 @@ defineExpose<MarkstreamRendererHandle>({
   scrollToNode,
 })
 
-function estimateIndexForOffset(offsetPx: number) {
-  if (offsetPx <= 0)
-    return 0
-  const nodes = parsedNodes.value
-  if (heightEstimationActive.value) {
-    return estimateIndexForOffsetFromPrefix(offsetPx)
-  }
-  if (heightTreeSize.value === nodes.length && heightSumTree.value.length && heightKnownTree.value.length) {
-    const avg = averageNodeHeight.value
-    const sumTree = heightSumTree.value
-    const countTree = heightKnownTree.value
-    const prefix = (endExclusive: number) => {
-      if (endExclusive <= 0)
-        return 0
-      const sumKnown = fenwickRangeSum(sumTree, 0, endExclusive)
-      const countKnown = fenwickRangeSum(countTree, 0, endExclusive)
-      return sumKnown + (endExclusive - countKnown) * avg
-    }
-    let low = 0
-    let high = nodes.length - 1
-    let ans = nodes.length - 1
-    while (low <= high) {
-      const mid = (low + high) >> 1
-      const height = prefix(mid + 1)
-      if (height >= offsetPx) {
-        ans = mid
-        high = mid - 1
-      }
-      else {
-        low = mid + 1
-      }
-    }
-    return ans
-  }
-  let remaining = offsetPx
-  for (let i = 0; i < nodes.length; i++) {
-    const height = nodeHeights[i] ?? averageNodeHeight.value
-    if (remaining <= height)
-      return i
-    remaining -= height
-  }
-  return Math.max(0, nodes.length - 1)
-}
-
-function estimateIndexForOffsetFromEnd(offsetPx: number) {
-  const nodes = parsedNodes.value
-  if (!nodes.length)
-    return 0
-  if (offsetPx <= 0)
-    return Math.max(0, nodes.length - 1)
-  if (heightEstimationActive.value) {
-    const prefix = getFallbackHeightPrefix()
-    const totalHeight = prefix[nodes.length] ?? 0
-    return estimateIndexForOffsetFromPrefix(Math.max(0, totalHeight - offsetPx))
-  }
-  if (heightTreeSize.value === nodes.length) {
-    const totalHeight = estimateHeightRange(0, nodes.length)
-    const target = Math.max(0, totalHeight - offsetPx)
-    return estimateIndexForOffset(target)
-  }
-  let remaining = offsetPx
-  for (let i = nodes.length - 1; i >= 0; i--) {
-    const height = nodeHeights[i] ?? averageNodeHeight.value
-    if (remaining <= height)
-      return i
-    remaining -= height
-  }
-  return 0
-}
-
 function bumpNodeSlotVersion() {
   nodeSlotVersion.value += 1
 }
@@ -5667,6 +5408,27 @@ function handleFragmentMouseout(event: MouseEvent) {
 
 const typewriterCursorRef = ref<HTMLElement | null>(null)
 const showTypewriterCursor = ref(false)
+const minimalDomActive = computed(() => {
+  if (rendererProps.domMode !== 'minimal')
+    return false
+  if (renderAsFragment.value)
+    return false
+  if (rendererProps.fade !== false)
+    return false
+  if (rendererProps.typewriter !== false || showTypewriterCursor.value)
+    return false
+  if (incrementalRenderingDomRequired.value)
+    return false
+  if (
+    virtualizationEnabled.value
+    || hostVirtualScrollDomRequired.value
+    || heightExperimentDomRequired.value
+    || deferNodesDomRequired.value
+  ) {
+    return false
+  }
+  return Object.keys(customComponentsMap.value).length === 0
+})
 let typewriterCursorTimeout: ReturnType<typeof setTimeout> | undefined
 let typewriterCursorRaf: number | null = null
 let typewriterCursorRafVersion = 0
@@ -6051,45 +5813,19 @@ onBeforeUnmount(() => {
     @mouseout="handleContainerMouseout"
   >
     <template v-if="heightEstimationDomActive || virtualizationEnabled">
-      <div
+      <HeightEstimationProbes
         v-if="heightEstimationDomActive"
-        class="height-estimation-probes"
-        :style="{ width: `${experimentProbeWidth}px` }"
-        aria-hidden="true"
-      >
-        <div ref="paragraphProbeWrapperRef" class="node-content" data-probe="paragraph">
-          <ParagraphNode
-            :node="paragraphProbeNode as any"
-            index-key="probe-paragraph"
-          />
-        </div>
-        <div ref="listItemProbeWrapperRef" class="node-content" data-probe="list-item">
-          <ul class="m-0 p-0">
-            <ListItemNode
-              :node="listItemProbeNode as any"
-              index-key="probe-list-item"
-            />
-          </ul>
-        </div>
-        <div ref="listProbeWrapperRef" class="node-content" data-probe="list">
-          <ListNode
-            :node="listProbeNode as any"
-            index-key="probe-list"
-          />
-        </div>
-        <div
-          v-for="level in 6"
-          :key="`probe-heading-${level}`"
-          :ref="el => setHeadingProbeWrapper(level, el as HTMLElement | null)"
-          class="node-content"
-          :data-probe="`heading-${level}`"
-        >
-          <HeadingNode
-            :node="getHeadingProbeNode(level) as any"
-            :index-key="`probe-heading-${level}`"
-          />
-        </div>
-      </div>
+        :width="experimentProbeWidth"
+        :flow-root="virtualizationEnabled || virtualScrollDomEnabled"
+        :paragraph-node="paragraphProbeNode"
+        :list-item-node="listItemProbeNode"
+        :list-node="listProbeNode"
+        :heading-nodes="headingProbeNodes"
+        :set-paragraph-wrapper="setParagraphProbeWrapper"
+        :set-list-item-wrapper="setListItemProbeWrapper"
+        :set-list-wrapper="setListProbeWrapper"
+        :set-heading-wrapper="setHeadingProbeWrapper"
+      />
       <div
         v-if="virtualizationEnabled"
         class="node-spacer"
@@ -6097,28 +5833,94 @@ onBeforeUnmount(() => {
         aria-hidden="true"
       />
     </template>
-    <template v-for="item in renderedItems" :key="item.index">
-      <div
-        :ref="el => setNodeSlotElement(item.index, el as HTMLElement | null)"
-        class="node-slot"
-        :data-node-index="item.index"
-        :data-node-type="item.node.type"
-      >
-        <div
+    <template v-if="minimalDomActive">
+      <template v-for="item in renderedItems" :key="item.index">
+        <component
+          :is="item.component"
           v-if="shouldRenderNode(item.index)"
-          :ref="el => setNodeContentRef(item.index, el as HTMLElement | null)"
-          class="node-content"
+          :node="item.node"
+          :loading="item.node.loading"
+          :index-key="item.indexKey"
+          v-bind="item.bindings"
+          :custom-id="rendererProps.customId"
+          :is-dark="rendererProps.isDark"
+          @mouseover="emit('mouseover', $event)"
+          @mouseout="emit('mouseout', $event)"
+          @copy="emit('copy', $event)"
+          @handle-artifact-click="emit('handleArtifactClick', $event)"
+        />
+      </template>
+    </template>
+    <template v-else>
+      <template v-for="item in renderedItems" :key="item.index">
+        <div
+          :ref="el => setNodeSlotElement(item.index, el as HTMLElement | null)"
+          class="node-slot"
+          :data-node-index="item.index"
+          :data-node-type="item.node.type"
         >
-          <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
-          <transition
-            v-if="!item.isCodeBlock"
-            name="fade"
-            :css="rendererProps.fade !== false"
-            :appear="rendererProps.fade !== false"
+          <div
+            v-if="shouldRenderNode(item.index)"
+            :ref="el => setNodeContentRef(item.index, el as HTMLElement | null)"
+            class="node-content"
           >
+            <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
+            <transition
+              v-if="!item.isCodeBlock"
+              name="fade"
+              :css="rendererProps.fade !== false"
+              :appear="rendererProps.fade !== false"
+            >
+              <component
+                :is="item.component"
+                v-if="item.rendersCustomNode"
+                v-bind="item.customBindings"
+                :node="item.node"
+                :loading="item.node.loading"
+                :index-key="item.indexKey"
+                :custom-id="rendererProps.customId"
+                :is-dark="rendererProps.isDark"
+                @copy="emit('copy', $event)"
+                @handle-artifact-click="emit('handleArtifactClick', $event)"
+              >
+                <NodeRenderer
+                  v-if="item.hasSlotChildren"
+                  v-bind="nestedRendererProps"
+                  :nodes="(item.node as any).children"
+                  :index-key="item.indexKey"
+                  :batch-rendering="false"
+                  :defer-nodes-until-visible="false"
+                  :render-as-fragment="true"
+                />
+                <NodeRenderer
+                  v-else-if="item.slotContent"
+                  v-bind="nestedRendererProps"
+                  :content="item.slotContent"
+                  :final="!item.node.loading"
+                  :index-key="`${item.indexKey}-content`"
+                  :smooth-streaming="false"
+                  :batch-rendering="false"
+                  :defer-nodes-until-visible="false"
+                  :render-as-fragment="true"
+                />
+              </component>
+              <component
+                :is="item.component"
+                v-else
+                :node="item.node"
+                :loading="item.node.loading"
+                :index-key="item.indexKey"
+                v-bind="item.bindings"
+                :custom-id="rendererProps.customId"
+                :is-dark="rendererProps.isDark"
+                @copy="emit('copy', $event)"
+                @handle-artifact-click="emit('handleArtifactClick', $event)"
+              />
+            </transition>
+
             <component
               :is="item.component"
-              v-if="item.rendersCustomNode"
+              v-else-if="item.rendersCustomNode"
               v-bind="item.customBindings"
               :node="item.node"
               :loading="item.node.loading"
@@ -6161,60 +5963,14 @@ onBeforeUnmount(() => {
               @copy="emit('copy', $event)"
               @handle-artifact-click="emit('handleArtifactClick', $event)"
             />
-          </transition>
-
-          <component
-            :is="item.component"
-            v-else-if="item.rendersCustomNode"
-            v-bind="item.customBindings"
-            :node="item.node"
-            :loading="item.node.loading"
-            :index-key="item.indexKey"
-            :custom-id="rendererProps.customId"
-            :is-dark="rendererProps.isDark"
-            @copy="emit('copy', $event)"
-            @handle-artifact-click="emit('handleArtifactClick', $event)"
-          >
-            <NodeRenderer
-              v-if="item.hasSlotChildren"
-              v-bind="nestedRendererProps"
-              :nodes="(item.node as any).children"
-              :index-key="item.indexKey"
-              :batch-rendering="false"
-              :defer-nodes-until-visible="false"
-              :render-as-fragment="true"
-            />
-            <NodeRenderer
-              v-else-if="item.slotContent"
-              v-bind="nestedRendererProps"
-              :content="item.slotContent"
-              :final="!item.node.loading"
-              :index-key="`${item.indexKey}-content`"
-              :smooth-streaming="false"
-              :batch-rendering="false"
-              :defer-nodes-until-visible="false"
-              :render-as-fragment="true"
-            />
-          </component>
-          <component
-            :is="item.component"
+          </div>
+          <div
             v-else
-            :node="item.node"
-            :loading="item.node.loading"
-            :index-key="item.indexKey"
-            v-bind="item.bindings"
-            :custom-id="rendererProps.customId"
-            :is-dark="rendererProps.isDark"
-            @copy="emit('copy', $event)"
-            @handle-artifact-click="emit('handleArtifactClick', $event)"
+            class="node-placeholder"
+            :style="{ height: `${getFallbackNodeHeight(item.index)}px` }"
           />
         </div>
-        <div
-          v-else
-          class="node-placeholder"
-          :style="{ height: `${getFallbackNodeHeight(item.index)}px` }"
-        />
-      </div>
+      </template>
     </template>
     <span
       v-if="showTypewriterCursor"
@@ -6249,16 +6005,6 @@ onBeforeUnmount(() => {
      already limits DOM cost, so keep it visible to avoid a blank first paint. */
   content-visibility: visible;
   contain-intrinsic-size: auto;
-}
-
-.height-estimation-probes {
-  position: absolute;
-  left: -100000px;
-  top: 0;
-  visibility: hidden;
-  pointer-events: none;
-  overflow: hidden;
-  z-index: -1;
 }
 
 .node-slot {

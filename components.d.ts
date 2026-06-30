@@ -25,6 +25,7 @@ declare module 'vue' {
     FootnoteReferenceNode: typeof import('./src/components/FootnoteReferenceNode/FootnoteReferenceNode.vue')['default']
     HardBreakNode: typeof import('./src/components/HardBreakNode/HardBreakNode.vue')['default']
     HeadingNode: typeof import('./src/components/HeadingNode/HeadingNode.vue')['default']
+    HeightEstimationProbes: typeof import('./src/components/NodeRenderer/HeightEstimationProbes.vue')['default']
     HighlightNode: typeof import('./src/components/HighlightNode/HighlightNode.vue')['default']
     HtmlBlockNode: typeof import('./src/components/HtmlBlockNode/HtmlBlockNode.vue')['default']
     HtmlInlineNode: typeof import('./src/components/HtmlInlineNode/HtmlInlineNode.vue')['default']
