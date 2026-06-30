@@ -157,4 +157,22 @@ describe('node source map metadata', () => {
 
     expect(nodes[0]?.sourceMap).toEqual({ startLine: 0, endLine: 5 })
   })
+
+  it('attaches sourceMap to standalone html documents', () => {
+    const source = [
+      '<html>',
+      '<body>',
+      'Document',
+      '</body>',
+      '</html>',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(source, getMarkdown('source-map-standalone-html'), {
+      final: true,
+      includeSourceMap: true,
+      streamParse: false,
+    }) as any[]
+
+    expect(nodes[0]?.sourceMap).toEqual({ startLine: 0, endLine: 5 })
+  })
 })

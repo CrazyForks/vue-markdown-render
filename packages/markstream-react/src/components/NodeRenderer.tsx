@@ -57,6 +57,17 @@ const fallbackMarkdown = getMarkdown()
 
 type ResolvedProps = NodeRendererProps & typeof DEFAULT_PROPS
 
+function sameSourceMap(prev: unknown, next: unknown) {
+  if (prev === next)
+    return true
+  if (!prev || !next || typeof prev !== 'object' || typeof next !== 'object')
+    return false
+
+  const prevMap = prev as { startLine?: unknown, endLine?: unknown }
+  const nextMap = next as { startLine?: unknown, endLine?: unknown }
+  return prevMap.startLine === nextMap.startLine && prevMap.endLine === nextMap.endLine
+}
+
 /**
  * Determine whether a parsed node is structurally identical to a previous
  * version at the same index.  When the content has not changed we reuse the
@@ -76,6 +87,8 @@ function isNodeStable(prev: ParsedNode, next: ParsedNode): boolean {
   if ((prev as any).loading !== (next as any).loading)
     return false
   if ((prev as any).autoClosed !== (next as any).autoClosed)
+    return false
+  if (!sameSourceMap((prev as any).sourceMap, (next as any).sourceMap))
     return false
   // Code block diff state can flip independently of `raw`.
   if (prev.type === 'code_block' || next.type === 'code_block') {

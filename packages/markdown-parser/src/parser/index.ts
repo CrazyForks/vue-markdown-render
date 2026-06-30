@@ -2556,6 +2556,14 @@ export function parseMarkdownToStructure(
 
   const standaloneHtmlDocument = parseStandaloneHtmlDocument(safeMarkdown)
   if (standaloneHtmlDocument) {
+    if (options.includeSourceMap) {
+      const sourceMapOptions: InternalParseOptions = {
+        ...options,
+        __sourceLineMapper: createSourceLineMapper(sourceMarkdown, safeMarkdown),
+      }
+      standaloneHtmlDocument[0].sourceMap = createSourceMapFromOffsets(safeMarkdown, 0, safeMarkdown.length, sourceMapOptions)
+    }
+
     // Keep pre/post hooks observable for callers that rely on them for
     // instrumentation, but preserve the full-document html_block shape.
     const preHook = options.preTransformTokens
