@@ -160,6 +160,53 @@ Footnotes are server-rendered.[^1]
     removeCustomComponents(scopeId)
   })
 
+  it('uses full DOM during SSR when minimal DOM mode will batch on the client', async () => {
+    const originalNodeEnv = process.env.NODE_ENV
+    process.env.NODE_ENV = 'development'
+
+    try {
+      const html = await renderComponent(MarkdownRender, {
+        domMode: 'minimal',
+        final: true,
+        mode: 'minimal',
+        nodes: [
+          paragraphNode([textNode('SSR minimal batching')]),
+        ],
+      })
+
+      expect(html).toContain('class="node-slot"')
+      expect(html).toContain('class="node-content"')
+      expect(html).toContain('SSR minimal batching')
+    }
+    finally {
+      process.env.NODE_ENV = originalNodeEnv
+    }
+  })
+
+  it('uses full DOM during SSR when host virtual scroll is requested in minimal DOM mode', async () => {
+    const html = await renderComponent(MarkdownRender, {
+      batchRendering: false,
+      deferNodesUntilVisible: false,
+      domMode: 'minimal',
+      fade: false,
+      final: true,
+      nodeVirtual: false,
+      nodes: [
+        paragraphNode([textNode('SSR minimal host virtual scroll')]),
+      ],
+      typewriter: false,
+      viewportPriority: false,
+      virtualScroll: {
+        enabled: true,
+        sessionKey: 'ssr-minimal-host-virtual-scroll',
+      },
+    })
+
+    expect(html).toContain('class="node-slot"')
+    expect(html).toContain('class="node-content"')
+    expect(html).toContain('SSR minimal host virtual scroll')
+  })
+
   it('keeps plugin custom components scoped to each SSR app instance', async () => {
     const ThinkingNode = defineComponent({
       name: 'SsrThinkingNode',
