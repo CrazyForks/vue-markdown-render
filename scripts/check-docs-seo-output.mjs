@@ -31,6 +31,8 @@ const primaryLandingPaths = [
   '/use-cases/ai-chat-streaming',
   '/use-cases/sse-websocket',
   '/use-cases/mobile-webview',
+  '/use-cases/streaming-mermaid-katex',
+  '/use-cases/long-ai-responses',
   '/zh',
   '/zh/frameworks',
   '/zh/frameworks/vue',

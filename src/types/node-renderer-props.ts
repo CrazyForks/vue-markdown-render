@@ -25,6 +25,7 @@ export type NodeRendererCodeBlockProps
 export type NodeRendererMode = 'docs' | 'chat' | 'minimal'
 export type NodeRendererCodeRenderer = 'pre' | 'shiki' | 'monaco'
 export type NodeRendererTypewriter = boolean | 'simple' | 'precise'
+export type NodeRendererDomMode = 'full' | 'minimal'
 
 export type MarkstreamVirtualPhase
   = | 'estimating'
@@ -294,6 +295,11 @@ export interface NodeRendererProps {
   customHtmlTags?: readonly string[]
   /** Preset renderer tuning. Default keeps the existing docs/rich path. */
   mode?: NodeRendererMode
+  /**
+   * DOM structure mode. `minimal` is best-effort and falls back to full DOM
+   * when rendering needs per-node wrappers.
+   */
+  domMode?: NodeRendererDomMode
   /** HTML rendering policy for html_block/html_inline nodes. Default: safe */
   htmlPolicy?: HtmlPolicy
   /** Enable priority rendering for visible viewport area */

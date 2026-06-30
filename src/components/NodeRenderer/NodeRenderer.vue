@@ -14,6 +14,7 @@ import type {
   MarkstreamVirtualReason,
   MarkstreamVirtualState,
   NodeRendererCodeRenderer,
+  NodeRendererDomMode,
   NodeRendererMode,
   NodeRendererProps,
 } from '../../types/node-renderer-props'
@@ -230,9 +231,14 @@ function normalizeTypewriterCursorMode(value: unknown) {
   return 'off'
 }
 
+function normalizeRendererDomMode(value: unknown): NodeRendererDomMode {
+  return value === 'minimal' ? 'minimal' : 'full'
+}
+
 const resolvedMode = computed<NodeRendererMode>(() => normalizeRendererMode(resolveRendererProp('mode')))
 const resolvedTypewriterCursorMode = computed(() => normalizeTypewriterCursorMode(resolveRendererProp('typewriter')))
 const typewriterEnabled = computed(() => resolvedTypewriterCursorMode.value !== 'off')
+const resolvedDomMode = computed<NodeRendererDomMode>(() => normalizeRendererDomMode(resolveRendererProp('domMode')))
 const resolvedCodeRenderer = computed<NodeRendererCodeRenderer>(() => {
   const renderCodeBlocksAsPre = resolveRendererProp('renderCodeBlocksAsPre')
   const codeRenderer = resolveRendererProp('codeRenderer')
@@ -276,6 +282,7 @@ const rendererProps = {
   get debugPerformance() { return props.debugPerformance },
   get customHtmlTags() { return resolveRendererProp('customHtmlTags') },
   get mode() { return resolveRendererProp('mode') },
+  get domMode() { return resolvedDomMode.value },
   get htmlPolicy() { return resolveRendererProp('htmlPolicy') },
   get viewportPriority() { return resolveRendererProp('viewportPriority') },
   get codeBlockStream() { return resolveRendererProp('codeBlockStream') },
@@ -680,6 +687,7 @@ const nestedRendererProps = computed<Partial<NodeRendererProps>>(() => ({
   htmlPolicy: resolvedHtmlPolicy.value,
   viewportPriority: rendererProps.viewportPriority,
   mode: resolvedMode.value,
+  domMode: rendererProps.domMode,
   codeRenderer: resolvedCodeRenderer.value,
   codeBlockStream: rendererProps.codeBlockStream,
   codeBlockDarkTheme: rendererProps.codeBlockDarkTheme,
@@ -718,17 +726,21 @@ const heightExperimentConfig = computed(() => {
   void heightEstimationExperimentRevision.value
   return getHeightEstimationExperiment(rendererProps.customId)
 })
-const heightExperimentEnabled = computed(() => Boolean(
-  isClient
-  && !renderAsFragment.value
+const heightExperimentDomRequired = computed(() => Boolean(
+  !renderAsFragment.value
   && rendererProps.customId
   && !isNestedListItemRenderer
   && heightExperimentConfig.value?.enabled,
+))
+const heightExperimentEnabled = computed(() => Boolean(
+  isClient
+  && heightExperimentDomRequired.value,
 ))
 const virtualScrollRequested = computed(() => Boolean(
   !renderAsFragment.value
   && props.virtualScroll?.enabled,
 ))
+const hostVirtualScrollDomRequired = computed(() => virtualScrollRequested.value)
 const virtualScrollMounted = ref(false)
 onMounted(() => {
   virtualScrollMounted.value = true
@@ -791,6 +803,19 @@ const viewportPriorityEnabled = computed(() => {
     return false
   return true
 })
+const deferNodesDomRequired = computed(() => {
+  if (renderAsFragment.value)
+    return false
+  if (rendererProps.deferNodesUntilVisible === false)
+    return false
+  if ((rendererProps.maxLiveNodes ?? 0) <= 0)
+    return false
+  if (virtualizationEnabled.value)
+    return false
+  if (parsedNodes.value.length > MAX_DEFERRED_NODE_COUNT)
+    return false
+  return rendererProps.viewportPriority !== false
+})
 // Provide viewport-priority registrar so heavy nodes can defer work until visible
 const registerNodeVisibility = provideViewportPriority(
   target => resolveViewportRoot(target ?? containerRef.value ?? null),
@@ -817,6 +842,13 @@ const {
   isClient,
   isTestEnv,
   renderAsFragment,
+})
+const incrementalRenderingDomRequired = computed(() => {
+  return !renderAsFragment.value
+    && rendererProps.batchRendering !== false
+    && resolvedBatchSize.value > 0
+    && !isTestEnv
+    && (rendererProps.maxLiveNodes ?? 0) <= 0
 })
 const nodeSlotElements = new Map<number, HTMLElement | null>()
 const nodeContentResizeObserverTargets = new Map<number, HTMLElement>()
@@ -974,22 +1006,7 @@ function importHeightCache(
   seedCurrentNodeHeightSignatures()
 }
 const deferNodes = computed(() => {
-  if (renderAsFragment.value)
-    return false
-  if (rendererProps.deferNodesUntilVisible === false)
-    return false
-  // In the incremental/batched mode (`maxLiveNodes <= 0`), placeholders are
-  // driven by the batch scheduler rather than viewport deferral.
-  if ((rendererProps.maxLiveNodes ?? 0) <= 0)
-    return false
-  // When virtualization is active, the virtual window already limits DOM work.
-  // Keep rendering immediate within that window (no placeholders).
-  if (virtualizationEnabled.value)
-    return false
-  // Avoid registering too many observer targets in non-virtualized mode.
-  if (parsedNodes.value.length > MAX_DEFERRED_NODE_COUNT)
-    return false
-  return viewportPriorityEnabled.value
+  return deferNodesDomRequired.value && viewportPriorityEnabled.value
 })
 const shouldObserveSlots = computed(() => !!registerNodeVisibility && (deferNodes.value || virtualizationEnabled.value))
 const scrollListenerEnabled = computed(() => virtualizationEnabled.value || virtualScrollEnabled.value)
@@ -5727,6 +5744,27 @@ function handleFragmentMouseout(event: MouseEvent) {
 const typewriterCursorRef = ref<HTMLElement | null>(null)
 const showTypewriterCursor = ref(false)
 const simpleTypewriterCursorTarget = ref<HTMLElement | null>(null)
+const minimalDomActive = computed(() => {
+  if (rendererProps.domMode !== 'minimal')
+    return false
+  if (renderAsFragment.value)
+    return false
+  if (rendererProps.fade !== false)
+    return false
+  if (typewriterEnabled.value || showTypewriterCursor.value)
+    return false
+  if (incrementalRenderingDomRequired.value)
+    return false
+  if (
+    virtualizationEnabled.value
+    || hostVirtualScrollDomRequired.value
+    || heightExperimentDomRequired.value
+    || deferNodesDomRequired.value
+  ) {
+    return false
+  }
+  return Object.keys(customComponentsMap.value).length === 0
+})
 let typewriterCursorTimeout: ReturnType<typeof setTimeout> | undefined
 let typewriterCursorRaf: number | null = null
 let typewriterCursorRafVersion = 0
@@ -6241,28 +6279,94 @@ onBeforeUnmount(() => {
         aria-hidden="true"
       />
     </template>
-    <template v-for="item in renderedItems" :key="item.index">
-      <div
-        :ref="el => setNodeSlotElement(item.index, el as HTMLElement | null)"
-        class="node-slot"
-        :data-node-index="item.index"
-        :data-node-type="item.node.type"
-      >
-        <div
+    <template v-if="minimalDomActive">
+      <template v-for="item in renderedItems" :key="item.index">
+        <component
+          :is="item.component"
           v-if="shouldRenderNode(item.index)"
-          :ref="el => setNodeContentRef(item.index, el as HTMLElement | null)"
-          class="node-content"
+          :node="item.node"
+          :loading="item.node.loading"
+          :index-key="item.indexKey"
+          v-bind="item.bindings"
+          :custom-id="rendererProps.customId"
+          :is-dark="rendererProps.isDark"
+          @mouseover="emit('mouseover', $event)"
+          @mouseout="emit('mouseout', $event)"
+          @copy="emit('copy', $event)"
+          @handle-artifact-click="emit('handleArtifactClick', $event)"
+        />
+      </template>
+    </template>
+    <template v-else>
+      <template v-for="item in renderedItems" :key="item.index">
+        <div
+          :ref="el => setNodeSlotElement(item.index, el as HTMLElement | null)"
+          class="node-slot"
+          :data-node-index="item.index"
+          :data-node-type="item.node.type"
         >
-          <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
-          <transition
-            v-if="!item.isCodeBlock"
-            name="fade"
-            :css="rendererProps.fade !== false"
-            :appear="rendererProps.fade !== false"
+          <div
+            v-if="shouldRenderNode(item.index)"
+            :ref="el => setNodeContentRef(item.index, el as HTMLElement | null)"
+            class="node-content"
           >
+            <!-- Skip wrapping code_block nodes in transitions to avoid touching Monaco editor internals -->
+            <transition
+              v-if="!item.isCodeBlock"
+              name="fade"
+              :css="rendererProps.fade !== false"
+              :appear="rendererProps.fade !== false"
+            >
+              <component
+                :is="item.component"
+                v-if="item.rendersCustomNode"
+                v-bind="item.customBindings"
+                :node="item.node"
+                :loading="item.node.loading"
+                :index-key="item.indexKey"
+                :custom-id="rendererProps.customId"
+                :is-dark="rendererProps.isDark"
+                @copy="emit('copy', $event)"
+                @handle-artifact-click="emit('handleArtifactClick', $event)"
+              >
+                <NodeRenderer
+                  v-if="item.hasSlotChildren"
+                  v-bind="nestedRendererProps"
+                  :nodes="(item.node as any).children"
+                  :index-key="item.indexKey"
+                  :batch-rendering="false"
+                  :defer-nodes-until-visible="false"
+                  :render-as-fragment="true"
+                />
+                <NodeRenderer
+                  v-else-if="item.slotContent"
+                  v-bind="nestedRendererProps"
+                  :content="item.slotContent"
+                  :final="!item.node.loading"
+                  :index-key="`${item.indexKey}-content`"
+                  :smooth-streaming="false"
+                  :batch-rendering="false"
+                  :defer-nodes-until-visible="false"
+                  :render-as-fragment="true"
+                />
+              </component>
+              <component
+                :is="item.component"
+                v-else
+                :node="item.node"
+                :loading="item.node.loading"
+                :index-key="item.indexKey"
+                v-bind="item.bindings"
+                :custom-id="rendererProps.customId"
+                :is-dark="rendererProps.isDark"
+                @copy="emit('copy', $event)"
+                @handle-artifact-click="emit('handleArtifactClick', $event)"
+              />
+            </transition>
+
             <component
               :is="item.component"
-              v-if="item.rendersCustomNode"
+              v-else-if="item.rendersCustomNode"
               v-bind="item.customBindings"
               :node="item.node"
               :loading="item.node.loading"
@@ -6305,60 +6409,14 @@ onBeforeUnmount(() => {
               @copy="emit('copy', $event)"
               @handle-artifact-click="emit('handleArtifactClick', $event)"
             />
-          </transition>
-
-          <component
-            :is="item.component"
-            v-else-if="item.rendersCustomNode"
-            v-bind="item.customBindings"
-            :node="item.node"
-            :loading="item.node.loading"
-            :index-key="item.indexKey"
-            :custom-id="rendererProps.customId"
-            :is-dark="rendererProps.isDark"
-            @copy="emit('copy', $event)"
-            @handle-artifact-click="emit('handleArtifactClick', $event)"
-          >
-            <NodeRenderer
-              v-if="item.hasSlotChildren"
-              v-bind="nestedRendererProps"
-              :nodes="(item.node as any).children"
-              :index-key="item.indexKey"
-              :batch-rendering="false"
-              :defer-nodes-until-visible="false"
-              :render-as-fragment="true"
-            />
-            <NodeRenderer
-              v-else-if="item.slotContent"
-              v-bind="nestedRendererProps"
-              :content="item.slotContent"
-              :final="!item.node.loading"
-              :index-key="`${item.indexKey}-content`"
-              :smooth-streaming="false"
-              :batch-rendering="false"
-              :defer-nodes-until-visible="false"
-              :render-as-fragment="true"
-            />
-          </component>
-          <component
-            :is="item.component"
+          </div>
+          <div
             v-else
-            :node="item.node"
-            :loading="item.node.loading"
-            :index-key="item.indexKey"
-            v-bind="item.bindings"
-            :custom-id="rendererProps.customId"
-            :is-dark="rendererProps.isDark"
-            @copy="emit('copy', $event)"
-            @handle-artifact-click="emit('handleArtifactClick', $event)"
+            class="node-placeholder"
+            :style="{ height: `${getFallbackNodeHeight(item.index)}px` }"
           />
         </div>
-        <div
-          v-else
-          class="node-placeholder"
-          :style="{ height: `${getFallbackNodeHeight(item.index)}px` }"
-        />
-      </div>
+      </template>
     </template>
     <span
       v-if="showTypewriterCursor && resolvedTypewriterCursorMode === 'precise'"

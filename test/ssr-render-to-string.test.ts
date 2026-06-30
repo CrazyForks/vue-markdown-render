@@ -16,6 +16,7 @@ import { disableKatex, enableKatex, setKatexLoader } from '../src/components/Mat
 import { disableMermaid, enableMermaid } from '../src/components/MermaidBlockNode/mermaid'
 import MarkdownRender from '../src/components/NodeRenderer'
 import { VueRendererMarkdown } from '../src/exports'
+import { setLanguageIconResolver } from '../src/utils/languageIcon'
 import { clearGlobalCustomComponents, removeCustomComponents, setCustomComponents } from '../src/utils/nodeComponents'
 
 const BASIC_SCOPE = 'ssr-render-basic'
@@ -76,6 +77,7 @@ describe('ssr renderToString coverage', () => {
     enableMermaid()
     enableD2()
     disableInfographic()
+    setLanguageIconResolver(null)
   })
 
   it('renders basic markdown, HTML, and custom HTML tags on the server', async () => {
@@ -158,6 +160,53 @@ Footnotes are server-rendered.[^1]
     removeCustomComponents(scopeId)
   })
 
+  it('uses full DOM during SSR when minimal DOM mode will batch on the client', async () => {
+    const originalNodeEnv = process.env.NODE_ENV
+    process.env.NODE_ENV = 'development'
+
+    try {
+      const html = await renderComponent(MarkdownRender, {
+        domMode: 'minimal',
+        final: true,
+        mode: 'minimal',
+        nodes: [
+          paragraphNode([textNode('SSR minimal batching')]),
+        ],
+      })
+
+      expect(html).toContain('class="node-slot"')
+      expect(html).toContain('class="node-content"')
+      expect(html).toContain('SSR minimal batching')
+    }
+    finally {
+      process.env.NODE_ENV = originalNodeEnv
+    }
+  })
+
+  it('uses full DOM during SSR when host virtual scroll is requested in minimal DOM mode', async () => {
+    const html = await renderComponent(MarkdownRender, {
+      batchRendering: false,
+      deferNodesUntilVisible: false,
+      domMode: 'minimal',
+      fade: false,
+      final: true,
+      nodeVirtual: false,
+      nodes: [
+        paragraphNode([textNode('SSR minimal host virtual scroll')]),
+      ],
+      typewriter: false,
+      viewportPriority: false,
+      virtualScroll: {
+        enabled: true,
+        sessionKey: 'ssr-minimal-host-virtual-scroll',
+      },
+    })
+
+    expect(html).toContain('class="node-slot"')
+    expect(html).toContain('class="node-content"')
+    expect(html).toContain('SSR minimal host virtual scroll')
+  })
+
   it('keeps plugin custom components scoped to each SSR app instance', async () => {
     const ThinkingNode = defineComponent({
       name: 'SsrThinkingNode',
@@ -199,6 +248,63 @@ Footnotes are server-rendered.[^1]
     expect(htmlA).toContain('tenant A')
     expect(htmlB).not.toContain('data-ssr-thinking')
     expect(htmlB).toContain('tenant B')
+  })
+
+  it('keeps plugin language icon resolvers scoped to each SSR app instance', async () => {
+    const node = {
+      type: 'code_block',
+      language: 'ts',
+      code: 'const answer = 42',
+      raw: '```ts\nconst answer = 42\n```',
+      loading: false,
+    }
+    const renderApp = async (tenant: string) => {
+      const app = createSSRApp({
+        render: () => h(MarkdownCodeBlockNode, {
+          node,
+          loading: false,
+          stream: false,
+        }),
+      })
+      app.use(VueRendererMarkdown, {
+        languageIconResolver: lang => `<svg data-ssr-language-icon="${tenant}-${lang}"></svg>`,
+      })
+      return renderToString(app)
+    }
+
+    const htmlA = await renderApp('tenant-a')
+    const htmlB = await renderApp('tenant-b')
+
+    expect(htmlA).toContain('data-ssr-language-icon="tenant-a-typescript"')
+    expect(htmlA).not.toContain('tenant-b-typescript')
+    expect(htmlB).toContain('data-ssr-language-icon="tenant-b-typescript"')
+    expect(htmlB).not.toContain('tenant-a-typescript')
+  })
+
+  it('falls back to theme icons instead of the global resolver on app-scoped resolver misses', async () => {
+    setLanguageIconResolver(lang => `<svg data-ssr-global-language-icon="${lang}"></svg>`)
+
+    const node = {
+      type: 'code_block',
+      language: 'ts',
+      code: 'const answer = 42',
+      raw: '```ts\nconst answer = 42\n```',
+      loading: false,
+    }
+    const app = createSSRApp({
+      render: () => h(MarkdownCodeBlockNode, {
+        node,
+        loading: false,
+        stream: false,
+      }),
+    })
+    app.use(VueRendererMarkdown, {
+      languageIconResolver: () => null,
+    })
+
+    const html = await renderToString(app)
+
+    expect(html).not.toContain('data-ssr-global-language-icon')
   })
 
   it('renders app-scoped custom tags registered with PascalCase keys', async () => {
