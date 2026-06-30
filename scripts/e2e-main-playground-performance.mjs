@@ -204,9 +204,12 @@ function assertTokenCloneBudget(parsePerformance) {
   }
 }
 
-function assertLayoutReadBudget(label, layoutReads) {
+function assertLayoutReadBudget(label, layoutReads, options = {}) {
   if (!layoutReads)
     throw new Error(`${label} should record layout read metrics.`)
+
+  if (options.requireReads && !(Number(layoutReads.total || 0) > 0))
+    throw new Error(`${label} should record at least one layout read.`)
 
   const maxPerFrame = Number(layoutReads.maxPerFrame || 0)
   if (!(maxPerFrame <= maxLayoutReadsPerFrame)) {
@@ -575,7 +578,7 @@ function assertScenario(result) {
     throw new Error(`Initial settle should stay within 7000ms. Got ${result.initial.settleTimeMs}.`)
   if (!(result.initial.rendererDomNodeCount <= 5000))
     throw new Error(`Initial renderer DOM node count budget exceeded. Got ${result.initial.rendererDomNodeCount}.`)
-  assertLayoutReadBudget('Initial', result.initial.layoutReads)
+  assertLayoutReadBudget('Initial', result.initial.layoutReads, { requireReads: true })
   if (result.fullScroll.fallbackCount !== 0)
     throw new Error('Code block fallbacks should be gone after full scroll settle.')
   if (result.fullScroll.renderedMermaidCount !== result.fullScroll.mermaidCount)

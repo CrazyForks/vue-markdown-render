@@ -190,9 +190,12 @@ function diffParsePerformance(after, before) {
   return out
 }
 
-function assertLayoutReadBudget(mode, phase, layoutReads) {
+function assertLayoutReadBudget(mode, phase, layoutReads, options = {}) {
   if (!layoutReads)
     throw new Error(`[${mode}] ${phase} should record layout read metrics.`)
+
+  if (options.requireReads && !(Number(layoutReads.total || 0) > 0))
+    throw new Error(`[${mode}] ${phase} should record at least one layout read.`)
 
   const maxPerFrame = Number(layoutReads.maxPerFrame || 0)
   if (!(maxPerFrame <= maxLayoutReadsPerFrame)) {
@@ -709,7 +712,7 @@ function assertScenario(result) {
     throw new Error(`[${result.mode}] Total long task time should stay within ${maxLongTaskTotalMs}ms. Got ${result.longTaskTotalMs}.`)
   if (!(result.rendererDomNodeCount <= 5000))
     throw new Error(`[${result.mode}] Renderer DOM node count budget exceeded. Got ${result.rendererDomNodeCount}.`)
-  assertLayoutReadBudget(result.mode, 'initial', result.layoutReads)
+  assertLayoutReadBudget(result.mode, 'initial', result.layoutReads, { requireReads: true })
   if (result.fullScroll.fallbackCount !== 0)
     throw new Error(`[${result.mode}] Code fallback should be gone after full scroll settle.`)
   if (result.fullScroll.renderedMermaidCount !== result.fullScroll.mermaidCount)

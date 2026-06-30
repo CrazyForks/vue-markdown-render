@@ -249,13 +249,19 @@ describe('optional dependency controllers', () => {
       expect(loader).toHaveBeenCalledTimes(1)
     })
 
-    it('returns null for an invalid infographic module shape', async () => {
-      const loader = vi.fn(async () => ({}))
+    it('does not cache an invalid infographic module shape', async () => {
+      class CustomInfographic {
+        render() {}
+      }
+
+      const loader = vi.fn()
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({ Infographic: CustomInfographic })
       setInfographicLoader(loader)
 
       await expect(getInfographic()).resolves.toBeNull()
-      await expect(getInfographic()).resolves.toBeNull()
-      expect(loader).toHaveBeenCalledTimes(1)
+      await expect(getInfographic()).resolves.toBe(CustomInfographic)
+      expect(loader).toHaveBeenCalledTimes(2)
     })
 
     it('requires an explicit loader when enabling infographic', () => {
