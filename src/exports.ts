@@ -52,7 +52,7 @@ import TextNode from './components/TextNode'
 import ThematicBreakNode from './components/ThematicBreakNode'
 import VmrContainerNode from './components/VmrContainerNode'
 import { useMarkstreamVirtualAdapter } from './composables/useMarkstreamVirtualAdapter'
-import { setDefaultI18nMap } from './composables/useSafeI18n'
+import { MARKSTREAM_I18N_FALLBACK_KEY, setDefaultI18nMap } from './composables/useSafeI18n'
 import { useSmoothMarkdownStream } from './composables/useSmoothMarkdownStream'
 import { setIconTheme } from './icon-themes'
 import { setLanguageIconResolver } from './utils/languageIcon'
@@ -171,6 +171,11 @@ export interface MarkstreamVuePluginOptions {
    * App-scoped custom components.
    */
   components?: Partial<MarkstreamCustomComponents>
+
+  /**
+   * App-scoped fallback translations used when vue-i18n is unavailable or a key is missing.
+   */
+  defaultI18nMap?: Partial<Record<string, string>>
 
   /**
    * App-scoped language icon resolver for code block headers.
@@ -341,6 +346,9 @@ export const VueRendererMarkdown: Plugin<[options?: MarkstreamVuePluginOptions]>
       setDefaultMathOptions(options.mathOptions)
     if (options && 'infographicLoader' in options)
       setInfographicLoader(options.infographicLoader ?? null)
+
+    if (options?.defaultI18nMap)
+      app.provide(MARKSTREAM_I18N_FALLBACK_KEY, options.defaultI18nMap)
 
     if (options?.components)
       app.provide(MARKSTREAM_CUSTOM_COMPONENTS_KEY, createCustomComponentsRef(options.components))
