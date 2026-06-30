@@ -88,8 +88,9 @@ setDefaultMathOptions({
 When calling `parseMarkdownToStructure` you can pass `ParseOptions` with these hooks:
 - `preTransformTokens?: (tokens: MarkdownToken[]) => MarkdownToken[]` — operate immediately after the `markdown-it` parser runs
 - `postTransformTokens?: (tokens: MarkdownToken[]) => MarkdownToken[]` — transform tokens after internal fixes
+- `postTransformNodes?: (nodes: ParsedNode[]) => ParsedNode[]` — patch the finalized AST before it is returned
 
-If you need to reshape the AST, post-process the returned `ParsedNode[]` and pass it to `MarkdownRender` via the `nodes` prop.
+Use `postTransformNodes` when you need the same AST patch to apply inside `MarkdownRender`'s `content` path without reparsing or managing a separate `nodes` prop.
 
 These hooks are also available via `parseOptions` prop on the `MarkdownRender` component (applies only when using `content` instead of `nodes`).
 

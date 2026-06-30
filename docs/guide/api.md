@@ -93,8 +93,9 @@ When passing `content`, you can intercept parser stages through `parse-options` 
 Hooks:
 - `preTransformTokens(tokens)` — mutate tokens before default handling.
 - `postTransformTokens(tokens)` — inspect/adjust tokens before node generation.
+- `postTransformNodes(nodes)` — patch the finalized AST before it is returned or rendered.
 
-If you need to reshape the AST, post-process the returned nodes and pass them to `MarkdownRender` via `nodes`.
+Use `postTransformNodes` when the same AST patch should run inside `MarkdownRender`'s `content` path. Use `nodes` only when your app already owns parsing outside the component.
 
 Example: render AI “thinking” tags as custom components (no hooks needed):
 

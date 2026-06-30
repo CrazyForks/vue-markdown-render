@@ -80,8 +80,9 @@ setDefaultMathOptions({
 ## 解析钩子（高级）
 传入 `ParseOptions` 可使用以下钩子：
 - `preTransformTokens`、`postTransformTokens`。
+- `postTransformNodes`：在最终 AST 返回前处理 `ParsedNode[]`。
 
-如需改造 AST，可在 `parseMarkdownToStructure` 返回后自行处理 `ParsedNode[]`，再通过 `MarkdownRender` 的 `nodes` 传入。
+当你希望同一个 AST patch 直接作用于 `MarkdownRender` 的 `content` 路径时，使用 `postTransformNodes`，这样不需要自行重解析或切换到单独的 `nodes` prop。
 
 这些钩子也可通过 `MarkdownRender` 组件传入 `parseOptions` prop（仅当使用 `content` prop 时生效）。
 

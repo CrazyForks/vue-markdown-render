@@ -72,6 +72,24 @@ function finishTimedParse<T extends ParsedNode[]>(result: T, timing: ParseTiming
   return result
 }
 
+function applyPostTransformNodes<T extends ParsedNode[]>(nodes: T, options: ParseOptions): T | ParsedNode[] {
+  const transform = options.postTransformNodes
+  if (typeof transform !== 'function')
+    return nodes
+
+  const transformed = transform(nodes)
+  return Array.isArray(transformed) ? transformed : nodes
+}
+
+function finishParsedNodes<T extends ParsedNode[]>(
+  result: T,
+  options: ParseOptions,
+  timing: ParseTimingMetrics | undefined,
+  startedAt: number,
+) {
+  return finishTimedParse(applyPostTransformNodes(result, options), timing, startedAt)
+}
+
 function processTokensWithTiming(tokens: MarkdownToken[], options: ParseOptions | undefined, timing: ParseTimingMetrics | undefined) {
   if (!timing)
     return processTokens(tokens, options)
@@ -2458,14 +2476,14 @@ export function parseMarkdownToStructure(
       if (typeof postHook === 'function')
         postHook(hookedTokens)
     }
-    return finishTimedParse(standaloneHtmlDocument, timing, parseStartedAt)
+    return finishParsedNodes(standaloneHtmlDocument, options, timing, parseStartedAt)
   }
 
   // Get tokens from markdown-it
   const tokens = parseTopLevelTokens(md, safeMarkdown, { __markstreamFinal: isFinal }, options)
   // Defensive: ensure tokens is an array
   if (!tokens || !Array.isArray(tokens))
-    return finishTimedParse([], timing, parseStartedAt)
+    return finishParsedNodes([], options, timing, parseStartedAt)
   // Allow consumers to transform tokens before processing
   const pre = options.preTransformTokens
   const post = options.postTransformTokens
@@ -2540,6 +2558,8 @@ export function parseMarkdownToStructure(
 
     finalizeHtmlBlockLoading(result)
   }
+
+  result = applyPostTransformNodes(result, options) as ParsedNode[]
 
   if (options.debug) {
     console.log('Parsed Markdown Tree Structure:', result)

@@ -354,15 +354,15 @@ export interface CustomComponents {
 
 // Function to parse markdown into a structured representation
 export type TransformTokensHook = (tokens: MarkdownToken[]) => MarkdownToken[]
+export type PostTransformNodesHook = (nodes: ParsedNode[]) => ParsedNode[]
 
 export interface ParseOptions {
   preTransformTokens?: TransformTokensHook
   postTransformTokens?: TransformTokensHook
+  postTransformNodes?: PostTransformNodesHook
   /**
    * Custom HTML-like tag names that should be emitted as custom nodes
    * instead of `html_inline` when encountered (e.g. ['thinking']).
    */
   customHtmlTags?: readonly string[]
 }
-
-export type PostTransformNodesHook = (nodes: ParsedNode[]) => ParsedNode[]

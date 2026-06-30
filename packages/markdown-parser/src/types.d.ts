@@ -304,9 +304,11 @@ export interface CustomComponents {
     [key: string]: unknown;
 }
 export type TransformTokensHook = (tokens: MarkdownToken[]) => MarkdownToken[];
+export type PostTransformNodesHook = (nodes: ParsedNode[]) => ParsedNode[];
 export interface ParseOptions {
     preTransformTokens?: TransformTokensHook;
     postTransformTokens?: TransformTokensHook;
+    postTransformNodes?: PostTransformNodesHook;
     /**
      * Defaults to 'auto': use markdown-it-ts' stream parser for non-final
      * top-level document parses when available. Final parses and fragment parses
@@ -344,5 +346,4 @@ export interface InternalParseOptions extends ParseOptions {
     __markdownIt?: MarkdownIt;
     __sourceMarkdown?: string;
 }
-export type PostTransformNodesHook = (nodes: ParsedNode[]) => ParsedNode[];
 export {};
