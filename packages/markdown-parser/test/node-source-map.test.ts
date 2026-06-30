@@ -82,6 +82,17 @@ describe('node source map metadata', () => {
     ])
   })
 
+  it('attaches source maps to VMR fallback containers and child blocks', () => {
+    const nodes = parseMarkdownToStructure('::: viewcode:demo\n# title\n:::', getMarkdown('source-map-vmr'), {
+      final: true,
+      includeSourceMap: true,
+      streamParse: false,
+    }) as any[]
+
+    expect(nodes[0]?.sourceMap).toEqual({ startLine: 0, endLine: 3 })
+    expect(nodes[0]?.children?.[0]?.sourceMap).toEqual({ startLine: 1, endLine: 2 })
+  })
+
   it('preserves source maps when postTransformTokens returns tokens', () => {
     const nodes = parseMarkdownToStructure('# Title\n\nParagraph text', getMarkdown('source-map-post-transform'), {
       final: true,
@@ -114,6 +125,35 @@ describe('node source map metadata', () => {
     }) as any[]
 
     expect(nodes[0]?.sourceMap).toEqual({ startLine: 0, endLine: 2 })
+  })
+
+  it('keeps CRLF math newline preprocessing on the default path without source maps', () => {
+    const nodes = parseMarkdownToStructure('x\r\nabla', getMarkdown('source-map-math-crlf-default'), {
+      final: true,
+      streamParse: false,
+    }) as any[]
+
+    expect(nodes[0]?.raw).toBe('x\\nabla')
+    expect(nodes[0]?.sourceMap).toBeUndefined()
+  })
+
+  it('attaches source maps when root-level inline tokens expand to html blocks', () => {
+    const nodes = parseMarkdownToStructure('Alpha\n<section>Body</section>', getMarkdown('source-map-root-inline-html'), {
+      final: true,
+      includeSourceMap: true,
+      streamParse: false,
+      postTransformTokens: () => [{
+        type: 'inline',
+        content: '<section>Body</section>',
+        map: [1, 2],
+        children: [
+          { type: 'html_block', content: '<section>Body</section>' },
+        ],
+      } as any],
+    }) as any[]
+
+    expect(nodes[0]?.type).toBe('html_block')
+    expect(nodes[0]?.sourceMap).toEqual({ startLine: 1, endLine: 2 })
   })
 
   it('keeps source maps on paragraph nodes promoted from inline custom tags', () => {

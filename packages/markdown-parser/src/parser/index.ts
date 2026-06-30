@@ -2798,6 +2798,10 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
             // no-op (matches previous behavior)
           }
           else if (parsed.every(n => n.type === 'html_block')) {
+            if (includeSourceMap) {
+              for (const node of parsed)
+                applyNodeSourceMap(node, token, options)
+            }
             result.push(...parsed)
           }
           else {
