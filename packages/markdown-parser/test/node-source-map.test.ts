@@ -50,6 +50,30 @@ describe('node source map metadata', () => {
     expect(nodes[3].endLine).toBe(10)
   })
 
+  it('attaches source maps to additional block types', () => {
+    const nodes = parseMarkdownToStructure([
+      '> Quote',
+      '',
+      '| A | B |',
+      '| - | - |',
+      '| 1 | 2 |',
+      '',
+      '$$',
+      'x + y',
+      '$$',
+    ].join('\n'), getMarkdown('source-map-extra-blocks'), {
+      final: true,
+      includeSourceMap: true,
+      streamParse: false,
+    }) as any[]
+
+    expect(nodes.map(node => [node.type, node.sourceMap])).toEqual([
+      ['blockquote', { startLine: 0, endLine: 1 }],
+      ['table', { startLine: 2, endLine: 5 }],
+      ['math_block', { startLine: 6, endLine: 9 }],
+    ])
+  })
+
   it('maps ranges back to caller source lines after custom tag preprocessing', () => {
     const nodes = parseMarkdownToStructure([
       'Alpha',
@@ -70,6 +94,43 @@ describe('node source map metadata', () => {
     ])
   })
 
+  it('maps repeated lines and same-line custom tag preprocessing back to caller source lines', () => {
+    const repeatedNodes = parseMarkdownToStructure([
+      'same',
+      '<thinking>hi</thinking>',
+      'same',
+      '<thinking>hi</thinking>',
+    ].join('\n'), getMarkdown('source-map-repeated-custom-tags'), {
+      customHtmlTags: ['thinking'],
+      final: true,
+      includeSourceMap: true,
+      streamParse: false,
+    }) as any[]
+
+    const splitNodes = parseMarkdownToStructure([
+      'Alpha',
+      '<thinking>hi',
+      '</thinking>',
+      'Alpha',
+    ].join('\n'), getMarkdown('source-map-same-line-custom-open'), {
+      customHtmlTags: ['thinking'],
+      final: true,
+      includeSourceMap: true,
+      streamParse: false,
+    }) as any[]
+
+    expect(repeatedNodes.map(node => node.sourceMap)).toEqual([
+      { startLine: 0, endLine: 1 },
+      { startLine: 1, endLine: 3 },
+      { startLine: 3, endLine: 4 },
+    ])
+    expect(splitNodes.map(node => [node.type, node.sourceMap])).toEqual([
+      ['paragraph', { startLine: 0, endLine: 1 }],
+      ['thinking', { startLine: 1, endLine: 3 }],
+      ['paragraph', { startLine: 3, endLine: 4 }],
+    ])
+  })
+
   it('attaches source maps to admonition containers', () => {
     const nodes = parseMarkdownToStructure('::: tip Title\nBody\n:::', getMarkdown('source-map-container'), {
       final: true,
@@ -80,6 +141,24 @@ describe('node source map metadata', () => {
     expect(nodes.map(node => [node.type, node.sourceMap])).toEqual([
       ['admonition', { startLine: 0, endLine: 3 }],
     ])
+  })
+
+  it('keeps admonition source maps aligned across blank lines and child lists', () => {
+    const nodes = parseMarkdownToStructure([
+      '::: tip Title',
+      'line 1',
+      '',
+      '- item',
+      ':::',
+    ].join('\n'), getMarkdown('source-map-container-multiline'), {
+      final: true,
+      includeSourceMap: true,
+      streamParse: false,
+    }) as any[]
+
+    expect(nodes[0]?.sourceMap).toEqual({ startLine: 0, endLine: 5 })
+    expect(nodes[0]?.children?.[0]?.sourceMap).toEqual({ startLine: 1, endLine: 2 })
+    expect(nodes[0]?.children?.[1]?.sourceMap).toEqual({ startLine: 3, endLine: 4 })
   })
 
   it('attaches source maps to VMR fallback containers and heading children', () => {
@@ -131,6 +210,21 @@ describe('node source map metadata', () => {
       ['heading', { startLine: 0, endLine: 1 }],
       ['paragraph', { startLine: 2, endLine: 3 }],
     ])
+  })
+
+  it('preserves parse options when postTransformTokens returns tokens without source maps', () => {
+    const nodes = parseMarkdownToStructure('<thinking>hi</thinking>', getMarkdown('source-map-post-transform-options', {
+      customHtmlTags: ['thinking'],
+    }), {
+      customHtmlTags: ['thinking'],
+      final: true,
+      streamParse: false,
+      postTransformTokens: tokens => tokens,
+    }) as any[]
+
+    expect(nodes[0]?.children?.[0]?.type).toBe('thinking')
+    expect(nodes[0]?.sourceMap).toBeUndefined()
+    expect(nodes[0]?.children?.[0]?.sourceMap).toBeUndefined()
   })
 
   it('maps source ranges across math newline preprocessing that collapses lines', () => {

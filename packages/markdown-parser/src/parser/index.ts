@@ -1463,6 +1463,33 @@ function createSourceLineMapper(source: string, parsedSource: string) {
       continue
     }
 
+    const sourceLine = sourceLines[sourceCursor] ?? ''
+    if (line !== '' && sourceLine !== line && sourceLine.startsWith(line)) {
+      let joinedLine = line
+      let splitEnd = -1
+      for (let nextParsedLine = parsedLine + 1; nextParsedLine < parsedLines.length; nextParsedLine++) {
+        joinedLine += parsedLines[nextParsedLine] ?? ''
+        if (joinedLine === sourceLine) {
+          splitEnd = nextParsedLine
+          break
+        }
+        if (!sourceLine.startsWith(joinedLine))
+          break
+      }
+
+      if (splitEnd !== -1) {
+        for (let mappedLine = parsedLine; mappedLine <= splitEnd; mappedLine++) {
+          mappedLines[mappedLine] = {
+            startLine: sourceCursor,
+            endLine: sourceCursor + 1,
+          }
+        }
+        sourceCursor++
+        parsedLine = splitEnd
+        continue
+      }
+    }
+
     let collapsedLine = sourceLines[sourceCursor] ?? ''
     let collapsedEnd = -1
     for (let sourceLine = sourceCursor + 1; sourceLine < sourceLines.length; sourceLine++) {
