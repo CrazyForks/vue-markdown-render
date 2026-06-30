@@ -356,7 +356,7 @@ export interface InternalParseOptions extends ParseOptions {
     __disableStreamParse?: boolean;
     __insideStrong?: boolean;
     __markdownIt?: MarkdownIt;
-    __sourceLineMapper?: (line: number) => number;
+    __sourceLineMapper?: (line: number) => MarkdownNodeSourceMap;
     __sourceMarkdown?: string;
 }
 export type PostTransformNodesHook = (nodes: ParsedNode[]) => ParsedNode[];

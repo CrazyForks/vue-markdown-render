@@ -13,15 +13,50 @@ function mapSourceLineRange(
     }
   }
 
-  const mappedStartLine = mapper(startLine)
+  const mappedStartRange = mapper(startLine)
   const mappedEndLine = endLine > startLine
-    ? mapper(endLine - 1) + 1
-    : mapper(endLine)
+    ? mapper(endLine - 1).endLine
+    : mapper(endLine).startLine
 
   return {
-    startLine: mappedStartLine,
-    endLine: Math.max(mappedStartLine, mappedEndLine),
+    startLine: mappedStartRange.startLine,
+    endLine: Math.max(mappedStartRange.startLine, mappedEndLine),
   }
+}
+
+function lineAtOffset(source: string, offset: number) {
+  const target = Math.max(0, Math.min(source.length, Math.trunc(offset)))
+  let line = 0
+  for (let i = 0; i < target; i++) {
+    if (source[i] === '\n')
+      line++
+  }
+  return line
+}
+
+function sourceLineRangeFromOffsets(source: string, start: number, end: number): MarkdownNodeSourceMap {
+  const startIndex = Math.max(0, Math.min(source.length, Math.trunc(start)))
+  const endIndex = Math.max(startIndex, Math.min(source.length, Math.trunc(end)))
+  const startLine = lineAtOffset(source, startIndex)
+  let endLine = lineAtOffset(source, endIndex)
+
+  if (endIndex > startIndex && source[endIndex - 1] !== '\n')
+    endLine++
+
+  return {
+    startLine,
+    endLine,
+  }
+}
+
+export function createSourceMapFromOffsets(
+  source: string,
+  start: number,
+  end: number,
+  options?: ParseOptions,
+): MarkdownNodeSourceMap {
+  const range = sourceLineRangeFromOffsets(source, start, end)
+  return mapSourceLineRange(range.startLine, range.endLine, options)
 }
 
 function readSourceMap(token: MarkdownToken | undefined, options?: ParseOptions): MarkdownNodeSourceMap | null {

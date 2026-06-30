@@ -463,7 +463,7 @@ export interface InternalParseOptions extends ParseOptions {
     marketTicker?: boolean
   }
   __markdownIt?: MarkdownIt
-  __sourceLineMapper?: (line: number) => number
+  __sourceLineMapper?: (line: number) => MarkdownNodeSourceMap
   __sourceMarkdown?: string
 }
 

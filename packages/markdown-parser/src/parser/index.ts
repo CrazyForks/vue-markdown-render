@@ -17,7 +17,7 @@ import { parseHardBreak } from './node-parsers/hardbreak-parser'
 import { parseHtmlBlock } from './node-parsers/html-block-parser'
 import { parseList } from './node-parsers/list-parser'
 import { parseParagraph } from './node-parsers/paragraph-parser'
-import { applyNodeSourceMap } from './node-source-map'
+import { applyNodeSourceMap, createSourceMapFromOffsets } from './node-source-map'
 import { cloneTokenWithMutableChildren } from './token-copy'
 
 type ParsedNodeWithFields = ParsedNode & {
@@ -530,6 +530,16 @@ function buildParagraphFromInlineChildren(children: ParsedNode[]): ParsedNode {
     children,
     raw: children.map(stringifyInlineNodeRaw).join(''),
   } as ParsedNode
+}
+
+function inheritSourceMap(nodes: ParsedNode[], sourceNode: ParsedNode) {
+  if (!sourceNode.sourceMap)
+    return
+
+  for (const node of nodes) {
+    if (!node.sourceMap)
+      node.sourceMap = sourceNode.sourceMap
+  }
 }
 
 function maybePromoteCustomNodeFromParagraph(node: ParsedNode, options?: ParseOptions) {
@@ -1099,7 +1109,7 @@ function combineStructuredDetailsHtmlBlocks(
       ? openRaw.slice(0, openTagEndIndex + 1)
       : openRaw
 
-    merged.push({
+    const detailsNode = {
       ...node,
       tag: 'details',
       attrs: parseTagAttrs(openRaw.slice(0, openTagEndIndex + 1)),
@@ -1107,7 +1117,12 @@ function combineStructuredDetailsHtmlBlocks(
       content: `${contentPrefix}${renderedMiddle}${renderedCloseRaw}`,
       children: [...prefixChildren, ...children],
       loading: !final && !explicitClose,
-    } as ParsedNode)
+    } as ParsedNode
+
+    if (options.includeSourceMap)
+      detailsNode.sourceMap = createSourceMapFromOffsets(source, openStart, explicitClose ? closeSliceEnd : source.length, options)
+
+    merged.push(detailsNode)
 
     cursor = explicitClose ? closeSliceEnd : source.length
     if (closeIndex === -1 && !selfContained)
@@ -1119,7 +1134,7 @@ function combineStructuredDetailsHtmlBlocks(
   return [merged, cursor]
 }
 
-function mergeSplitTopLevelHtmlBlocks(nodes: ParsedNode[], final: boolean, source: string) {
+function mergeSplitTopLevelHtmlBlocks(nodes: ParsedNode[], final: boolean, source: string, options?: ParseOptions) {
   if (!source)
     return nodes
 
@@ -1167,6 +1182,8 @@ function mergeSplitTopLevelHtmlBlocks(nodes: ParsedNode[], final: boolean, sourc
     node.raw = exact.raw
     node.loading = desiredLoading
     node.attrs = exactAttrs.length ? exactAttrs : undefined
+    if (options?.includeSourceMap)
+      node.sourceMap = createSourceMapFromOffsets(source, exact.start, exact.end, options)
 
     if (!needsExpansion)
       continue
@@ -1431,15 +1448,39 @@ function createSourceLineMapper(source: string, parsedSource: string) {
 
   const sourceLines = source.split(/\r?\n/)
   const parsedLines = parsedSource.split(/\r?\n/)
-  const mappedLines: number[] = []
+  const mappedLines: Array<{ startLine: number, endLine: number }> = []
   let sourceCursor = 0
 
   for (let parsedLine = 0; parsedLine < parsedLines.length; parsedLine++) {
     const line = parsedLines[parsedLine] ?? ''
 
     if (sourceLines[sourceCursor] === line) {
-      mappedLines[parsedLine] = sourceCursor
+      mappedLines[parsedLine] = {
+        startLine: sourceCursor,
+        endLine: sourceCursor + 1,
+      }
       sourceCursor++
+      continue
+    }
+
+    let collapsedLine = sourceLines[sourceCursor] ?? ''
+    let collapsedEnd = -1
+    for (let sourceLine = sourceCursor + 1; sourceLine < sourceLines.length; sourceLine++) {
+      collapsedLine += `\\n${sourceLines[sourceLine] ?? ''}`
+      if (collapsedLine === line) {
+        collapsedEnd = sourceLine + 1
+        break
+      }
+      if (!line.startsWith(collapsedLine))
+        break
+    }
+
+    if (collapsedEnd !== -1) {
+      mappedLines[parsedLine] = {
+        startLine: sourceCursor,
+        endLine: collapsedEnd,
+      }
+      sourceCursor = collapsedEnd
       continue
     }
 
@@ -1455,24 +1496,38 @@ function createSourceLineMapper(source: string, parsedSource: string) {
     }
 
     if (found !== -1) {
-      mappedLines[parsedLine] = found
+      mappedLines[parsedLine] = {
+        startLine: found,
+        endLine: found + 1,
+      }
       sourceCursor = found + 1
       continue
     }
 
-    mappedLines[parsedLine] = Math.min(
+    const fallbackLine = Math.min(
       Math.max(0, sourceLines.length - 1),
       Math.max(0, sourceCursor - 1),
     )
+    mappedLines[parsedLine] = {
+      startLine: fallbackLine,
+      endLine: fallbackLine + 1,
+    }
   }
 
   return (line: number) => {
     const index = Number.isFinite(line) ? Math.max(0, Math.trunc(line)) : 0
     if (index < mappedLines.length)
-      return mappedLines[index] ?? 0
+      return mappedLines[index] ?? { startLine: 0, endLine: 0 }
 
-    const lastMapped = mappedLines[mappedLines.length - 1] ?? Math.max(0, sourceLines.length - 1)
-    return Math.min(sourceLines.length, lastMapped + index - mappedLines.length + 1)
+    const lastMapped = mappedLines[mappedLines.length - 1] ?? {
+      startLine: Math.max(0, sourceLines.length - 1),
+      endLine: sourceLines.length,
+    }
+    const startLine = Math.min(sourceLines.length, lastMapped.endLine + index - mappedLines.length)
+    return {
+      startLine,
+      endLine: Math.min(sourceLines.length, startLine + 1),
+    }
   }
 }
 
@@ -2571,9 +2626,9 @@ export function parseMarkdownToStructure(
     }
   }
 
-  result = mergeSplitTopLevelHtmlBlocks(result, isFinal, safeMarkdown)
-  result = combineStructuredDetailsHtmlBlocks(result, safeMarkdown, md, options, isFinal)[0]
-  result = structureGenericHtmlBlockChildren(result, md, options, isFinal)
+  result = mergeSplitTopLevelHtmlBlocks(result, isFinal, safeMarkdown, internalOptions)
+  result = combineStructuredDetailsHtmlBlocks(result, safeMarkdown, md, internalOptions, isFinal)[0]
+  result = structureGenericHtmlBlockChildren(result, md, internalOptions, isFinal)
 
   if (isFinal) {
     const seen = new WeakSet<object>()
@@ -2640,10 +2695,14 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
         if (includeSourceMap)
           applyNodeSourceMap(paragraphNode, token, options)
         const promoted = maybePromoteCustomNodeFromParagraph(paragraphNode, options)
-        if (promoted)
+        if (promoted) {
+          if (includeSourceMap)
+            inheritSourceMap(promoted, paragraphNode)
           result.push(...promoted)
-        else
+        }
+        else {
           result.push(paragraphNode)
+        }
         linkifyContext.remember(paragraphNode.raw)
         i += 3 // Skip paragraph_open, inline, paragraph_close
         break
@@ -2742,10 +2801,14 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
             if (includeSourceMap)
               applyNodeSourceMap(paragraphNode, token, options)
             const promoted = maybePromoteCustomNodeFromParagraph(paragraphNode, options)
-            if (promoted)
+            if (promoted) {
+              if (includeSourceMap)
+                inheritSourceMap(promoted, paragraphNode)
               result.push(...promoted)
-            else
+            }
+            else {
               result.push(paragraphNode)
+            }
           }
           linkifyContext.remember(raw)
         }
