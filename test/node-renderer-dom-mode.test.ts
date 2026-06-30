@@ -99,9 +99,13 @@ describe('node renderer domMode', () => {
     const wrapper = mount(NodeRenderer, {
       props: {
         nodes: [paragraphNode(1), paragraphNode(2)],
+        batchRendering: false,
+        deferNodesUntilVisible: false,
         domMode: 'minimal',
+        fade: false,
         maxLiveNodes: 1,
         nodeVirtual: true,
+        typewriter: false,
         viewportPriority: false,
       },
     })
@@ -212,6 +216,7 @@ describe('node renderer domMode', () => {
         batchRendering: false,
         deferNodesUntilVisible: false,
         domMode: 'minimal',
+        fade: false,
         nodeVirtual: false,
         typewriter: false,
         viewportPriority: false,
