@@ -235,6 +235,8 @@ describe('node source map metadata', () => {
     }) as any[]
 
     expect(nodes[0]?.sourceMap).toEqual({ startLine: 0, endLine: 5 })
+    expect(nodes[0]?.children?.find((child: any) => child?.tag === 'summary')?.sourceMap).toBeUndefined()
+    expect(nodes[0]?.children?.find((child: any) => child?.type === 'paragraph')?.sourceMap).toEqual({ startLine: 3, endLine: 4 })
   })
 
   it('updates sourceMap when split top-level html blocks are merged', () => {

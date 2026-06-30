@@ -345,8 +345,9 @@ export interface ParseOptions {
      */
     validateLink?: (url: string) => boolean;
     /**
-     * When true, attach 0-based source line metadata to top-level block nodes
-     * whose markdown-it token exposes `map`.
+     * When true, attach 0-based source line metadata to parsed block/custom nodes
+     * when token maps or parser source offsets are available. Nested container
+     * children may also be annotated.
      */
     includeSourceMap?: boolean;
     debug?: boolean;
