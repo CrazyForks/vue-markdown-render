@@ -13,8 +13,9 @@ If you only need one of these common tasks, start elsewhere first:
 
 - `preTransformTokens?: (tokens: MarkdownToken[]) => MarkdownToken[]` — mutate tokens immediately after the `markdown-it` parse
 - `postTransformTokens?: (tokens: MarkdownToken[]) => MarkdownToken[]` — further token transforms
+- `postTransformNodes?: (nodes: ParsedNode[]) => ParsedNode[]` — patch the parsed AST after built-in node normalization
 
-If you need to reshape the AST, post-process the returned `ParsedNode[]` and pass it to `MarkdownRender` via the `nodes` prop.
+Use `postTransformNodes` when the patch should apply inside `MarkdownRender`'s `content` path. Use `nodes` only when your app already owns parsing outside the component.
 
 ### Example: custom HTML-like tags (recommended)
 For simple custom tags like `<thinking>...</thinking>`, you no longer need to normalize the source or rewrite tokens. Just opt the tag into the allowlist and register a component:
@@ -41,21 +42,21 @@ When `custom-html-tags` includes a tag name, the parser:
 ## Custom component parsing
 
 The built‑in custom tag pipeline above handles most “component‑like” tags (inline or block).
-Hooks are still useful when you need to reshape the node — for example, to strip wrappers, merge adjacent blocks, or map attributes:
+Hooks are still useful when you need to reshape nodes inside the normal `content` path — for example, to strip wrappers, merge adjacent blocks, or map attributes:
 
 ```ts
 import { getMarkdown, parseMarkdownToStructure } from 'markstream-vue'
 
-function preTransformTokens(tokens: MarkdownToken[]) {
-  return tokens.map((t) => {
-    if (t.type === 'html_block' && t.tag === 'thinking')
-      return { ...t, content: String(t.content ?? '').replace(/<\/?thinking[^>]*>/g, '').trim() }
-    return t
+function postTransformNodes(nodes: ParsedNode[]) {
+  return nodes.map((node) => {
+    if (node.type === 'thinking')
+      return { ...node, data: { role: 'reasoning' } }
+    return node
   })
 }
 
 const md = getMarkdown()
-const nodes = parseMarkdownToStructure(markdown, md, { preTransformTokens })
+const nodes = parseMarkdownToStructure(markdown, md, { postTransformNodes })
 ```
 
 Alternative flows (pick what fits your pipeline):

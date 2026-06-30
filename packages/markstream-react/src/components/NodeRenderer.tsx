@@ -1166,6 +1166,12 @@ export function NodeRenderer<
   // their previous object reference.  This is the key enabler for
   // NodeSlotContent's React.memo to skip re-rendering unchanged nodes.
   const prevStableNodesRef = useRef<ParsedNode[]>([])
+  const postTransformNodes = (mergedParseOptions as any)?.postTransformNodes
+  const previousPostTransformNodesRef = useRef(postTransformNodes)
+  if (previousPostTransformNodesRef.current !== postTransformNodes) {
+    prevStableNodesRef.current = []
+    previousPostTransformNodesRef.current = postTransformNodes
+  }
   const parsedNodes = stabilizeParsedNodes(rawParsedNodes, prevStableNodesRef.current)
   prevStableNodesRef.current = parsedNodes
 
