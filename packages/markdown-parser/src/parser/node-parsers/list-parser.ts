@@ -7,6 +7,7 @@ import type {
 } from '../../types'
 import { parseInlineTokens } from '../inline-parsers'
 import { createLinkifyDemotionContextTracker } from '../linkifyHeuristics'
+import { applyNodeSourceMap } from '../node-source-map'
 import { cloneTokenWithMutableChildren } from '../token-copy'
 import { parseCommonBlockToken } from './block-token-parser'
 import { parseBlockquote } from './blockquote-parser'
@@ -136,11 +137,13 @@ export function parseList(
             trimInlineTokenTail(contentToken)
           }
           const paragraphRaw = String(contentToken.content ?? '')
-          itemChildren.push({
+          const paragraphNode: ParsedNode = {
             type: 'paragraph',
             children: parseInlineTokens(contentToken.children || [], paragraphRaw, preToken, linkifyContext.options()),
             raw: paragraphRaw,
-          })
+          }
+          applyNodeSourceMap(paragraphNode, tokens[k], options)
+          itemChildren.push(paragraphNode)
           linkifyContext.remember(paragraphRaw)
           k += 3 // Skip paragraph_open, inline, paragraph_close
         }
@@ -173,11 +176,13 @@ export function parseList(
         }
       }
 
-      listItems.push({
+      const listItemNode: ListItemNode = {
         type: 'list_item',
         children: itemChildren,
         raw: itemChildren.map(child => child.raw).join(''),
-      })
+      }
+      applyNodeSourceMap(listItemNode, tokens[j], options)
+      listItems.push(listItemNode)
 
       j = k + 1 // Move past list_item_close
     }
@@ -203,6 +208,8 @@ export function parseList(
     items: listItems,
     raw: listItems.map(item => item.raw).join('\n'),
   }
+
+  applyNodeSourceMap(listNode, token, options)
 
   return [listNode, j + 1] // Move past list_close
 }

@@ -74,6 +74,38 @@ describe('node source map metadata', () => {
     ])
   })
 
+  it('attaches source maps to list and blockquote child blocks', () => {
+    const nodes = parseMarkdownToStructure([
+      '- item',
+      '  - nested',
+      '',
+      '> quote',
+      '> - quoted item',
+    ].join('\n'), getMarkdown('source-map-nested-list-blockquote'), {
+      final: true,
+      includeSourceMap: true,
+      streamParse: false,
+    }) as any[]
+
+    const list = nodes[0]
+    const nestedList = list.items[0].children[1]
+    const blockquote = nodes[1]
+    const quotedList = blockquote.children[1]
+
+    expect(list.sourceMap).toEqual({ startLine: 0, endLine: 3 })
+    expect(list.items[0].sourceMap).toEqual({ startLine: 0, endLine: 3 })
+    expect(list.items[0].children[0].sourceMap).toEqual({ startLine: 0, endLine: 1 })
+    expect(nestedList.sourceMap).toEqual({ startLine: 1, endLine: 3 })
+    expect(nestedList.items[0].sourceMap).toEqual({ startLine: 1, endLine: 3 })
+    expect(nestedList.items[0].children[0].sourceMap).toEqual({ startLine: 1, endLine: 2 })
+
+    expect(blockquote.sourceMap).toEqual({ startLine: 3, endLine: 5 })
+    expect(blockquote.children[0].sourceMap).toEqual({ startLine: 3, endLine: 4 })
+    expect(quotedList.sourceMap).toEqual({ startLine: 4, endLine: 5 })
+    expect(quotedList.items[0].sourceMap).toEqual({ startLine: 4, endLine: 5 })
+    expect(quotedList.items[0].children[0].sourceMap).toEqual({ startLine: 4, endLine: 5 })
+  })
+
   it('maps ranges back to caller source lines after custom tag preprocessing', () => {
     const nodes = parseMarkdownToStructure([
       'Alpha',
@@ -183,6 +215,31 @@ describe('node source map metadata', () => {
     expect(nodes[0]?.sourceMap).toEqual({ startLine: 0, endLine: 5 })
     expect(nodes[0]?.children?.[0]?.sourceMap).toEqual({ startLine: 1, endLine: 2 })
     expect(nodes[0]?.children?.[1]?.sourceMap).toEqual({ startLine: 3, endLine: 4 })
+  })
+
+  it('uses close token maps when paired container open maps are already exclusive', () => {
+    const nodes = parseMarkdownToStructure([
+      '::: tip',
+      'body',
+      ':::',
+      'after',
+    ].join('\n'), getMarkdown('source-map-container-close-token-map'), {
+      final: true,
+      includeSourceMap: true,
+      streamParse: false,
+      postTransformTokens(tokens) {
+        const openToken = tokens.find(token => token.type === 'container_tip_open')
+        const closeToken = tokens.find(token => token.type === 'container_tip_close')
+        if (openToken)
+          openToken.map = [0, 3]
+        if (closeToken)
+          closeToken.map = [2, 3]
+        return tokens
+      },
+    }) as any[]
+
+    expect(nodes[0]?.sourceMap).toEqual({ startLine: 0, endLine: 3 })
+    expect(nodes[1]?.sourceMap).toEqual({ startLine: 3, endLine: 4 })
   })
 
   it('attaches source maps to VMR fallback containers and heading children', () => {

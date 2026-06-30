@@ -185,7 +185,9 @@ function applyPairedBlockSourceMap<TNode extends ParsedNode>(
   options?: ParseOptions,
 ) {
   if (closeToken?.type.endsWith('_close')) {
-    const endLine = Array.isArray(openToken.map) ? Number(openToken.map[1]) + 1 : Number.NaN
+    let endLine = Array.isArray(closeToken.map) ? Number(closeToken.map[1]) : Number.NaN
+    if (!Number.isFinite(endLine))
+      endLine = Array.isArray(openToken.map) ? Number(openToken.map[1]) + 1 : Number.NaN
     return applyNodeSourceMapRange(node, openToken, endLine, options)
   }
 

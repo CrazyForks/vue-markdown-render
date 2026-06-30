@@ -1,6 +1,7 @@
 import type { BlockquoteNode, MarkdownToken, ParsedNode, ParseOptions } from '../../types'
 import { parseInlineTokens } from '../inline-parsers'
 import { createLinkifyDemotionContextTracker } from '../linkifyHeuristics'
+import { applyNodeSourceMap } from '../node-source-map'
 import { parseCommonBlockToken } from './block-token-parser'
 import { containerTokenHandlers } from './container-token-handlers'
 import { parseList } from './list-parser'
@@ -25,6 +26,7 @@ export function parseBlockquote(
           children: parseInlineTokens(contentToken.children || [], String(contentToken.content ?? ''), undefined, linkifyContext.options()),
           raw: String(contentToken.content ?? ''),
         } as ParsedNode
+        applyNodeSourceMap(paragraphNode, token, options)
         blockquoteChildren.push(paragraphNode)
         linkifyContext.remember(paragraphNode.raw)
         j += 3 // Skip paragraph_open, inline, paragraph_close
@@ -65,6 +67,7 @@ export function parseBlockquote(
     children: blockquoteChildren,
     raw: blockquoteChildren.map(child => child.raw).join('\n'),
   }
+  applyNodeSourceMap(blockquoteNode, tokens[index], options)
 
   return [blockquoteNode, j + 1] // Skip blockquote_close
 }
