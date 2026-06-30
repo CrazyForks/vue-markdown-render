@@ -1,3 +1,4 @@
+import { getHighlightRegistrationKey } from 'markstream-core'
 import { describe, expect, it } from 'vitest'
 import {
   buildVirtualMeasurementKey,
@@ -69,6 +70,106 @@ describe('virtual layout key helpers', () => {
       codeBlockMinWidth: 320,
       codeBlockMaxWidth: '100%',
     })).not.toBe(base)
+  })
+
+  it('preserves the exact monaco layout key token sequence', () => {
+    const key = buildVirtualRendererLayoutKey({
+      renderer: 'monaco',
+      isDark: true,
+      codeBlockStream: false,
+      codeBlockMinWidth: 320,
+      codeBlockMaxWidth: '100%',
+      codeBlockMonacoOptions: {
+        fontSize: 14,
+        lineHeight: 20,
+        fontFamily: 'JetBrains Mono',
+        tabSize: 2,
+        MAX_HEIGHT: 560,
+        wordWrap: 'on',
+        wrappingIndent: 'same',
+        padding: { top: 12, bottom: 16 },
+      },
+      codeBlockProps: {
+        showHeader: true,
+        showCopyButton: false,
+        showExpandButton: true,
+        showPreviewButton: false,
+        showCollapseButton: true,
+        showFontSizeButtons: false,
+      },
+    })
+
+    expect(key).toBe([
+      'dark',
+      'code-rich',
+      'code-static',
+      '320',
+      '100%',
+      '14',
+      '20',
+      'JetBrains Mono',
+      '2',
+      '560',
+      'on',
+      'same',
+      '{"top":12,"bottom":16}',
+      'true',
+      'false',
+      'true',
+      'false',
+      'true',
+      'false',
+    ].join('\u0000'))
+  })
+
+  it('preserves the exact shiki layout key token sequence', () => {
+    const registrationKey = getHighlightRegistrationKey(['github-light'], ['typescript'])
+    const key = buildVirtualRendererLayoutKey({
+      renderer: 'shiki',
+      isDark: false,
+      codeBlockStream: true,
+      codeBlockMinWidth: '16rem',
+      codeBlockMaxWidth: 960,
+      codeBlockMonacoOptions: {
+        fontSize: 18,
+        lineHeight: 28,
+      },
+      themes: ['vitesse-light'],
+      langs: ['javascript'],
+      codeBlockProps: {
+        themes: ['github-light'],
+        langs: ['ts'],
+        showHeader: false,
+        showCopyButton: true,
+        showExpandButton: false,
+        showPreviewButton: true,
+        showCollapseButton: false,
+        showFontSizeButtons: true,
+      },
+    })
+
+    expect(key).toBe([
+      'light',
+      'code-shiki',
+      'code-stream',
+      '16rem',
+      '960',
+      registrationKey,
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      'false',
+      'true',
+      'false',
+      'true',
+      'false',
+      'true',
+    ].join('\u0000'))
   })
 
   it('includes monaco options only for monaco renderer layout keys', () => {
