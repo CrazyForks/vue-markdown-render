@@ -1221,6 +1221,9 @@ function syncFocusToScroll(force = false) {
   const isViewportRoot = root === doc?.documentElement || root === doc?.body
 
   const total = parsedNodes.value.length
+  if (total <= 0)
+    return
+
   const reverseFlex = !isViewportRoot && total > 0 && isReverseFlexScrollRoot(root)
   if (reverseFlex) {
     // In reverse-flex scroll roots (chat UIs), `scrollTop` is effectively the
@@ -1234,10 +1237,13 @@ function syncFocusToScroll(force = false) {
     const offsetFromBottom = Math.max(0, distanceFromBottom) + Math.max(0, viewportHeight) * 0.5
     const estimated = estimateIndexForOffsetFromEnd(offsetFromBottom)
     const next = clamp(estimated, 0, Math.max(0, total - 1))
-    if (force || Math.abs(next - focusIndex.value) > 1) {
-      focusIndex.value = next
-      updateLiveRange()
-    }
+    applyScrollFocusIndex(next, force)
+    return
+  }
+
+  const estimated = estimateFocusIndexFromScroll(root, doc, view, isViewportRoot)
+  if (estimated != null) {
+    applyScrollFocusIndex(estimated, force)
     return
   }
 
@@ -1287,15 +1293,43 @@ function syncFocusToScroll(force = false) {
       : readLayout('syncFocusToScroll.fallback.root.clientHeight', () => root.clientHeight)
     const targetOffset = relativeScrollTop + Math.max(0, viewportHeight) * 0.5
     const estimated = estimateIndexForOffset(targetOffset)
-    focusIndex.value = clamp(estimated, 0, Math.max(0, parsedNodes.value.length - 1))
-    updateLiveRange()
+    applyScrollFocusIndex(clamp(estimated, 0, Math.max(0, parsedNodes.value.length - 1)), true)
     return
   }
   const midpoint = Math.round((firstVisible + lastVisible) / 2)
-  if (!force && Math.abs(midpoint - focusIndex.value) <= 1)
+  applyScrollFocusIndex(midpoint, force)
+}
+
+function applyScrollFocusIndex(index: number, force = false) {
+  const next = clamp(index, 0, Math.max(0, parsedNodes.value.length - 1))
+  if (!force && Math.abs(next - focusIndex.value) <= 1)
     return
-  focusIndex.value = clamp(midpoint, 0, Math.max(0, parsedNodes.value.length - 1))
+
+  focusIndex.value = next
   updateLiveRange()
+}
+
+function estimateFocusIndexFromScroll(
+  root: HTMLElement,
+  doc: Document,
+  view: Window | null,
+  isViewportRoot: boolean,
+) {
+  const container = containerRef.value
+  if (!container)
+    return null
+
+  const viewportTop = isViewportRoot
+    ? 0
+    : readLayout('syncFocusToScroll.model.root.getBoundingClientRect', () => root.getBoundingClientRect().top)
+  const containerTop = readLayout('syncFocusToScroll.model.container.getBoundingClientRect', () => container.getBoundingClientRect().top)
+  const relativeScrollTop = Math.max(0, viewportTop - containerTop)
+  const viewportHeight = isViewportRoot
+    ? readLayout('syncFocusToScroll.model.viewport.clientHeight', () => view?.innerHeight ?? doc.documentElement?.clientHeight ?? root.clientHeight ?? 0)
+    : readLayout('syncFocusToScroll.model.root.clientHeight', () => root.clientHeight)
+  const targetOffset = relativeScrollTop + Math.max(0, viewportHeight) * 0.5
+  const estimated = estimateIndexForOffset(targetOffset)
+  return clamp(estimated, 0, Math.max(0, parsedNodes.value.length - 1))
 }
 
 function clamp(value: number, min: number, max: number) {
