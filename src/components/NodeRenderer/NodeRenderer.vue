@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ParsedNode } from 'stream-markdown-parser'
+import type { EstimatedNodeHeight } from '../../internal/heightEstimationExperiment'
 import type { CustomComponents } from '../../types'
 import type { CodeBlockPreviewPayload } from '../../types/component-props'
 import type {
@@ -494,6 +495,18 @@ const layoutReadFrameCounts = new Map<string, number>()
 let layoutReadFrameScheduled = false
 let maxLayoutReadsPerFrame = 0
 
+interface BenchmarkLayoutReadPerformance {
+  total: number
+  maxPerFrame: number
+  byLabel: Record<string, number>
+  currentFrameTotal?: number
+  frameScheduled?: boolean
+}
+
+type BenchmarkLayoutReadWindow = Window & {
+  __markstreamLayoutReadPerformance?: BenchmarkLayoutReadPerformance
+}
+
 function getMapTotal(map: Map<string, number>) {
   let total = 0
   for (const count of map.values())
@@ -531,12 +544,65 @@ function scheduleLayoutReadFrameFlush() {
   setTimeout(flushLayoutReadFrameCounts, 0)
 }
 
+function getBenchmarkLayoutReadPerformance() {
+  if (!isClient || typeof window === 'undefined')
+    return null
+
+  const target = window as BenchmarkLayoutReadWindow
+  if (target.__markstreamLayoutReadPerformance)
+    return target.__markstreamLayoutReadPerformance
+
+  const created: BenchmarkLayoutReadPerformance = {
+    total: 0,
+    maxPerFrame: 0,
+    byLabel: {},
+  }
+  target.__markstreamLayoutReadPerformance = created
+  return created
+}
+
+function flushBenchmarkLayoutReadFrame(state: BenchmarkLayoutReadPerformance) {
+  state.maxPerFrame = Math.max(
+    Number(state.maxPerFrame || 0),
+    Number(state.currentFrameTotal || 0),
+  )
+  state.currentFrameTotal = 0
+  state.frameScheduled = false
+}
+
+function publishBenchmarkLayoutRead(label: string) {
+  const performance = getBenchmarkLayoutReadPerformance()
+  if (!performance)
+    return
+
+  performance.total = Number(performance.total || 0) + 1
+  performance.byLabel[label] = Number(performance.byLabel[label] || 0) + 1
+  performance.currentFrameTotal = Number(performance.currentFrameTotal || 0) + 1
+
+  if (performance.frameScheduled)
+    return
+
+  performance.frameScheduled = true
+  if (typeof window.requestAnimationFrame === 'function') {
+    window.requestAnimationFrame(() => flushBenchmarkLayoutReadFrame(performance))
+    return
+  }
+
+  if (typeof queueMicrotask === 'function') {
+    queueMicrotask(() => flushBenchmarkLayoutReadFrame(performance))
+    return
+  }
+
+  setTimeout(() => flushBenchmarkLayoutReadFrame(performance), 0)
+}
+
 function recordLayoutRead(label: string) {
   if (!debugPerformanceEnabled.value)
     return
 
   layoutReadCounts.set(label, (layoutReadCounts.get(label) ?? 0) + 1)
   layoutReadFrameCounts.set(label, (layoutReadFrameCounts.get(label) ?? 0) + 1)
+  publishBenchmarkLayoutRead(label)
   scheduleLayoutReadFrameFlush()
 }
 
@@ -1156,6 +1222,9 @@ function syncFocusToScroll(force = false) {
   const isViewportRoot = root === doc?.documentElement || root === doc?.body
 
   const total = parsedNodes.value.length
+  if (total <= 0)
+    return
+
   const reverseFlex = !isViewportRoot && total > 0 && isReverseFlexScrollRoot(root)
   if (reverseFlex) {
     // In reverse-flex scroll roots (chat UIs), `scrollTop` is effectively the
@@ -1169,10 +1238,13 @@ function syncFocusToScroll(force = false) {
     const offsetFromBottom = Math.max(0, distanceFromBottom) + Math.max(0, viewportHeight) * 0.5
     const estimated = estimateIndexForOffsetFromEnd(offsetFromBottom)
     const next = clamp(estimated, 0, Math.max(0, total - 1))
-    if (force || Math.abs(next - focusIndex.value) > 1) {
-      focusIndex.value = next
-      updateLiveRange()
-    }
+    applyScrollFocusIndex(next, force)
+    return
+  }
+
+  const estimated = estimateFocusIndexFromScroll(root, doc, view, isViewportRoot)
+  if (estimated != null) {
+    applyScrollFocusIndex(estimated, force)
     return
   }
 
@@ -1222,15 +1294,43 @@ function syncFocusToScroll(force = false) {
       : readLayout('syncFocusToScroll.fallback.root.clientHeight', () => root.clientHeight)
     const targetOffset = relativeScrollTop + Math.max(0, viewportHeight) * 0.5
     const estimated = estimateIndexForOffset(targetOffset)
-    focusIndex.value = clamp(estimated, 0, Math.max(0, parsedNodes.value.length - 1))
-    updateLiveRange()
+    applyScrollFocusIndex(clamp(estimated, 0, Math.max(0, parsedNodes.value.length - 1)), true)
     return
   }
   const midpoint = Math.round((firstVisible + lastVisible) / 2)
-  if (!force && Math.abs(midpoint - focusIndex.value) <= 1)
+  applyScrollFocusIndex(midpoint, force)
+}
+
+function applyScrollFocusIndex(index: number, force = false) {
+  const next = clamp(index, 0, Math.max(0, parsedNodes.value.length - 1))
+  if (!force && Math.abs(next - focusIndex.value) <= 1)
     return
-  focusIndex.value = clamp(midpoint, 0, Math.max(0, parsedNodes.value.length - 1))
+
+  focusIndex.value = next
   updateLiveRange()
+}
+
+function estimateFocusIndexFromScroll(
+  root: HTMLElement,
+  doc: Document,
+  view: Window | null,
+  isViewportRoot: boolean,
+) {
+  const container = containerRef.value
+  if (!container)
+    return null
+
+  const viewportTop = isViewportRoot
+    ? 0
+    : readLayout('syncFocusToScroll.model.root.getBoundingClientRect', () => root.getBoundingClientRect().top)
+  const containerTop = readLayout('syncFocusToScroll.model.container.getBoundingClientRect', () => container.getBoundingClientRect().top)
+  const relativeScrollTop = Math.max(0, viewportTop - containerTop)
+  const viewportHeight = isViewportRoot
+    ? readLayout('syncFocusToScroll.model.viewport.clientHeight', () => view?.innerHeight ?? doc.documentElement?.clientHeight ?? root.clientHeight ?? 0)
+    : readLayout('syncFocusToScroll.model.root.clientHeight', () => root.clientHeight)
+  const targetOffset = relativeScrollTop + Math.max(0, viewportHeight) * 0.5
+  const estimated = estimateIndexForOffset(targetOffset)
+  return clamp(estimated, 0, Math.max(0, parsedNodes.value.length - 1))
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -1356,14 +1456,16 @@ function resolveCodeBlockShowHeader() {
   return showHeader !== false
 }
 
+const EMPTY_ESTIMATED_NODE_HEIGHTS: Array<EstimatedNodeHeight | null> = []
+
 const estimatedNodeHeights = computed(() => {
   const nodes = parsedNodes.value
   if (!nodes.length || !heightEstimationActive.value)
-    return nodes.map(() => null)
+    return EMPTY_ESTIMATED_NODE_HEIGHTS
 
   const width = experimentContainerWidth.value || readLayout('estimatedNodeHeights.clientWidth', () => containerRef.value?.clientWidth || 0)
   if (!Number.isFinite(width) || width <= 0)
-    return nodes.map(() => null)
+    return EMPTY_ESTIMATED_NODE_HEIGHTS
 
   return nodes.map((node, index) => {
     const measuredHeight = nodeHeights[index]
@@ -6231,6 +6333,12 @@ onBeforeUnmount(() => {
   background-image: linear-gradient(90deg, var(--loading-shimmer), transparent, var(--loading-shimmer));
   background-size: 200% 100%;
   animation: node-placeholder-shimmer 1.1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .node-placeholder {
+    animation: none;
+  }
 }
 
 .node-placeholder:first-child {

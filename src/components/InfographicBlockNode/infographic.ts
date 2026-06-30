@@ -21,6 +21,7 @@ export type InfographicLoader = () => Promise<InfographicModuleLike> | Infograph
 
 let cachedInfographic: InfographicConstructor | null = null
 let infographicLoader: InfographicLoader | null = null
+let pendingInfographic: Promise<InfographicConstructor | null> | null = null
 let loaderVersion = 0
 
 function normalizeInfographicModule(mod: unknown): InfographicConstructor | null {
@@ -43,6 +44,7 @@ function normalizeInfographicModule(mod: unknown): InfographicConstructor | null
 export function setInfographicLoader(loader?: InfographicLoader | null) {
   infographicLoader = loader ?? null
   cachedInfographic = null
+  pendingInfographic = null
   loaderVersion++
 }
 
@@ -72,15 +74,26 @@ export async function getInfographic(): Promise<InfographicConstructor | null> {
   const version = loaderVersion
   if (!loader)
     return null
-  const mod: any = await loader()
-  if (version !== loaderVersion || loader !== infographicLoader)
-    return null
-  const resolved = normalizeInfographicModule(mod)
-  if (version !== loaderVersion || loader !== infographicLoader)
-    return null
-  if (!resolved)
-    return null
 
-  cachedInfographic = resolved
-  return cachedInfographic
+  if (pendingInfographic)
+    return pendingInfographic
+
+  pendingInfographic = (async () => {
+    const mod: any = await loader()
+    if (version !== loaderVersion || loader !== infographicLoader)
+      return null
+    const resolved = normalizeInfographicModule(mod)
+    if (version !== loaderVersion || loader !== infographicLoader)
+      return null
+    if (!resolved)
+      return null
+
+    cachedInfographic = resolved
+    return cachedInfographic
+  })().finally(() => {
+    if (version === loaderVersion && loader === infographicLoader)
+      pendingInfographic = null
+  })
+
+  return pendingInfographic
 }

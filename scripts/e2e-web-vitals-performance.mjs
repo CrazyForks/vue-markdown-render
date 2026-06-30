@@ -363,6 +363,11 @@ async function resetPhase(page, phase) {
     state.frames = []
     state.lastFrameAt = 0
     state.parseBaseline = JSON.parse(JSON.stringify(state.parsePerformance ?? null))
+    window.__markstreamLayoutReadPerformance = {
+      total: 0,
+      maxPerFrame: 0,
+      byLabel: {},
+    }
   }, phase)
   await waitForFrames(page, 1)
 }
@@ -417,6 +422,11 @@ async function installObservers(context) {
       },
     }
 
+    window.__markstreamLayoutReadPerformance = {
+      total: 0,
+      maxPerFrame: 0,
+      byLabel: {},
+    }
     window.__webVitalsProbeState = state
     window.__playgroundPerfState = state
 
@@ -639,6 +649,25 @@ async function captureVitalsSnapshot(page, label, performanceDelta = null) {
         streamModes,
       }
     }
+    const normalizeLayoutReadPerformance = (value) => {
+      if (!value || typeof value !== 'object')
+        return null
+
+      const byLabel = value.byLabel && typeof value.byLabel === 'object'
+        ? Object.fromEntries(
+            Object.entries(value.byLabel)
+              .map(([key, count]) => [key, Number(count || 0)])
+              .filter(([, count]) => count > 0)
+              .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+          )
+        : {}
+
+      return {
+        total: Number(value.total || 0),
+        maxPerFrame: Math.max(Number(value.maxPerFrame || 0), Number(value.currentFrameTotal || 0)),
+        byLabel,
+      }
+    }
 
     for (const event of events) {
       const key = Number(event.interactionId || 0) > 0
@@ -742,6 +771,7 @@ async function captureVitalsSnapshot(page, label, performanceDelta = null) {
       hasMonacoDom: Boolean(document.querySelector('.monaco-editor, .monaco-diff-editor')),
       jsHeapUsedBytes: null,
       parsePerformance: diffParsePerformance(state.parsePerformance, state.parseBaseline),
+      layoutReads: normalizeLayoutReadPerformance(window.__markstreamLayoutReadPerformance),
       topLayoutShifts: [...layoutShifts]
         .sort((a, b) => Number(b?.value || 0) - Number(a?.value || 0))
         .slice(0, 8),
