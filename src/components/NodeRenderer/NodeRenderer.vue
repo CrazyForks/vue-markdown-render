@@ -17,6 +17,7 @@ import type {
   NodeRendererMode,
   NodeRendererProps,
 } from '../../types/node-renderer-props'
+import type { VirtualHeightSummary } from './composables/useHeightModel'
 import { getHighlightRegistrationKey, normalizeShikiLanguage } from 'markstream-core'
 import { computed, defineAsyncComponent, getCurrentInstance, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
@@ -74,6 +75,7 @@ import { useBatchRenderingScheduler } from './composables/useBatchRenderingSched
 import { useBatchRenderingState } from './composables/useBatchRenderingState'
 import { useFocusSyncScheduler } from './composables/useFocusSyncScheduler'
 import { useHeightMeasurements } from './composables/useHeightMeasurements'
+import { getHeightCacheWidthBucket, UNKNOWN_HEIGHT_CACHE_WIDTH_BUCKET, useHeightModel } from './composables/useHeightModel'
 import { useLiveRangeState } from './composables/useLiveRangeState'
 import { useMarkdownParsing } from './composables/useMarkdownParsing'
 import { useNodeVisibilityState } from './composables/useNodeVisibilityState'
@@ -331,8 +333,6 @@ const MAX_DEFERRED_NODE_COUNT = 900
 const MAX_VIEWPORT_OBSERVER_TARGETS = 640
 const VIEWPORT_PRIORITY_RECOVERY_COUNT = 200
 const CONTENT_STREAMING_TAIL_IDLE_MS = 1200
-const HEIGHT_CACHE_WIDTH_BUCKET_PX = 32
-const UNKNOWN_HEIGHT_CACHE_WIDTH_BUCKET = -1
 const BOTTOM_ANCHOR_CAPTURE_MAX_DISTANCE_PX = 160
 const BOTTOM_ANCHOR_SCROLL_ROOT_MAX_DISTANCE_PX = 64
 const BOTTOM_ANCHOR_RELEASE_THRESHOLD_PX = 32
@@ -847,6 +847,33 @@ function consumeVirtualBottomProgrammaticScrollGuard(box: { scrollTop: number })
 
   return guarded
 }
+
+let heightModel: ReturnType<typeof useHeightModel>
+
+function markFallbackHeightPrefixDirty() {
+  heightModel.markFallbackHeightPrefixDirty()
+}
+
+function getFallbackNodeHeight(index: number) {
+  return heightModel.getFallbackNodeHeight(index)
+}
+
+function estimateHeightRange(start: number, end: number) {
+  return heightModel.estimateHeightRange(start, end)
+}
+
+function estimateIndexForOffset(offsetPx: number) {
+  return heightModel.estimateIndexForOffset(offsetPx)
+}
+
+function estimateIndexForOffsetFromEnd(offsetPx: number) {
+  return heightModel.estimateIndexForOffsetFromEnd(offsetPx)
+}
+
+function getEstimatedNodeHeightCount() {
+  return heightModel.getEstimatedNodeHeightCount()
+}
+
 const {
   activeRestoreAnchor,
   getRelativeScrollTopWithinContainer,
@@ -1027,13 +1054,6 @@ const pendingAsyncNodeCount = computed(() => {
   return total
 })
 let heightMeasurementRaf: number | null = null
-let fallbackHeightPrefixDirty = true
-let fallbackHeightPrefixCache: number[] = [0]
-let fallbackHeightPrefixCacheKey = ''
-
-function markFallbackHeightPrefixDirty() {
-  fallbackHeightPrefixDirty = true
-}
 
 const desiredRenderedCount = computed(() => {
   if (!virtualizationEnabled.value)
@@ -1492,212 +1512,38 @@ const estimatedNodeHeights = computed(() => {
   })
 })
 
-function getFallbackNodeHeight(index: number) {
-  const measured = nodeHeights[index]
-  if (Number.isFinite(measured) && measured > 0)
-    return measured
+heightModel = useHeightModel({
+  parsedNodes,
+  nodeHeights,
+  heightStats,
+  heightTreeSize,
+  heightSumTree,
+  heightKnownTree,
+  averageNodeHeight,
+  heightEstimationActive,
+  estimatedNodeHeights,
+  getContainerWidth: getMeasuredContainerWidth,
+  getPrefixCacheKeyParts: () => {
+    const width = experimentContainerWidth.value || readLayout('getFallbackHeightPrefix.clientWidth', () => containerRef.value?.clientWidth || 0)
+    const widthBucket = getHeightCacheWidthBucket(width)
+    const measurementKey = props.virtualScroll?.measurementKey == null
+      ? ''
+      : String(props.virtualScroll.measurementKey)
 
-  const estimated = estimatedNodeHeights.value[index]?.height
-  if (Number.isFinite(estimated) && estimated > 0)
-    return estimated
-
-  return Math.max(
-    averageNodeHeight.value,
-    getStaticNodeHeightFallback(index),
-  )
-}
-
-function getStaticNodeHeightFallback(index: number) {
-  const node = parsedNodes.value[index] as any
-  if (!node || typeof node !== 'object')
-    return 32
-
-  const type = String(node.type ?? '')
-  const width = getMeasuredContainerWidth() || 640
-
-  switch (type) {
-    case 'heading':
-      return 44
-
-    case 'paragraph':
-      return estimateTextFallbackHeight(
-        String(node.raw ?? node.content ?? ''),
-        width,
-        34,
-      )
-
-    case 'list': {
-      const items = Array.isArray(node.items) ? node.items.length : 1
-      return Math.max(48, items * 30 + 12)
-    }
-
-    case 'list_item':
-      return estimateTextFallbackHeight(
-        String(node.raw ?? node.content ?? ''),
-        width,
-        34,
-      )
-
-    case 'blockquote':
-      return estimateTextFallbackHeight(
-        String(node.raw ?? node.content ?? ''),
-        width,
-        56,
-      )
-
-    case 'table': {
-      const rowCount = Array.isArray(node.rows)
-        ? node.rows.length
-        : Array.isArray(node.children)
-          ? node.children.length
-          : 3
-      return Math.max(120, rowCount * 38 + 48)
-    }
-
-    case 'code_block':
-      return estimateTextFallbackHeight(
-        String(node.code ?? node.raw ?? ''),
-        width,
-        96,
-        20,
-      )
-
-    case 'math_block':
-      return 72
-
-    case 'image':
-      return 220
-
-    case 'admonition':
-    case 'vmr_container':
-    case 'html_block':
-      return estimateTextFallbackHeight(
-        String(node.raw ?? node.content ?? ''),
-        width,
-        96,
-      )
-
-    case 'thematic_break':
-      return 24
-
-    default:
-      return estimateTextFallbackHeight(
-        String(node.raw ?? node.content ?? ''),
-        width,
-        40,
-      )
-  }
-}
-
-function estimateTextFallbackHeight(
-  text: string,
-  width: number,
-  minHeight: number,
-  lineHeight = 22,
-) {
-  const source = String(text ?? '')
-  if (!source)
-    return minHeight
-
-  const charsPerLine = Math.max(18, Math.floor(Math.max(320, width) / 8))
-  const hardLines = source.split(/\r?\n/).length
-  const softLines = Math.ceil(source.length / charsPerLine)
-  const lines = Math.max(1, hardLines, softLines)
-
-  return Math.max(minHeight, Math.ceil(lines * lineHeight + 12))
-}
-
-function getHeightCacheWidthBucket(width: unknown) {
-  const numeric = Number(width)
-  if (!Number.isFinite(numeric) || numeric <= 0)
-    return UNKNOWN_HEIGHT_CACHE_WIDTH_BUCKET
-
-  return Math.round(numeric / HEIGHT_CACHE_WIDTH_BUCKET_PX)
-}
-
-function getFallbackHeightPrefix() {
-  const total = parsedNodes.value.length
-  const width = experimentContainerWidth.value || readLayout('getFallbackHeightPrefix.clientWidth', () => containerRef.value?.clientWidth || 0)
-  const widthBucket = getHeightCacheWidthBucket(width)
-  const measurementKey = props.virtualScroll?.measurementKey == null
-    ? ''
-    : String(props.virtualScroll.measurementKey)
-  const key = [
-    total,
-    heightStats.count,
-    Math.round(heightStats.total),
-    Math.round(averageNodeHeight.value * 100),
-    measurementKey,
-    widthBucket,
-    heightEstimationActive.value ? 1 : 0,
-    heightEstimationExperimentRevision.value,
-    streamRenderVersion.value,
-  ].join(':')
-
-  if (!fallbackHeightPrefixDirty && fallbackHeightPrefixCacheKey === key)
-    return fallbackHeightPrefixCache
-
-  const prefix = new Array<number>(total + 1)
-  prefix[0] = 0
-
-  for (let i = 0; i < total; i++) {
-    prefix[i + 1] = prefix[i] + (
-      heightEstimationActive.value
-        ? getFallbackNodeHeight(i)
-        : (nodeHeights[i] ?? averageNodeHeight.value)
-    )
-  }
-
-  fallbackHeightPrefixCache = prefix
-  fallbackHeightPrefixCacheKey = key
-  fallbackHeightPrefixDirty = false
-
-  return prefix
-}
-
-function estimateHeightRangeFromPrefix(start: number, end: number) {
-  const total = parsedNodes.value.length
-  const boundedStart = clamp(Math.trunc(start), 0, total)
-  const boundedEnd = clamp(Math.trunc(end), boundedStart, total)
-  if (boundedStart >= boundedEnd)
-    return 0
-
-  const prefix = getFallbackHeightPrefix()
-  return (prefix[boundedEnd] ?? 0) - (prefix[boundedStart] ?? 0)
-}
-
-function estimateIndexForOffsetFromPrefix(offsetPx: number) {
-  const nodes = parsedNodes.value
-  const total = nodes.length
-  if (total <= 0)
-    return 0
-  if (offsetPx <= 0)
-    return 0
-
-  const prefix = getFallbackHeightPrefix()
-  const totalHeight = prefix[total] ?? 0
-  if (offsetPx >= totalHeight)
-    return total - 1
-
-  let low = 0
-  let high = total - 1
-  let answer = total - 1
-
-  while (low <= high) {
-    const mid = (low + high) >> 1
-    const midEnd = prefix[mid + 1] ?? 0
-
-    if (midEnd >= offsetPx) {
-      answer = mid
-      high = mid - 1
-    }
-    else {
-      low = mid + 1
-    }
-  }
-
-  return answer
-}
+    return [
+      parsedNodes.value.length,
+      heightStats.count,
+      Math.round(heightStats.total),
+      Math.round(averageNodeHeight.value * 100),
+      measurementKey,
+      widthBucket,
+      heightEstimationActive.value ? 1 : 0,
+      heightEstimationExperimentRevision.value,
+      streamRenderVersion.value,
+    ]
+  },
+  fenwickRangeSum,
+})
 
 watch(
   () => parsedNodes.value.length,
@@ -1714,32 +1560,6 @@ watch(
   },
   { immediate: true },
 )
-
-function estimateHeightRange(start: number, end: number) {
-  if (start >= end)
-    return 0
-  if (heightEstimationActive.value) {
-    return estimateHeightRangeFromPrefix(start, end)
-  }
-  if (heightTreeSize.value !== parsedNodes.value.length) {
-    let total = 0
-    for (let i = start; i < end; i++)
-      total += nodeHeights[i] ?? averageNodeHeight.value
-    return total
-  }
-  const sumTree = heightSumTree.value
-  const countTree = heightKnownTree.value
-  if (!sumTree.length || !countTree.length) {
-    let total = 0
-    for (let i = start; i < end; i++)
-      total += nodeHeights[i] ?? averageNodeHeight.value
-    return total
-  }
-  const sumKnown = fenwickRangeSum(sumTree, start, end)
-  const countKnown = fenwickRangeSum(countTree, start, end)
-  const unknownCount = (end - start) - countKnown
-  return sumKnown + unknownCount * averageNodeHeight.value
-}
 
 const visibleNodes = computed(() => {
   // Use the full `parsedNodes` list to build the visible window so that
@@ -1775,49 +1595,12 @@ const bottomSpacerHeight = computed(() => {
   return estimateHeightRange(end, total)
 })
 
-interface VirtualHeightSummary {
-  totalNodes: number
-  measuredCount: number
-  estimatedCount: number
-  averageNodeHeight: number
-  topSpacerHeight: number
-  bottomSpacerHeight: number
-  estimatedTotalHeight: number
-  width: number
-}
-
-function getEstimatedNodeHeightCount() {
-  if (!heightEstimationActive.value)
-    return 0
-
-  let count = 0
-  const estimates = estimatedNodeHeights.value
-  for (let i = 0; i < estimates.length; i++) {
-    if (!estimates[i])
-      continue
-
-    const measuredHeight = nodeHeights[i]
-    if (Number.isFinite(measuredHeight) && measuredHeight > 0)
-      continue
-
-    count++
-  }
-  return count
-}
-
 function buildVirtualHeightSummary(): VirtualHeightSummary {
-  const totalNodes = parsedNodes.value.length
-
-  return {
-    totalNodes,
-    measuredCount: heightStats.count,
-    estimatedCount: getEstimatedNodeHeightCount(),
-    averageNodeHeight: averageNodeHeight.value,
+  return heightModel.buildVirtualHeightSummary({
     topSpacerHeight: topSpacerHeight.value,
     bottomSpacerHeight: bottomSpacerHeight.value,
-    estimatedTotalHeight: estimateHeightRange(0, totalNodes),
     width: getCurrentVirtualWidth(),
-  }
+  })
 }
 
 function buildExperimentReport() {
@@ -3998,76 +3781,6 @@ defineExpose<MarkstreamRendererHandle>({
   settle,
   scrollToNode,
 })
-
-function estimateIndexForOffset(offsetPx: number) {
-  if (offsetPx <= 0)
-    return 0
-  const nodes = parsedNodes.value
-  if (heightEstimationActive.value) {
-    return estimateIndexForOffsetFromPrefix(offsetPx)
-  }
-  if (heightTreeSize.value === nodes.length && heightSumTree.value.length && heightKnownTree.value.length) {
-    const avg = averageNodeHeight.value
-    const sumTree = heightSumTree.value
-    const countTree = heightKnownTree.value
-    const prefix = (endExclusive: number) => {
-      if (endExclusive <= 0)
-        return 0
-      const sumKnown = fenwickRangeSum(sumTree, 0, endExclusive)
-      const countKnown = fenwickRangeSum(countTree, 0, endExclusive)
-      return sumKnown + (endExclusive - countKnown) * avg
-    }
-    let low = 0
-    let high = nodes.length - 1
-    let ans = nodes.length - 1
-    while (low <= high) {
-      const mid = (low + high) >> 1
-      const height = prefix(mid + 1)
-      if (height >= offsetPx) {
-        ans = mid
-        high = mid - 1
-      }
-      else {
-        low = mid + 1
-      }
-    }
-    return ans
-  }
-  let remaining = offsetPx
-  for (let i = 0; i < nodes.length; i++) {
-    const height = nodeHeights[i] ?? averageNodeHeight.value
-    if (remaining <= height)
-      return i
-    remaining -= height
-  }
-  return Math.max(0, nodes.length - 1)
-}
-
-function estimateIndexForOffsetFromEnd(offsetPx: number) {
-  const nodes = parsedNodes.value
-  if (!nodes.length)
-    return 0
-  if (offsetPx <= 0)
-    return Math.max(0, nodes.length - 1)
-  if (heightEstimationActive.value) {
-    const prefix = getFallbackHeightPrefix()
-    const totalHeight = prefix[nodes.length] ?? 0
-    return estimateIndexForOffsetFromPrefix(Math.max(0, totalHeight - offsetPx))
-  }
-  if (heightTreeSize.value === nodes.length) {
-    const totalHeight = estimateHeightRange(0, nodes.length)
-    const target = Math.max(0, totalHeight - offsetPx)
-    return estimateIndexForOffset(target)
-  }
-  let remaining = offsetPx
-  for (let i = nodes.length - 1; i >= 0; i--) {
-    const height = nodeHeights[i] ?? averageNodeHeight.value
-    if (remaining <= height)
-      return i
-    remaining -= height
-  }
-  return 0
-}
 
 function bumpNodeSlotVersion() {
   nodeSlotVersion.value += 1
