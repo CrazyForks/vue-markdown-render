@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ParsedNode } from 'stream-markdown-parser'
+import type { EstimatedNodeHeight } from '../../internal/heightEstimationExperiment'
 import type { CustomComponents } from '../../types'
 import type { CodeBlockPreviewPayload } from '../../types/component-props'
 import type {
@@ -1455,14 +1456,16 @@ function resolveCodeBlockShowHeader() {
   return showHeader !== false
 }
 
+const EMPTY_ESTIMATED_NODE_HEIGHTS: Array<EstimatedNodeHeight | null> = []
+
 const estimatedNodeHeights = computed(() => {
   const nodes = parsedNodes.value
   if (!nodes.length || !heightEstimationActive.value)
-    return nodes.map(() => null)
+    return EMPTY_ESTIMATED_NODE_HEIGHTS
 
   const width = experimentContainerWidth.value || readLayout('estimatedNodeHeights.clientWidth', () => containerRef.value?.clientWidth || 0)
   if (!Number.isFinite(width) || width <= 0)
-    return nodes.map(() => null)
+    return EMPTY_ESTIMATED_NODE_HEIGHTS
 
   return nodes.map((node, index) => {
     const measuredHeight = nodeHeights[index]
