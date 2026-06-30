@@ -26,7 +26,26 @@ type ParsedNodeWithFields = ParsedNode & {
 }
 
 const streamParseEnvCache = new WeakMap<object, Map<string, Record<string, unknown>>>()
+
+interface ExplicitBracketMathContext {
+  fenceChar: '`' | '~' | ''
+  fenceInBlockquote: boolean
+  fenceInList: boolean
+  fenceLen: number
+  fenceListIndent: number
+  inFence: boolean
+  inMath: boolean
+  listContentIndent: number | null
+}
+
+interface ExplicitBracketMathStreamState {
+  committedContext: ExplicitBracketMathContext
+  context: ExplicitBracketMathContext
+  lineBuffer: string
+}
+
 const tolerantMathBoundaryStreamCache = new WeakMap<object, {
+  explicitBracketMath: ExplicitBracketMathStreamState
   source: string
   key: string | null
   pendingCandidate: boolean
@@ -328,12 +347,31 @@ function clearTolerantMathBoundaryStreamCache(md: MarkdownIt) {
   tolerantMathBoundaryStreamCache.delete(md as unknown as object)
 }
 
+function createExplicitBracketMathContext(): ExplicitBracketMathContext {
+  return {
+    fenceChar: '',
+    fenceInBlockquote: false,
+    fenceInList: false,
+    fenceLen: 0,
+    fenceListIndent: 0,
+    inFence: false,
+    inMath: false,
+    listContentIndent: null,
+  }
+}
+
+function cloneExplicitBracketMathContext(context: ExplicitBracketMathContext): ExplicitBracketMathContext {
+  return { ...context }
+}
+
 function setTolerantMathBoundaryStreamCache(
   md: MarkdownIt,
   source: string,
   key: string | null,
+  explicitBracketMath: ExplicitBracketMathStreamState = scanExplicitBracketMathStreamState(source).state,
 ) {
   tolerantMathBoundaryStreamCache.set(md as unknown as object, {
+    explicitBracketMath,
     source,
     key,
     pendingCandidate: key === null && mayContainTolerantMathBlockBoundaryOpener(source),
@@ -354,13 +392,13 @@ function appendedChunkMayAffectTolerantMathBoundary(previousSource: string, appe
   if (!appended)
     return false
 
-  if (appended.includes('$$') || appended.includes('\\[') || appended.includes('\\]'))
+  if (appended.includes('$$') || appended.includes('\\['))
     return true
 
   if (previousSource.endsWith('$') && appended[0] === '$')
     return true
 
-  if (previousSource.endsWith('\\') && (appended[0] === '[' || appended[0] === ']'))
+  if (previousSource.endsWith('\\') && appended[0] === '[')
     return true
 
   // The opener may have arrived in the previous chunk:
@@ -371,6 +409,357 @@ function appendedChunkMayAffectTolerantMathBoundary(previousSource: string, appe
     return true
 
   return false
+}
+
+function isEscapedDelimiterAt(source: string, index: number) {
+  let cursor = index - 1
+  let backslashes = 0
+  while (cursor >= 0 && source[cursor] === '\\') {
+    backslashes++
+    cursor--
+  }
+  return backslashes % 2 === 1
+}
+
+function isIndentWhitespace(ch: string) {
+  return ch === ' ' || ch === '\t'
+}
+
+function advanceMarkdownIndentColumn(column: number, ch: string) {
+  return ch === ' ' ? column + 1 : column + 4 - (column % 4)
+}
+
+function getMarkdownIndent(line: string) {
+  let index = 0
+  let column = 0
+
+  while (index < line.length && isIndentWhitespace(line[index])) {
+    column = advanceMarkdownIndentColumn(column, line[index])
+    index++
+  }
+
+  return { index, column }
+}
+
+function consumeMarkdownIndent(line: string) {
+  const indent = getMarkdownIndent(line)
+  return indent.column > 3 ? null : indent
+}
+
+function parseMarkdownFenceMarker(line: string) {
+  const indent = consumeMarkdownIndent(line)
+  if (!indent)
+    return null
+
+  const index = indent.index
+  const markerChar = line[index]
+  if (markerChar !== '`' && markerChar !== '~')
+    return null
+
+  let markerEnd = index
+  while (markerEnd < line.length && line[markerEnd] === markerChar)
+    markerEnd++
+
+  const markerLen = markerEnd - index
+  if (markerLen < 3)
+    return null
+
+  const rest = line.slice(markerEnd)
+  if (markerChar === '`' && rest.includes('`'))
+    return null
+
+  return { markerChar: markerChar as '`' | '~', markerLen, rest }
+}
+
+function stripMarkdownListPrefix(line: string) {
+  const indent = consumeMarkdownIndent(line)
+  if (!indent)
+    return null
+
+  const rest = line.slice(indent.index)
+  const marker = /^(?:[-+*]|\d{1,9}[.)])(?=[\t ]|$)/.exec(rest)?.[0]
+  if (!marker)
+    return null
+
+  let index = indent.index + marker.length
+  let column = indent.column + marker.length
+  if (!isIndentWhitespace(line[index]))
+    return null
+
+  while (index < line.length && isIndentWhitespace(line[index])) {
+    column = advanceMarkdownIndentColumn(column, line[index])
+    index++
+  }
+
+  return {
+    content: line.slice(index),
+    contentIndent: column,
+  }
+}
+
+function stripMarkdownBlockquotePrefix(line: string) {
+  let rest = line
+  let saw = false
+
+  while (true) {
+    const indent = consumeMarkdownIndent(rest)
+    if (!indent)
+      return saw ? rest : null
+
+    let index = indent.index
+    if (rest[index] !== '>')
+      return saw ? rest : null
+
+    saw = true
+    index++
+    if (rest[index] === ' ' || rest[index] === '\t')
+      index++
+    rest = rest.slice(index)
+  }
+}
+
+function matchMarkdownFenceMarker(line: string) {
+  const direct = parseMarkdownFenceMarker(line)
+  if (direct)
+    return { ...direct, inBlockquote: false, inList: false, listIndent: 0 }
+
+  const quoted = stripMarkdownBlockquotePrefix(line)
+  const quotedMarker = quoted == null ? null : parseMarkdownFenceMarker(quoted)
+  if (quotedMarker)
+    return { ...quotedMarker, inBlockquote: true, inList: false, listIndent: 0 }
+
+  const listed = stripMarkdownListPrefix(line)
+  if (!listed)
+    return null
+
+  const listedMarker = parseMarkdownFenceMarker(listed.content)
+  return listedMarker == null
+    ? null
+    : { ...listedMarker, inBlockquote: false, inList: true, listIndent: listed.contentIndent }
+}
+
+function countRepeatedChar(source: string, index: number, ch: string) {
+  let end = index
+  while (end < source.length && source[end] === ch)
+    end++
+  return end - index
+}
+
+function findCodeSpanCloseIndex(line: string, start: number, markerLen: number) {
+  let index = start
+
+  while (index < line.length) {
+    const next = line.indexOf('`', index)
+    if (next === -1)
+      return -1
+
+    const runLen = countRepeatedChar(line, next, '`')
+    if (runLen === markerLen)
+      return next
+
+    index = next + runLen
+  }
+
+  return -1
+}
+
+function resetExplicitBracketFenceContext(context: ExplicitBracketMathContext) {
+  context.inFence = false
+  context.fenceChar = ''
+  context.fenceLen = 0
+  context.fenceInBlockquote = false
+  context.fenceInList = false
+  context.fenceListIndent = 0
+}
+
+function scanLineForExplicitBracketMathState(
+  line: string,
+  context: ExplicitBracketMathContext,
+  lineStart: number,
+  appendStart: number | null,
+  openAtAppendStart: boolean,
+) {
+  let index = 0
+  let closedOpenMath = false
+
+  while (index < line.length) {
+    const sourceIndex = index
+
+    if (context.inMath) {
+      if (line.startsWith('\\]', index) && !isEscapedDelimiterAt(line, sourceIndex)) {
+        if (appendStart != null && openAtAppendStart && lineStart + index + 2 > appendStart)
+          closedOpenMath = true
+        context.inMath = false
+        index += 2
+        continue
+      }
+
+      index++
+      continue
+    }
+
+    if (line[index] === '`' && !isEscapedDelimiterAt(line, sourceIndex)) {
+      const markerLen = countRepeatedChar(line, index, '`')
+      const closeIndex = findCodeSpanCloseIndex(line, index + markerLen, markerLen)
+      if (closeIndex === -1)
+        break
+      index = closeIndex + markerLen
+      continue
+    }
+
+    if (line.startsWith('\\[', index) && !isEscapedDelimiterAt(line, sourceIndex)) {
+      context.inMath = true
+      index += 2
+      continue
+    }
+
+    index++
+  }
+
+  return closedOpenMath
+}
+
+function scanExplicitBracketMathLine(
+  line: string,
+  context: ExplicitBracketMathContext,
+  lineStart: number,
+  appendStart: number | null,
+  openAtAppendStart: boolean,
+) {
+  const lineIndent = getMarkdownIndent(line)
+  const listPrefix = stripMarkdownListPrefix(line)
+
+  if (context.inFence && context.fenceInBlockquote && line.trim() && stripMarkdownBlockquotePrefix(line) == null)
+    resetExplicitBracketFenceContext(context)
+
+  if (
+    context.inFence
+    && context.fenceInList
+    && line.trim()
+    && lineIndent.column < context.fenceListIndent
+    && !listPrefix
+  ) {
+    resetExplicitBracketFenceContext(context)
+  }
+
+  if (listPrefix) {
+    context.listContentIndent = listPrefix.contentIndent
+  }
+  else if (
+    line.trim()
+    && context.listContentIndent != null
+    && lineIndent.column < context.listContentIndent
+    && !context.inFence
+  ) {
+    context.listContentIndent = null
+  }
+
+  if (!context.inMath) {
+    const fenceMatch = matchMarkdownFenceMarker(line)
+    if (fenceMatch) {
+      if (context.inFence) {
+        if (
+          fenceMatch.markerChar === context.fenceChar
+          && fenceMatch.markerLen >= context.fenceLen
+          && /^\s*$/.test(fenceMatch.rest)
+        ) {
+          resetExplicitBracketFenceContext(context)
+        }
+      }
+      else {
+        context.inFence = true
+        context.fenceChar = fenceMatch.markerChar
+        context.fenceLen = fenceMatch.markerLen
+        context.fenceInBlockquote = fenceMatch.inBlockquote
+        context.fenceInList = fenceMatch.inList
+          || (
+            context.listContentIndent != null
+            && !fenceMatch.inBlockquote
+            && lineIndent.column >= context.listContentIndent
+          )
+        context.fenceListIndent = fenceMatch.listIndent || context.listContentIndent || 0
+      }
+    }
+    else if (!context.inFence) {
+      return scanLineForExplicitBracketMathState(line, context, lineStart, appendStart, openAtAppendStart)
+    }
+  }
+  else {
+    return scanLineForExplicitBracketMathState(line, context, lineStart, appendStart, openAtAppendStart)
+  }
+
+  return false
+}
+
+function scanExplicitBracketMathStreamState(
+  source: string,
+  initialContext: ExplicitBracketMathContext = createExplicitBracketMathContext(),
+  appendStart: number | null = null,
+  openAtAppendStart = false,
+) {
+  const context = cloneExplicitBracketMathContext(initialContext)
+  let committedContext = cloneExplicitBracketMathContext(initialContext)
+  let lineBuffer = ''
+  let closedOpenMath = false
+  let index = 0
+
+  while (index < source.length) {
+    const newlineIndex = source.indexOf('\n', index)
+    const hasNewline = newlineIndex !== -1
+    const lineEnd = hasNewline && newlineIndex > index && source[newlineIndex - 1] === '\r'
+      ? newlineIndex - 1
+      : hasNewline ? newlineIndex : source.length
+    const line = source.slice(index, lineEnd)
+
+    if (scanExplicitBracketMathLine(line, context, index, appendStart, openAtAppendStart))
+      closedOpenMath = true
+
+    if (hasNewline) {
+      committedContext = cloneExplicitBracketMathContext(context)
+      lineBuffer = ''
+    }
+    else {
+      lineBuffer = line
+    }
+
+    index = hasNewline ? newlineIndex + 1 : source.length
+  }
+
+  return {
+    closedOpenMath,
+    state: {
+      committedContext,
+      context,
+      lineBuffer,
+    },
+  }
+}
+
+function updateExplicitBracketMathStreamState(previous: ExplicitBracketMathStreamState, appended: string) {
+  if (
+    appended
+    && !previous.context.inMath
+    && !previous.context.inFence
+    && !previous.committedContext.inFence
+    && !/[\\`~\r\n]/.test(appended)
+    && !(previous.lineBuffer.endsWith('\\') && (appended[0] === '[' || appended[0] === ']'))
+  ) {
+    return {
+      closedOpenMath: false,
+      state: {
+        committedContext: cloneExplicitBracketMathContext(previous.committedContext),
+        context: cloneExplicitBracketMathContext(previous.context),
+        lineBuffer: previous.lineBuffer + appended,
+      },
+    }
+  }
+
+  return scanExplicitBracketMathStreamState(
+    previous.lineBuffer + appended,
+    previous.committedContext,
+    previous.lineBuffer.length,
+    previous.context.inMath,
+  )
 }
 
 function syncTolerantMathBoundaryStreamCache(md: MarkdownIt, source: string) {
@@ -387,29 +776,39 @@ function syncTolerantMathBoundaryStreamCache(md: MarkdownIt, source: string) {
   if (previous?.source === source)
     return
 
-  if (previous && source.startsWith(previous.source)) {
-    const appended = source.slice(previous.source.length)
+  const sourceExtendsPrevious = previous ? source.startsWith(previous.source) : false
+  const appended = sourceExtendsPrevious && previous ? source.slice(previous.source.length) : ''
+  const explicitBracketMathUpdate = sourceExtendsPrevious && previous
+    ? updateExplicitBracketMathStreamState(previous.explicitBracketMath, appended)
+    : scanExplicitBracketMathStreamState(source)
+  const nextExplicitBracketMath = explicitBracketMathUpdate.state
+  const completesExplicitBracketMathClose = sourceExtendsPrevious && previous
+    ? explicitBracketMathUpdate.closedOpenMath
+    : false
 
+  if (previous && sourceExtendsPrevious) {
     if (
       previous.key === null
       && previous.pendingCandidate === false
+      && !completesExplicitBracketMathClose
       && !appendedChunkMayAffectTolerantMathBoundary(previous.source, appended)
       && !sourceEndsWithSplitTolerantBoundaryPrefix(source)
     ) {
       previous.source = source
+      previous.explicitBracketMath = nextExplicitBracketMath
       return
     }
   }
 
   const nextKey = getTolerantMathBlockBoundaryStreamKey(source)
-  const sourceWasReplaced = previous ? !source.startsWith(previous.source) : false
+  const sourceWasReplaced = previous ? !sourceExtendsPrevious : false
 
-  if (previous && (sourceWasReplaced || previous.key !== nextKey))
+  if (previous && (sourceWasReplaced || previous.key !== nextKey || completesExplicitBracketMathClose))
     stream.reset()
   else if (!previous && nextKey)
     stream.reset()
 
-  setTolerantMathBoundaryStreamCache(md, source, nextKey)
+  setTolerantMathBoundaryStreamCache(md, source, nextKey, nextExplicitBracketMath)
 }
 
 function shouldCloneTopLevelStreamTokens(options: ParseOptions) {

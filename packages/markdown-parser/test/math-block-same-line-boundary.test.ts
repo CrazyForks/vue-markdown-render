@@ -126,6 +126,179 @@ $$ where $\\epsilon$ denotes the target accuracy, $n$ is the number of nodes, an
     expect(resetCount).toBeLessThanOrEqual(2)
   })
 
+  it('resets stream cache when a standard bracket math close delimiter is split', () => {
+    const md = getMarkdown('standard-bracket-split-close-reset')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats?.()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    const chunks = [
+      '### 一般形式（在点 \\\\(x = a\\\\) 处展开）：\n\\[\n',
+      `f(x) = f(a) + f'(a)(x-a) + \\frac{f''(a)}{2!}(x-a)^2 + R_n(x)\n`,
+      '\\',
+      ']',
+    ]
+
+    let source = ''
+    let nodes: any[] = []
+
+    for (const chunk of chunks) {
+      source += chunk
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+    }
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(false)
+    expect(mathBlocks[0].content).toContain('2!')
+    expect(collectByType(nodes, 'text').map((node: any) => node.content)).not.toContain(']')
+    expect(resetCount).toBeGreaterThanOrEqual(1)
+  })
+
+  it('does not reset stream cache for bracket math delimiters inside code', () => {
+    const cases = [
+      [
+        'fenced',
+        [
+          '```tex\n\\[\n```\n\n',
+          '\\]\n\n',
+        ],
+      ],
+      [
+        'inline',
+        [
+          'Example `\\[`\n\n',
+          '\\]\n\n',
+        ],
+      ],
+    ] as const
+
+    for (const [name, chunks] of cases) {
+      const md = getMarkdown(`standard-bracket-code-delimiters-no-reset-${name}`)
+      ;(md as any).stream.reset()
+      ;(md as any).stream.resetStats?.()
+
+      const stream = (md as any).stream
+      const originalReset = stream.reset.bind(stream)
+      let resetCount = 0
+      stream.reset = () => {
+        resetCount++
+        return originalReset()
+      }
+
+      let source = ''
+      let nodes: any[] = []
+      for (const chunk of chunks) {
+        source += chunk
+        nodes = parseMarkdownToStructure(source, md, {
+          final: false,
+          streamParse: true,
+        }) as any[]
+      }
+
+      expect(resetCount, name).toBe(0)
+      expect(collectByType(nodes, 'math_block'), name).toHaveLength(0)
+    }
+  })
+
+  it('ignores escaped bracket close before a later split close delimiter', () => {
+    const md = getMarkdown('standard-bracket-escaped-close-before-split-close-reset')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats?.()
+
+    const stream = (md as any).stream
+    const originalReset = stream.reset.bind(stream)
+    let resetCount = 0
+    stream.reset = () => {
+      resetCount++
+      return originalReset()
+    }
+
+    const chunks = [
+      '\\[\n',
+      'x + y \\\\',
+      ']\nz = 1\n',
+      '\\',
+      ']',
+    ]
+
+    let source = ''
+    let nodes: any[] = []
+    let resetCountBeforeEscapedClose = 0
+    let resetCountBeforeFinalClose = 0
+
+    for (const [index, chunk] of chunks.entries()) {
+      source += chunk
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+
+      if (index === 1)
+        resetCountBeforeEscapedClose = resetCount
+      if (index === 2)
+        expect(resetCount).toBe(resetCountBeforeEscapedClose)
+      if (index === 3)
+        resetCountBeforeFinalClose = resetCount
+    }
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(false)
+    expect(mathBlocks[0].content).toContain('x + y')
+    expect(mathBlocks[0].content).toContain('z = 1')
+    expect(collectByType(nodes, 'text').map((node: any) => node.content)).not.toContain(']')
+    expect(resetCount).toBeGreaterThan(resetCountBeforeFinalClose)
+  })
+
+  it('preserves suffix when a standard bracket math split close has trailing text', () => {
+    const md = getMarkdown('standard-bracket-split-close-suffix')
+    ;(md as any).stream.reset()
+    ;(md as any).stream.resetStats?.()
+
+    const chunks = [
+      'Before $a$ display\n\\[\n',
+      'x + y = z\n',
+      '\\',
+      '] where $b$ follows.',
+    ]
+
+    let source = ''
+    let nodes: any[] = []
+
+    for (const chunk of chunks) {
+      source += chunk
+      nodes = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+    }
+
+    expect(nodes.map(node => node.type)).toEqual([
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ])
+
+    const mathBlocks = collectByType(nodes, 'math_block')
+    expect(mathBlocks).toHaveLength(1)
+    expect(mathBlocks[0].loading).toBe(false)
+    expect(mathBlocks[0].content).toBe('x + y = z')
+    expect(mathBlocks[0].content).not.toContain('where')
+    expect(collectByType(nodes, 'math_inline').map((node: any) => node.content)).toEqual(['a', 'b'])
+    expect(collectByType(nodes, 'text').map((node: any) => node.content)).not.toContain(']')
+  })
+
   it('preserves suffix when close delimiter shares a line with formula content', () => {
     const md = getMarkdown('math-close-line-with-content-and-suffix')
     const source = [

@@ -136,6 +136,7 @@ const SPAN_CURLY_RE = /span\{([^}]+)\}/
 const OPERATORNAME_SPAN_RE = /\\operatorname\{span\}\{((?:[^{}]|\{[^}]*\})+)\}/
 const SINGLE_BACKSLASH_NEWLINE_RE = /(^|[^\\])\\\r?\n/g
 const ENDING_SINGLE_BACKSLASH_RE = /(^|[^\\])\\$/g
+const FACTORIAL_PRECEDING_RE = /[\p{L}\p{M}\p{N}\p{Pe}\p{Pf}'′″‴|‖]/u
 
 // Cache for dynamically built regexes depending on commands list
 // Avoid lookbehind; capture possible prefix so replacements can preserve it.
@@ -204,6 +205,15 @@ function countUnescapedStrong(s: string) {
   return c
 }
 
+function escapeStandaloneExclamation(value: string) {
+  return value.replace(/(^|[^\\])!+/gu, (match: string, prefix: string) => {
+    if (prefix && FACTORIAL_PRECEDING_RE.test(prefix))
+      return match
+    const marks = prefix ? match.slice(prefix.length) : match
+    return `${prefix}${'\\!'.repeat(marks.length)}`
+  })
+}
+
 function findLastUnescapedStrongMarker(s: string) {
   const re = /(^|[^\\])(__|\*\*)/g
   let m: RegExpExecArray | null
@@ -242,7 +252,7 @@ export function normalizeStandaloneBackslashT(s: string, opts?: MathOptions) {
 
   // Escape standalone '!' but don't double-escape already escaped ones.
   if (escapeExclamation)
-    out = out.replace(/(^|[^\\])!/g, '$1\\!')
+    out = escapeStandaloneExclamation(out)
 
   // Final pass: some TeX command names take a brace argument and may have
   // lost their leading backslash, e.g. "operatorname{span}". Ensure we

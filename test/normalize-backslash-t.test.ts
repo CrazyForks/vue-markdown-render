@@ -20,4 +20,12 @@ describe('normalizeStandaloneBackslashT', () => {
   it('escapes exclamation marks', () => {
     expect(normalizeStandaloneBackslashT('!')).toBe('\\!')
   })
+
+  it('preserves factorial exclamation marks', () => {
+    expect(normalizeStandaloneBackslashT('2! + n! + (n+1)! + \\alpha!')).toBe('2! + n! + (n+1)! + \\alpha!')
+    expect(normalizeStandaloneBackslashT('π!')).toBe('π!')
+    expect(normalizeStandaloneBackslashT('x\'!')).toBe('x\'!')
+    expect(normalizeStandaloneBackslashT('|x|!')).toBe('|x|!')
+    expect(normalizeStandaloneBackslashT('𝑛! + 𝟚! + x\u0301!')).toBe('𝑛! + 𝟚! + x\u0301!')
+  })
 })
