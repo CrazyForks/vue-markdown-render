@@ -131,6 +131,30 @@ describe('node source map metadata', () => {
     ])
   })
 
+  it('keeps source maps anchored when an inline custom block prefix repeats later', () => {
+    const source = [
+      'Alpha <thinking>',
+      'body',
+      '</thinking>',
+      'Alpha',
+    ].join('\n')
+
+    const nodes = parseMarkdownToStructure(source, getMarkdown('source-map-inline-prefix-repeat', {
+      customHtmlTags: ['thinking'],
+    }), {
+      customHtmlTags: ['thinking'],
+      final: true,
+      includeSourceMap: true,
+      streamParse: false,
+    }) as any[]
+
+    expect(nodes.map(node => [node.type, node.sourceMap])).toEqual([
+      ['paragraph', { startLine: 0, endLine: 1 }],
+      ['thinking', { startLine: 0, endLine: 3 }],
+      ['paragraph', { startLine: 3, endLine: 4 }],
+    ])
+  })
+
   it('attaches source maps to admonition containers', () => {
     const nodes = parseMarkdownToStructure('::: tip Title\nBody\n:::', getMarkdown('source-map-container'), {
       final: true,

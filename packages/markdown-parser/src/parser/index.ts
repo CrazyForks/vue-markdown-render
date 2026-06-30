@@ -1488,6 +1488,12 @@ function createSourceLineMapper(source: string, parsedSource: string) {
         parsedLine = splitEnd
         continue
       }
+
+      mappedLines[parsedLine] = {
+        startLine: sourceCursor,
+        endLine: sourceCursor + 1,
+      }
+      continue
     }
 
     let collapsedLine = sourceLines[sourceCursor] ?? ''
