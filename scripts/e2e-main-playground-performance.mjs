@@ -123,6 +123,7 @@ const parsePerformanceStreamCounterKeys = [
   'chunkedParses',
 ]
 const tokenCloneTotalBudgetRatio = 0.35
+const maxLayoutReadsPerFrame = Number(process.env.MARKSTREAM_BENCHMARK_MAX_LAYOUT_READS_PER_FRAME || 50)
 
 function cloneParsePerformance(value) {
   return value == null ? null : JSON.parse(JSON.stringify(value))
@@ -199,6 +200,18 @@ function assertTokenCloneBudget(parsePerformance) {
   if (tokenCloneMs > totalMs * tokenCloneTotalBudgetRatio) {
     throw new Error(
       `Replay token clone cost too high: ${tokenCloneMs}ms of ${totalMs}ms.`,
+    )
+  }
+}
+
+function assertLayoutReadBudget(label, layoutReads) {
+  if (!layoutReads)
+    throw new Error(`${label} should record layout read metrics.`)
+
+  const maxPerFrame = Number(layoutReads.maxPerFrame || 0)
+  if (!(maxPerFrame <= maxLayoutReadsPerFrame)) {
+    throw new Error(
+      `${label} layout reads per frame exceeded ${maxLayoutReadsPerFrame}. Got ${maxPerFrame}.`,
     )
   }
 }
@@ -562,6 +575,7 @@ function assertScenario(result) {
     throw new Error(`Initial settle should stay within 7000ms. Got ${result.initial.settleTimeMs}.`)
   if (!(result.initial.rendererDomNodeCount <= 5000))
     throw new Error(`Initial renderer DOM node count budget exceeded. Got ${result.initial.rendererDomNodeCount}.`)
+  assertLayoutReadBudget('Initial', result.initial.layoutReads)
   if (result.fullScroll.fallbackCount !== 0)
     throw new Error('Code block fallbacks should be gone after full scroll settle.')
   if (result.fullScroll.renderedMermaidCount !== result.fullScroll.mermaidCount)
@@ -572,10 +586,12 @@ function assertScenario(result) {
     throw new Error('All d2 blocks should finish after full scroll settle.')
   if (!(result.fullScroll.rendererDomNodeCount <= 5000))
     throw new Error(`Full-scroll renderer DOM node count budget exceeded. Got ${result.fullScroll.rendererDomNodeCount}.`)
+  assertLayoutReadBudget('Full-scroll', result.fullScroll.layoutReads)
   if (!(result.replay.settleTimeMs <= 5000))
     throw new Error(`Replay settle should stay within 5000ms. Got ${result.replay.settleTimeMs}.`)
   if (!(result.replay.rendererDomNodeCount <= 5000))
     throw new Error(`Replay renderer DOM node count budget exceeded. Got ${result.replay.rendererDomNodeCount}.`)
+  assertLayoutReadBudget('Replay', result.replay.layoutReads)
   const parsePerformance = result.replay.parsePerformance
   if (!parsePerformance || !(parsePerformance.parseCommitCount > 0))
     throw new Error('Replay should record Markdown parse commit metrics.')

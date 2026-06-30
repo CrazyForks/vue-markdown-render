@@ -271,6 +271,8 @@ describe('release dependency gates', () => {
     expect(benchmarkScript).toContain('processTokensMs')
     expect(diagnosticScript).toContain('__markstreamLayoutReadPerformance')
     expect(mainScript).toContain('__markstreamLayoutReadPerformance')
+    expect(diagnosticScript).toContain('MARKSTREAM_BENCHMARK_MAX_LAYOUT_READS_PER_FRAME')
+    expect(mainScript).toContain('MARKSTREAM_BENCHMARK_MAX_LAYOUT_READS_PER_FRAME')
     expect(benchmarkScript).toContain('layoutReadsSummary')
   })
 

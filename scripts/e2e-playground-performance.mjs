@@ -122,6 +122,7 @@ const parsePerformanceStreamCounterKeys = [
   'fullParses',
   'chunkedParses',
 ]
+const maxLayoutReadsPerFrame = Number(process.env.MARKSTREAM_BENCHMARK_MAX_LAYOUT_READS_PER_FRAME || 50)
 
 function cloneParsePerformance(value) {
   return value == null ? null : JSON.parse(JSON.stringify(value))
@@ -187,6 +188,18 @@ function diffParsePerformance(after, before) {
     out.streamModes[key] = diffNumber(after.streamModes?.[key], before.streamModes?.[key])
 
   return out
+}
+
+function assertLayoutReadBudget(mode, phase, layoutReads) {
+  if (!layoutReads)
+    throw new Error(`[${mode}] ${phase} should record layout read metrics.`)
+
+  const maxPerFrame = Number(layoutReads.maxPerFrame || 0)
+  if (!(maxPerFrame <= maxLayoutReadsPerFrame)) {
+    throw new Error(
+      `[${mode}] ${phase} layout reads per frame exceeded ${maxLayoutReadsPerFrame}. Got ${maxPerFrame}.`,
+    )
+  }
 }
 
 function startDevServer(port) {
@@ -696,6 +709,7 @@ function assertScenario(result) {
     throw new Error(`[${result.mode}] Total long task time should stay within ${maxLongTaskTotalMs}ms. Got ${result.longTaskTotalMs}.`)
   if (!(result.rendererDomNodeCount <= 5000))
     throw new Error(`[${result.mode}] Renderer DOM node count budget exceeded. Got ${result.rendererDomNodeCount}.`)
+  assertLayoutReadBudget(result.mode, 'initial', result.layoutReads)
   if (result.fullScroll.fallbackCount !== 0)
     throw new Error(`[${result.mode}] Code fallback should be gone after full scroll settle.`)
   if (result.fullScroll.renderedMermaidCount !== result.fullScroll.mermaidCount)
@@ -706,6 +720,7 @@ function assertScenario(result) {
     throw new Error(`[${result.mode}] D2 blocks should all finish after full scroll settle.`)
   if (!(result.fullScroll.rendererDomNodeCount <= 5000))
     throw new Error(`[${result.mode}] Full-scroll renderer DOM node count budget exceeded. Got ${result.fullScroll.rendererDomNodeCount}.`)
+  assertLayoutReadBudget(result.mode, 'full-scroll', result.fullScroll.layoutReads)
 }
 
 async function run() {
