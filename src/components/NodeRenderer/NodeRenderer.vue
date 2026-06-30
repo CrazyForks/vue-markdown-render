@@ -716,17 +716,21 @@ const heightExperimentConfig = computed(() => {
   void heightEstimationExperimentRevision.value
   return getHeightEstimationExperiment(rendererProps.customId)
 })
-const heightExperimentEnabled = computed(() => Boolean(
-  isClient
-  && !renderAsFragment.value
+const heightExperimentDomRequired = computed(() => Boolean(
+  !renderAsFragment.value
   && rendererProps.customId
   && !isNestedListItemRenderer
   && heightExperimentConfig.value?.enabled,
+))
+const heightExperimentEnabled = computed(() => Boolean(
+  isClient
+  && heightExperimentDomRequired.value,
 ))
 const virtualScrollRequested = computed(() => Boolean(
   !renderAsFragment.value
   && props.virtualScroll?.enabled,
 ))
+const hostVirtualScrollDomRequired = computed(() => virtualScrollRequested.value)
 const virtualScrollMounted = ref(false)
 onMounted(() => {
   virtualScrollMounted.value = true
@@ -789,6 +793,19 @@ const viewportPriorityEnabled = computed(() => {
     return false
   return true
 })
+const deferNodesDomRequired = computed(() => {
+  if (renderAsFragment.value)
+    return false
+  if (rendererProps.deferNodesUntilVisible === false)
+    return false
+  if ((rendererProps.maxLiveNodes ?? 0) <= 0)
+    return false
+  if (virtualizationEnabled.value)
+    return false
+  if (parsedNodes.value.length > MAX_DEFERRED_NODE_COUNT)
+    return false
+  return rendererProps.viewportPriority !== false
+})
 // Provide viewport-priority registrar so heavy nodes can defer work until visible
 const registerNodeVisibility = provideViewportPriority(
   target => resolveViewportRoot(target ?? containerRef.value ?? null),
@@ -815,6 +832,13 @@ const {
   isClient,
   isTestEnv,
   renderAsFragment,
+})
+const incrementalRenderingDomRequired = computed(() => {
+  return !renderAsFragment.value
+    && rendererProps.batchRendering !== false
+    && resolvedBatchSize.value > 0
+    && !isTestEnv
+    && (rendererProps.maxLiveNodes ?? 0) <= 0
 })
 const nodeSlotElements = new Map<number, HTMLElement | null>()
 const nodeContentResizeObserverTargets = new Map<number, HTMLElement>()
@@ -972,22 +996,7 @@ function importHeightCache(
   seedCurrentNodeHeightSignatures()
 }
 const deferNodes = computed(() => {
-  if (renderAsFragment.value)
-    return false
-  if (rendererProps.deferNodesUntilVisible === false)
-    return false
-  // In the incremental/batched mode (`maxLiveNodes <= 0`), placeholders are
-  // driven by the batch scheduler rather than viewport deferral.
-  if ((rendererProps.maxLiveNodes ?? 0) <= 0)
-    return false
-  // When virtualization is active, the virtual window already limits DOM work.
-  // Keep rendering immediate within that window (no placeholders).
-  if (virtualizationEnabled.value)
-    return false
-  // Avoid registering too many observer targets in non-virtualized mode.
-  if (parsedNodes.value.length > MAX_DEFERRED_NODE_COUNT)
-    return false
-  return viewportPriorityEnabled.value
+  return deferNodesDomRequired.value && viewportPriorityEnabled.value
 })
 const shouldObserveSlots = computed(() => !!registerNodeVisibility && (deferNodes.value || virtualizationEnabled.value))
 const scrollListenerEnabled = computed(() => virtualizationEnabled.value || virtualScrollEnabled.value)
@@ -5733,10 +5742,16 @@ const minimalDomActive = computed(() => {
     return false
   if (rendererProps.typewriter !== false || showTypewriterCursor.value)
     return false
-  if (incrementalRenderingActive.value)
+  if (incrementalRenderingDomRequired.value)
     return false
-  if (virtualizationEnabled.value || heightEstimationDomActive.value || shouldMeasureNodeHeights.value || deferNodes.value)
+  if (
+    virtualizationEnabled.value
+    || hostVirtualScrollDomRequired.value
+    || heightExperimentDomRequired.value
+    || deferNodesDomRequired.value
+  ) {
     return false
+  }
   return Object.keys(customComponentsMap.value).length === 0
 })
 let typewriterCursorTimeout: ReturnType<typeof setTimeout> | undefined

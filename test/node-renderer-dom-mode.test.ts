@@ -67,6 +67,34 @@ describe('node renderer domMode', () => {
     minimal.unmount()
   })
 
+  it('forwards mouse events from nodes in minimal DOM mode', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [paragraphNode(1)],
+        batchRendering: false,
+        deferNodesUntilVisible: false,
+        domMode: 'minimal',
+        fade: false,
+        nodeVirtual: false,
+        typewriter: false,
+        viewportPriority: false,
+      },
+    })
+
+    await flushAll()
+
+    expect(wrapper.findAll('.node-slot')).toHaveLength(0)
+
+    const paragraph = wrapper.get('.paragraph-node')
+    await paragraph.trigger('mouseover')
+    await paragraph.trigger('mouseout')
+
+    expect(wrapper.emitted('mouseover')).toHaveLength(1)
+    expect(wrapper.emitted('mouseout')).toHaveLength(1)
+
+    wrapper.unmount()
+  })
+
   it('falls back to full DOM when node virtualization is active', async () => {
     const wrapper = mount(NodeRenderer, {
       props: {

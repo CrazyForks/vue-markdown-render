@@ -294,7 +294,10 @@ export interface NodeRendererProps {
   customHtmlTags?: readonly string[]
   /** Preset renderer tuning. Default keeps the existing docs/rich path. */
   mode?: NodeRendererMode
-  /** DOM structure mode. `minimal` skips per-node wrappers only when rendering does not need them. */
+  /**
+   * DOM structure mode. `minimal` is best-effort and falls back to full DOM
+   * when rendering needs per-node wrappers.
+   */
   domMode?: NodeRendererDomMode
   /** HTML rendering policy for html_block/html_inline nodes. Default: safe */
   htmlPolicy?: HtmlPolicy
