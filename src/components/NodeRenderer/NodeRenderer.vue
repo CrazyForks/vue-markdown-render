@@ -6071,6 +6071,30 @@ watch(
 )
 
 watch(
+  resolvedTypewriterCursorMode,
+  async () => {
+    if (!isClient || renderAsFragment.value || !ownsTypewriterCursor.value || !showTypewriterCursor.value)
+      return
+
+    await nextTick()
+    if (resolvedTypewriterCursorMode.value === 'simple') {
+      clearTypewriterCursorRaf()
+      updateSimpleTypewriterCursorTarget()
+      return
+    }
+
+    clearSimpleTypewriterCursorTarget()
+    if (resolvedTypewriterCursorMode.value === 'precise') {
+      scheduleTypewriterCursorPositionUpdate()
+      return
+    }
+
+    hideTypewriterCursorElement()
+  },
+  { flush: 'post' },
+)
+
+watch(
   [() => renderedCount.value, () => liveRange.start, () => liveRange.end],
   async () => {
     if (!isClient || renderAsFragment.value || !ownsTypewriterCursor.value || !showTypewriterCursor.value)
