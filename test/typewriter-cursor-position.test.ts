@@ -66,6 +66,91 @@ describe('typewriter cursor position', () => {
     wrapper.unmount()
   })
 
+  it('marks one simple cursor target for nested inline text', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        typewriter: 'simple',
+        smoothStreaming: false,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+
+    await wrapper.setProps({ content: 'hello **world**' })
+    await flushAll()
+
+    const targets = wrapper.findAll('.typewriter-simple-cursor-target')
+    expect(targets).toHaveLength(1)
+    expect(targets[0].classes()).toContain('text-node')
+    expect(targets[0].text()).toBe('world')
+
+    wrapper.unmount()
+  })
+
+  it('marks a simple cursor target when node virtualization adds spacers', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        typewriter: 'simple',
+        nodeVirtual: true,
+        smoothStreaming: false,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+
+    await wrapper.setProps({ content: 'first\n\nsecond' })
+    await flushAll()
+
+    expect(wrapper.classes()).toContain('virtualized')
+    expect(wrapper.find('.node-spacer').exists()).toBe(true)
+
+    const targets = wrapper.findAll('.typewriter-simple-cursor-target')
+    expect(targets).toHaveLength(1)
+    expect(targets[0].classes()).toContain('text-node')
+    expect(targets[0].text()).toBe('second')
+
+    wrapper.unmount()
+  })
+
+  it('treats static string true as precise cursor mode', async () => {
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        typewriter: 'true' as any,
+        smoothStreaming: false,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+
+    await wrapper.setProps({ content: 'hello world' })
+    await flushAll()
+
+    expect(wrapper.classes()).not.toContain('typewriter-simple-cursor')
+    expect(wrapper.find('.typewriter-cursor').exists()).toBe(true)
+    expect(queuedFrames).toHaveLength(1)
+
+    wrapper.unmount()
+  })
+
   it('repositions while smooth visible content catches up after the source stops growing', async () => {
     const queuedFrames: FrameRequestCallback[] = []
     const frameIds = new WeakMap<FrameRequestCallback, number>()

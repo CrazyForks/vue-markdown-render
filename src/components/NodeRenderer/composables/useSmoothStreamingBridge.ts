@@ -40,9 +40,11 @@ export function useSmoothStreamingBridge(
       return true
 
     // auto mode: enable only for typewriter or incremental mode.
-    return props.typewriter === true
-      || props.typewriter === 'simple'
-      || props.typewriter === 'precise'
+    const typewriter = props.typewriter as unknown
+    return typewriter === true
+      || typewriter === 'true'
+      || typewriter === 'simple'
+      || typewriter === 'precise'
       || (props.maxLiveNodes ?? 0) <= 0
   })
 

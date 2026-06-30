@@ -225,7 +225,7 @@ function normalizeRendererMode(value: unknown): NodeRendererMode {
 function normalizeTypewriterCursorMode(value: unknown) {
   if (value === 'simple')
     return 'simple'
-  if (value === true || value === 'precise')
+  if (value === true || value === 'true' || value === 'precise')
     return 'precise'
   return 'off'
 }
@@ -5726,11 +5726,13 @@ function handleFragmentMouseout(event: MouseEvent) {
 
 const typewriterCursorRef = ref<HTMLElement | null>(null)
 const showTypewriterCursor = ref(false)
+const simpleTypewriterCursorTarget = ref<HTMLElement | null>(null)
 let typewriterCursorTimeout: ReturnType<typeof setTimeout> | undefined
 let typewriterCursorRaf: number | null = null
 let typewriterCursorRafVersion = 0
 let lastTypewriterContentLength = 0
 let lastTypewriterVisibleLength = 0
+const TYPEWRITER_SIMPLE_CURSOR_TARGET_CLASS = 'typewriter-simple-cursor-target'
 const TYPEWRITER_CURSOR_EXCLUDED_NODE_TYPE_LIST = [
   'code_block',
   'admonition',
@@ -5816,6 +5818,7 @@ function clearTypewriterCursorRaf() {
 
 function hideTypewriterCursorElement() {
   clearTypewriterCursorRaf()
+  clearSimpleTypewriterCursorTarget()
   if (typewriterCursorRef.value)
     typewriterCursorRef.value.style.visibility = 'hidden'
 }
@@ -5879,6 +5882,40 @@ function getTypewriterCursorTextTarget() {
   }
 
   return null
+}
+
+function clearSimpleTypewriterCursorTarget() {
+  if (!simpleTypewriterCursorTarget.value)
+    return
+
+  simpleTypewriterCursorTarget.value.classList.remove(TYPEWRITER_SIMPLE_CURSOR_TARGET_CLASS)
+  simpleTypewriterCursorTarget.value = null
+}
+
+function getSimpleTypewriterCursorElement(text: Text) {
+  const textNodeElement = text.parentElement?.closest('.text-node')
+  if (textNodeElement instanceof HTMLElement)
+    return textNodeElement
+  return text.parentElement
+}
+
+function updateSimpleTypewriterCursorTarget() {
+  if (resolvedTypewriterCursorMode.value !== 'simple' || !isClient || !showTypewriterCursor.value || !containerRef.value) {
+    clearSimpleTypewriterCursorTarget()
+    return
+  }
+
+  const text = getTypewriterCursorTextTarget()
+  const target = text ? getSimpleTypewriterCursorElement(text) : null
+  if (target === simpleTypewriterCursorTarget.value)
+    return
+
+  clearSimpleTypewriterCursorTarget()
+  if (!target)
+    return
+
+  target.classList.add(TYPEWRITER_SIMPLE_CURSOR_TARGET_CLASS)
+  simpleTypewriterCursorTarget.value = target
 }
 
 function updateTypewriterCursorPosition() {
@@ -5999,7 +6036,13 @@ watch(
       typewriterCursorRef.value.style.visibility = 'hidden'
     clearTypewriterCursorTimeout()
     await nextTick()
-    scheduleTypewriterCursorPositionUpdate()
+    if (resolvedTypewriterCursorMode.value === 'simple') {
+      updateSimpleTypewriterCursorTarget()
+    }
+    else {
+      clearSimpleTypewriterCursorTarget()
+      scheduleTypewriterCursorPositionUpdate()
+    }
     typewriterCursorTimeout = setTimeout(() => {
       typewriterCursorTimeout = undefined
       showTypewriterCursor.value = false
@@ -6015,10 +6058,14 @@ watch(
       hideTypewriterCursorElement()
       return
     }
-    if (resolvedTypewriterCursorMode.value !== 'precise')
-      return
     await nextTick()
-    scheduleTypewriterCursorPositionUpdate()
+    if (resolvedTypewriterCursorMode.value === 'simple') {
+      updateSimpleTypewriterCursorTarget()
+      return
+    }
+    clearSimpleTypewriterCursorTarget()
+    if (resolvedTypewriterCursorMode.value === 'precise')
+      scheduleTypewriterCursorPositionUpdate()
   },
   { flush: 'post' },
 )
@@ -6026,11 +6073,17 @@ watch(
 watch(
   [() => renderedCount.value, () => liveRange.start, () => liveRange.end],
   async () => {
-    if (!isClient || renderAsFragment.value || !ownsTypewriterCursor.value || !showTypewriterCursor.value || resolvedTypewriterCursorMode.value !== 'precise')
+    if (!isClient || renderAsFragment.value || !ownsTypewriterCursor.value || !showTypewriterCursor.value)
       return
 
     await nextTick()
-    scheduleTypewriterCursorPositionUpdate()
+    if (resolvedTypewriterCursorMode.value === 'simple') {
+      updateSimpleTypewriterCursorTarget()
+      return
+    }
+    clearSimpleTypewriterCursorTarget()
+    if (resolvedTypewriterCursorMode.value === 'precise')
+      scheduleTypewriterCursorPositionUpdate()
   },
   { flush: 'post' },
 )
@@ -6038,6 +6091,7 @@ watch(
 onBeforeUnmount(() => {
   clearTypewriterCursorTimeout()
   clearTypewriterCursorRaf()
+  clearSimpleTypewriterCursorTarget()
   mathBlockMinHeightCache.clear()
 })
 </script>
@@ -6408,7 +6462,7 @@ onBeforeUnmount(() => {
 
 <style>
 /* Lightweight typewriter cursor for simple mode. */
-.markstream-vue.typewriter-simple-cursor .node-slot:last-of-type .text-node:last-of-type::after {
+.markstream-vue.typewriter-simple-cursor .typewriter-simple-cursor-target::after {
   content: "";
   display: inline-block;
   width: 0.55em;
@@ -6421,7 +6475,7 @@ onBeforeUnmount(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .markstream-vue.typewriter-simple-cursor .node-slot:last-of-type .text-node:last-of-type::after {
+  .markstream-vue.typewriter-simple-cursor .typewriter-simple-cursor-target::after {
     animation: none;
   }
 }
