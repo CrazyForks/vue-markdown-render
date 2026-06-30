@@ -84,6 +84,7 @@ import { useScrollRestore } from './composables/useScrollRestore'
 import { useSmoothStreamingBridge } from './composables/useSmoothStreamingBridge'
 import { useViewportRoot } from './composables/useViewportRoot'
 import FallbackComponent from './FallbackComponent.vue'
+import HeightEstimationProbes from './HeightEstimationProbes.vue'
 import { InfographicBlockNodeLoading } from './InfographicBlockNodeLoading'
 import { MermaidBlockNodeLoading } from './MermaidBlockNodeLoading'
 
@@ -1149,8 +1150,16 @@ function ensureExperimentProbeNodes() {
   headingProbeNodes.value = headings
 }
 
-function getHeadingProbeNode(level: number) {
-  return headingProbeNodes.value?.[level] ?? null
+function setParagraphProbeWrapper(el: HTMLElement | null) {
+  paragraphProbeWrapperRef.value = el
+}
+
+function setListItemProbeWrapper(el: HTMLElement | null) {
+  listItemProbeWrapperRef.value = el
+}
+
+function setListProbeWrapper(el: HTMLElement | null) {
+  listProbeWrapperRef.value = el
 }
 
 const {
@@ -6100,45 +6109,19 @@ onBeforeUnmount(() => {
     @mouseout="handleContainerMouseout"
   >
     <template v-if="heightEstimationDomActive || virtualizationEnabled">
-      <div
+      <HeightEstimationProbes
         v-if="heightEstimationDomActive"
-        class="height-estimation-probes"
-        :style="{ width: `${experimentProbeWidth}px` }"
-        aria-hidden="true"
-      >
-        <div ref="paragraphProbeWrapperRef" class="node-content" data-probe="paragraph">
-          <ParagraphNode
-            :node="paragraphProbeNode as any"
-            index-key="probe-paragraph"
-          />
-        </div>
-        <div ref="listItemProbeWrapperRef" class="node-content" data-probe="list-item">
-          <ul class="m-0 p-0">
-            <ListItemNode
-              :node="listItemProbeNode as any"
-              index-key="probe-list-item"
-            />
-          </ul>
-        </div>
-        <div ref="listProbeWrapperRef" class="node-content" data-probe="list">
-          <ListNode
-            :node="listProbeNode as any"
-            index-key="probe-list"
-          />
-        </div>
-        <div
-          v-for="level in 6"
-          :key="`probe-heading-${level}`"
-          :ref="el => setHeadingProbeWrapper(level, el as HTMLElement | null)"
-          class="node-content"
-          :data-probe="`heading-${level}`"
-        >
-          <HeadingNode
-            :node="getHeadingProbeNode(level) as any"
-            :index-key="`probe-heading-${level}`"
-          />
-        </div>
-      </div>
+        :width="experimentProbeWidth"
+        :flow-root="virtualizationEnabled || virtualScrollDomEnabled"
+        :paragraph-node="paragraphProbeNode"
+        :list-item-node="listItemProbeNode"
+        :list-node="listProbeNode"
+        :heading-nodes="headingProbeNodes"
+        :set-paragraph-wrapper="setParagraphProbeWrapper"
+        :set-list-item-wrapper="setListItemProbeWrapper"
+        :set-list-wrapper="setListProbeWrapper"
+        :set-heading-wrapper="setHeadingProbeWrapper"
+      />
       <div
         v-if="virtualizationEnabled"
         class="node-spacer"
@@ -6298,16 +6281,6 @@ onBeforeUnmount(() => {
      already limits DOM cost, so keep it visible to avoid a blank first paint. */
   content-visibility: visible;
   contain-intrinsic-size: auto;
-}
-
-.height-estimation-probes {
-  position: absolute;
-  left: -100000px;
-  top: 0;
-  visibility: hidden;
-  pointer-events: none;
-  overflow: hidden;
-  z-index: -1;
 }
 
 .node-slot {
