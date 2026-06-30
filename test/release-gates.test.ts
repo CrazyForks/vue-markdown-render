@@ -269,6 +269,9 @@ describe('release dependency gates', () => {
     expect(benchmarkScript).toContain('parsePerformanceSummary')
     expect(benchmarkScript).toContain('tokenCloneMs')
     expect(benchmarkScript).toContain('processTokensMs')
+    expect(diagnosticScript).toContain('__markstreamLayoutReadPerformance')
+    expect(mainScript).toContain('__markstreamLayoutReadPerformance')
+    expect(benchmarkScript).toContain('layoutReadsSummary')
   })
 
   it('does not create release tags for package versions already published on npm', () => {

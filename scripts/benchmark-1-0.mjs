@@ -258,6 +258,25 @@ function parsePerformanceSummary(row) {
   ].join('<br>')
 }
 
+function layoutReadsSummary(row) {
+  const layoutReads = row.layoutReads
+  if (!layoutReads)
+    return '-'
+
+  const byLabel = layoutReads.byLabel && typeof layoutReads.byLabel === 'object'
+    ? Object.entries(layoutReads.byLabel)
+        .filter(([, count]) => Number(count || 0) > 0)
+        .sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0) || a[0].localeCompare(b[0]))
+        .slice(0, 3)
+    : []
+  const topLabels = byLabel.length
+    ? `<br>${byLabel.map(([label, count]) => `${label} ${formatNumber(count)}`).join('<br>')}`
+    : ''
+
+  const maxPerFrame = Math.max(Number(layoutReads.maxPerFrame || 0), Number(layoutReads.currentFrameTotal || 0))
+  return `total ${formatNumber(layoutReads.total)} / max-frame ${formatNumber(maxPerFrame)}${topLabels}`
+}
+
 function scenarioRows(entry) {
   const rows = []
   const result = entry.result
@@ -340,8 +359,8 @@ function renderMarkdownReport(report) {
   lines.push('')
   lines.push('## Results')
   lines.push('')
-  lines.push('| Scenario | Phase | Viewport | LCP ms | CLS | INP candidate ms | Max input delay ms | Max event processing ms | Settle ms | Frame samples | Frame p95 ms | Heavy settle frame samples | Heavy settle frame p95 ms | Max long task ms | Page DOM nodes | Renderer DOM nodes | Parse stream | Fallbacks | Heavy blocks readiness | Scroll drift px | Heap after renderer unmount + GC |')
-  lines.push('| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | ---: | ---: |')
+  lines.push('| Scenario | Phase | Viewport | LCP ms | CLS | INP candidate ms | Max input delay ms | Max event processing ms | Settle ms | Frame samples | Frame p95 ms | Heavy settle frame samples | Heavy settle frame p95 ms | Max long task ms | Page DOM nodes | Renderer DOM nodes | Parse stream | Layout reads | Fallbacks | Heavy blocks readiness | Scroll drift px | Heap after renderer unmount + GC |')
+  lines.push('| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- | ---: | ---: |')
 
   for (const entry of report.scenarios) {
     for (const item of scenarioRows(entry)) {
@@ -349,7 +368,7 @@ function renderMarkdownReport(report) {
       const cls = row.cls ?? row.phaseCls
       const settleMs = row.settleTimeMs ?? row.phaseElapsedMs
       const viewport = row.viewport ?? item.viewport ?? report.environment.defaultViewport
-      lines.push(`| ${item.scenario} | ${item.phase} | ${formatViewport(viewport)} | ${formatMs(row.lcpMs)} | ${typeof cls === 'number' ? cls.toFixed(4) : '-'} | ${formatMs(row.eventTimingInpCandidateMs)} | ${formatMs(row.eventTimingMaxInputDelayMs)} | ${formatMs(row.eventTimingMaxProcessingMs)} | ${formatMs(settleMs)} | ${formatNumber(phaseFrameSampleCount(row))} | ${formatMs(phaseFrameP95Ms(row))} | ${formatNumber(row.heavySettleFrameSampleCount)} | ${formatMs(row.heavySettleFrameP95Ms)} | ${formatMs(row.longTaskMaxMs)} | ${formatNumber(row.pageDomNodeCount)} | ${formatNumber(row.rendererDomNodeCount)} | ${parsePerformanceSummary(row)} | ${fallbackSummary(row)} | ${heavyBlockSummary(row, item.heavyBlockScope)} | ${formatMs(row.scrollDriftPx)} | ${formatBytes(item.memoryAfterUnmountBytes)} |`)
+      lines.push(`| ${item.scenario} | ${item.phase} | ${formatViewport(viewport)} | ${formatMs(row.lcpMs)} | ${typeof cls === 'number' ? cls.toFixed(4) : '-'} | ${formatMs(row.eventTimingInpCandidateMs)} | ${formatMs(row.eventTimingMaxInputDelayMs)} | ${formatMs(row.eventTimingMaxProcessingMs)} | ${formatMs(settleMs)} | ${formatNumber(phaseFrameSampleCount(row))} | ${formatMs(phaseFrameP95Ms(row))} | ${formatNumber(row.heavySettleFrameSampleCount)} | ${formatMs(row.heavySettleFrameP95Ms)} | ${formatMs(row.longTaskMaxMs)} | ${formatNumber(row.pageDomNodeCount)} | ${formatNumber(row.rendererDomNodeCount)} | ${parsePerformanceSummary(row)} | ${layoutReadsSummary(row)} | ${fallbackSummary(row)} | ${heavyBlockSummary(row, item.heavyBlockScope)} | ${formatMs(row.scrollDriftPx)} | ${formatBytes(item.memoryAfterUnmountBytes)} |`)
     }
   }
 
@@ -389,7 +408,7 @@ function renderMarkdownReport(report) {
   for (const entry of report.scenarios)
     lines.push(`- **${entry.title}**: ${entry.notes}`)
   lines.push('')
-  lines.push('This report records measured release evidence from the shipped playgrounds. The environment viewport is mixed because Web Vitals scenarios use row-specific viewports; use the Results table viewport column when citing LCP, CLS, visible heavy-block readiness, or DOM-node counts. Initial rows report readiness for heavy blocks visible in the phase viewport, and show N/A when that viewport contains no heavy blocks. Full-scroll rows report all heavy blocks after the scroll pass. Page DOM nodes are recorded for diagnostics; renderer DOM nodes are scoped to the benchmark surface and are the value used by the release gate. Parse stream metrics record renderer parse commits, coalesced smooth-stream parse updates, and markdown-it stream parser full/append/tail/cache counters. Frame p95 is the phase-local p95 `requestAnimationFrame` delta; for full-scroll rows it covers only the active scroll loop. Heavy-settle frame p95 covers post-scroll heavy block readiness separately. Web Vitals frame p95/max and sample density are hard release-gate metrics. Raw scrollTop drift is recorded for diagnostics but is not a 1.0 release gate. Heap after renderer unmount is best-effort Chrome-only `performance.memory` after unmount plus GC. Keep benchmark claims tied to this environment disclosure and rerun before publishing 1.0.')
+  lines.push('This report records measured release evidence from the shipped playgrounds. The environment viewport is mixed because Web Vitals scenarios use row-specific viewports; use the Results table viewport column when citing LCP, CLS, visible heavy-block readiness, or DOM-node counts. Initial rows report readiness for heavy blocks visible in the phase viewport, and show N/A when that viewport contains no heavy blocks. Full-scroll rows report all heavy blocks after the scroll pass. Page DOM nodes are recorded for diagnostics; renderer DOM nodes are scoped to the benchmark surface and are the value used by the release gate. Parse stream metrics record renderer parse commits, coalesced smooth-stream parse updates, and markdown-it stream parser full/append/tail/cache counters. Layout reads are collected only when renderer debug performance mode is enabled and show total reads plus the largest observed frame bucket for the benchmark phase. Frame p95 is the phase-local p95 `requestAnimationFrame` delta; for full-scroll rows it covers only the active scroll loop. Heavy-settle frame p95 covers post-scroll heavy block readiness separately. Web Vitals frame p95/max and sample density are hard release-gate metrics. Raw scrollTop drift is recorded for diagnostics but is not a 1.0 release gate. Heap after renderer unmount is best-effort Chrome-only `performance.memory` after unmount plus GC. Keep benchmark claims tied to this environment disclosure and rerun before publishing 1.0.')
   return `${lines.join('\n')}\n`
 }
 

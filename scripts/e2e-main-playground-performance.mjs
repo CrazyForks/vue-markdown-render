@@ -128,6 +128,36 @@ function cloneParsePerformance(value) {
   return value == null ? null : JSON.parse(JSON.stringify(value))
 }
 
+function normalizeLayoutReadPerformance(value) {
+  if (!value || typeof value !== 'object')
+    return null
+
+  const byLabel = value.byLabel && typeof value.byLabel === 'object'
+    ? Object.fromEntries(
+        Object.entries(value.byLabel)
+          .map(([key, count]) => [key, Number(count || 0)])
+          .filter(([, count]) => count > 0)
+          .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+      )
+    : {}
+
+  return {
+    total: Number(value.total || 0),
+    maxPerFrame: Math.max(Number(value.maxPerFrame || 0), Number(value.currentFrameTotal || 0)),
+    byLabel,
+  }
+}
+
+async function resetLayoutReadPerformance(page) {
+  await page.evaluate(() => {
+    window.__markstreamLayoutReadPerformance = {
+      total: 0,
+      maxPerFrame: 0,
+      byLabel: {},
+    }
+  })
+}
+
 function diffNumber(after, before) {
   return Number(after || 0) - Number(before || 0)
 }
@@ -380,6 +410,7 @@ async function collectMetrics(page) {
       visibleD2Count: visibleD2Blocks.length,
       visibleRenderedD2Count: visibleD2Blocks.filter(element => element.querySelector('.d2-svg svg')).length,
       parsePerformance: state.parsePerformance ?? null,
+      layoutReads: window.__markstreamLayoutReadPerformance ?? null,
       topLayoutShifts: Array.isArray(state.layoutShifts)
         ? [...state.layoutShifts]
             .sort((a, b) => Number(b?.value || 0) - Number(a?.value || 0))
@@ -388,7 +419,9 @@ async function collectMetrics(page) {
     }
   }, initialFrameStats)
   initial.parsePerformance = cloneParsePerformance(initial.parsePerformance)
+  initial.layoutReads = normalizeLayoutReadPerformance(initial.layoutReads)
   const fullScrollParsePerformanceBaseline = cloneParsePerformance(initial.parsePerformance)
+  await resetLayoutReadPerformance(page)
 
   const scrollMetrics = await scrollThroughRoot(page, rootSelector, '__mainPlaygroundPerf')
   const heavySettleFrameBaseline = await frameBaseline(page, '__mainPlaygroundPerf')
@@ -419,6 +452,7 @@ async function collectMetrics(page) {
       renderedD2Count: d2Blocks.filter(element => element.querySelector('.d2-svg svg')).length,
       longTaskTotalMs: longTasks.reduce((sum, duration) => sum + Number(duration || 0), 0),
       parsePerformance: state.parsePerformance ?? null,
+      layoutReads: window.__markstreamLayoutReadPerformance ?? null,
       scrollDriftPx: null,
     }
   }, {
@@ -433,6 +467,7 @@ async function collectMetrics(page) {
     fullScroll.parsePerformance,
     fullScrollParsePerformanceBaseline,
   )
+  fullScroll.layoutReads = normalizeLayoutReadPerformance(fullScroll.layoutReads)
   fullScroll.scrollDriftPx = scrollMetrics.maxScrollDriftPx
 
   const replayButton = page.locator('button.nav-btn--stream')
@@ -458,6 +493,7 @@ async function collectMetrics(page) {
       : JSON.parse(JSON.stringify(state.parsePerformance))
     return state.replayParsePerformanceBaseline
   })
+  await resetLayoutReadPerformance(page)
   await page.locator('button.nav-btn--stream').click()
   await waitForVisibleBlocksReady(page, rootSelector)
   await page.waitForTimeout(250)
@@ -485,12 +521,14 @@ async function collectMetrics(page) {
       rendererDomNodeCount: root ? root.querySelectorAll('*').length : 0,
       jsHeapUsedBytes: performance.memory?.usedJSHeapSize ?? null,
       parsePerformance: state.parsePerformance ?? null,
+      layoutReads: window.__markstreamLayoutReadPerformance ?? null,
     }
   })
   replay.parsePerformance = diffParsePerformance(
     replay.parsePerformance,
     replayParsePerformanceBaseline,
   )
+  replay.layoutReads = normalizeLayoutReadPerformance(replay.layoutReads)
 
   const memoryBeforeUnmountBytes = await readUsedHeapBytes(page)
   const memoryAfterUnmountBytes = await measureAfterRendererUnmount(page)
@@ -614,6 +652,11 @@ async function run() {
         },
       }
 
+      window.__markstreamLayoutReadPerformance = {
+        total: 0,
+        maxPerFrame: 0,
+        byLabel: {},
+      }
       window.__mainPlaygroundPerf = state
 
       const originalInfo = console.info.bind(console)

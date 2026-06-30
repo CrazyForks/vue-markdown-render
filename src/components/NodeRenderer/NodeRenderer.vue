@@ -494,6 +494,18 @@ const layoutReadFrameCounts = new Map<string, number>()
 let layoutReadFrameScheduled = false
 let maxLayoutReadsPerFrame = 0
 
+interface BenchmarkLayoutReadPerformance {
+  total: number
+  maxPerFrame: number
+  byLabel: Record<string, number>
+  currentFrameTotal?: number
+  frameScheduled?: boolean
+}
+
+type BenchmarkLayoutReadWindow = Window & {
+  __markstreamLayoutReadPerformance?: BenchmarkLayoutReadPerformance
+}
+
 function getMapTotal(map: Map<string, number>) {
   let total = 0
   for (const count of map.values())
@@ -531,12 +543,65 @@ function scheduleLayoutReadFrameFlush() {
   setTimeout(flushLayoutReadFrameCounts, 0)
 }
 
+function getBenchmarkLayoutReadPerformance() {
+  if (!isClient || typeof window === 'undefined')
+    return null
+
+  const target = window as BenchmarkLayoutReadWindow
+  if (target.__markstreamLayoutReadPerformance)
+    return target.__markstreamLayoutReadPerformance
+
+  const created: BenchmarkLayoutReadPerformance = {
+    total: 0,
+    maxPerFrame: 0,
+    byLabel: {},
+  }
+  target.__markstreamLayoutReadPerformance = created
+  return created
+}
+
+function flushBenchmarkLayoutReadFrame(state: BenchmarkLayoutReadPerformance) {
+  state.maxPerFrame = Math.max(
+    Number(state.maxPerFrame || 0),
+    Number(state.currentFrameTotal || 0),
+  )
+  state.currentFrameTotal = 0
+  state.frameScheduled = false
+}
+
+function publishBenchmarkLayoutRead(label: string) {
+  const performance = getBenchmarkLayoutReadPerformance()
+  if (!performance)
+    return
+
+  performance.total = Number(performance.total || 0) + 1
+  performance.byLabel[label] = Number(performance.byLabel[label] || 0) + 1
+  performance.currentFrameTotal = Number(performance.currentFrameTotal || 0) + 1
+
+  if (performance.frameScheduled)
+    return
+
+  performance.frameScheduled = true
+  if (typeof window.requestAnimationFrame === 'function') {
+    window.requestAnimationFrame(() => flushBenchmarkLayoutReadFrame(performance))
+    return
+  }
+
+  if (typeof queueMicrotask === 'function') {
+    queueMicrotask(() => flushBenchmarkLayoutReadFrame(performance))
+    return
+  }
+
+  setTimeout(() => flushBenchmarkLayoutReadFrame(performance), 0)
+}
+
 function recordLayoutRead(label: string) {
   if (!debugPerformanceEnabled.value)
     return
 
   layoutReadCounts.set(label, (layoutReadCounts.get(label) ?? 0) + 1)
   layoutReadFrameCounts.set(label, (layoutReadFrameCounts.get(label) ?? 0) + 1)
+  publishBenchmarkLayoutRead(label)
   scheduleLayoutReadFrameFlush()
 }
 
@@ -6231,6 +6296,12 @@ onBeforeUnmount(() => {
   background-image: linear-gradient(90deg, var(--loading-shimmer), transparent, var(--loading-shimmer));
   background-size: 200% 100%;
   animation: node-placeholder-shimmer 1.1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .node-placeholder {
+    animation: none;
+  }
 }
 
 .node-placeholder:first-child {

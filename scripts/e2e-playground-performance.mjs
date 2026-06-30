@@ -127,6 +127,36 @@ function cloneParsePerformance(value) {
   return value == null ? null : JSON.parse(JSON.stringify(value))
 }
 
+function normalizeLayoutReadPerformance(value) {
+  if (!value || typeof value !== 'object')
+    return null
+
+  const byLabel = value.byLabel && typeof value.byLabel === 'object'
+    ? Object.fromEntries(
+        Object.entries(value.byLabel)
+          .map(([key, count]) => [key, Number(count || 0)])
+          .filter(([, count]) => count > 0)
+          .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+      )
+    : {}
+
+  return {
+    total: Number(value.total || 0),
+    maxPerFrame: Math.max(Number(value.maxPerFrame || 0), Number(value.currentFrameTotal || 0)),
+    byLabel,
+  }
+}
+
+async function resetLayoutReadPerformance(page) {
+  await page.evaluate(() => {
+    window.__markstreamLayoutReadPerformance = {
+      total: 0,
+      maxPerFrame: 0,
+      byLabel: {},
+    }
+  })
+}
+
 function diffNumber(after, before) {
   return Number(after || 0) - Number(before || 0)
 }
@@ -379,6 +409,11 @@ async function runScenario(browser, port, mode) {
       },
     }
 
+    window.__markstreamLayoutReadPerformance = {
+      total: 0,
+      maxPerFrame: 0,
+      byLabel: {},
+    }
     window.__playgroundPerfState = state
 
     const originalInfo = console.info.bind(console)
@@ -557,6 +592,7 @@ async function runScenario(browser, port, mode) {
       visibleRenderedD2Count: visibleD2Blocks.filter(element => element.querySelector('.d2-svg svg')).length,
       sandboxFrameMounted: Boolean(document.querySelector('.sandbox-frame')),
       parsePerformance: state.parsePerformance ?? null,
+      layoutReads: window.__markstreamLayoutReadPerformance ?? null,
       topLayoutShifts: Array.isArray(state.layoutShifts)
         ? [...state.layoutShifts]
             .sort((a, b) => Number(b?.value || 0) - Number(a?.value || 0))
@@ -565,7 +601,9 @@ async function runScenario(browser, port, mode) {
     }
   }, initialFrameStats)
   result.parsePerformance = cloneParsePerformance(result.parsePerformance)
+  result.layoutReads = normalizeLayoutReadPerformance(result.layoutReads)
   const fullScrollParsePerformanceBaseline = cloneParsePerformance(result.parsePerformance)
+  await resetLayoutReadPerformance(page)
 
   const scrollMetrics = await scrollThroughRoot(page, rootSelector, '__playgroundPerfState')
   const heavySettleFrameBaseline = await frameBaseline(page, '__playgroundPerfState')
@@ -595,6 +633,7 @@ async function runScenario(browser, port, mode) {
       renderedD2Count: d2Blocks.filter(element => element.querySelector('.d2-svg svg')).length,
       longTaskTotalMs: longTasks.reduce((sum, duration) => sum + Number(duration || 0), 0),
       parsePerformance: state.parsePerformance ?? null,
+      layoutReads: window.__markstreamLayoutReadPerformance ?? null,
       scrollDriftPx: null,
     }
   }, {
@@ -609,6 +648,7 @@ async function runScenario(browser, port, mode) {
     result.fullScroll.parsePerformance,
     fullScrollParsePerformanceBaseline,
   )
+  result.fullScroll.layoutReads = normalizeLayoutReadPerformance(result.fullScroll.layoutReads)
   result.fullScroll.scrollDriftPx = scrollMetrics.maxScrollDriftPx
   result.memoryBeforeUnmountBytes = await readUsedHeapBytes(page)
   result.memoryAfterUnmountBytes = await measureAfterRendererUnmount(page)
