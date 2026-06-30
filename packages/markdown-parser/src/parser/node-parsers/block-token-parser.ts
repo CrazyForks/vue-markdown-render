@@ -5,7 +5,7 @@ import { buildAllowedHtmlTagSet } from '../index'
 import { parseInlineTokens } from '../inline-parsers'
 import { parseFenceToken } from '../inline-parsers/fence-parser'
 import { createLinkifyDemotionContextTracker } from '../linkifyHeuristics'
-import { applyNodeSourceMap, applyNodeSourceMapRange } from '../node-source-map'
+import { applyNodeSourceMap, applyNodeSourceMapRange, createSourceMapFromOffsets } from '../node-source-map'
 import { parseBlockquote } from './blockquote-parser'
 import { parseCodeBlock } from './code-block-parser'
 import { parseDefinitionList } from './definition-list-parser'
@@ -107,6 +107,8 @@ function parseVmrContainer(
           children: parseInlineTokens(childrenArr || [], undefined, undefined, linkifyContext.options()),
           raw: String(contentToken.content ?? ''),
         } as ParsedNode
+        if (options?.includeSourceMap)
+          applyNodeSourceMap(paragraphNode, tokens[j], options)
         children.push(paragraphNode)
         linkifyContext.remember(paragraphNode.raw)
       }
@@ -118,6 +120,8 @@ function parseVmrContainer(
     ) {
       // Handle list tokens
       const [listNode, newIndex] = parseList(tokens, j, linkifyContext.options())
+      if (options?.includeSourceMap)
+        applyNodeSourceMap(listNode, tokens[j], options)
       children.push(listNode)
       linkifyContext.remember(listNode.raw)
       j = newIndex
@@ -125,6 +129,8 @@ function parseVmrContainer(
     else if (tokens[j].type === 'blockquote_open') {
       // Handle blockquote tokens
       const [blockquoteNode, newIndex] = parseBlockquote(tokens, j, linkifyContext.options())
+      if (options?.includeSourceMap)
+        applyNodeSourceMap(blockquoteNode, tokens[j], options)
       children.push(blockquoteNode)
       linkifyContext.remember(blockquoteNode.raw)
       j = newIndex
@@ -256,7 +262,7 @@ function findNextCustomHtmlBlockFromSource(
   source: string,
   tag: string,
   startIndex: number,
-): { raw: string, end: number } | null {
+): { raw: string, start: number, end: number } | null {
   if (!source || !tag)
     return null
 
@@ -277,7 +283,7 @@ function findNextCustomHtmlBlockFromSource(
   // Self-closing custom tags: treat as a complete block
   if (/\/\s*>\s*$/.test(openSlice.slice(0, openEndRel + 1))) {
     const end = openEnd + 1
-    return { raw: source.slice(openStart, end), end }
+    return { raw: source.slice(openStart, end), start: openStart, end }
   }
 
   let depth = 1
@@ -296,7 +302,7 @@ function findNextCustomHtmlBlockFromSource(
     const lt = source.indexOf('<', i)
     if (lt === -1) {
       // No more tags in the remaining source; treat as unclosed streaming block.
-      return { raw: source.slice(openStart), end: source.length }
+      return { raw: source.slice(openStart), start: openStart, end: source.length }
     }
 
     if (isCloseAt(lt)) {
@@ -306,7 +312,7 @@ function findNextCustomHtmlBlockFromSource(
       depth--
       if (depth === 0) {
         const end = gt + 1
-        return { raw: source.slice(openStart, end), end }
+        return { raw: source.slice(openStart, end), start: openStart, end }
       }
       i = gt + 1
       continue
@@ -327,7 +333,7 @@ function findNextCustomHtmlBlockFromSource(
   // If the closing tag hasn't arrived yet (streaming), return a partial block
   // from the opening tag to end-of-source. This preserves original lines like
   // `---` so inner markdown can render progressively.
-  return { raw: source.slice(openStart), end: source.length }
+  return { raw: source.slice(openStart), start: openStart, end: source.length }
 }
 
 function clampNonNegative(n: number) {
@@ -470,8 +476,12 @@ export function parseBasicBlockToken(
           attrs: attrs.length ? attrs : undefined,
         } as ParsedNode
 
-        if (includeSourceMap)
-          applyNodeSourceMap(customNode, token, options)
+        if (includeSourceMap) {
+          if (fromSource)
+            customNode.sourceMap = createSourceMapFromOffsets(source, fromSource.start, fromSource.end, options)
+          else
+            applyNodeSourceMap(customNode, token, options)
+        }
         return [
           customNode,
           index + 1,

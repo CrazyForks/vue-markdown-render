@@ -1,6 +1,7 @@
 import type { AdmonitionNode, MarkdownToken, ParsedNode, ParseOptions } from '../../types'
 import { parseInlineTokens } from '../inline-parsers'
 import { createLinkifyDemotionContextTracker } from '../linkifyHeuristics'
+import { applyNodeSourceMap } from '../node-source-map'
 import { parseBasicBlockToken } from './block-token-parser'
 import { parseBlockquote } from './blockquote-parser'
 import { parseList } from './list-parser'
@@ -26,6 +27,8 @@ export function parseAdmonition(
           children: parseInlineTokens(contentToken.children || [], String(contentToken.content ?? ''), undefined, linkifyContext.options()),
           raw: String(contentToken.content ?? ''),
         } as ParsedNode
+        if (options?.includeSourceMap)
+          applyNodeSourceMap(paragraphNode, tokens[j], options)
         admonitionChildren.push(paragraphNode)
         linkifyContext.remember(paragraphNode.raw)
       }
@@ -36,12 +39,16 @@ export function parseAdmonition(
       || tokens[j].type === 'ordered_list_open'
     ) {
       const [listNode, newIndex] = parseList(tokens, j, linkifyContext.options())
+      if (options?.includeSourceMap)
+        applyNodeSourceMap(listNode, tokens[j], options)
       admonitionChildren.push(listNode)
       linkifyContext.remember(listNode.raw)
       j = newIndex
     }
     else if (tokens[j].type === 'blockquote_open') {
       const [blockquoteNode, newIndex] = parseBlockquote(tokens, j, linkifyContext.options())
+      if (options?.includeSourceMap)
+        applyNodeSourceMap(blockquoteNode, tokens[j], options)
       admonitionChildren.push(blockquoteNode)
       linkifyContext.remember(blockquoteNode.raw)
       j = newIndex

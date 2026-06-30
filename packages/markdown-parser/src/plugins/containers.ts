@@ -128,7 +128,7 @@ function parseLooseInlineAttrs(input: string): Record<string, unknown> | null {
   return out
 }
 
-function offsetTokenMaps(tokens: Token[], lineOffset: number) {
+function offsetTokenMaps(tokens: Token[], lineOffset: number, maxEndLine: number) {
   for (const token of tokens) {
     const mappedToken = token as unknown as MarkdownToken
     const map = mappedToken.map
@@ -136,11 +136,11 @@ function offsetTokenMaps(tokens: Token[], lineOffset: number) {
       const startLine = Number(map[0])
       const endLine = Number(map[1])
       if (Number.isFinite(startLine) && Number.isFinite(endLine))
-        mappedToken.map = [startLine + lineOffset, endLine + lineOffset]
+        mappedToken.map = [startLine + lineOffset, Math.min(endLine + lineOffset, maxEndLine)]
     }
 
     if (Array.isArray(mappedToken.children))
-      offsetTokenMaps(mappedToken.children as unknown as Token[], lineOffset)
+      offsetTokenMaps(mappedToken.children as unknown as Token[], lineOffset, maxEndLine)
   }
 }
 
@@ -350,7 +350,7 @@ export function applyContainers(md: MarkdownIt) {
         const innerTokens: Token[] = []
         // Use the same env as the parent block parser to ensure all block rules are available
         s.md.block.parse(innerSrc, s.md, s.env, innerTokens)
-        offsetTokenMaps(innerTokens, startLine + 1)
+        offsetTokenMaps(innerTokens, startLine + 1, startLine + 1 + contentLines.length)
         s.tokens.push(...(innerTokens as unknown as MarkdownToken[]))
       }
 

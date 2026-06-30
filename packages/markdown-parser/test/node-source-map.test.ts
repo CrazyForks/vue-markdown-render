@@ -82,7 +82,7 @@ describe('node source map metadata', () => {
     ])
   })
 
-  it('attaches source maps to VMR fallback containers and child blocks', () => {
+  it('attaches source maps to VMR fallback containers and heading children', () => {
     const nodes = parseMarkdownToStructure('::: viewcode:demo\n# title\n:::', getMarkdown('source-map-vmr'), {
       final: true,
       includeSourceMap: true,
@@ -90,6 +90,32 @@ describe('node source map metadata', () => {
     }) as any[]
 
     expect(nodes[0]?.sourceMap).toEqual({ startLine: 0, endLine: 3 })
+    expect(nodes[0]?.children?.[0]?.sourceMap).toEqual({ startLine: 1, endLine: 2 })
+  })
+
+  it('attaches source maps to VMR fallback paragraph and list children', () => {
+    const paragraphNodes = parseMarkdownToStructure('::: viewcode:demo\nbody\n:::', getMarkdown('source-map-vmr-paragraph'), {
+      final: true,
+      includeSourceMap: true,
+      streamParse: false,
+    }) as any[]
+    const listNodes = parseMarkdownToStructure('::: viewcode:demo\n- item\n:::', getMarkdown('source-map-vmr-list'), {
+      final: true,
+      includeSourceMap: true,
+      streamParse: false,
+    }) as any[]
+
+    expect(paragraphNodes[0]?.children?.[0]?.sourceMap).toEqual({ startLine: 1, endLine: 2 })
+    expect(listNodes[0]?.children?.[0]?.sourceMap).toEqual({ startLine: 1, endLine: 2 })
+  })
+
+  it('attaches source maps to admonition paragraph children', () => {
+    const nodes = parseMarkdownToStructure('::: tip\nbody\n:::', getMarkdown('source-map-admonition-child'), {
+      final: true,
+      includeSourceMap: true,
+      streamParse: false,
+    }) as any[]
+
     expect(nodes[0]?.children?.[0]?.sourceMap).toEqual({ startLine: 1, endLine: 2 })
   })
 
@@ -170,6 +196,27 @@ describe('node source map metadata', () => {
       ['paragraph', { startLine: 0, endLine: 1 }],
       ['thinking', { startLine: 0, endLine: 1 }],
     ])
+  })
+
+  it('maps custom html block source maps to the re-extracted raw source range', () => {
+    const source = [
+      '<thinking>',
+      '',
+      'Body',
+      '',
+      '</thinking>',
+    ].join('\n')
+    const nodes = parseMarkdownToStructure(source, getMarkdown('source-map-custom-html-raw', {
+      customHtmlTags: ['thinking'],
+    }), {
+      customHtmlTags: ['thinking'],
+      final: true,
+      includeSourceMap: true,
+      streamParse: false,
+    }) as any[]
+
+    expect(nodes[0]?.raw).toBe(source)
+    expect(nodes[0]?.sourceMap).toEqual({ startLine: 0, endLine: 5 })
   })
 
   it('updates sourceMap when details html blocks are merged', () => {
