@@ -718,6 +718,24 @@ function scanExplicitBracketMathStreamState(
 }
 
 function updateExplicitBracketMathStreamState(previous: ExplicitBracketMathStreamState, appended: string) {
+  if (
+    appended
+    && !previous.context.inMath
+    && !previous.context.inFence
+    && !previous.committedContext.inFence
+    && !/[\\`~\r\n]/.test(appended)
+    && !(previous.lineBuffer.endsWith('\\') && (appended[0] === '[' || appended[0] === ']'))
+  ) {
+    return {
+      closedOpenMath: false,
+      state: {
+        committedContext: cloneExplicitBracketMathContext(previous.committedContext),
+        context: cloneExplicitBracketMathContext(previous.context),
+        lineBuffer: previous.lineBuffer + appended,
+      },
+    }
+  }
+
   return scanExplicitBracketMathStreamState(
     previous.lineBuffer + appended,
     previous.committedContext,

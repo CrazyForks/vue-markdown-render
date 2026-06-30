@@ -109,4 +109,30 @@ describe('math block streaming close handling', () => {
 
     expect(literalCloseMs).toBeLessThan(plainMs * 8 + 80)
   })
+
+  it('does not regress on long single-line streaming text without bracket math', () => {
+    const md = getMarkdown('long-single-line-no-bracket-math')
+    let markdown = `prefix\n\n${'x'.repeat(8_000)}`
+
+    parseMarkdownToStructure(markdown, md, {
+      final: false,
+      streamParse: true,
+    })
+    const before = md.stream?.stats?.() as { fullParses?: number, tailHits?: number } | undefined
+
+    const startedAt = performance.now()
+    for (let index = 0; index < 80; index++) {
+      markdown += ` token${index}`
+      parseMarkdownToStructure(markdown, md, {
+        final: false,
+        streamParse: true,
+      })
+    }
+    const elapsedMs = performance.now() - startedAt
+    const after = md.stream?.stats?.() as typeof before
+
+    expect((after?.tailHits ?? 0) - (before?.tailHits ?? 0)).toBe(80)
+    expect((after?.fullParses ?? 0) - (before?.fullParses ?? 0)).toBe(0)
+    expect(elapsedMs).toBeLessThan(1000)
+  })
 })
