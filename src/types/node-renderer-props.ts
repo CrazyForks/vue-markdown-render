@@ -24,6 +24,7 @@ export type NodeRendererCodeBlockProps
     & Record<string, unknown>
 export type NodeRendererMode = 'docs' | 'chat' | 'minimal'
 export type NodeRendererCodeRenderer = 'pre' | 'shiki' | 'monaco'
+export type NodeRendererTypewriter = boolean | 'simple' | 'precise'
 
 export type MarkstreamVirtualPhase
   = | 'estimating'
@@ -346,8 +347,8 @@ export interface NodeRendererProps {
   /** Scope key used by `setCustomComponents()` and `data-custom-id` style overrides. */
   customId?: string
   indexKey?: number | string
-  /** Show a blinking typewriter cursor while streamed content grows. Applies to `content` mode; ignored when non-empty `nodes` are provided. Default: false */
-  typewriter?: boolean
+  /** Show a blinking typewriter cursor while streamed content grows. `true` uses precise cursor positioning. Applies to `content` mode; ignored when non-empty `nodes` are provided. Default: false */
+  typewriter?: NodeRendererTypewriter
   /**
    * Enable built-in smooth pacing for streaming `content` updates.
    * - `true`: force-enable smooth streaming (content mode only)

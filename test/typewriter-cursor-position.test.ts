@@ -36,6 +36,36 @@ describe('typewriter cursor position', () => {
     vi.unstubAllGlobals()
   })
 
+  it('simple mode shows the CSS cursor without range positioning', async () => {
+    const requestAnimationFrameSpy = vi.fn()
+    vi.stubGlobal('requestAnimationFrame', requestAnimationFrameSpy as unknown as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', vi.fn() as unknown as typeof cancelAnimationFrame)
+    const createRangeSpy = vi.spyOn(document, 'createRange')
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        typewriter: 'simple',
+        smoothStreaming: false,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+
+    await wrapper.setProps({ content: 'hello world' })
+    await flushAll()
+
+    expect(wrapper.classes()).toContain('typewriter-simple-cursor')
+    expect(wrapper.find('.typewriter-cursor').exists()).toBe(false)
+    expect(createRangeSpy).not.toHaveBeenCalled()
+    expect(requestAnimationFrameSpy).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
   it('repositions while smooth visible content catches up after the source stops growing', async () => {
     const queuedFrames: FrameRequestCallback[] = []
     const frameIds = new WeakMap<FrameRequestCallback, number>()

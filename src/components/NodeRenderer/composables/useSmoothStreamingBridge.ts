@@ -40,7 +40,10 @@ export function useSmoothStreamingBridge(
       return true
 
     // auto mode: enable only for typewriter or incremental mode.
-    return props.typewriter === true || (props.maxLiveNodes ?? 0) <= 0
+    return props.typewriter === true
+      || props.typewriter === 'simple'
+      || props.typewriter === 'precise'
+      || (props.maxLiveNodes ?? 0) <= 0
   })
 
   // Prevent pacing initial static content on first client render.

@@ -222,7 +222,17 @@ function normalizeRendererMode(value: unknown): NodeRendererMode {
     : 'docs'
 }
 
+function normalizeTypewriterCursorMode(value: unknown) {
+  if (value === 'simple')
+    return 'simple'
+  if (value === true || value === 'precise')
+    return 'precise'
+  return 'off'
+}
+
 const resolvedMode = computed<NodeRendererMode>(() => normalizeRendererMode(resolveRendererProp('mode')))
+const resolvedTypewriterCursorMode = computed(() => normalizeTypewriterCursorMode(resolveRendererProp('typewriter')))
+const typewriterEnabled = computed(() => resolvedTypewriterCursorMode.value !== 'off')
 const resolvedCodeRenderer = computed<NodeRendererCodeRenderer>(() => {
   const renderCodeBlocksAsPre = resolveRendererProp('renderCodeBlocksAsPre')
   const codeRenderer = resolveRendererProp('codeRenderer')
@@ -400,7 +410,7 @@ const {
 })
 provide('markstreamShowTooltips', resolvedShowTooltips)
 provide('markstreamHtmlPolicy', resolvedHtmlPolicy)
-provide('markstreamTypewriter', computed(() => rendererProps.typewriter !== false))
+provide('markstreamTypewriter', typewriterEnabled)
 provide('markstreamFade', computed(() => rendererProps.fade !== false))
 provide('markstreamTypewriterCursor', computed(() => true))
 provide('markstreamTextStreamState', textStreamState)
@@ -686,7 +696,7 @@ const nestedRendererProps = computed<Partial<NodeRendererProps>>(() => ({
   themes: rendererProps.themes,
   langs: rendererProps.langs,
   isDark: rendererProps.isDark,
-  typewriter: rendererProps.typewriter,
+  typewriter: typewriterEnabled.value,
   smoothStreamingOptions: rendererProps.smoothStreamingOptions,
   parseCoalesceMs: rendererProps.parseCoalesceMs,
   fade: rendererProps.fade,
@@ -5330,7 +5340,7 @@ const infographicBindings = computed(() => ({
   ...(rendererProps.infographicProps || {}),
 }))
 const nonCodeBindings = computed(() => ({
-  typewriter: rendererProps.typewriter,
+  typewriter: typewriterEnabled.value,
   fade: rendererProps.fade,
   // Forward customHtmlTags for non-whitelisted tag detection in child components
   customHtmlTags: mergedParseOptions.value.customHtmlTags,
@@ -5872,6 +5882,8 @@ function getTypewriterCursorTextTarget() {
 }
 
 function updateTypewriterCursorPosition() {
+  if (resolvedTypewriterCursorMode.value !== 'precise')
+    return
   if (!isClient || !showTypewriterCursor.value || !containerRef.value || !typewriterCursorRef.value)
     return
 
@@ -5916,6 +5928,8 @@ function updateTypewriterCursorPosition() {
 }
 
 function scheduleTypewriterCursorPositionUpdate() {
+  if (resolvedTypewriterCursorMode.value !== 'precise')
+    return
   if (!isClient || !showTypewriterCursor.value)
     return
   if (typewriterCursorRaf != null)
@@ -5968,8 +5982,8 @@ watch(
     const cursorAllowed = shouldShowTypewriterCursorForCurrentNodes()
     const sourceGrowing = nextLength > lastTypewriterContentLength
     const visibleGrowing = nextVisibleLength > lastTypewriterVisibleLength
-    if (rendererProps.typewriter === false || !cursorAllowed || (!sourceGrowing && !visibleGrowing)) {
-      if (rendererProps.typewriter === false || !cursorAllowed) {
+    if (!typewriterEnabled.value || !cursorAllowed || (!sourceGrowing && !visibleGrowing)) {
+      if (!typewriterEnabled.value || !cursorAllowed) {
         showTypewriterCursor.value = false
         hideTypewriterCursorElement()
       }
@@ -5981,7 +5995,7 @@ watch(
     lastTypewriterContentLength = nextLength
     lastTypewriterVisibleLength = nextVisibleLength
     showTypewriterCursor.value = true
-    if (typewriterCursorRef.value)
+    if (resolvedTypewriterCursorMode.value === 'precise' && typewriterCursorRef.value)
       typewriterCursorRef.value.style.visibility = 'hidden'
     clearTypewriterCursorTimeout()
     await nextTick()
@@ -6001,6 +6015,8 @@ watch(
       hideTypewriterCursorElement()
       return
     }
+    if (resolvedTypewriterCursorMode.value !== 'precise')
+      return
     await nextTick()
     scheduleTypewriterCursorPositionUpdate()
   },
@@ -6010,7 +6026,7 @@ watch(
 watch(
   [() => renderedCount.value, () => liveRange.start, () => liveRange.end],
   async () => {
-    if (!isClient || renderAsFragment.value || !ownsTypewriterCursor.value || !showTypewriterCursor.value)
+    if (!isClient || renderAsFragment.value || !ownsTypewriterCursor.value || !showTypewriterCursor.value || resolvedTypewriterCursorMode.value !== 'precise')
       return
 
     await nextTick()
@@ -6093,6 +6109,7 @@ onBeforeUnmount(() => {
       { dark: rendererProps.isDark },
       { virtualized: virtualizationEnabled },
       { 'virtual-scroll-coordinated': virtualScrollDomEnabled },
+      { 'typewriter-simple-cursor': showTypewriterCursor && resolvedTypewriterCursorMode === 'simple' },
     ]"
     :data-custom-id="rendererProps.customId"
     @click="handleContainerClick"
@@ -6266,7 +6283,7 @@ onBeforeUnmount(() => {
       </div>
     </template>
     <span
-      v-if="showTypewriterCursor"
+      v-if="showTypewriterCursor && resolvedTypewriterCursorMode === 'precise'"
       ref="typewriterCursorRef"
       class="typewriter-cursor"
       aria-hidden="true"
@@ -6390,6 +6407,25 @@ onBeforeUnmount(() => {
 </style>
 
 <style>
+/* Lightweight typewriter cursor for simple mode. */
+.markstream-vue.typewriter-simple-cursor .node-slot:last-of-type .text-node:last-of-type::after {
+  content: "";
+  display: inline-block;
+  width: 0.55em;
+  height: 1em;
+  margin-left: 0.08em;
+  vertical-align: -0.12em;
+  border-right: 2px solid currentColor;
+  pointer-events: none;
+  animation: typewriter-cursor-blink 1s steps(1, end) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .markstream-vue.typewriter-simple-cursor .node-slot:last-of-type .text-node:last-of-type::after {
+    animation: none;
+  }
+}
+
 /* Global (unscoped) CSS for enter animations */
 .markstream-vue .fade-enter-from {
   opacity: 0;
