@@ -268,6 +268,7 @@ describe('node renderer virtual-scroll coordination', () => {
     const probe = wrapper.element.querySelector('.height-estimation-probes') as HTMLElement | null
     expect(probe).toBeTruthy()
     expect(probe?.style.width).toBe('280px')
+    expect(probe?.querySelector('[data-probe="paragraph"]')?.classList.contains('node-content-flow-root')).toBe(true)
 
     wrapper.unmount()
   })
