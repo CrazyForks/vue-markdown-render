@@ -56,6 +56,7 @@ import { setDefaultI18nMap } from './composables/useSafeI18n'
 import { useSmoothMarkdownStream } from './composables/useSmoothMarkdownStream'
 import { setIconTheme } from './icon-themes'
 import { setLanguageIconResolver } from './utils/languageIcon'
+import { MARKSTREAM_LANGUAGE_ICON_RESOLVER_KEY } from './utils/languageIconContext'
 import { clearGlobalCustomComponents, createCustomComponentsRef, getCustomNodeComponents, MARKSTREAM_CUSTOM_COMPONENTS_KEY, removeCustomComponents, setCustomComponents } from './utils/nodeComponents'
 
 function definePublicAsyncComponent<TProps extends object>(
@@ -170,6 +171,14 @@ export interface MarkstreamVuePluginOptions {
    * App-scoped custom components.
    */
   components?: Partial<MarkstreamCustomComponents>
+
+  /**
+   * App-scoped language icon resolver for code block headers.
+   *
+   * Prefer this in SSR and multi-tenant apps; when configured, misses fall back
+   * to the active icon theme instead of the legacy process-global resolver.
+   */
+  languageIconResolver?: LanguageIconResolver | null
 
   /**
    * @deprecated Prefer setLanguageIconResolver() before app.mount().
@@ -324,6 +333,8 @@ export const VueRendererMarkdown: Plugin<[options?: MarkstreamVuePluginOptions]>
 
     if (options?.iconTheme)
       setIconTheme(options.iconTheme)
+    if (options && 'languageIconResolver' in options)
+      app.provide(MARKSTREAM_LANGUAGE_ICON_RESOLVER_KEY, options.languageIconResolver ?? null)
     if (options?.getLanguageIcon)
       setLanguageIconResolver(options.getLanguageIcon)
     if (options?.mathOptions)
