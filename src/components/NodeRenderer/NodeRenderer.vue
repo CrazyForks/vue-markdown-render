@@ -18,7 +18,7 @@ import type {
   NodeRendererProps,
 } from '../../types/node-renderer-props'
 import type { VirtualHeightSummary } from './composables/useHeightModel'
-import { getHighlightRegistrationKey, normalizeShikiLanguage } from 'markstream-core'
+import { normalizeShikiLanguage } from 'markstream-core'
 import { computed, defineAsyncComponent, getCurrentInstance, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
@@ -90,6 +90,7 @@ import HeightEstimationProbes from './HeightEstimationProbes.vue'
 import { InfographicBlockNodeLoading } from './InfographicBlockNodeLoading'
 import { MermaidBlockNodeLoading } from './MermaidBlockNodeLoading'
 import { normalizeRendererMode, RENDERER_MODE_DEFAULTS, resolveNodeRendererCodeRenderer } from './rendererModeDefaults'
+import { buildVirtualMeasurementKey, buildVirtualRendererLayoutKey, stringifyVirtualToken } from './virtualLayoutKey'
 
 type RuntimeCodeBlockNode = ParsedNode & {
   type: 'code_block'
@@ -1619,55 +1620,27 @@ function isSameVirtualThreadKey(threadKey: string | undefined) {
   return (threadKey ?? '') === (getVirtualThreadKey() ?? '')
 }
 
-function getHostVirtualMeasurementKey() {
-  const key = props.virtualScroll?.measurementKey
-  return key == null ? '' : String(key)
-}
-
 function getVirtualRendererLayoutKey() {
   const renderer = resolvedCodeRenderer.value
-  const monaco = renderer === 'monaco' ? rendererProps.codeBlockMonacoOptions : undefined
-  const codeProps = rendererProps.codeBlockProps as Record<string, unknown> | undefined
-  const includeShikiCodeOptions = renderer === 'shiki'
 
-  return [
-    rendererProps.isDark ? 'dark' : 'light',
-    renderer === 'monaco'
-      ? 'code-rich'
-      : renderer === 'pre'
-        ? 'code-pre'
-        : 'code-shiki',
-    rendererProps.codeBlockStream === false ? 'code-static' : 'code-stream',
-    stringifyVirtualToken(rendererProps.codeBlockMinWidth),
-    stringifyVirtualToken(rendererProps.codeBlockMaxWidth),
-    ...(includeShikiCodeOptions
-      ? [getHighlightRegistrationKey(
-          (codeProps?.themes ?? rendererProps.themes) as readonly unknown[] | undefined,
-          (codeProps?.langs ?? rendererProps.langs) as readonly unknown[] | undefined,
-        )]
-      : []),
-    stringifyVirtualToken(monaco?.fontSize),
-    stringifyVirtualToken(monaco?.lineHeight),
-    stringifyVirtualToken(monaco?.fontFamily),
-    stringifyVirtualToken(monaco?.tabSize),
-    stringifyVirtualToken(monaco?.MAX_HEIGHT),
-    stringifyVirtualToken(monaco?.wordWrap),
-    stringifyVirtualToken(monaco?.wrappingIndent),
-    stringifyVirtualToken(monaco?.padding),
-    stringifyVirtualToken(codeProps?.showHeader),
-    stringifyVirtualToken(codeProps?.showCopyButton),
-    stringifyVirtualToken(codeProps?.showExpandButton),
-    stringifyVirtualToken(codeProps?.showPreviewButton),
-    stringifyVirtualToken(codeProps?.showCollapseButton),
-    stringifyVirtualToken(codeProps?.showFontSizeButtons),
-  ].join('\u0000')
+  return buildVirtualRendererLayoutKey({
+    renderer,
+    isDark: rendererProps.isDark,
+    codeBlockStream: rendererProps.codeBlockStream,
+    codeBlockMinWidth: rendererProps.codeBlockMinWidth,
+    codeBlockMaxWidth: rendererProps.codeBlockMaxWidth,
+    codeBlockMonacoOptions: renderer === 'monaco' ? rendererProps.codeBlockMonacoOptions : undefined,
+    codeBlockProps: rendererProps.codeBlockProps,
+    themes: renderer === 'shiki' ? rendererProps.themes : undefined,
+    langs: renderer === 'shiki' ? rendererProps.langs : undefined,
+  })
 }
 
 function getVirtualMeasurementKey() {
-  return [
-    getHostVirtualMeasurementKey(),
+  return buildVirtualMeasurementKey(
+    props.virtualScroll?.measurementKey,
     getVirtualRendererLayoutKey(),
-  ].join('\u0000')
+  )
 }
 
 function getCurrentVirtualWidth() {
@@ -3419,26 +3392,6 @@ function shouldEmitVirtualMetrics(metrics: MarkstreamVirtualMetrics) {
     || metrics.nodeCount !== previous.nodeCount
     || metrics.measuredCount !== previous.measuredCount
     || metrics.width !== previous.width
-}
-
-function stringifyVirtualToken(value: unknown) {
-  if (value == null)
-    return ''
-
-  if (
-    typeof value === 'string'
-    || typeof value === 'number'
-    || typeof value === 'boolean'
-  ) {
-    return String(value)
-  }
-
-  try {
-    return JSON.stringify(value)
-  }
-  catch {
-    return String(value)
-  }
 }
 
 function getManualSettleTokenKey(token: unknown = props.virtualScroll?.settledToken) {
