@@ -20,9 +20,16 @@ const defaultMermaidLoader: MermaidLoader = () => import('mermaid')
 
 let cachedMermaid: any = null
 let mermaidLoader: MermaidLoader | null = defaultMermaidLoader
+let pendingMermaid: Promise<MermaidModule | null> | null = null
+let defaultMermaidLoadFailed = false
+let defaultMermaidWarningShown = false
+let mermaidLoaderVersion = 0
 
 function resetCachedMermaid() {
   cachedMermaid = null
+  pendingMermaid = null
+  defaultMermaidLoadFailed = false
+  defaultMermaidWarningShown = false
 }
 
 function getGlobalMermaid() {
@@ -37,6 +44,7 @@ function getGlobalMermaid() {
 
 export function setMermaidLoader(loader: MermaidLoader | null) {
   mermaidLoader = loader
+  mermaidLoaderVersion++
   resetCachedMermaid()
 }
 
@@ -113,6 +121,17 @@ function patchInitialize(target: any) {
   }
 }
 
+function warnDefaultMermaidLoadFailed(err: unknown) {
+  if (defaultMermaidWarningShown)
+    return
+
+  defaultMermaidWarningShown = true
+  console.warn(
+    '[markstream-vue] Optional dependency "mermaid" is not installed. Mermaid blocks will render as source.',
+    err,
+  )
+}
+
 export async function getMermaid(): Promise<MermaidModule | null> {
   if (cachedMermaid)
     return cachedMermaid
@@ -125,21 +144,46 @@ export async function getMermaid(): Promise<MermaidModule | null> {
   }
 
   const loader = mermaidLoader
+  const version = mermaidLoaderVersion
   if (!loader)
     return null
-  let mod: any
-  try {
-    mod = await loader()
-  }
-  catch (err) {
-    if (loader === defaultMermaidLoader) {
-      throw new Error('Optional dependency "mermaid" is not installed. Please install it to enable mermaid diagrams.')
-    }
-    throw err
-  }
-  if (!mod)
+
+  if (loader === defaultMermaidLoader && defaultMermaidLoadFailed)
     return null
-  cachedMermaid = normalizeMermaidModule(mod)
-  patchInitialize(cachedMermaid)
-  return cachedMermaid
+
+  if (pendingMermaid)
+    return pendingMermaid
+
+  pendingMermaid = (async () => {
+    let mod: any
+    try {
+      mod = await loader()
+    }
+    catch (err) {
+      if (loader === defaultMermaidLoader) {
+        if (version === mermaidLoaderVersion && loader === mermaidLoader) {
+          defaultMermaidLoadFailed = true
+          warnDefaultMermaidLoadFailed(err)
+        }
+        return null
+      }
+      throw err
+    }
+    finally {
+      if (version === mermaidLoaderVersion && loader === mermaidLoader)
+        pendingMermaid = null
+    }
+
+    if (version !== mermaidLoaderVersion || loader !== mermaidLoader)
+      return null
+
+    if (!mod)
+      return null
+
+    cachedMermaid = normalizeMermaidModule(mod)
+    patchInitialize(cachedMermaid)
+    return cachedMermaid
+  })()
+
+  return pendingMermaid
 }
