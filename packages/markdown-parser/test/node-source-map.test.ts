@@ -78,7 +78,7 @@ describe('node source map metadata', () => {
     }) as any[]
 
     expect(nodes.map(node => [node.type, node.sourceMap])).toEqual([
-      ['admonition', { startLine: 0, endLine: 2 }],
+      ['admonition', { startLine: 0, endLine: 3 }],
     ])
   })
 
@@ -98,6 +98,16 @@ describe('node source map metadata', () => {
 
   it('maps source ranges across math newline preprocessing that collapses lines', () => {
     const nodes = parseMarkdownToStructure('x\nabla', getMarkdown('source-map-math-collapse'), {
+      final: true,
+      includeSourceMap: true,
+      streamParse: false,
+    }) as any[]
+
+    expect(nodes[0]?.sourceMap).toEqual({ startLine: 0, endLine: 2 })
+  })
+
+  it('maps source ranges across CRLF math newline preprocessing', () => {
+    const nodes = parseMarkdownToStructure('x\r\nabla', getMarkdown('source-map-math-crlf'), {
       final: true,
       includeSourceMap: true,
       streamParse: false,

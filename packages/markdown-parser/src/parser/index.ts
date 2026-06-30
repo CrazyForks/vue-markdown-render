@@ -2431,7 +2431,7 @@ export function parseMarkdownToStructure(
   // Ensure markdown is a string — guard against null/undefined inputs from callers
   // todo: 下面的特殊 math 其实应该更精确匹配到() 或者 $$ $$ 或者 \[ \] 内部的内容
   const sourceMarkdown = (markdown ?? '').toString()
-  let safeMarkdown = sourceMarkdown.replace(/([^\\])\r(ight|ho)/g, '$1\\r$2').replace(/([^\\])\n(abla|eq|ot|exists)/g, '$1\\n$2')
+  let safeMarkdown = sourceMarkdown.replace(/([^\\])\r(ight|ho)/g, '$1\\r$2').replace(/([^\\])\r?\n(abla|eq|ot|exists)/g, '$1\\n$2')
 
   if (shouldResetTopLevelStreamCacheForFinalAutoParse(md, options)) {
     md.stream!.reset!()

@@ -93,3 +93,28 @@ export function applyNodeSourceMap<TNode extends ParsedNode>(
 
   return node
 }
+
+export function applyNodeSourceMapRange<TNode extends ParsedNode>(
+  node: TNode,
+  token: MarkdownToken | undefined,
+  endLine: number,
+  options?: ParseOptions,
+): TNode {
+  if (!options?.includeSourceMap)
+    return node
+
+  const map = token?.map
+  if (!Array.isArray(map) || map.length < 2)
+    return node
+
+  const startLine = Number(map[0])
+  const tokenEndLine = Number(map[1])
+  const rangeEndLine = Number(endLine)
+  if (!Number.isFinite(startLine) || !Number.isFinite(tokenEndLine) || !Number.isFinite(rangeEndLine))
+    return node
+
+  const sourceMap = mapSourceLineRange(startLine, Math.max(tokenEndLine, rangeEndLine), options)
+
+  node.sourceMap = sourceMap
+  return node
+}

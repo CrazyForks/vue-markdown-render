@@ -5,7 +5,7 @@ import { buildAllowedHtmlTagSet } from '../index'
 import { parseInlineTokens } from '../inline-parsers'
 import { parseFenceToken } from '../inline-parsers/fence-parser'
 import { createLinkifyDemotionContextTracker } from '../linkifyHeuristics'
-import { applyNodeSourceMap } from '../node-source-map'
+import { applyNodeSourceMap, applyNodeSourceMapRange } from '../node-source-map'
 import { parseBlockquote } from './blockquote-parser'
 import { parseCodeBlock } from './code-block-parser'
 import { parseDefinitionList } from './definition-list-parser'
@@ -170,6 +170,20 @@ function parseVmrContainer(
 
   // Skip the closing token when present; otherwise we're already at the end.
   return [containerNode, hasCloseToken ? (j + 1) : j]
+}
+
+function applyPairedBlockSourceMap<TNode extends ParsedNode>(
+  node: TNode,
+  openToken: MarkdownToken,
+  closeToken: MarkdownToken | undefined,
+  options?: ParseOptions,
+) {
+  if (closeToken?.type.endsWith('_close')) {
+    const endLine = Array.isArray(openToken.map) ? Number(openToken.map[1]) + 1 : Number.NaN
+    return applyNodeSourceMapRange(node, openToken, endLine, options)
+  }
+
+  return applyNodeSourceMap(node, openToken, options)
 }
 
 function stripWrapperNewlines(s: string) {
@@ -540,7 +554,7 @@ export function parseCommonBlockToken(
       if (handlers?.parseContainer) {
         const result = handlers.parseContainer(tokens, index, options)
         if (includeSourceMap)
-          applyNodeSourceMap(result[0], token, options)
+          applyPairedBlockSourceMap(result[0], token, tokens[result[1] - 1], options)
         return result
       }
       break
@@ -551,7 +565,7 @@ export function parseCommonBlockToken(
         const result = handlers.matchAdmonition(tokens, index, options)
         if (result) {
           if (includeSourceMap)
-            applyNodeSourceMap(result[0], token, options)
+            applyPairedBlockSourceMap(result[0], token, tokens[result[1] - 1], options)
           return result
         }
       }
@@ -561,7 +575,7 @@ export function parseCommonBlockToken(
     case 'vmr_container_open': {
       const result = parseVmrContainer(tokens, index, options)
       if (includeSourceMap)
-        applyNodeSourceMap(result[0], token, options)
+        applyPairedBlockSourceMap(result[0], token, tokens[result[1] - 1], options)
       return result
     }
     default:
