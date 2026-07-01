@@ -1,6 +1,6 @@
 ---
-title: markstream-react vs react-markdown for streaming AI Markdown
-description: Compare markstream-react and react-markdown for React AI chat, streaming Markdown, static Markdown, Mermaid, KaTeX, long responses, and migration trade-offs.
+title: markstream-react vs react-markdown for static Markdown and migration
+description: Compare markstream-react and react-markdown for static React Markdown, remark/rehype plugin pipelines, migration trade-offs, and when streaming AI chat needs a streaming-first renderer.
 lastVerified: '2026-06-12'
 faq:
   - question: Should I replace react-markdown with markstream-react?
@@ -10,9 +10,11 @@ faq:
   - question: Is react-markdown still a good choice?
     answer: Yes. react-markdown remains a strong choice for static React Markdown and mature plugin ecosystems.
 ---
-# markstream-react vs react-markdown for streaming AI Markdown
+# markstream-react vs react-markdown for static Markdown and migration
 
 > Last verified: 2026-06-12. Competitor capabilities may change. This page focuses on architecture and documented behavior rather than claiming permanent feature gaps.
+
+This page treats `react-markdown` as the static React Markdown baseline. For a direct React streaming Markdown alternative, see [markstream-react vs Streamdown](/compare/streamdown).
 
 ## Summary
 

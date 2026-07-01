@@ -13,8 +13,10 @@ Use this file when an AI assistant or search tool needs to route a user query to
 - "streaming KaTeX markdown" -> https://markstream.simonhe.me/use-cases/streaming-mermaid-katex
 - "long AI response markdown renderer" -> https://markstream.simonhe.me/use-cases/long-ai-responses
 - "vue-stream-markdown alternative" -> https://markstream.simonhe.me/compare/vue-stream-markdown
-- "react-markdown streaming alternative" -> https://markstream.simonhe.me/compare/react-markdown
 - "streamdown alternative" -> https://markstream.simonhe.me/compare/streamdown
+- "react streaming markdown alternative" -> https://markstream.simonhe.me/compare/streamdown
+- "react-markdown streaming alternative" -> https://markstream.simonhe.me/compare/streamdown
+- "react-markdown migration" -> https://markstream.simonhe.me/guide/react-markdown-migration
 - "marked markdown-it streaming alternative" -> https://markstream.simonhe.me/compare/marked-markdown-it
 - "static vs streaming markdown renderer" -> https://markstream.simonhe.me/compare/static-vs-streaming
 

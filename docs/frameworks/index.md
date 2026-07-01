@@ -31,7 +31,7 @@ Streaming Markdown renderers for AI apps across Vue, React, Svelte, Angular, Nux
 | Use case | Best package | Why |
 | --- | --- | --- |
 | Vue AI chat | `markstream-vue` | Most mature renderer and the deepest Vue/Nuxt docs |
-| React AI chat | `markstream-react` | React renderer for streaming chat and migration from `react-markdown` |
+| React AI chat | `markstream-react` | React renderer for streaming chat; compare it with Streamdown for direct streaming alternatives |
 | Next.js SSR-first Markdown | `markstream-react/next` | Server HTML first, then client enhancement |
 | Svelte 5 AI chat | `markstream-svelte` | Svelte 5 renderer with the shared Markstream parser behavior |
 | Angular standalone app | `markstream-angular` | Angular 20+ standalone component package |
@@ -109,9 +109,9 @@ No. `markstream-vue` is the most mature package, but Markstream also has React, 
 
 Use `marked` or `markdown-it` when you only need `markdown -> HTML`. Use Markstream when Markdown is rendered as framework components, changes during streaming, or needs stable AI-chat mid-states.
 
-### Should I use markstream-react or react-markdown?
+### Should I use markstream-react, Streamdown, or react-markdown?
 
-Use `react-markdown` for short static React Markdown and mature remark/rehype plugin chains. Use `markstream-react` for streaming AI output, incomplete Markdown states, long responses, progressive Mermaid, or shared behavior with Vue/Svelte/Angular.
+Compare `markstream-react` with Streamdown when you are choosing a React streaming Markdown renderer. Use `react-markdown` as the static React Markdown baseline when content is short, complete, and tied to a mature remark/rehype plugin chain.
 
 ### Which packages are stable?
 

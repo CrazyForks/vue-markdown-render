@@ -15,8 +15,8 @@ softwareRuntimePlatform:
 faq:
   - question: Is Markstream only for Vue?
     answer: No. markstream-react is the React renderer in the Markstream family, alongside Vue, Svelte, Angular, Vue 2, parser, and core packages.
-  - question: Should I use markstream-react or react-markdown?
-    answer: Use react-markdown for short static Markdown or existing remark/rehype pipelines. Use markstream-react for LLM streaming, incomplete Markdown states, long outputs, or heavy blocks.
+  - question: Should I use markstream-react, Streamdown, or react-markdown?
+    answer: Compare markstream-react with Streamdown for React streaming Markdown. Use react-markdown as the static Markdown baseline or when an existing remark/rehype pipeline matters most.
   - question: Does markstream-react support Next.js SSR?
     answer: Yes. Use markstream-react/next for SSR-first rendering, markstream-react/server for server-only rendering, and the root package in client components for live streams.
 ---
@@ -104,7 +104,7 @@ For SSR safety with optional peers, see the [React installation guide](/guide/re
 | AI Chat / SSE | [AI Chat & Streaming](/guide/ai-chat-streaming) |
 | Migrate from react-markdown | [Migration guide](/guide/react-markdown-migration) |
 
-## vs react-markdown and Streamdown
+## vs Streamdown and react-markdown
 
 | | markstream-react | react-markdown | Streamdown |
 | --- | --- | --- | --- |
@@ -115,7 +115,7 @@ For SSR safety with optional peers, see the [React installation guide](/guide/re
 | Cross-framework parser | ✅ | ❌ | ❌ |
 | Static Markdown | ✅ (overhead) | ✅ (best fit) | ✅ |
 
-For a detailed comparison, see [markstream-react vs react-markdown](/compare/react-markdown) and [markstream-react vs Streamdown](/compare/streamdown).
+For a detailed streaming comparison, see [markstream-react vs Streamdown](/compare/streamdown). For static-renderer migration trade-offs, see [markstream-react vs react-markdown](/compare/react-markdown).
 
 ## Try it
 

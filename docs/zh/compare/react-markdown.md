@@ -1,6 +1,6 @@
 ---
-title: markstream-react 与 react-markdown 对比
-description: 对比 markstream-react 和 react-markdown 在 React AI 聊天、流式 Markdown、静态文档、Mermaid、KaTeX、长回答和迁移成本中的取舍。
+title: markstream-react 与 react-markdown 静态基线对比
+description: 对比 markstream-react 和 react-markdown 在静态 React Markdown、remark/rehype 插件链、迁移成本，以及流式 AI 聊天是否需要流式优先渲染器中的取舍。
 lastVerified: '2026-06-12'
 faq:
   - question: 应该把 react-markdown 换成 markstream-react 吗？
@@ -11,9 +11,11 @@ faq:
     answer: 值得。对于静态 React Markdown 和成熟插件生态，react-markdown 仍然是合适选择。
 ---
 
-# markstream-react 与 react-markdown 对比
+# markstream-react 与 react-markdown 静态基线对比
 
 > 最后核验：2026-06-12。竞品能力可能变化；本页聚焦架构和公开文档行为，不把能力差异写成永久结论。
+
+本页把 `react-markdown` 作为静态 React Markdown 基线。直接对比 React 流式 Markdown 竞品时，优先看 [markstream-react 与 Streamdown 对比](/zh/compare/streamdown)。
 
 `react-markdown` 是成熟的 React Markdown 渲染器，适合短静态内容、博客、README 预览和依赖 remark/rehype 插件生态的项目。`markstream-react` 面向 AI 聊天和流式 Markdown，重点是处理不断变化的内容、未闭合语法、长回答和渐进式重型块。
 

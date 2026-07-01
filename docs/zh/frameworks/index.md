@@ -32,7 +32,7 @@ Markstream 是一组面向 AI 应用的流式 Markdown 渲染器，覆盖 Vue、
 | 场景 | 推荐包 | 原因 |
 | --- | --- | --- |
 | Vue AI 聊天 | `markstream-vue` | 最成熟的渲染器，Vue/Nuxt 文档最完整 |
-| React AI 聊天 | `markstream-react` | 面向 React 流式渲染和 `react-markdown` 迁移 |
+| React AI 聊天 | `markstream-react` | 面向 React 流式渲染；直接竞品对比优先看 Streamdown |
 | Next.js SSR-first Markdown | `markstream-react/next` | 先输出服务端 HTML，再做客户端增强 |
 | Svelte 5 AI 聊天 | `markstream-svelte` | Svelte 5 渲染器，复用 Markstream parser 行为 |
 | Angular standalone 应用 | `markstream-angular` | Angular 20+ standalone component |
@@ -112,9 +112,9 @@ export class MessageComponent {
 
 只需要 `markdown -> HTML` 时，用 `marked` 或 `markdown-it` 更直接。需要框架组件渲染、流式中间态稳定性或 AI 聊天体验时，用 Markstream。
 
-### 应该用 markstream-react 还是 react-markdown？
+### 应该用 markstream-react、Streamdown 还是 react-markdown？
 
-短静态 React Markdown 或成熟 remark/rehype 插件链优先继续评估 `react-markdown`。流式 AI 输出、未闭合语法、长回答、渐进 Mermaid 或多框架一致行为优先看 `markstream-react`。
+选择 React 流式 Markdown 渲染器时，优先对比 `markstream-react` 和 Streamdown。短静态 React Markdown 或成熟 remark/rehype 插件链可以继续评估 `react-markdown`。
 
 ### 哪些包是稳定的？
 
