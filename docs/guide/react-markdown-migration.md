@@ -1,5 +1,13 @@
 ---
+title: Migrate from react-markdown to markstream-react
 description: Migrate from react-markdown to markstream-react with guidance on renderer replacement, plugin audits, and non-1:1 customization gaps.
+keywords:
+  - react-markdown migration
+  - react-markdown alternative
+  - markstream-react migration
+  - React streaming Markdown renderer
+  - remark rehype migration
+  - AI chat Markdown React
 ---
 
 # Migrate from react-markdown

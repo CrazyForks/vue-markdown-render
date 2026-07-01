@@ -1,5 +1,7 @@
 ---
 layout: home
+title: 'Markstream：面向 AI 应用的流式 Markdown 渲染器'
+titleTemplate: false
 description: 面向 AI 应用的多框架流式 Markdown 渲染器家族，支持 Vue、React、Svelte、Angular、Nuxt 和 Next.js。处理 LLM token 流、SSE/WebSocket 输出、AI 聊天、长文档、渐进式 Mermaid、KaTeX 和流式代码块。
 keywords:
   - 流式 Markdown 渲染器

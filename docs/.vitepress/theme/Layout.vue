@@ -1,10 +1,18 @@
 <script setup lang="ts">
+import { useData } from 'vitepress'
 import DefaultTheme from 'vitepress/theme'
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watchEffect } from 'vue'
 import FaqFromFrontmatter from './FaqFromFrontmatter.vue'
 
+const { page } = useData()
 const stars = ref<number | null>(null)
 const isLoading = ref(true)
+
+watchEffect(() => {
+  // Keep lastUpdated available to VitePress build hooks, but hide the default theme footer.
+  if (page.value.lastUpdated)
+    page.value.lastUpdated = 0
+})
 
 onMounted(async () => {
   try {

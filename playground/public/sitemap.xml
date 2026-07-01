@@ -5,24 +5,4 @@
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
-  <url>
-    <loc>https://markstream-vue.simonhe.me/markdown</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.85</priority>
-  </url>
-  <url>
-    <loc>https://markstream-vue.simonhe.me/test</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.75</priority>
-  </url>
-  <url>
-    <loc>https://markstream-vue.simonhe.me/cdn-peers</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://markstream-vue.simonhe.me/mermaid-export-demo</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.76</priority>
-  </url>
 </urlset>

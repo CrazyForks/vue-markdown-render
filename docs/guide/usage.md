@@ -1,5 +1,13 @@
 ---
+title: markstream-vue usage and streaming modes
 description: Choose between content and nodes, understand the render pipeline, and wire markstream-vue into Vite, VitePress, Nuxt, and streaming UIs.
+keywords:
+  - markstream-vue usage
+  - Vue streaming Markdown usage
+  - content vs nodes Markdown
+  - MarkdownRender Vue example
+  - VitePress Markdown usage
+  - Nuxt streaming Markdown
 ---
 
 # Usage & API

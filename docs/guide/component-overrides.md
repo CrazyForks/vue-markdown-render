@@ -1,5 +1,13 @@
 ---
+title: Override markstream-vue built-in components
 description: Override built-in markstream-vue components like image, code_block, mermaid, and link with scoped, project-safe custom mappings.
+keywords:
+  - markstream-vue component overrides
+  - Vue Markdown custom components
+  - override Markdown image renderer
+  - override code block renderer
+  - custom Markdown node renderer
+  - scoped Markdown components
 ---
 
 # Override Built-in Components

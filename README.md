@@ -1,8 +1,8 @@
-# Markstream
+# Markstream — Streaming Markdown renderers for AI chat
 
-Markstream is a streaming Markdown renderer family for AI chat, LLM token streams, SSE/WebSocket output, and long AI responses.
+`markstream-vue` is a Vue 3 / Nuxt / VitePress streaming Markdown renderer for AI chat, LLM token streams, SSE/WebSocket output, incomplete Markdown, long AI responses, Mermaid, KaTeX, and streaming code blocks.
 
-Use `markstream-vue` for Vue 3, Nuxt, and VitePress; use the sibling packages for React, Svelte, Angular, and Vue 2. The renderer is built for incomplete Markdown states, progressive Mermaid, KaTeX, streaming code blocks, mobile WebView, and safe component rendering.
+Markstream is the renderer family for Vue, React, Svelte, Angular, and Vue 2. Use sibling packages for non-Vue frameworks; use `markstream-vue` when your Vue/Nuxt/VitePress UI needs stable partial Markdown states, mobile WebView rendering, safe component rendering, and progressive heavy blocks.
 
 [![中文版](https://img.shields.io/badge/docs-中文文档-blue)](README.zh-CN.md)
 [![Docs](https://img.shields.io/badge/docs-vitepress-blue)](https://markstream.simonhe.me/)
@@ -30,13 +30,35 @@ Other packages:
 [![CI](https://github.com/Simon-He95/markstream-vue/actions/workflows/ci.yml/badge.svg)](https://github.com/Simon-He95/markstream-vue/actions/workflows/ci.yml)
 [![License](https://img.shields.io/npm/l/markstream-vue)](./license)
 
+## Install markstream-vue
+
+```bash
+pnpm add markstream-vue
+```
+
+```vue
+<script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
+import 'markstream-vue/index.css'
+
+defineProps<{
+  content: string
+  isDone: boolean
+}>()
+</script>
+
+<template>
+  <MarkdownRender mode="chat" :content="content" :final="isDone" />
+</template>
+```
+
 ## Why not marked / markdown-it / react-markdown?
 
 Use `marked`, `markdown-it`, or `react-markdown` for finished Markdown documents.
 
 Use Markstream when the Markdown is still changing while the user is reading it.
 
-Detailed comparisons: [react-markdown](https://markstream.simonhe.me/compare/react-markdown), [marked / markdown-it](https://markstream.simonhe.me/compare/marked-markdown-it), and [Streamdown](https://markstream.simonhe.me/compare/streamdown).
+Detailed comparisons: [vue-stream-markdown](https://markstream.simonhe.me/compare/vue-stream-markdown), [Streamdown](https://markstream.simonhe.me/compare/streamdown), [react-markdown](https://markstream.simonhe.me/compare/react-markdown), and [marked / markdown-it](https://markstream.simonhe.me/compare/marked-markdown-it).
 
 ## Packages
 
@@ -64,7 +86,7 @@ Start with the [framework overview](https://markstream.simonhe.me/frameworks) if
 
 ## Stability
 
-`markstream-vue@1.0` is the most mature renderer with a stable surface: `MarkdownRender`, streaming content rendering, pre-parsed node rendering, the safe HTML policy, optional Mermaid / KaTeX / Monaco / D2 / Infographic integrations, virtual-scroll coordination, CSS exports, worker client subpaths, and SSR imports for Vite / Nuxt / VitePress.
+`markstream-vue` has a stable 1.x API contract. The current npm package may still use beta tags while the 1.0 release gate and cross-framework package family are finalized. The stable surface includes `MarkdownRender`, streaming content rendering, pre-parsed node rendering, the safe HTML policy, optional Mermaid / KaTeX / Monaco / D2 / Infographic integrations, virtual-scroll coordination, CSS exports, worker client subpaths, and SSR imports for Vite / Nuxt / VitePress.
 
 Cross-framework renderers (`markstream-react`, `markstream-svelte`, `markstream-angular`, `markstream-vue2`) are available and actively developed. Check each package page for API maturity, framework support, and known limitations.
 

@@ -1,6 +1,6 @@
 ---
-title: 'Vue and Nuxt streaming Markdown renderer for AI chat'
-description: Use markstream-vue to render streamed Markdown in Vue 3, Nuxt, VitePress, SSE, WebSocket, AI chat UIs, mobile WebView, and long documents with optional Mermaid, KaTeX, Shiki, and Monaco.
+title: 'Vue streaming Markdown renderer for AI chat, SSE, WebSocket, and Nuxt'
+description: Use markstream-vue to render LLM token streams, SSE/WebSocket Markdown, incomplete code fences, Mermaid, KaTeX, and long AI responses in Vue 3, Nuxt, and VitePress.
 keywords:
   - markstream-vue
   - Vue streaming Markdown renderer
@@ -109,3 +109,10 @@ pnpm add @antv/infographic @terrastruct/d2  # additional diagram types
 - [Live playground](https://markstream-vue.simonhe.me/)
 - [Nuxt playground](https://markstream-nuxt.pages.dev/)
 - [Full documentation](/guide/)
+
+## Next steps
+
+- Building a Vue AI chat UI? Read [Vue AI chat Markdown renderer](/use-cases/vue-ai-chat-markdown-renderer).
+- Rendering raw LLM chunks? Read [LLM token stream Markdown](/use-cases/llm-token-stream-markdown).
+- Need Nuxt SSR? Read [Nuxt streaming Markdown renderer](/frameworks/nuxt).
+- Comparing Vue alternatives? Read [markstream-vue vs vue-stream-markdown](/compare/vue-stream-markdown).

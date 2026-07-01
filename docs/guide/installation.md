@@ -1,5 +1,13 @@
 ---
+title: Install markstream-vue for Vue, Nuxt, and VitePress
 description: Install markstream-vue for Vue, Nuxt, and VitePress with the right peer dependency set for docs sites, AI chat UIs, Mermaid, KaTeX, Monaco, and large documents.
+keywords:
+  - install markstream-vue
+  - Vue Markdown renderer install
+  - Nuxt Markdown renderer install
+  - VitePress Markdown renderer
+  - markstream-vue peer dependencies
+  - streaming Markdown Vue setup
 ---
 
 # Vue / Nuxt Installation

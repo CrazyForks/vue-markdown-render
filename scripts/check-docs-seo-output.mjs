@@ -13,6 +13,8 @@ const oldHostRedirect = `${oldHost}/*  ${newHost}/:splat  301`
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 
 const scannedExtensions = new Set(['.html', '.xml', '.txt'])
+const compareLastVerifiedMaxAgeDays = 120
+const strictSeoFreshness = process.env.MARKSTREAM_STRICT_SEO_FRESHNESS === '1'
 const primaryLandingPaths = [
   '/',
   '/frameworks',
@@ -27,9 +29,14 @@ const primaryLandingPaths = [
   '/compare/react-markdown',
   '/compare/streamdown',
   '/compare/marked-markdown-it',
+  '/compare/vue-stream-markdown',
   '/use-cases',
+  '/use-cases/vue-ai-chat-markdown-renderer',
+  '/use-cases/llm-token-stream-markdown',
   '/use-cases/ai-chat-streaming',
   '/use-cases/sse-websocket',
+  '/use-cases/incomplete-markdown-renderer',
+  '/use-cases/streaming-code-blocks',
   '/use-cases/mobile-webview',
   '/use-cases/streaming-mermaid-katex',
   '/use-cases/long-ai-responses',
@@ -93,6 +100,10 @@ function readDistFile(relativePath) {
   return readFileSync(filePath, 'utf8')
 }
 
+function readRepoJson(relativePath) {
+  return JSON.parse(readFileSync(resolve(root, relativePath), 'utf8'))
+}
+
 function markdownRoutePath(filePath) {
   let route = `/${docsRelative(filePath).replace(/\.md$/, '')}`
   route = route.replace(/\/index$/, '')
@@ -129,6 +140,31 @@ function readFrontmatter(filePath) {
 
 function hasFrontmatterKey(frontmatter, key) {
   return new RegExp(`^${key}:`, 'm').test(frontmatter)
+}
+
+function frontmatterStringValue(frontmatter, key) {
+  const line = frontmatter.split('\n').find(line => line.startsWith(`${key}:`))
+  if (!line)
+    return null
+
+  let value = line.slice(key.length + 1).trim()
+  if (
+    value
+    && (value.startsWith('\'') || value.startsWith('"'))
+    && value.endsWith(value[0])
+  ) {
+    value = value.slice(1, -1)
+  }
+
+  return value || null
+}
+
+function daysSinceIsoDate(value) {
+  const timestamp = Date.parse(`${value}T00:00:00Z`)
+  if (!Number.isFinite(timestamp))
+    return null
+
+  return Math.floor((Date.now() - timestamp) / 86_400_000)
 }
 
 function decodeHtmlEntities(value) {
@@ -261,6 +297,13 @@ function validateFaqPageNode(node, relativePath) {
   }
 }
 
+function validateWebPageNode(node, relativePath) {
+  for (const field of ['name', 'description', 'url', 'dateModified']) {
+    if (!hasNonEmptyString(node[field]))
+      failures.push(`${relativePath} WebPage is missing ${field}`)
+  }
+}
+
 function validateArticleNode(node, relativePath, lastVerified) {
   for (const field of ['headline', 'description', 'url', 'mainEntityOfPage']) {
     if (!hasNonEmptyString(node[field]))
@@ -271,8 +314,32 @@ function validateArticleNode(node, relativePath, lastVerified) {
     failures.push(`${relativePath} is missing Article dateModified ${lastVerified}`)
 }
 
+function validateCompareFreshness(relativePath, lastVerified) {
+  if (!lastVerified) {
+    failures.push(`${relativePath} compare page is missing lastVerified`)
+    return
+  }
+
+  const ageDays = daysSinceIsoDate(lastVerified)
+  if (ageDays === null) {
+    failures.push(`${relativePath} has invalid lastVerified ${lastVerified}`)
+    return
+  }
+
+  if (ageDays > compareLastVerifiedMaxAgeDays) {
+    const message = `${relativePath} lastVerified ${lastVerified} is older than ${compareLastVerifiedMaxAgeDays} days`
+    if (strictSeoFreshness)
+      failures.push(message)
+    else
+      console.warn(`[docs-seo-output] warning: ${message}`)
+  }
+}
+
 function validateStructuredDataNodes(relativePath, nodes) {
   for (const node of nodes) {
+    if (structuredDataTypes(node).includes('WebPage'))
+      validateWebPageNode(node, relativePath)
+
     if (structuredDataTypes(node).includes('SoftwareApplication'))
       validateSoftwareApplicationNode(node, relativePath)
   }
@@ -285,6 +352,31 @@ function findStructuredDataNode(nodes, type) {
 function expectContains(content, relativePath, marker, message) {
   if (!content.includes(marker))
     failures.push(`${relativePath} ${message}`)
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function expectSitemapLastmod(sitemap, routePath) {
+  const loc = `${newHost}${routePath === '/' ? '/' : routePath}`
+  const urlBlockPattern = new RegExp(
+    `<url>[\\s\\S]*?<loc>${escapeRegExp(loc)}</loc>[\\s\\S]*?<lastmod>[^<]+</lastmod>[\\s\\S]*?</url>`,
+  )
+
+  if (!urlBlockPattern.test(sitemap))
+    failures.push(`sitemap.xml is missing lastmod for ${loc}`)
+}
+
+function seoKeywordMapTargets(entry) {
+  return [
+    entry.target,
+    ...(Array.isArray(entry.targetAlternates) ? entry.targetAlternates : []),
+    entry.targetZh,
+    ...(Array.isArray(entry.targetZhAlternates) ? entry.targetZhAlternates : []),
+    entry.targetZhFallback,
+    ...(Array.isArray(entry.targetZhFallbackAlternates) ? entry.targetZhFallbackAlternates : []),
+  ].filter(Boolean)
 }
 
 if (isMain) {
@@ -304,6 +396,9 @@ if (isMain) {
       failures.push(`${relativePath} still contains old docs host ${oldHost}`)
 
     if (extname(filePath) === '.html') {
+      if (content.includes('VPLastUpdated'))
+        failures.push(`${relativePath} renders the default theme Last updated footer`)
+
       const nodes = parseStructuredDataNodes(content, relativePath)
       jsonLdNodesByRelativePath.set(relativePath, nodes)
       validateStructuredDataNodes(relativePath, nodes)
@@ -324,6 +419,60 @@ if (isMain) {
       failures.push(`${relativePath} does not contain new docs host ${newHost}`)
   }
 
+  const sitemap = readDistFile('sitemap.xml')
+  if (sitemap) {
+    if (!sitemap.includes('<lastmod>'))
+      failures.push('sitemap.xml is missing lastmod entries')
+
+    for (const routePath of primaryLandingPaths)
+      expectSitemapLastmod(sitemap, routePath)
+
+    expectContains(
+      sitemap,
+      'sitemap.xml',
+      `${newHost}/use-cases`,
+      'should include use-cases hub in sitemap',
+    )
+  }
+
+  const compareIndex = readDistFile('compare/index.html')
+  if (compareIndex) {
+    expectContains(
+      compareIndex,
+      'compare/index.html',
+      '/compare/vue-stream-markdown',
+      'should link to vue-stream-markdown comparison page',
+    )
+  }
+
+  const seoKeywordMap = readRepoJson('docs/seo-keyword-map.json')
+  if (!Array.isArray(seoKeywordMap) || seoKeywordMap.length === 0) {
+    failures.push('docs/seo-keyword-map.json must contain keyword mappings')
+  }
+  else {
+    for (const [index, entry] of seoKeywordMap.entries()) {
+      if (!hasNonEmptyString(entry.query))
+        failures.push(`docs/seo-keyword-map.json entry ${index} is missing query`)
+
+      if (entry.targetZh && !entry.targetZh.startsWith('/zh/'))
+        failures.push(`docs/seo-keyword-map.json entry ${index} targetZh must start with /zh/ or use targetZhFallback`)
+
+      if (entry.targetZhFallback && entry.targetZhFallback.startsWith('/zh/'))
+        failures.push(`docs/seo-keyword-map.json entry ${index} targetZhFallback must point to a non-zh fallback route`)
+
+      for (const target of seoKeywordMapTargets(entry)) {
+        if (typeof target !== 'string' || !target.startsWith('/')) {
+          failures.push(`docs/seo-keyword-map.json entry ${index} has invalid target ${target}`)
+          continue
+        }
+
+        const relativePath = htmlFileForRoute(target)
+        if (!existsSync(resolve(distDir, relativePath)))
+          failures.push(`docs/seo-keyword-map.json entry ${index} target ${target} is missing built file ${relativePath}`)
+      }
+    }
+  }
+
   const redirects = readDistFile('_redirects')
   if (redirects)
     expectContains(redirects, '_redirects', oldHostRedirect, `is missing old docs host redirect ${oldHostRedirect}`)
@@ -337,6 +486,10 @@ if (isMain) {
     const canonicalUrl = `${newHost}${routePath === '/' ? '/' : routePath}`
     expectContains(content, relativePath, `<link rel="canonical" href="${canonicalUrl}">`, `is missing canonical ${canonicalUrl}`)
     expectContains(content, relativePath, `<meta property="og:url" content="${canonicalUrl}">`, `is missing og:url ${canonicalUrl}`)
+
+    const structuredDataNodes = jsonLdNodesByRelativePath.get(relativePath) ?? parseStructuredDataNodes(content, relativePath)
+    if (!hasStructuredDataType(structuredDataNodes, 'WebPage'))
+      failures.push(`${relativePath} is missing WebPage structured data`)
   }
 
   for (const filePath of walkFiles(docsDir, new Set(['.vitepress', 'node_modules']))) {
@@ -379,15 +532,13 @@ if (isMain) {
         failures.push(`${relativePath} is missing ${marker} ${label}`)
     }
 
-    const lastVerifiedLine = frontmatter.split('\n').find(line => line.startsWith('lastVerified:'))
-    let lastVerified = lastVerifiedLine ? lastVerifiedLine.slice('lastVerified:'.length).trim() : null
-    if (
-      lastVerified
-      && (lastVerified.startsWith('\'') || lastVerified.startsWith('"'))
-      && lastVerified.endsWith(lastVerified[0])
-    ) {
-      lastVerified = lastVerified.slice(1, -1)
+    const lastVerified = frontmatterStringValue(frontmatter, 'lastVerified')
+    if (isArticle) {
+      validateCompareFreshness(relativePath, lastVerified)
+      if (!content.includes('Verification') && !content.includes('核验方式'))
+        failures.push(`${relativePath} compare page is missing visible Verification section`)
     }
+
     const softwareSourceCodeNode = findStructuredDataNode(structuredDataNodes, 'SoftwareSourceCode')
     if (softwareSourceCodeNode)
       validateSoftwareSourceCodeNode(softwareSourceCodeNode, relativePath)

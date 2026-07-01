@@ -99,3 +99,39 @@ const nodes = parseMarkdownToStructure(content, md)
 ```
 
 This gives you the streaming parser without any framework dependency.
+
+## Verification
+
+Last verified: 2026-06-12
+
+Sources checked:
+- [marked docs](https://marked.js.org/)
+- [markdown-it docs](https://markdown-it.github.io/)
+- Markstream parser docs and package metadata
+- local smoke reproduction
+
+Tested scenarios:
+- complete static Markdown
+- incomplete code fences
+- partial tables
+- streaming Mermaid and KaTeX through Markstream renderers
+- long response > 50 KB
+
+## Sources and references
+
+- [marked docs](https://marked.js.org/)
+- [markdown-it demo and docs](https://markdown-it.github.io/)
+- [stream-markdown-parser guide](/guide/parser-api)
+- [Static vs streaming Markdown rendering](/compare/static-vs-streaming)
+- [1.0 Benchmark Report](/guide/benchmark-1-0)
+
+## Reproduce Markstream scenarios
+
+These commands reproduce the Markstream streaming and performance scenarios used while writing this comparison. They are not a side-by-side benchmark against the alternative packages.
+
+```bash
+pnpm benchmark:1.0
+pnpm run test:e2e:main-playground-performance
+```
+
+Include complete static Markdown, unclosed code fences, partial tables, partial KaTeX, Mermaid, and long AI responses in the same test set.

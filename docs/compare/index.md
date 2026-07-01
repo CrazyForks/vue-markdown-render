@@ -1,6 +1,6 @@
 ---
 title: Compare Markstream with other Markdown renderers
-description: Compare Markstream with react-markdown, Streamdown, marked, markdown-it, and static Markdown renderers for AI streaming scenarios.
+description: Compare Markstream with Streamdown, react-markdown, marked, markdown-it, and static Markdown renderers for AI streaming scenarios.
 ---
 # Compare Markstream
 
@@ -12,8 +12,9 @@ Choose the right Markdown rendering approach for your AI application.
 
 ## Framework-specific comparisons
 
-- [markstream-react vs react-markdown](/compare/react-markdown) — when to use each for AI chat
+- [markstream-vue vs vue-stream-markdown](/compare/vue-stream-markdown) — Vue streaming Markdown alternatives for AI chat, SSR, and long responses
 - [markstream-react vs Streamdown](/compare/streamdown) — React streaming alternatives compared
+- [markstream-react vs react-markdown](/compare/react-markdown) — React static baseline and migration trade-offs
 
 ## Parser comparisons
 

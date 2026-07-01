@@ -145,6 +145,8 @@ Keep the mode stable for a given surface. Switch pacing/animation props (`smooth
 
 ## Framework-specific guides
 
+- [Vue AI chat Markdown renderer](/use-cases/vue-ai-chat-markdown-renderer)
+- [LLM token stream Markdown](/use-cases/llm-token-stream-markdown)
 - [Vue 3 AI Chat & Streaming](/guide/ai-chat-streaming)
 - [React Quick Start](/guide/react-quick-start)
 - [Svelte Quick Start](/guide/svelte)

@@ -1,4 +1,21 @@
-# React Next SSR
+---
+title: Next.js SSR Markdown renderer with markstream-react
+description: Render Markdown in Next.js App Router and Pages Router with markstream-react/next for SSR-first HTML, markstream-react/server for server-only rendering, and client components for live AI chat streams.
+keywords:
+  - Next.js Markdown renderer
+  - Next.js streaming Markdown
+  - Next.js AI chat Markdown
+  - markstream-react next
+  - React SSR Markdown renderer
+  - server-rendered Markdown React
+faq:
+  - question: Can markstream-react render Markdown on the Next.js server?
+    answer: Yes. Use markstream-react/next for server HTML plus hydration, or markstream-react/server for server-only Markdown rendering.
+  - question: Should live SSE Markdown streams use a Client Component?
+    answer: Yes. Live SSE and WebSocket streams should use the root markstream-react package inside a Client Component.
+---
+
+# Next.js SSR Markdown renderer with markstream-react
 
 `markstream-react` now exposes two explicit SSR entrypoints for Next.js:
 

@@ -1,0 +1,35 @@
+/markdown
+  X-Robots-Tag: noindex, nofollow
+
+/test
+  X-Robots-Tag: noindex, nofollow
+
+/cdn-peers
+  X-Robots-Tag: noindex, nofollow
+
+/mermaid-export-demo
+  X-Robots-Tag: noindex, nofollow
+
+/diff-theme-regression
+  X-Robots-Tag: noindex, nofollow
+
+/diff-line-info-regression
+  X-Robots-Tag: noindex, nofollow
+
+/test-sandbox
+  X-Robots-Tag: noindex, nofollow
+
+/example
+  X-Robots-Tag: noindex, nofollow
+
+/height-estimation-experiment
+  X-Robots-Tag: noindex, nofollow
+
+/virtual-scroll
+  X-Robots-Tag: noindex, nofollow
+
+/virtual-scroller-markstream
+  X-Robots-Tag: noindex, nofollow
+
+/virtual-timeline-zero
+  X-Robots-Tag: noindex, nofollow

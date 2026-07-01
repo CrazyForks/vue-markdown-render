@@ -1,6 +1,6 @@
 ---
-title: markstream-react vs react-markdown for streaming AI Markdown
-description: Compare markstream-react and react-markdown for React AI chat, streaming Markdown, static Markdown, Mermaid, KaTeX, long responses, and migration trade-offs.
+title: markstream-react vs react-markdown for static Markdown and migration
+description: Compare markstream-react and react-markdown for static React Markdown, remark/rehype plugin pipelines, migration trade-offs, and when streaming AI chat needs a streaming-first renderer.
 lastVerified: '2026-06-12'
 faq:
   - question: Should I replace react-markdown with markstream-react?
@@ -10,9 +10,11 @@ faq:
   - question: Is react-markdown still a good choice?
     answer: Yes. react-markdown remains a strong choice for static React Markdown and mature plugin ecosystems.
 ---
-# markstream-react vs react-markdown for streaming AI Markdown
+# markstream-react vs react-markdown for static Markdown and migration
 
 > Last verified: 2026-06-12. Competitor capabilities may change. This page focuses on architecture and documented behavior rather than claiming permanent feature gaps.
+
+This page treats `react-markdown` as the static React Markdown baseline. For a direct React streaming Markdown alternative, see [markstream-react vs Streamdown](/compare/streamdown).
 
 ## Summary
 
@@ -113,3 +115,37 @@ However, for AI chat UIs and streaming surfaces, the streaming features replace 
 6. Install optional peers only if your AI output includes Mermaid, KaTeX, or Monaco blocks
 
 For a full migration guide, see [Migrate from react-markdown](/guide/react-markdown-migration).
+
+## Verification
+
+Last verified: 2026-06-12
+
+Sources checked:
+- [react-markdown README](https://github.com/remarkjs/react-markdown)
+- Markstream React docs and package metadata
+- public examples and local smoke reproduction
+
+Tested scenarios:
+- incomplete code fences
+- partial tables
+- partial KaTeX
+- long response > 50 KB
+- `final=true` settling behavior
+
+## Sources and references
+
+- [react-markdown README](https://github.com/remarkjs/react-markdown)
+- [markstream-react framework page](/frameworks/react)
+- [Migrate from react-markdown](/guide/react-markdown-migration)
+- [1.0 Benchmark Report](/guide/benchmark-1-0)
+
+## Reproduce Markstream scenarios
+
+These commands reproduce the Markstream streaming and performance scenarios used while writing this comparison. They are not a side-by-side benchmark against the alternative package.
+
+```bash
+pnpm benchmark:1.0
+pnpm run test:e2e:main-playground-performance
+```
+
+Test incomplete code fences, partial tables, partial KaTeX, Mermaid blocks, and long AI responses before choosing a renderer for a streaming UI.

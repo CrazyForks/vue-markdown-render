@@ -1,0 +1,230 @@
+[
+  {
+    "query": "react streaming markdown renderer",
+    "queryZh": "react 流式 markdown 渲染器",
+    "intent": "framework",
+    "target": "/frameworks/react",
+    "targetZh": "/zh/frameworks/react",
+    "primaryTitle": "React streaming Markdown renderer"
+  },
+  {
+    "query": "nextjs ai chat markdown renderer",
+    "queryZh": "nextjs ai 聊天 markdown 渲染",
+    "intent": "framework",
+    "target": "/frameworks/next",
+    "targetAlternates": ["/frameworks/react"],
+    "targetZh": "/zh/frameworks/next",
+    "targetZhAlternates": ["/zh/frameworks/react"],
+    "primaryTitle": "Next.js streaming Markdown renderer for AI chat"
+  },
+  {
+    "query": "vue streaming markdown renderer",
+    "queryZh": "vue 流式 markdown 渲染器",
+    "intent": "framework",
+    "target": "/frameworks/vue",
+    "targetZh": "/zh/frameworks/vue",
+    "primaryTitle": "Vue streaming Markdown renderer for AI chat, SSE, WebSocket, and Nuxt"
+  },
+  {
+    "query": "Nuxt SSR markdown renderer",
+    "queryZh": "Nuxt Markdown 流式渲染",
+    "intent": "framework",
+    "target": "/frameworks/nuxt",
+    "targetZh": "/zh/frameworks/nuxt",
+    "primaryTitle": "Nuxt streaming Markdown SSR"
+  },
+  {
+    "query": "Vue AI chat markdown renderer",
+    "queryZh": "Vue AI 聊天 Markdown 渲染器",
+    "intent": "use-case",
+    "target": "/use-cases/vue-ai-chat-markdown-renderer",
+    "targetZh": "/zh/frameworks/vue",
+    "primaryTitle": "Vue AI chat Markdown renderer"
+  },
+  {
+    "query": "Vue LLM markdown renderer",
+    "queryZh": "Vue 大模型 Markdown 渲染器",
+    "intent": "use-case",
+    "target": "/use-cases/vue-ai-chat-markdown-renderer",
+    "targetZh": "/zh/frameworks/vue",
+    "primaryTitle": "Vue LLM Markdown renderer"
+  },
+  {
+    "query": "LLM token stream markdown renderer",
+    "queryZh": "LLM token 流 Markdown 渲染器",
+    "intent": "use-case",
+    "target": "/use-cases/llm-token-stream-markdown",
+    "targetZh": "/zh/use-cases/ai-chat-streaming",
+    "primaryTitle": "LLM token stream Markdown renderer"
+  },
+  {
+    "query": "vue2 streaming markdown renderer",
+    "queryZh": "vue2 流式 markdown 渲染器",
+    "intent": "framework",
+    "target": "/frameworks/vue2",
+    "targetZh": "/zh/frameworks/vue2",
+    "primaryTitle": "Vue 2 streaming Markdown renderer"
+  },
+  {
+    "query": "vue 2 ai chat markdown renderer",
+    "queryZh": "vue 2 ai 聊天 markdown 渲染器",
+    "intent": "framework",
+    "target": "/frameworks/vue2",
+    "targetZh": "/zh/frameworks/vue2",
+    "primaryTitle": "Vue 2 AI chat Markdown renderer"
+  },
+  {
+    "query": "vue2 sse markdown renderer",
+    "queryZh": "vue2 sse markdown 渲染器",
+    "intent": "framework",
+    "target": "/frameworks/vue2",
+    "targetZh": "/zh/frameworks/vue2",
+    "primaryTitle": "Vue 2 SSE Markdown renderer"
+  },
+  {
+    "query": "legacy vue 2 markdown renderer",
+    "queryZh": "vue 2 存量项目 markdown 渲染器",
+    "intent": "framework",
+    "target": "/frameworks/vue2",
+    "targetZh": "/zh/frameworks/vue2",
+    "primaryTitle": "Legacy Vue 2 Markdown renderer"
+  },
+  {
+    "query": "svelte streaming markdown renderer",
+    "queryZh": "svelte 流式 markdown 渲染",
+    "intent": "framework",
+    "target": "/frameworks/svelte",
+    "targetZh": "/zh/frameworks/svelte",
+    "primaryTitle": "Svelte streaming Markdown renderer"
+  },
+  {
+    "query": "angular streaming markdown renderer",
+    "queryZh": "angular 流式 markdown 渲染",
+    "intent": "framework",
+    "target": "/frameworks/angular",
+    "targetZh": "/zh/frameworks/angular",
+    "primaryTitle": "Angular streaming Markdown renderer"
+  },
+  {
+    "query": "ai chat markdown renderer",
+    "queryZh": "ai 聊天 markdown 渲染器",
+    "intent": "use-case",
+    "target": "/use-cases/ai-chat-streaming",
+    "targetZh": "/zh/use-cases/ai-chat-streaming",
+    "primaryTitle": "AI chat streaming Markdown renderer"
+  },
+  {
+    "query": "sse markdown renderer",
+    "queryZh": "sse markdown 流式渲染",
+    "intent": "use-case",
+    "target": "/use-cases/sse-websocket",
+    "targetZh": "/zh/use-cases/sse-websocket",
+    "primaryTitle": "SSE Markdown renderer"
+  },
+  {
+    "query": "websocket markdown renderer",
+    "queryZh": "websocket markdown 渲染",
+    "intent": "use-case",
+    "target": "/use-cases/sse-websocket",
+    "targetZh": "/zh/use-cases/sse-websocket",
+    "primaryTitle": "WebSocket Markdown renderer"
+  },
+  {
+    "query": "mobile webview ai markdown renderer",
+    "queryZh": "移动端 WebView AI Markdown 渲染",
+    "intent": "use-case",
+    "target": "/use-cases/mobile-webview",
+    "targetZh": "/zh/use-cases/mobile-webview",
+    "primaryTitle": "Mobile WebView AI Markdown renderer"
+  },
+  {
+    "query": "vue-stream-markdown alternative",
+    "queryZh": "vue-stream-markdown 替代",
+    "intent": "comparison",
+    "target": "/compare/vue-stream-markdown",
+    "targetZhFallback": "/compare/vue-stream-markdown",
+    "primaryTitle": "markstream-vue vs vue-stream-markdown"
+  },
+  {
+    "query": "streamdown alternative",
+    "queryZh": "streamdown 替代",
+    "intent": "comparison",
+    "target": "/compare/streamdown",
+    "targetZh": "/zh/compare/streamdown",
+    "primaryTitle": "markstream-react vs Streamdown"
+  },
+  {
+    "query": "react streaming markdown alternative",
+    "queryZh": "react 流式 markdown 替代",
+    "intent": "comparison",
+    "target": "/compare/streamdown",
+    "targetZh": "/zh/compare/streamdown",
+    "primaryTitle": "React streaming Markdown alternatives"
+  },
+  {
+    "query": "react-markdown streaming alternative",
+    "queryZh": "react-markdown 流式替代",
+    "intent": "comparison",
+    "target": "/compare/react-markdown",
+    "targetAlternates": ["/guide/react-markdown-migration", "/compare/streamdown"],
+    "targetZh": "/zh/compare/react-markdown",
+    "targetZhAlternates": ["/zh/guide/react-markdown-migration", "/zh/compare/streamdown"],
+    "primaryTitle": "react-markdown streaming alternative"
+  },
+  {
+    "query": "react-markdown migration",
+    "queryZh": "react-markdown 迁移",
+    "intent": "migration",
+    "target": "/guide/react-markdown-migration",
+    "targetZh": "/zh/guide/react-markdown-migration",
+    "primaryTitle": "Migrate from react-markdown"
+  },
+  {
+    "query": "streaming mermaid markdown",
+    "queryZh": "流式 mermaid markdown",
+    "intent": "use-case",
+    "target": "/use-cases/streaming-mermaid-katex",
+    "targetZhFallback": "/use-cases/streaming-mermaid-katex",
+    "primaryTitle": "Streaming Mermaid and KaTeX Markdown"
+  },
+  {
+    "query": "streaming KaTeX markdown",
+    "queryZh": "流式 katex markdown",
+    "intent": "use-case",
+    "target": "/use-cases/streaming-mermaid-katex",
+    "targetZhFallback": "/use-cases/streaming-mermaid-katex",
+    "primaryTitle": "Streaming KaTeX Markdown"
+  },
+  {
+    "query": "long AI response markdown renderer",
+    "queryZh": "长 ai 回复 markdown 渲染",
+    "intent": "use-case",
+    "target": "/use-cases/long-ai-responses",
+    "targetZhFallback": "/use-cases/long-ai-responses",
+    "primaryTitle": "Long AI response Markdown renderer"
+  },
+  {
+    "query": "incomplete markdown renderer",
+    "queryZh": "未闭合 markdown 渲染器",
+    "intent": "use-case",
+    "target": "/use-cases/incomplete-markdown-renderer",
+    "targetZhFallback": "/use-cases/incomplete-markdown-renderer",
+    "primaryTitle": "Incomplete Markdown renderer"
+  },
+  {
+    "query": "marked markdown-it streaming alternative",
+    "queryZh": "markdown-it 流式替代",
+    "intent": "comparison",
+    "target": "/compare/marked-markdown-it",
+    "targetZh": "/zh/compare/marked-markdown-it",
+    "primaryTitle": "Markstream vs marked and markdown-it"
+  },
+  {
+    "query": "static vs streaming markdown renderer",
+    "queryZh": "静态 markdown 与流式 markdown 渲染器",
+    "intent": "comparison",
+    "target": "/compare/static-vs-streaming",
+    "targetZhFallback": "/compare/static-vs-streaming",
+    "primaryTitle": "Static vs streaming Markdown rendering"
+  }
+]

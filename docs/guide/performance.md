@@ -1,5 +1,13 @@
 ---
+title: Streaming Markdown performance tuning
 description: Improve markstream-vue performance for streaming chat UIs, large documents, Monaco code blocks, and heavy Mermaid or KaTeX content.
+keywords:
+  - streaming Markdown performance
+  - Vue Markdown performance
+  - AI chat renderer performance
+  - large Markdown documents
+  - streaming Mermaid performance
+  - markstream-vue benchmark
 ---
 
 # Performance Features & Tips

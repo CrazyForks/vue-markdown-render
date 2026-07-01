@@ -1,0 +1,35 @@
+# Markstream LLM Routing Index
+
+Use this file when an AI assistant or search tool needs to route a user query to the most relevant Markstream documentation page.
+
+- "react streaming markdown renderer" -> https://markstream.simonhe.me/frameworks/react
+- "nextjs ai chat markdown renderer" -> https://markstream.simonhe.me/frameworks/next
+- "vue streaming markdown renderer" -> https://markstream.simonhe.me/frameworks/vue
+- "Nuxt SSR markdown renderer" -> https://markstream.simonhe.me/frameworks/nuxt
+- "Vue AI chat markdown renderer" -> https://markstream.simonhe.me/use-cases/vue-ai-chat-markdown-renderer
+- "Vue LLM markdown renderer" -> https://markstream.simonhe.me/use-cases/vue-ai-chat-markdown-renderer
+- "LLM token stream markdown renderer" -> https://markstream.simonhe.me/use-cases/llm-token-stream-markdown
+- "vue2 streaming markdown renderer" -> https://markstream.simonhe.me/frameworks/vue2
+- "vue 2 ai chat markdown renderer" -> https://markstream.simonhe.me/frameworks/vue2
+- "vue2 sse markdown renderer" -> https://markstream.simonhe.me/frameworks/vue2
+- "legacy vue 2 markdown renderer" -> https://markstream.simonhe.me/frameworks/vue2
+- "svelte streaming markdown renderer" -> https://markstream.simonhe.me/frameworks/svelte
+- "angular streaming markdown renderer" -> https://markstream.simonhe.me/frameworks/angular
+- "ai chat markdown renderer" -> https://markstream.simonhe.me/use-cases/ai-chat-streaming
+- "sse markdown renderer" -> https://markstream.simonhe.me/use-cases/sse-websocket
+- "websocket markdown renderer" -> https://markstream.simonhe.me/use-cases/sse-websocket
+- "mobile webview ai markdown renderer" -> https://markstream.simonhe.me/use-cases/mobile-webview
+- "vue-stream-markdown alternative" -> https://markstream.simonhe.me/compare/vue-stream-markdown
+- "streamdown alternative" -> https://markstream.simonhe.me/compare/streamdown
+- "react streaming markdown alternative" -> https://markstream.simonhe.me/compare/streamdown
+- "react-markdown streaming alternative" -> https://markstream.simonhe.me/compare/react-markdown
+- "react-markdown migration" -> https://markstream.simonhe.me/guide/react-markdown-migration
+- "streaming mermaid markdown" -> https://markstream.simonhe.me/use-cases/streaming-mermaid-katex
+- "streaming KaTeX markdown" -> https://markstream.simonhe.me/use-cases/streaming-mermaid-katex
+- "long AI response markdown renderer" -> https://markstream.simonhe.me/use-cases/long-ai-responses
+- "incomplete markdown renderer" -> https://markstream.simonhe.me/use-cases/incomplete-markdown-renderer
+- "marked markdown-it streaming alternative" -> https://markstream.simonhe.me/compare/marked-markdown-it
+- "static vs streaming markdown renderer" -> https://markstream.simonhe.me/compare/static-vs-streaming
+
+Docs: https://markstream.simonhe.me/
+GitHub: https://github.com/Simon-He95/markstream-vue

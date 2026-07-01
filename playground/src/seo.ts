@@ -1,6 +1,7 @@
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 
 const PLAYGROUND_SITE_URL = 'https://markstream-vue.simonhe.me'
+const DOCS_SITE_URL = 'https://markstream.simonhe.me'
 const PLAYGROUND_OG_IMAGE_URL = `${PLAYGROUND_SITE_URL}/og-image.svg`
 const GITHUB_REPO_URL = 'https://github.com/Simon-He95/markstream-vue'
 const DEFAULT_TITLE = 'markstream-vue Playground | Streaming Markdown, Mermaid, and large-document demos'
@@ -11,6 +12,7 @@ interface RouteSeoConfig {
   title: string
   description: string
   robots?: string
+  canonicalUrl?: string
 }
 
 const routeSeoMap: Record<string, RouteSeoConfig> = {
@@ -22,22 +24,26 @@ const routeSeoMap: Record<string, RouteSeoConfig> = {
   '/markdown': {
     title: 'Markdown Block Playground | markstream-vue',
     description: 'Focus on MarkdownCodeBlockNode behavior with streaming content, KaTeX, Mermaid, custom tags, and code block theming.',
-    robots: 'index,follow',
+    robots: 'noindex,nofollow',
+    canonicalUrl: `${DOCS_SITE_URL}/guide/code-blocks`,
   },
   '/test': {
     title: 'Markdown Preview & Test Lab | markstream-vue Playground',
     description: 'Paste markdown for live preview, then compare framework and version behavior with streaming, Monaco, Mermaid, and KaTeX in one place.',
-    robots: 'index,follow',
+    robots: 'noindex,nofollow',
+    canonicalUrl: `${DOCS_SITE_URL}/guide/playground`,
   },
   '/cdn-peers': {
     title: 'CDN Peer Loading Demo | markstream-vue Playground',
     description: 'See how to run markstream-vue with KaTeX and Mermaid loaded from CDNs, including worker setup and runtime fallback handling.',
-    robots: 'index,follow',
+    robots: 'noindex,nofollow',
+    canonicalUrl: `${DOCS_SITE_URL}/guide/mermaid`,
   },
   '/mermaid-export-demo': {
     title: 'Mermaid Export Override Demo | markstream-vue Playground',
     description: 'Learn how to intercept Mermaid export events, replace the built-in renderer, and upload generated SVG output.',
-    robots: 'index,follow',
+    robots: 'noindex,nofollow',
+    canonicalUrl: `${DOCS_SITE_URL}/guide/mermaid-export-demo`,
   },
   '/diff-theme-regression': {
     title: 'Diff Theme Regression Check | markstream-vue Playground',
@@ -148,23 +154,11 @@ function createStructuredData(path: string, canonicalUrl: string, seo: RouteSeoC
       ],
     },
     {
-      '@type': 'SoftwareApplication',
+      '@type': 'WebPage',
+      '@id': `${canonicalUrl}#webpage`,
       'name': pageName,
-      'applicationCategory': 'DeveloperApplication',
-      'operatingSystem': 'Web',
       'url': canonicalUrl,
       'description': seo.description,
-      'image': PLAYGROUND_OG_IMAGE_URL,
-      'isAccessibleForFree': true,
-      'offers': {
-        '@type': 'Offer',
-        'price': '0',
-        'priceCurrency': 'USD',
-      },
-      'sameAs': [
-        GITHUB_REPO_URL,
-        `${PLAYGROUND_SITE_URL}/`,
-      ],
       'isPartOf': {
         '@id': `${PLAYGROUND_SITE_URL}/#website`,
       },
@@ -180,7 +174,7 @@ function createStructuredData(path: string, canonicalUrl: string, seo: RouteSeoC
 function applyRouteSeo(route: RouteLocationNormalizedLoaded) {
   const path = normalizeRoutePath(route.path)
   const seo = getRouteSeo(path)
-  const canonicalUrl = path === '/' ? `${PLAYGROUND_SITE_URL}/` : `${PLAYGROUND_SITE_URL}${path}`
+  const canonicalUrl = seo.canonicalUrl || (path === '/' ? `${PLAYGROUND_SITE_URL}/` : `${PLAYGROUND_SITE_URL}${path}`)
 
   document.title = seo.title
 

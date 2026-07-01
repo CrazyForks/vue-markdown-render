@@ -136,8 +136,12 @@ const englishGuideSidebar = [
     collapsed: true,
     items: [
       { text: 'Use Cases overview', link: '/use-cases/' },
+      { text: 'Vue AI Chat Markdown', link: '/use-cases/vue-ai-chat-markdown-renderer' },
+      { text: 'LLM Token Streams', link: '/use-cases/llm-token-stream-markdown' },
       { text: 'AI Chat Streaming Markdown', link: '/use-cases/ai-chat-streaming' },
       { text: 'SSE & WebSocket Markdown', link: '/use-cases/sse-websocket' },
+      { text: 'Incomplete Markdown', link: '/use-cases/incomplete-markdown-renderer' },
+      { text: 'Streaming Code Blocks', link: '/use-cases/streaming-code-blocks' },
       { text: 'Mobile WebView', link: '/use-cases/mobile-webview' },
       { text: 'Streaming Mermaid & KaTeX', link: '/use-cases/streaming-mermaid-katex' },
       { text: 'Long AI Responses', link: '/use-cases/long-ai-responses' },
@@ -181,6 +185,7 @@ const englishGuideSidebar = [
       { text: 'Migrating to 1.0', link: '/guide/migration-1-0' },
       { text: 'Why use it?', link: '/guide/why' },
       { text: 'Compared', link: '/guide/compared' },
+      { text: 'vs vue-stream-markdown', link: '/compare/vue-stream-markdown' },
       { text: 'vs react-markdown', link: '/compare/react-markdown' },
       { text: 'vs Streamdown', link: '/compare/streamdown' },
       { text: 'vs marked/markdown-it', link: '/compare/marked-markdown-it' },
@@ -307,7 +312,6 @@ const chineseGuideSidebar = [
 const siteHead = [
   ['link', { rel: 'icon', href: '/app-icon.svg', type: 'image/svg+xml' }],
   ['meta', { name: 'theme-color', content: '#111827' }],
-  ['meta', { name: 'robots', content: 'index,follow' }],
   ['meta', { property: 'og:type', content: 'website' }],
   ['meta', { property: 'og:site_name', content: 'Markstream' }],
   ['meta', { property: 'og:image', content: docsOgImageUrl }],
@@ -366,7 +370,13 @@ function normalizeDocsSeoPath(page: string) {
   return normalized || '/'
 }
 
-function createDocsSeoTitle(pageTitle?: string) {
+function createDocsSeoTitle(pageTitle?: string, path?: string) {
+  if (path === '/')
+    return 'Markstream: Streaming Markdown renderers for AI apps'
+
+  if (path === '/zh')
+    return pageTitle && pageTitle !== 'Markstream' ? pageTitle : 'Markstream：面向 AI 应用的流式 Markdown 渲染器'
+
   if (!pageTitle || pageTitle === 'Markstream')
     return 'Markstream'
 
@@ -428,9 +438,15 @@ const docsPrimaryLandingPaths = new Set([
   '/compare/react-markdown',
   '/compare/streamdown',
   '/compare/marked-markdown-it',
+  '/compare/vue-stream-markdown',
   '/compare/static-vs-streaming',
+  '/use-cases',
+  '/use-cases/vue-ai-chat-markdown-renderer',
+  '/use-cases/llm-token-stream-markdown',
   '/use-cases/ai-chat-streaming',
   '/use-cases/sse-websocket',
+  '/use-cases/incomplete-markdown-renderer',
+  '/use-cases/streaming-code-blocks',
   '/use-cases/mobile-webview',
   '/use-cases/streaming-mermaid-katex',
   '/use-cases/long-ai-responses',
@@ -458,7 +474,6 @@ const docsSecondaryLandingPaths = new Set([
   '/compare/react-markdown',
   '/compare/streamdown',
   '/compare/marked-markdown-it',
-  '/compare/vue-stream-markdown',
   '/compare/static-vs-streaming',
   '/guide/parser',
   '/guide/parser-api',
@@ -494,7 +509,7 @@ function getDocsSitemapHints(path: string) {
 
 function getDocsAlternatePaths(path: string) {
   const englishPath = path === '/zh' ? '/' : path.startsWith('/zh/') ? path.slice(3) || '/' : path
-  const chinesePath = path === '/' ? '/zh' : path.startsWith('/zh/') ? path : `/zh${path}`
+  const chinesePath = path === '/' || path === '/zh' ? '/zh' : path.startsWith('/zh/') ? path : `/zh${path}`
 
   const alternates = {
     english: availableDocsRoutePaths.has(englishPath) ? englishPath : null,
@@ -563,6 +578,29 @@ function getDocsPageKeywords(frontmatter: Record<string, any>, isChinese: boolea
   return keywords.length > 0 ? keywords : isChinese ? docsDefaultKeywordsZh : docsDefaultKeywords
 }
 
+function getDocsPageDateModified(frontmatter: Record<string, any>, pageLastUpdated: unknown) {
+  if (frontmatter.lastUpdated === false)
+    return null
+
+  const frontmatterDate = typeof frontmatter.lastVerified === 'string' && frontmatter.lastVerified.length > 0
+    ? frontmatter.lastVerified
+    : frontmatter.lastUpdated
+
+  if (typeof frontmatterDate === 'string' && frontmatterDate.length > 0)
+    return frontmatterDate
+
+  if (frontmatterDate instanceof Date)
+    return frontmatterDate.toISOString()
+
+  if (typeof frontmatter.gitLastUpdated === 'number' && frontmatter.gitLastUpdated > 0)
+    return new Date(frontmatter.gitLastUpdated).toISOString()
+
+  if (typeof pageLastUpdated === 'number' && pageLastUpdated > 0)
+    return new Date(pageLastUpdated).toISOString()
+
+  return null
+}
+
 function frontmatterFaqItems(value: unknown) {
   if (!Array.isArray(value))
     return []
@@ -583,7 +621,7 @@ function frontmatterFaqItems(value: unknown) {
     .filter((item): item is { question: string, answer: string } => Boolean(item))
 }
 
-function createDocsStructuredData(path: string, title: string, description: string, isChinese: boolean, frontmatter: Record<string, any>) {
+function createDocsStructuredData(path: string, title: string, description: string, isChinese: boolean, frontmatter: Record<string, any>, dateModified: string | null) {
   const graph: Record<string, any>[] = []
   const homePath = isChinese ? '/zh' : '/'
   const faqItems = frontmatterFaqItems(frontmatter.faq)
@@ -591,6 +629,26 @@ function createDocsStructuredData(path: string, title: string, description: stri
   const lastVerified = typeof frontmatter.lastVerified === 'string' && frontmatter.lastVerified.length > 0
     ? frontmatter.lastVerified
     : null
+
+  graph.push({
+    '@type': 'WebPage',
+    '@id': `${docsSiteUrl}${path === '/' ? '/' : path}#webpage`,
+    'name': title,
+    'headline': title,
+    'url': `${docsSiteUrl}${path === '/' ? '/' : path}`,
+    description,
+    keywords,
+    'inLanguage': isChinese ? 'zh-CN' : 'en-US',
+    ...(dateModified ? { dateModified } : {}),
+    'isPartOf': {
+      '@id': `${docsSiteUrl}${homePath === '/' ? '/' : homePath}#website`,
+    },
+    'publisher': {
+      '@type': 'Organization',
+      'name': 'Markstream',
+      'url': githubRepoUrl,
+    },
+  })
 
   if (path === homePath) {
     graph.push({
@@ -601,6 +659,7 @@ function createDocsStructuredData(path: string, title: string, description: stri
       'inLanguage': isChinese ? 'zh-CN' : 'en-US',
       description,
       keywords,
+      ...(dateModified ? { dateModified } : {}),
       'publisher': {
         '@type': 'Organization',
         'name': 'Markstream',
@@ -629,6 +688,7 @@ function createDocsStructuredData(path: string, title: string, description: stri
       'license': 'https://opensource.org/licenses/MIT',
       'programmingLanguage': programmingLanguage.length > 0 ? programmingLanguage : ['TypeScript'],
       'runtimePlatform': runtimePlatform,
+      ...(dateModified ? { dateModified } : {}),
       'sameAs': [`https://www.npmjs.com/package/${npmPackage}`],
     })
   }
@@ -643,7 +703,7 @@ function createDocsStructuredData(path: string, title: string, description: stri
       'mainEntityOfPage': `${docsSiteUrl}${path}`,
       'articleSection': isChinese ? 'Markdown 渲染器对比' : 'Markdown renderer comparison',
       'inLanguage': isChinese ? 'zh-CN' : 'en-US',
-      ...(lastVerified ? { dateModified: lastVerified } : {}),
+      ...((lastVerified || dateModified) ? { dateModified: lastVerified || dateModified } : {}),
       'author': {
         '@type': 'Organization',
         'name': 'Markstream',
@@ -697,6 +757,7 @@ export default defineConfig({
   description: docsDefaultDescription,
   base: process.env.VITEPRESS_BASE || '/',
   head: siteHead,
+  lastUpdated: true,
   markdown: {
     languages: ['ts', 'tsx', 'js', 'jsx', 'vue'],
     codeTransformers: [
@@ -813,14 +874,27 @@ export default defineConfig({
       },
     },
   },
+  transformPageData(pageData) {
+    if (typeof pageData.lastUpdated !== 'number' || pageData.lastUpdated <= 0)
+      return
+
+    return {
+      frontmatter: {
+        ...pageData.frontmatter,
+        gitLastUpdated: pageData.lastUpdated,
+      },
+    }
+  },
   transformHead(ctx) {
     const normalizedPath = normalizeDocsSeoPath(ctx.page)
     const canonicalUrl = `${docsSiteUrl}${normalizedPath}`
     const frontmatter = ctx.pageData.frontmatter ?? {}
     const isChinese = normalizedPath === '/zh' || normalizedPath.startsWith('/zh/')
     const description = frontmatter.description || ctx.description || docsDefaultDescription
-    const keywords = getDocsPageKeywords(frontmatter, isChinese)
-    const title = createDocsSeoTitle(frontmatter.title || ctx.pageData.title || ctx.title)
+    const pageTitle = frontmatter.title || ctx.pageData.title || ctx.title || 'Markstream'
+    const seoTitle = createDocsSeoTitle(pageTitle, normalizedPath)
+    const structuredDataTitle = normalizedPath === '/' || normalizedPath === '/zh' ? seoTitle : pageTitle
+    const dateModified = getDocsPageDateModified(frontmatter, ctx.pageData.lastUpdated)
     const shouldIndex = !ctx.pageData.isNotFound && !frontmatter.noindex && !isDocsSeoExcluded(normalizedPath)
     const alternates = getDocsAlternatePaths(normalizedPath)
     const alternateHead = []
@@ -843,10 +917,11 @@ export default defineConfig({
     const structuredData = shouldIndex
       ? createDocsStructuredData(
           normalizedPath,
-          frontmatter.title || ctx.pageData.title || ctx.title || 'Markstream',
+          structuredDataTitle,
           description,
           isChinese,
           frontmatter,
+          dateModified,
         )
       : []
 
@@ -854,16 +929,15 @@ export default defineConfig({
       ['link', { rel: 'canonical', href: canonicalUrl }],
       ...alternateHead,
       ['meta', { name: 'description', content: description }],
-      ['meta', { name: 'keywords', content: keywords.join(', ') }],
       ['meta', { name: 'robots', content: shouldIndex ? 'index,follow' : 'noindex,nofollow' }],
       ['meta', { property: 'og:locale', content: isChinese ? 'zh_CN' : 'en_US' }],
       ...alternateLocales
         .filter(locale => locale !== (isChinese ? 'zh_CN' : 'en_US'))
         .map(locale => ['meta', { property: 'og:locale:alternate', content: locale }]),
-      ['meta', { property: 'og:title', content: title }],
+      ['meta', { property: 'og:title', content: seoTitle }],
       ['meta', { property: 'og:description', content: description }],
       ['meta', { property: 'og:url', content: canonicalUrl }],
-      ['meta', { name: 'twitter:title', content: title }],
+      ['meta', { name: 'twitter:title', content: seoTitle }],
       ['meta', { name: 'twitter:description', content: description }],
       ...structuredData,
     ]

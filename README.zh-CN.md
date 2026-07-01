@@ -58,7 +58,7 @@ Vue 包：
 
 ## 稳定性
 
-`markstream-vue@1.0` 是最成熟的渲染器，稳定面包括：`MarkdownRender`、流式内容渲染、预解析节点渲染、安全 HTML 策略、可选 Mermaid / KaTeX / Monaco / D2 / Infographic 集成、虚拟滚动协调、CSS 导出、worker client 子路径以及 Vite / Nuxt / VitePress 的 SSR 导入。
+`markstream-vue` 已进入稳定的 1.x API 契约；当前 npm 包仍可能带 beta tag，用于发布门禁和跨框架家族同步。稳定面包括：`MarkdownRender`、流式内容渲染、预解析节点渲染、安全 HTML 策略、可选 Mermaid / KaTeX / Monaco / D2 / Infographic 集成、虚拟滚动协调、CSS 导出、worker client 子路径以及 Vite / Nuxt / VitePress 的 SSR 导入。
 
 跨框架渲染器（`markstream-react`、`markstream-svelte`、`markstream-angular`、`markstream-vue2`）已可用并积极开发中。请查看各包文档了解 API 成熟度、框架支持和已知限制。
 
