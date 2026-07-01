@@ -121,6 +121,23 @@ flowchart LR
 | Multi-framework project (React + Vue + Svelte) | markstream-react |
 | Need `content` and pre-parsed `nodes` paths | markstream-react |
 
+## Verification
+
+Last verified: 2026-06-12
+
+Sources checked:
+- [Streamdown docs](https://streamdown.ai)
+- Streamdown package/plugin documentation
+- Markstream React docs and package metadata
+- public examples and local smoke reproduction
+
+Tested scenarios:
+- incomplete code fences
+- partial tables
+- streaming Mermaid
+- long response > 50 KB
+- `final=true` settling behavior
+
 ## Sources and references
 
 - [Streamdown docs](https://streamdown.ai)

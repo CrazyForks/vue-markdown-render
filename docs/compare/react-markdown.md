@@ -116,6 +116,22 @@ However, for AI chat UIs and streaming surfaces, the streaming features replace 
 
 For a full migration guide, see [Migrate from react-markdown](/guide/react-markdown-migration).
 
+## Verification
+
+Last verified: 2026-06-12
+
+Sources checked:
+- [react-markdown README](https://github.com/remarkjs/react-markdown)
+- Markstream React docs and package metadata
+- public examples and local smoke reproduction
+
+Tested scenarios:
+- incomplete code fences
+- partial tables
+- partial KaTeX
+- long response > 50 KB
+- `final=true` settling behavior
+
 ## Sources and references
 
 - [react-markdown README](https://github.com/remarkjs/react-markdown)

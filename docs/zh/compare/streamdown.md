@@ -52,3 +52,20 @@ export function Message({ content, isDone }: { content: string, isDone: boolean 
 如果你的项目只在 React 内部使用，且最看重 drop-in 迁移体验，Streamdown 值得评估。如果你的文档、聊天、移动 WebView 或多框架包需要一致的 Markstream 行为，优先看 `markstream-react`。
 
 对比信息会随 Streamdown 插件生态变化而变化；做技术选型时应同时查看 Streamdown 官方文档和本项目当前版本说明。
+
+## 核验方式
+
+最后核验：2026-06-12
+
+核验来源：
+- Streamdown 官方文档
+- Streamdown 包和插件文档
+- Markstream React 文档和包元数据
+- 公开示例和本地 smoke reproduction
+
+测试场景：
+- 未闭合 code fence
+- 部分表格
+- 流式 Mermaid
+- 超过 50 KB 的长回答
+- `final=true` 收尾行为

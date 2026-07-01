@@ -13,6 +13,7 @@ const oldHostRedirect = `${oldHost}/*  ${newHost}/:splat  301`
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 
 const scannedExtensions = new Set(['.html', '.xml', '.txt'])
+const compareLastVerifiedMaxAgeDays = 120
 const primaryLandingPaths = [
   '/',
   '/frameworks',
@@ -138,6 +139,31 @@ function readFrontmatter(filePath) {
 
 function hasFrontmatterKey(frontmatter, key) {
   return new RegExp(`^${key}:`, 'm').test(frontmatter)
+}
+
+function frontmatterStringValue(frontmatter, key) {
+  const line = frontmatter.split('\n').find(line => line.startsWith(`${key}:`))
+  if (!line)
+    return null
+
+  let value = line.slice(key.length + 1).trim()
+  if (
+    value
+    && (value.startsWith('\'') || value.startsWith('"'))
+    && value.endsWith(value[0])
+  ) {
+    value = value.slice(1, -1)
+  }
+
+  return value || null
+}
+
+function daysSinceIsoDate(value) {
+  const timestamp = Date.parse(`${value}T00:00:00Z`)
+  if (!Number.isFinite(timestamp))
+    return null
+
+  return Math.floor((Date.now() - timestamp) / 86_400_000)
 }
 
 function decodeHtmlEntities(value) {
@@ -285,6 +311,22 @@ function validateArticleNode(node, relativePath, lastVerified) {
 
   if (lastVerified && node.dateModified !== lastVerified)
     failures.push(`${relativePath} is missing Article dateModified ${lastVerified}`)
+}
+
+function validateCompareFreshness(relativePath, lastVerified) {
+  if (!lastVerified) {
+    failures.push(`${relativePath} compare page is missing lastVerified`)
+    return
+  }
+
+  const ageDays = daysSinceIsoDate(lastVerified)
+  if (ageDays === null) {
+    failures.push(`${relativePath} has invalid lastVerified ${lastVerified}`)
+    return
+  }
+
+  if (ageDays > compareLastVerifiedMaxAgeDays)
+    failures.push(`${relativePath} lastVerified ${lastVerified} is older than ${compareLastVerifiedMaxAgeDays} days`)
 }
 
 function validateStructuredDataNodes(relativePath, nodes) {
@@ -456,15 +498,13 @@ if (isMain) {
         failures.push(`${relativePath} is missing ${marker} ${label}`)
     }
 
-    const lastVerifiedLine = frontmatter.split('\n').find(line => line.startsWith('lastVerified:'))
-    let lastVerified = lastVerifiedLine ? lastVerifiedLine.slice('lastVerified:'.length).trim() : null
-    if (
-      lastVerified
-      && (lastVerified.startsWith('\'') || lastVerified.startsWith('"'))
-      && lastVerified.endsWith(lastVerified[0])
-    ) {
-      lastVerified = lastVerified.slice(1, -1)
+    const lastVerified = frontmatterStringValue(frontmatter, 'lastVerified')
+    if (isArticle) {
+      validateCompareFreshness(relativePath, lastVerified)
+      if (!content.includes('Verification') && !content.includes('核验方式'))
+        failures.push(`${relativePath} compare page is missing visible Verification section`)
     }
+
     const softwareSourceCodeNode = findStructuredDataNode(structuredDataNodes, 'SoftwareSourceCode')
     if (softwareSourceCodeNode)
       validateSoftwareSourceCodeNode(softwareSourceCodeNode, relativePath)

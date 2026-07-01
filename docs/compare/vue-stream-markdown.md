@@ -143,6 +143,22 @@ Plan extra testing when your app uses custom renderers, syntax highlighting, SSR
 
 Do not use `markstream-vue` just because it has more features. If your Vue app only renders short, plain streaming Markdown and bundle size is the dominant requirement, a smaller renderer can be the right choice.
 
+## Verification
+
+Last verified: 2026-07-01
+
+Sources checked:
+- [vue-stream-markdown package](https://www.npmjs.com/package/vue-stream-markdown)
+- Markstream Vue docs and package metadata
+- public examples and local smoke reproduction
+
+Tested scenarios:
+- incomplete code fences
+- partial tables
+- streaming Mermaid and KaTeX
+- long response > 50 KB
+- Nuxt/VitePress SSR import behavior
+
 ## Sources and references
 
 - [vue-stream-markdown package](https://www.npmjs.com/package/vue-stream-markdown)

@@ -100,6 +100,23 @@ const nodes = parseMarkdownToStructure(content, md)
 
 This gives you the streaming parser without any framework dependency.
 
+## Verification
+
+Last verified: 2026-06-12
+
+Sources checked:
+- [marked docs](https://marked.js.org/)
+- [markdown-it docs](https://markdown-it.github.io/)
+- Markstream parser docs and package metadata
+- local smoke reproduction
+
+Tested scenarios:
+- complete static Markdown
+- incomplete code fences
+- partial tables
+- streaming Mermaid and KaTeX through Markstream renderers
+- long response > 50 KB
+
 ## Sources and references
 
 - [marked docs](https://marked.js.org/)

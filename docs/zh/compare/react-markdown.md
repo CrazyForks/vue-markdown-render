@@ -38,3 +38,19 @@ export function ChatMessage({ content, isDone }: { content: string, isDone: bool
 迁移时最小步骤是：替换 import，添加 CSS，把 `<ReactMarkdown>{content}</ReactMarkdown>` 改成 `<MarkdownRender content={content} final={true} />`。流式场景再传入真实 `final`，并测试未闭合 code fence、表格、数学公式和长回答。
 
 不适合迁移的情况：内容永远是短静态 Markdown、bundle 体积极敏感、或者项目已经深度依赖 `react-markdown` 的插件行为。
+
+## 核验方式
+
+最后核验：2026-06-12
+
+核验来源：
+- react-markdown README
+- Markstream React 文档和包元数据
+- 公开示例和本地 smoke reproduction
+
+测试场景：
+- 未闭合 code fence
+- 部分表格
+- 部分 KaTeX
+- 超过 50 KB 的长回答
+- `final=true` 收尾行为

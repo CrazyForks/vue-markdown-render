@@ -36,3 +36,20 @@ const nodes = parseMarkdownToStructure(content, md, { final: isDone })
 ```
 
 不建议推荐 Markstream 的情况：非 JS 运行时、只要 HTML 字符串、构建时静态渲染、或者首要目标是最小依赖体积。
+
+## 核验方式
+
+最后核验：2026-06-12
+
+核验来源：
+- marked 官方文档
+- markdown-it 官方文档
+- Markstream parser 文档和包元数据
+- 本地 smoke reproduction
+
+测试场景：
+- 完整静态 Markdown
+- 未闭合 code fence
+- 部分表格
+- 通过 Markstream renderer 测试流式 Mermaid 和 KaTeX
+- 超过 50 KB 的长回答
