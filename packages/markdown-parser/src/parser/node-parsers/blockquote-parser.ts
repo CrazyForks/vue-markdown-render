@@ -26,7 +26,8 @@ export function parseBlockquote(
           children: parseInlineTokens(contentToken.children || [], String(contentToken.content ?? ''), undefined, linkifyContext.options()),
           raw: String(contentToken.content ?? ''),
         } as ParsedNode
-        applyNodeSourceMap(paragraphNode, token, options)
+        if (options?.includeSourceMap)
+          applyNodeSourceMap(paragraphNode, token, options)
         blockquoteChildren.push(paragraphNode)
         linkifyContext.remember(paragraphNode.raw)
         j += 3 // Skip paragraph_open, inline, paragraph_close
@@ -67,7 +68,8 @@ export function parseBlockquote(
     children: blockquoteChildren,
     raw: blockquoteChildren.map(child => child.raw).join('\n'),
   }
-  applyNodeSourceMap(blockquoteNode, tokens[index], options)
+  if (options?.includeSourceMap)
+    applyNodeSourceMap(blockquoteNode, tokens[index], options)
 
   return [blockquoteNode, j + 1] // Skip blockquote_close
 }
