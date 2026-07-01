@@ -343,11 +343,13 @@ provide('markstreamCustomMarkdownIt', computed(() => rendererProps.customMarkdow
 const {
   smoothStreamingEnabled,
   renderContent,
+  requestedFinal,
   effectiveFinal,
 } = useSmoothStreamingBridge(rendererProps, {
   isClient,
   inheritedSmoothStreaming,
 })
+const stableLayoutInitiallyFinal = requestedFinal.value === true
 provide('markstreamSmoothStreaming', smoothStreamingEnabled)
 const contentStreamingTailActive = ref(false)
 let previousContentStreamValue = ''
@@ -958,6 +960,7 @@ const incrementalRenderingConfigured = computed(() => {
 })
 const stableLayoutDomEnabled = computed(() => {
   return !renderAsFragment.value
+    && stableLayoutInitiallyFinal
     && effectiveFinal.value === true
     && !virtualizationEnabled.value
     && !virtualScrollRequested.value
