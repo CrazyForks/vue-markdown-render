@@ -63,12 +63,24 @@ defineProps<{
 </template>
 ```
 
-For a lightweight Shiki renderer, install `stream-markdown` and override code blocks:
+For a lightweight Shiki renderer, install `stream-markdown` and scope the code block override to this chat surface:
 
 ```ts
 import { MarkdownCodeBlockNode, setCustomComponents } from 'markstream-vue'
 
-setCustomComponents({ code_block: MarkdownCodeBlockNode })
+setCustomComponents('chat-code-blocks', {
+  code_block: MarkdownCodeBlockNode,
+})
+```
+
+```vue
+<MarkdownRender
+  custom-id="chat-code-blocks"
+  mode="chat"
+  :content="content"
+  :final="isDone"
+  :fade="false"
+/>
 ```
 
 For mobile WebViews or conservative bundles, use plain `pre` rendering:

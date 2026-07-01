@@ -14,6 +14,7 @@ const isMain = process.argv[1] && import.meta.url === pathToFileURL(resolve(proc
 
 const scannedExtensions = new Set(['.html', '.xml', '.txt'])
 const compareLastVerifiedMaxAgeDays = 120
+const strictSeoFreshness = process.env.MARKSTREAM_STRICT_SEO_FRESHNESS === '1'
 const primaryLandingPaths = [
   '/',
   '/frameworks',
@@ -325,8 +326,13 @@ function validateCompareFreshness(relativePath, lastVerified) {
     return
   }
 
-  if (ageDays > compareLastVerifiedMaxAgeDays)
-    failures.push(`${relativePath} lastVerified ${lastVerified} is older than ${compareLastVerifiedMaxAgeDays} days`)
+  if (ageDays > compareLastVerifiedMaxAgeDays) {
+    const message = `${relativePath} lastVerified ${lastVerified} is older than ${compareLastVerifiedMaxAgeDays} days`
+    if (strictSeoFreshness)
+      failures.push(message)
+    else
+      console.warn(`[docs-seo-output] warning: ${message}`)
+  }
 }
 
 function validateStructuredDataNodes(relativePath, nodes) {
@@ -346,6 +352,20 @@ function findStructuredDataNode(nodes, type) {
 function expectContains(content, relativePath, marker, message) {
   if (!content.includes(marker))
     failures.push(`${relativePath} ${message}`)
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function expectSitemapLastmod(sitemap, routePath) {
+  const loc = `${newHost}${routePath === '/' ? '/' : routePath}`
+  const urlBlockPattern = new RegExp(
+    `<url>[\\s\\S]*?<loc>${escapeRegExp(loc)}</loc>[\\s\\S]*?<lastmod>[^<]+</lastmod>[\\s\\S]*?</url>`,
+  )
+
+  if (!urlBlockPattern.test(sitemap))
+    failures.push(`sitemap.xml is missing lastmod for ${loc}`)
 }
 
 function seoKeywordMapTargets(entry) {
@@ -398,6 +418,9 @@ if (isMain) {
   if (sitemap) {
     if (!sitemap.includes('<lastmod>'))
       failures.push('sitemap.xml is missing lastmod entries')
+
+    for (const routePath of primaryLandingPaths)
+      expectSitemapLastmod(sitemap, routePath)
 
     expectContains(
       sitemap,

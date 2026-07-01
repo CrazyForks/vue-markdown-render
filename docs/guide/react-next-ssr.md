@@ -15,7 +15,7 @@ faq:
     answer: Yes. Live SSE and WebSocket streams should use the root markstream-react package inside a Client Component.
 ---
 
-# React Next SSR
+# Next.js SSR Markdown renderer with markstream-react
 
 `markstream-react` now exposes two explicit SSR entrypoints for Next.js:
 

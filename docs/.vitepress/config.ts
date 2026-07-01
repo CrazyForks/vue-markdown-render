@@ -312,7 +312,6 @@ const chineseGuideSidebar = [
 const siteHead = [
   ['link', { rel: 'icon', href: '/app-icon.svg', type: 'image/svg+xml' }],
   ['meta', { name: 'theme-color', content: '#111827' }],
-  ['meta', { name: 'robots', content: 'index,follow' }],
   ['meta', { property: 'og:type', content: 'website' }],
   ['meta', { property: 'og:site_name', content: 'Markstream' }],
   ['meta', { property: 'og:image', content: docsOgImageUrl }],
