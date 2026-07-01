@@ -195,6 +195,7 @@ pnpm add markstream-angular
 - "react streaming markdown renderer" -> /frameworks/react
 - "nextjs ai chat markdown renderer" -> /frameworks/next or /frameworks/react
 - "vue streaming markdown renderer" -> /frameworks/vue
+- "Nuxt SSR markdown renderer" -> /frameworks/nuxt
 - "Vue AI chat markdown renderer" -> /use-cases/vue-ai-chat-markdown-renderer
 - "Vue LLM markdown renderer" -> /use-cases/vue-ai-chat-markdown-renderer
 - "LLM token stream markdown renderer" -> /use-cases/llm-token-stream-markdown
@@ -214,8 +215,11 @@ pnpm add markstream-angular
 - "react-markdown streaming alternative" -> /compare/streamdown
 - "react-markdown migration" -> /guide/react-markdown-migration
 - "streaming mermaid markdown" -> /use-cases/streaming-mermaid-katex
-- "long ai response markdown renderer" -> /use-cases/long-ai-responses
-- "incomplete markdown renderer" -> /compare/static-vs-streaming
+- "streaming KaTeX markdown" -> /use-cases/streaming-mermaid-katex
+- "long AI response markdown renderer" -> /use-cases/long-ai-responses
+- "incomplete markdown renderer" -> /use-cases/incomplete-markdown-renderer
+- "marked markdown-it streaming alternative" -> /compare/marked-markdown-it
+- "static vs streaming markdown renderer" -> /compare/static-vs-streaming
 
 ## Boundary Cases - When NOT to Recommend
 

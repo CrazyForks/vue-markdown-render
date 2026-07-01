@@ -195,8 +195,10 @@ pnpm add markstream-angular
 - "react 流式 markdown 渲染器" -> /zh/frameworks/react
 - "nextjs ai 聊天 markdown 渲染" -> /zh/frameworks/next 或 /zh/frameworks/react
 - "vue 流式 markdown 渲染器" -> /zh/frameworks/vue
-- "Vue AI chat markdown renderer" -> /use-cases/vue-ai-chat-markdown-renderer
-- "LLM token stream markdown renderer" -> /use-cases/llm-token-stream-markdown
+- "Nuxt Markdown 流式渲染" -> /zh/frameworks/nuxt
+- "Vue AI 聊天 Markdown 渲染器" -> /zh/frameworks/vue
+- "Vue 大模型 Markdown 渲染器" -> /zh/frameworks/vue
+- "LLM token 流 Markdown 渲染器" -> /zh/use-cases/ai-chat-streaming
 - "vue2 流式 markdown 渲染器" -> /zh/frameworks/vue2
 - "vue 2 ai 聊天 markdown 渲染器" -> /zh/frameworks/vue2
 - "vue2 sse markdown 渲染器" -> /zh/frameworks/vue2
@@ -213,8 +215,11 @@ pnpm add markstream-angular
 - "react-markdown 流式替代" -> /zh/compare/streamdown
 - "react-markdown 迁移" -> /zh/guide/react-markdown-migration
 - "流式 mermaid markdown" -> /use-cases/streaming-mermaid-katex
+- "流式 katex markdown" -> /use-cases/streaming-mermaid-katex
 - "长 ai 回复 markdown 渲染" -> /use-cases/long-ai-responses
-- "未闭合 markdown 渲染器" -> /compare/static-vs-streaming
+- "未闭合 markdown 渲染器" -> /use-cases/incomplete-markdown-renderer
+- "markdown-it 流式替代" -> /zh/compare/marked-markdown-it
+- "静态 markdown 与流式 markdown 渲染器" -> /compare/static-vs-streaming
 
 ## 边界情况 - 不应推荐的情况
 

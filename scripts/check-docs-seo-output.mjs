@@ -98,6 +98,10 @@ function readDistFile(relativePath) {
   return readFileSync(filePath, 'utf8')
 }
 
+function readRepoJson(relativePath) {
+  return JSON.parse(readFileSync(resolve(root, relativePath), 'utf8'))
+}
+
 function markdownRoutePath(filePath) {
   let route = `/${docsRelative(filePath).replace(/\.md$/, '')}`
   route = route.replace(/\/index$/, '')
@@ -302,6 +306,15 @@ function expectContains(content, relativePath, marker, message) {
     failures.push(`${relativePath} ${message}`)
 }
 
+function seoKeywordMapTargets(entry) {
+  return [
+    entry.target,
+    ...(Array.isArray(entry.targetAlternates) ? entry.targetAlternates : []),
+    entry.targetZh,
+    ...(Array.isArray(entry.targetZhAlternates) ? entry.targetZhAlternates : []),
+  ].filter(Boolean)
+}
+
 if (isMain) {
   if (!existsSync(distDir)) {
     console.error(`[docs-seo-output] ${relative(root, distDir)} does not exist. Run docs:build first.`)
@@ -360,6 +373,28 @@ if (isMain) {
       '/compare/vue-stream-markdown',
       'should link to vue-stream-markdown comparison page',
     )
+  }
+
+  const seoKeywordMap = readRepoJson('docs/seo-keyword-map.json')
+  if (!Array.isArray(seoKeywordMap) || seoKeywordMap.length === 0) {
+    failures.push('docs/seo-keyword-map.json must contain keyword mappings')
+  }
+  else {
+    for (const [index, entry] of seoKeywordMap.entries()) {
+      if (!hasNonEmptyString(entry.query))
+        failures.push(`docs/seo-keyword-map.json entry ${index} is missing query`)
+
+      for (const target of seoKeywordMapTargets(entry)) {
+        if (typeof target !== 'string' || !target.startsWith('/')) {
+          failures.push(`docs/seo-keyword-map.json entry ${index} has invalid target ${target}`)
+          continue
+        }
+
+        const relativePath = htmlFileForRoute(target)
+        if (!existsSync(resolve(distDir, relativePath)))
+          failures.push(`docs/seo-keyword-map.json entry ${index} target ${target} is missing built file ${relativePath}`)
+      }
+    }
   }
 
   const redirects = readDistFile('_redirects')

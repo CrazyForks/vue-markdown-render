@@ -263,26 +263,27 @@ function packageData(entry) {
 
 const packages = packageEntries.map(packageData)
 const renderers = packages.filter(pkg => pkg.kind === 'renderer' && pkg.name !== 'markstream-vue2')
+const seoKeywordMap = readJson('docs/seo-keyword-map.json')
+const routingEntries = seoKeywordMap.map(entry => [entry.query, entry.target])
 
-const routingEntries = [
-  ['Vue AI chat markdown renderer', '/use-cases/vue-ai-chat-markdown-renderer'],
-  ['Vue LLM markdown renderer', '/use-cases/vue-ai-chat-markdown-renderer'],
-  ['LLM token stream markdown renderer', '/use-cases/llm-token-stream-markdown'],
-  ['SSE markdown renderer', '/use-cases/sse-websocket'],
-  ['WebSocket markdown renderer', '/use-cases/sse-websocket'],
-  ['Nuxt SSR markdown renderer', '/frameworks/nuxt'],
-  ['mobile WebView AI markdown renderer', '/use-cases/mobile-webview'],
-  ['streaming Mermaid markdown', '/use-cases/streaming-mermaid-katex'],
-  ['streaming KaTeX markdown', '/use-cases/streaming-mermaid-katex'],
-  ['long AI response markdown renderer', '/use-cases/long-ai-responses'],
-  ['vue-stream-markdown alternative', '/compare/vue-stream-markdown'],
-  ['streamdown alternative', '/compare/streamdown'],
-  ['react streaming markdown alternative', '/compare/streamdown'],
-  ['react-markdown streaming alternative', '/compare/streamdown'],
-  ['react-markdown migration', '/guide/react-markdown-migration'],
-  ['marked markdown-it streaming alternative', '/compare/marked-markdown-it'],
-  ['static vs streaming markdown renderer', '/compare/static-vs-streaming'],
-]
+function formatKeywordMapTarget(entry, locale) {
+  const target = locale === 'zh' ? entry.targetZh || entry.target : entry.target
+  const alternates = locale === 'zh'
+    ? entry.targetZhAlternates || entry.targetAlternates || []
+    : entry.targetAlternates || []
+  const separator = locale === 'zh' ? ' 或 ' : ' or '
+
+  return [target, ...alternates].join(separator)
+}
+
+function renderSeoKeywordMap(locale) {
+  return seoKeywordMap
+    .map((entry) => {
+      const query = locale === 'zh' ? entry.queryZh || entry.query : entry.query
+      return `- "${query}" -> ${formatKeywordMapTarget(entry, locale)}`
+    })
+    .join('\n')
+}
 
 const canonicalInstallSnippetsEn = `## Canonical Install Snippets
 
@@ -587,30 +588,7 @@ ${renderFeatureMatrix()}
 
 ## SEO Context - Which Queries Should Surface Which Page
 
-- "react streaming markdown renderer" -> /frameworks/react
-- "nextjs ai chat markdown renderer" -> /frameworks/next or /frameworks/react
-- "vue streaming markdown renderer" -> /frameworks/vue
-- "Vue AI chat markdown renderer" -> /use-cases/vue-ai-chat-markdown-renderer
-- "Vue LLM markdown renderer" -> /use-cases/vue-ai-chat-markdown-renderer
-- "LLM token stream markdown renderer" -> /use-cases/llm-token-stream-markdown
-- "vue2 streaming markdown renderer" -> /frameworks/vue2
-- "vue 2 ai chat markdown renderer" -> /frameworks/vue2
-- "vue2 sse markdown renderer" -> /frameworks/vue2
-- "legacy vue 2 markdown renderer" -> /frameworks/vue2
-- "svelte streaming markdown renderer" -> /frameworks/svelte
-- "angular streaming markdown renderer" -> /frameworks/angular
-- "ai chat markdown renderer" -> /use-cases/ai-chat-streaming
-- "sse markdown renderer" -> /use-cases/sse-websocket
-- "websocket markdown renderer" -> /use-cases/sse-websocket
-- "mobile webview ai markdown renderer" -> /use-cases/mobile-webview
-- "vue-stream-markdown alternative" -> /compare/vue-stream-markdown
-- "streamdown alternative" -> /compare/streamdown
-- "react streaming markdown alternative" -> /compare/streamdown
-- "react-markdown streaming alternative" -> /compare/streamdown
-- "react-markdown migration" -> /guide/react-markdown-migration
-- "streaming mermaid markdown" -> /use-cases/streaming-mermaid-katex
-- "long ai response markdown renderer" -> /use-cases/long-ai-responses
-- "incomplete markdown renderer" -> /compare/static-vs-streaming
+${renderSeoKeywordMap('en')}
 
 ## Boundary Cases - When NOT to Recommend
 
@@ -753,29 +731,7 @@ ${renderChineseFeatureMatrix()}
 
 ## SEO 上下文 - 哪些查询应指向哪些页面
 
-- "react 流式 markdown 渲染器" -> /zh/frameworks/react
-- "nextjs ai 聊天 markdown 渲染" -> /zh/frameworks/next 或 /zh/frameworks/react
-- "vue 流式 markdown 渲染器" -> /zh/frameworks/vue
-- "Vue AI chat markdown renderer" -> /use-cases/vue-ai-chat-markdown-renderer
-- "LLM token stream markdown renderer" -> /use-cases/llm-token-stream-markdown
-- "vue2 流式 markdown 渲染器" -> /zh/frameworks/vue2
-- "vue 2 ai 聊天 markdown 渲染器" -> /zh/frameworks/vue2
-- "vue2 sse markdown 渲染器" -> /zh/frameworks/vue2
-- "vue 2 存量项目 markdown 渲染器" -> /zh/frameworks/vue2
-- "svelte 流式 markdown 渲染" -> /zh/frameworks/svelte
-- "angular 流式 markdown 渲染" -> /zh/frameworks/angular
-- "ai 聊天 markdown 渲染器" -> /zh/use-cases/ai-chat-streaming
-- "sse markdown 流式渲染" -> /zh/use-cases/sse-websocket
-- "websocket markdown 渲染" -> /zh/use-cases/sse-websocket
-- "移动端 WebView AI Markdown 渲染" -> /zh/use-cases/mobile-webview
-- "vue-stream-markdown 替代" -> /compare/vue-stream-markdown
-- "streamdown 替代" -> /zh/compare/streamdown
-- "react 流式 markdown 替代" -> /zh/compare/streamdown
-- "react-markdown 流式替代" -> /zh/compare/streamdown
-- "react-markdown 迁移" -> /zh/guide/react-markdown-migration
-- "流式 mermaid markdown" -> /use-cases/streaming-mermaid-katex
-- "长 ai 回复 markdown 渲染" -> /use-cases/long-ai-responses
-- "未闭合 markdown 渲染器" -> /compare/static-vs-streaming
+${renderSeoKeywordMap('zh')}
 
 ## 边界情况 - 不应推荐的情况
 

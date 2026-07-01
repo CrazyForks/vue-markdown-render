@@ -1,10 +1,8 @@
-# markstream-vue / Markstream
+# Markstream — Streaming Markdown renderers for AI chat
 
-Vue, Nuxt, React, Svelte, and Angular streaming Markdown renderers for AI chat and LLM token streams.
+`markstream-vue` is a Vue 3 / Nuxt / VitePress streaming Markdown renderer for AI chat, LLM token streams, SSE/WebSocket output, incomplete Markdown, long AI responses, Mermaid, KaTeX, and streaming code blocks.
 
-Markstream is a streaming Markdown renderer family for AI chat, LLM token streams, SSE/WebSocket output, and long AI responses.
-
-Use `markstream-vue` for Vue 3, Nuxt, and VitePress; use the sibling packages for React, Svelte, Angular, and Vue 2. The renderer is built for incomplete Markdown states, progressive Mermaid, KaTeX, streaming code blocks, mobile WebView, and safe component rendering.
+Markstream is the renderer family for Vue, React, Svelte, Angular, and Vue 2. Use sibling packages for non-Vue frameworks; use `markstream-vue` when your Vue/Nuxt/VitePress UI needs stable partial Markdown states, mobile WebView rendering, safe component rendering, and progressive heavy blocks.
 
 [![中文版](https://img.shields.io/badge/docs-中文文档-blue)](README.zh-CN.md)
 [![Docs](https://img.shields.io/badge/docs-vitepress-blue)](https://markstream.simonhe.me/)
@@ -31,6 +29,28 @@ Other packages:
 [![Security](https://img.shields.io/badge/security-policy-8A2BE2)](./SECURITY.md)
 [![CI](https://github.com/Simon-He95/markstream-vue/actions/workflows/ci.yml/badge.svg)](https://github.com/Simon-He95/markstream-vue/actions/workflows/ci.yml)
 [![License](https://img.shields.io/npm/l/markstream-vue)](./license)
+
+## Install markstream-vue
+
+```bash
+pnpm add markstream-vue
+```
+
+```vue
+<script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
+import 'markstream-vue/index.css'
+
+defineProps<{
+  content: string
+  isDone: boolean
+}>()
+</script>
+
+<template>
+  <MarkdownRender mode="chat" :content="content" :final="isDone" />
+</template>
+```
 
 ## Why not marked / markdown-it / react-markdown?
 
