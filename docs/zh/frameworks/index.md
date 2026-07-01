@@ -41,6 +41,8 @@ Markstream 是一组面向 AI 应用的流式 Markdown 渲染器，覆盖 Vue、
 
 ## 包成熟度
 
+`markstream-vue` 已进入稳定的 1.x API 契约；当前 npm 版本仍可能带 beta tag，用于发布门禁和跨框架家族同步。
+
 | 包 | 成熟度 | 说明 |
 | --- | --- | --- |
 | `markstream-vue` | stable | 主线渲染器，文档最完整 |

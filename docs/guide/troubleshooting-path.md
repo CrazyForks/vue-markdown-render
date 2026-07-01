@@ -1,5 +1,13 @@
 ---
+title: Troubleshoot markstream-vue by symptom
 description: Diagnose markstream-vue problems by symptom across CSS order, missing peers, SSR boundaries, trusted tags, and streaming performance.
+keywords:
+  - markstream-vue troubleshooting
+  - Vue Markdown CSS issues
+  - Markdown SSR troubleshooting
+  - missing Mermaid KaTeX Monaco peers
+  - AI chat streaming performance
+  - VitePress Markdown troubleshooting
 ---
 
 # Troubleshooting by Symptom

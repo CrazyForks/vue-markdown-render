@@ -1,5 +1,7 @@
 ---
 layout: home
+title: 'Markstream: Streaming Markdown renderers for AI apps'
+titleTemplate: false
 description: Streaming Markdown renderers for AI applications across Vue, React, Svelte, Angular, Nuxt, and Next.js. Render LLM token streams, SSE/WebSocket output, AI chat messages, and long documents with progressive Mermaid, KaTeX, and streaming code blocks.
 keywords:
   - streaming Markdown renderer

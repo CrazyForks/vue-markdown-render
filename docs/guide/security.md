@@ -1,3 +1,16 @@
+---
+title: Safe Markdown rendering for AI output
+description: Render untrusted AI Markdown with markstream-vue safe HTML policy, unsafe URL filtering, sanitized Mermaid SVG, custom component boundaries, and escape/trusted mode guidance.
+keywords:
+  - safe Markdown renderer
+  - AI output Markdown security
+  - Vue Markdown sanitizer
+  - htmlPolicy safe
+  - sanitized Mermaid SVG
+  - unsafe Markdown links
+  - markstream-vue security
+---
+
 # Security
 
 `MarkdownRender` defaults to `htmlPolicy="safe"`. This is the right default for AI output and other content that should allow a small, sanitized HTML subset.

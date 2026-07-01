@@ -1,5 +1,13 @@
 ---
+title: AI chat streaming Markdown with markstream-vue
 description: Build AI chat and streaming Markdown UIs with content, built-in smooth streaming, performance guidance, trusted custom tags, and SSR-safe setup.
+keywords:
+  - AI chat Markdown renderer
+  - Vue AI chat streaming
+  - SSE Markdown renderer
+  - LLM token stream Markdown
+  - smooth streaming Markdown
+  - markstream-vue chat
 ---
 
 # AI Chat & Streaming

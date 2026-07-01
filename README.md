@@ -86,7 +86,7 @@ Start with the [framework overview](https://markstream.simonhe.me/frameworks) if
 
 ## Stability
 
-`markstream-vue@1.0` is the most mature renderer with a stable surface: `MarkdownRender`, streaming content rendering, pre-parsed node rendering, the safe HTML policy, optional Mermaid / KaTeX / Monaco / D2 / Infographic integrations, virtual-scroll coordination, CSS exports, worker client subpaths, and SSR imports for Vite / Nuxt / VitePress.
+`markstream-vue` has a stable 1.x API contract. The current npm package may still use beta tags while the 1.0 release gate and cross-framework package family are finalized. The stable surface includes `MarkdownRender`, streaming content rendering, pre-parsed node rendering, the safe HTML policy, optional Mermaid / KaTeX / Monaco / D2 / Infographic integrations, virtual-scroll coordination, CSS exports, worker client subpaths, and SSR imports for Vite / Nuxt / VitePress.
 
 Cross-framework renderers (`markstream-react`, `markstream-svelte`, `markstream-angular`, `markstream-vue2`) are available and actively developed. Check each package page for API maturity, framework support, and known limitations.
 

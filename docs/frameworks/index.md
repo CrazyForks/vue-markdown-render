@@ -40,6 +40,8 @@ Streaming Markdown renderers for AI apps across Vue, React, Svelte, Angular, Nux
 
 ## Package maturity
 
+`markstream-vue` has a stable 1.x API contract. Current npm versions may still carry beta tags while the 1.0 release gate and cross-framework package family are finalized.
+
 | Package | Maturity | Notes |
 | --- | --- | --- |
 | `markstream-vue` | stable | Main renderer, most documented path |

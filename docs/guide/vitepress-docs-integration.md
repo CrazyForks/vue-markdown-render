@@ -1,5 +1,13 @@
 ---
+title: VitePress Markdown renderer integration
 description: Integrate markstream-vue into VitePress and docs sites with the content input path, enhanceApp registration, trusted custom tags, and safe CSS ordering.
+keywords:
+  - VitePress Markdown renderer
+  - VitePress markstream-vue
+  - docs site Markdown renderer
+  - Vue docs Markdown
+  - trusted custom tags VitePress
+  - VitePress AI chat Markdown
 ---
 
 # Docs Site & VitePress

@@ -371,7 +371,10 @@ function normalizeDocsSeoPath(page: string) {
   return normalized || '/'
 }
 
-function createDocsSeoTitle(pageTitle?: string) {
+function createDocsSeoTitle(pageTitle?: string, path?: string) {
+  if (path === '/')
+    return 'Markstream: Streaming Markdown renderers for AI apps'
+
   if (!pageTitle || pageTitle === 'Markstream')
     return 'Markstream'
 
@@ -872,7 +875,7 @@ export default defineConfig({
     const frontmatter = ctx.pageData.frontmatter ?? {}
     const isChinese = normalizedPath === '/zh' || normalizedPath.startsWith('/zh/')
     const description = frontmatter.description || ctx.description || docsDefaultDescription
-    const title = createDocsSeoTitle(frontmatter.title || ctx.pageData.title || ctx.title)
+    const title = createDocsSeoTitle(frontmatter.title || ctx.pageData.title || ctx.title, normalizedPath)
     const dateModified = getDocsPageDateModified(frontmatter, ctx.pageData.lastUpdated)
     const shouldIndex = !ctx.pageData.isNotFound && !frontmatter.noindex && !isDocsSeoExcluded(normalizedPath)
     const alternates = getDocsAlternatePaths(normalizedPath)
