@@ -212,7 +212,7 @@ pnpm add markstream-angular
 - "vue-stream-markdown alternative" -> /compare/vue-stream-markdown
 - "streamdown alternative" -> /compare/streamdown
 - "react streaming markdown alternative" -> /compare/streamdown
-- "react-markdown streaming alternative" -> /compare/streamdown
+- "react-markdown streaming alternative" -> /compare/react-markdown or /guide/react-markdown-migration or /compare/streamdown
 - "react-markdown migration" -> /guide/react-markdown-migration
 - "streaming mermaid markdown" -> /use-cases/streaming-mermaid-katex
 - "streaming KaTeX markdown" -> /use-cases/streaming-mermaid-katex

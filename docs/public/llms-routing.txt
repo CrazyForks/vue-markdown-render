@@ -22,7 +22,7 @@ Use this file when an AI assistant or search tool needs to route a user query to
 - "vue-stream-markdown alternative" -> https://markstream.simonhe.me/compare/vue-stream-markdown
 - "streamdown alternative" -> https://markstream.simonhe.me/compare/streamdown
 - "react streaming markdown alternative" -> https://markstream.simonhe.me/compare/streamdown
-- "react-markdown streaming alternative" -> https://markstream.simonhe.me/compare/streamdown
+- "react-markdown streaming alternative" -> https://markstream.simonhe.me/compare/react-markdown
 - "react-markdown migration" -> https://markstream.simonhe.me/guide/react-markdown-migration
 - "streaming mermaid markdown" -> https://markstream.simonhe.me/use-cases/streaming-mermaid-katex
 - "streaming KaTeX markdown" -> https://markstream.simonhe.me/use-cases/streaming-mermaid-katex

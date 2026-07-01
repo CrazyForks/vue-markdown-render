@@ -212,7 +212,7 @@ pnpm add markstream-angular
 - "vue-stream-markdown 替代" -> /compare/vue-stream-markdown（英文页面 fallback）
 - "streamdown 替代" -> /zh/compare/streamdown
 - "react 流式 markdown 替代" -> /zh/compare/streamdown
-- "react-markdown 流式替代" -> /zh/compare/streamdown
+- "react-markdown 流式替代" -> /zh/compare/react-markdown 或 /zh/guide/react-markdown-migration 或 /zh/compare/streamdown
 - "react-markdown 迁移" -> /zh/guide/react-markdown-migration
 - "流式 mermaid markdown" -> /use-cases/streaming-mermaid-katex（英文页面 fallback）
 - "流式 katex markdown" -> /use-cases/streaming-mermaid-katex（英文页面 fallback）

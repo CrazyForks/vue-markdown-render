@@ -9,6 +9,7 @@ const stars = ref<number | null>(null)
 const isLoading = ref(true)
 
 watchEffect(() => {
+  // Keep lastUpdated available to VitePress build hooks, but hide the default theme footer.
   if (page.value.lastUpdated)
     page.value.lastUpdated = 0
 })

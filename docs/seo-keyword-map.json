@@ -165,8 +165,10 @@
     "query": "react-markdown streaming alternative",
     "queryZh": "react-markdown 流式替代",
     "intent": "comparison",
-    "target": "/compare/streamdown",
-    "targetZh": "/zh/compare/streamdown",
+    "target": "/compare/react-markdown",
+    "targetAlternates": ["/guide/react-markdown-migration", "/compare/streamdown"],
+    "targetZh": "/zh/compare/react-markdown",
+    "targetZhAlternates": ["/zh/guide/react-markdown-migration", "/zh/compare/streamdown"],
     "primaryTitle": "react-markdown streaming alternative"
   },
   {
