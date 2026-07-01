@@ -374,6 +374,9 @@ function createDocsSeoTitle(pageTitle?: string, path?: string) {
   if (path === '/')
     return 'Markstream: Streaming Markdown renderers for AI apps'
 
+  if (path === '/zh')
+    return pageTitle && pageTitle !== 'Markstream' ? pageTitle : 'Markstream：面向 AI 应用的流式 Markdown 渲染器'
+
   if (!pageTitle || pageTitle === 'Markstream')
     return 'Markstream'
 
@@ -506,7 +509,7 @@ function getDocsSitemapHints(path: string) {
 
 function getDocsAlternatePaths(path: string) {
   const englishPath = path === '/zh' ? '/' : path.startsWith('/zh/') ? path.slice(3) || '/' : path
-  const chinesePath = path === '/' ? '/zh' : path.startsWith('/zh/') ? path : `/zh${path}`
+  const chinesePath = path === '/' || path === '/zh' ? '/zh' : path.startsWith('/zh/') ? path : `/zh${path}`
 
   const alternates = {
     english: availableDocsRoutePaths.has(englishPath) ? englishPath : null,
@@ -888,7 +891,9 @@ export default defineConfig({
     const frontmatter = ctx.pageData.frontmatter ?? {}
     const isChinese = normalizedPath === '/zh' || normalizedPath.startsWith('/zh/')
     const description = frontmatter.description || ctx.description || docsDefaultDescription
-    const title = createDocsSeoTitle(frontmatter.title || ctx.pageData.title || ctx.title, normalizedPath)
+    const pageTitle = frontmatter.title || ctx.pageData.title || ctx.title || 'Markstream'
+    const seoTitle = createDocsSeoTitle(pageTitle, normalizedPath)
+    const structuredDataTitle = normalizedPath === '/' || normalizedPath === '/zh' ? seoTitle : pageTitle
     const dateModified = getDocsPageDateModified(frontmatter, ctx.pageData.lastUpdated)
     const shouldIndex = !ctx.pageData.isNotFound && !frontmatter.noindex && !isDocsSeoExcluded(normalizedPath)
     const alternates = getDocsAlternatePaths(normalizedPath)
@@ -912,7 +917,7 @@ export default defineConfig({
     const structuredData = shouldIndex
       ? createDocsStructuredData(
           normalizedPath,
-          title,
+          structuredDataTitle,
           description,
           isChinese,
           frontmatter,
@@ -929,10 +934,10 @@ export default defineConfig({
       ...alternateLocales
         .filter(locale => locale !== (isChinese ? 'zh_CN' : 'en_US'))
         .map(locale => ['meta', { property: 'og:locale:alternate', content: locale }]),
-      ['meta', { property: 'og:title', content: title }],
+      ['meta', { property: 'og:title', content: seoTitle }],
       ['meta', { property: 'og:description', content: description }],
       ['meta', { property: 'og:url', content: canonicalUrl }],
-      ['meta', { name: 'twitter:title', content: title }],
+      ['meta', { name: 'twitter:title', content: seoTitle }],
       ['meta', { name: 'twitter:description', content: description }],
       ...structuredData,
     ]

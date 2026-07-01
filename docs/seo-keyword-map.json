@@ -23,7 +23,7 @@
     "intent": "framework",
     "target": "/frameworks/vue",
     "targetZh": "/zh/frameworks/vue",
-    "primaryTitle": "Vue and Nuxt streaming Markdown renderer for AI chat"
+    "primaryTitle": "Vue streaming Markdown renderer for AI chat, SSE, WebSocket, and Nuxt"
   },
   {
     "query": "Nuxt SSR markdown renderer",
