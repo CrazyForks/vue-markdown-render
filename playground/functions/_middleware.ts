@@ -22,8 +22,15 @@ export async function onRequest(context: PagesContext) {
   const response = await context.next()
   const path = new URL(context.request.url).pathname.replace(/\/+$/, '') || '/'
 
-  if (noindexPaths.has(path))
-    response.headers.set('X-Robots-Tag', 'noindex, nofollow')
+  if (!noindexPaths.has(path))
+    return response
 
-  return response
+  const headers = new Headers(response.headers)
+  headers.set('X-Robots-Tag', 'noindex, nofollow')
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  })
 }

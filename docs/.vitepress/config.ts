@@ -912,7 +912,7 @@ export default defineConfig({
     const structuredData = shouldIndex
       ? createDocsStructuredData(
           normalizedPath,
-          frontmatter.title || ctx.pageData.title || ctx.title || 'Markstream',
+          title,
           description,
           isChinese,
           frontmatter,
