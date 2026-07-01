@@ -26,7 +26,7 @@ Static Markdown renderers are optimized for complete input. During a token strea
 
 | Partial input | Common failure mode |
 | --- | --- |
-| Unclosed ` ```ts ` fence | The rest of the message becomes a code block |
+| Unclosed <code>```ts</code> fence | The rest of the message becomes a code block |
 | Partial table header row | A partial table flickers between paragraph and table |
 | `$$ E = mc` | Math renderer throws or shows noisy errors |
 | `<details><summary>Plan` | HTML parsing can produce unstable output |

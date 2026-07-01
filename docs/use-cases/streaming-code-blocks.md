@@ -28,7 +28,6 @@ A static Markdown renderer can make an unfinished code fence consume everything 
 ```ts
 export function answer() {
   return "still streaming"
-```
 ````
 
 The renderer needs to keep this state readable and avoid expensive highlighter churn until the fence is stable.
