@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it } from 'vitest'
 import { defineComponent, h, onBeforeUnmount, onMounted } from 'vue'
@@ -107,5 +108,62 @@ describe('node renderer final transition DOM stability', () => {
     expect(wrapper.get('.paragraph-probe').element).toBe(initialElement)
 
     wrapper.unmount()
+  })
+
+  it('disables the root intrinsic placeholder for completed stable renders only', async () => {
+    const content = Array.from({ length: 80 }, (_, index) => `Paragraph ${index + 1}`).join('\n\n')
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content,
+        final: true,
+        smoothStreaming: false,
+        batchRendering: false,
+        deferNodesUntilVisible: false,
+        maxLiveNodes: Number.MAX_SAFE_INTEGER,
+        nodeVirtual: false,
+      },
+    })
+    await flushAll()
+
+    const root = wrapper.get('.markdown-renderer')
+    expect(root.classes()).toContain('stable-layout')
+    expect(root.classes()).not.toContain('virtualized')
+    expect(root.classes()).not.toContain('virtual-scroll-coordinated')
+    wrapper.unmount()
+
+    const streamingWrapper = mount(NodeRenderer, {
+      props: {
+        content,
+        final: false,
+        smoothStreaming: false,
+        batchRendering: false,
+        deferNodesUntilVisible: false,
+        maxLiveNodes: Number.MAX_SAFE_INTEGER,
+        nodeVirtual: false,
+      },
+    })
+    await flushAll()
+
+    expect(streamingWrapper.get('.markdown-renderer').classes()).not.toContain('stable-layout')
+    streamingWrapper.unmount()
+
+    const batchedWrapper = mount(NodeRenderer, {
+      props: {
+        content,
+        final: true,
+        mode: 'chat',
+        smoothStreaming: false,
+      },
+    })
+    await flushAll()
+
+    expect(batchedWrapper.get('.markdown-renderer').classes()).not.toContain('stable-layout')
+    batchedWrapper.unmount()
+
+    const source = readFileSync('src/components/NodeRenderer/NodeRenderer.vue', 'utf8')
+    expect(source).toContain(`.markdown-renderer.stable-layout {
+  content-visibility: visible;
+  contain-intrinsic-size: none;
+}`)
   })
 })
