@@ -38,7 +38,7 @@ Use `marked`, `markdown-it`, or `react-markdown` for finished Markdown documents
 
 Use Markstream when the Markdown is still changing while the user is reading it.
 
-Detailed comparisons: [react-markdown](https://markstream.simonhe.me/compare/react-markdown), [marked / markdown-it](https://markstream.simonhe.me/compare/marked-markdown-it), and [Streamdown](https://markstream.simonhe.me/compare/streamdown).
+Detailed comparisons: [vue-stream-markdown](https://markstream.simonhe.me/compare/vue-stream-markdown), [react-markdown](https://markstream.simonhe.me/compare/react-markdown), [marked / markdown-it](https://markstream.simonhe.me/compare/marked-markdown-it), and [Streamdown](https://markstream.simonhe.me/compare/streamdown).
 
 ## Packages
 

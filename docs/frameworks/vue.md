@@ -109,3 +109,10 @@ pnpm add @antv/infographic @terrastruct/d2  # additional diagram types
 - [Live playground](https://markstream-vue.simonhe.me/)
 - [Nuxt playground](https://markstream-nuxt.pages.dev/)
 - [Full documentation](/guide/)
+
+## Next steps
+
+- Building a Vue AI chat UI? Read [Vue AI chat Markdown renderer](/use-cases/vue-ai-chat-markdown-renderer).
+- Rendering raw LLM chunks? Read [LLM token stream Markdown](/use-cases/llm-token-stream-markdown).
+- Need Nuxt SSR? Read [Nuxt streaming Markdown renderer](/frameworks/nuxt).
+- Comparing Vue alternatives? Read [markstream-vue vs vue-stream-markdown](/compare/vue-stream-markdown).

@@ -8,6 +8,8 @@ Markstream is designed for scenarios where Markdown arrives incrementally. Here 
 
 ## AI chat and LLM streaming
 
+- [Vue AI chat Markdown renderer](/use-cases/vue-ai-chat-markdown-renderer) — build Vue 3 and Nuxt chat surfaces for LLM token streams
+- [LLM token stream Markdown](/use-cases/llm-token-stream-markdown) — batch and render chunks from SSE, WebSocket, fetch streams, or custom transports
 - [AI chat streaming Markdown](/use-cases/ai-chat-streaming) — render LLM token streams in Vue, React, Svelte, and Angular
 - [SSE and WebSocket streaming](/use-cases/sse-websocket) — handle Server-Sent Events and WebSocket Markdown output
 - [Incomplete Markdown renderer](/use-cases/incomplete-markdown-renderer) — keep unclosed fences, partial tables, math, and HTML stable while a response is still streaming

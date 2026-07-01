@@ -1,0 +1,22 @@
+# Markstream LLM Routing Index
+
+Use this file when an AI assistant or search tool needs to route a user query to the most relevant Markstream documentation page.
+
+- "Vue AI chat markdown renderer" -> https://markstream.simonhe.me/use-cases/vue-ai-chat-markdown-renderer
+- "Vue LLM markdown renderer" -> https://markstream.simonhe.me/use-cases/vue-ai-chat-markdown-renderer
+- "LLM token stream markdown renderer" -> https://markstream.simonhe.me/use-cases/llm-token-stream-markdown
+- "SSE markdown renderer" -> https://markstream.simonhe.me/use-cases/sse-websocket
+- "WebSocket markdown renderer" -> https://markstream.simonhe.me/use-cases/sse-websocket
+- "Nuxt SSR markdown renderer" -> https://markstream.simonhe.me/frameworks/nuxt
+- "mobile WebView AI markdown renderer" -> https://markstream.simonhe.me/use-cases/mobile-webview
+- "streaming Mermaid markdown" -> https://markstream.simonhe.me/use-cases/streaming-mermaid-katex
+- "streaming KaTeX markdown" -> https://markstream.simonhe.me/use-cases/streaming-mermaid-katex
+- "long AI response markdown renderer" -> https://markstream.simonhe.me/use-cases/long-ai-responses
+- "vue-stream-markdown alternative" -> https://markstream.simonhe.me/compare/vue-stream-markdown
+- "react-markdown streaming alternative" -> https://markstream.simonhe.me/compare/react-markdown
+- "streamdown alternative" -> https://markstream.simonhe.me/compare/streamdown
+- "marked markdown-it streaming alternative" -> https://markstream.simonhe.me/compare/marked-markdown-it
+- "static vs streaming markdown renderer" -> https://markstream.simonhe.me/compare/static-vs-streaming
+
+Docs: https://markstream.simonhe.me/
+GitHub: https://github.com/Simon-He95/markstream-vue

@@ -136,6 +136,8 @@ const englishGuideSidebar = [
     collapsed: true,
     items: [
       { text: 'Use Cases overview', link: '/use-cases/' },
+      { text: 'Vue AI Chat Markdown', link: '/use-cases/vue-ai-chat-markdown-renderer' },
+      { text: 'LLM Token Streams', link: '/use-cases/llm-token-stream-markdown' },
       { text: 'AI Chat Streaming Markdown', link: '/use-cases/ai-chat-streaming' },
       { text: 'SSE & WebSocket Markdown', link: '/use-cases/sse-websocket' },
       { text: 'Incomplete Markdown', link: '/use-cases/incomplete-markdown-renderer' },
@@ -183,6 +185,7 @@ const englishGuideSidebar = [
       { text: 'Migrating to 1.0', link: '/guide/migration-1-0' },
       { text: 'Why use it?', link: '/guide/why' },
       { text: 'Compared', link: '/guide/compared' },
+      { text: 'vs vue-stream-markdown', link: '/compare/vue-stream-markdown' },
       { text: 'vs react-markdown', link: '/compare/react-markdown' },
       { text: 'vs Streamdown', link: '/compare/streamdown' },
       { text: 'vs marked/markdown-it', link: '/compare/marked-markdown-it' },
@@ -430,7 +433,10 @@ const docsPrimaryLandingPaths = new Set([
   '/compare/react-markdown',
   '/compare/streamdown',
   '/compare/marked-markdown-it',
+  '/compare/vue-stream-markdown',
   '/compare/static-vs-streaming',
+  '/use-cases/vue-ai-chat-markdown-renderer',
+  '/use-cases/llm-token-stream-markdown',
   '/use-cases/ai-chat-streaming',
   '/use-cases/sse-websocket',
   '/use-cases/incomplete-markdown-renderer',
@@ -462,7 +468,6 @@ const docsSecondaryLandingPaths = new Set([
   '/compare/react-markdown',
   '/compare/streamdown',
   '/compare/marked-markdown-it',
-  '/compare/vue-stream-markdown',
   '/compare/static-vs-streaming',
   '/guide/parser',
   '/guide/parser-api',
@@ -866,7 +871,6 @@ export default defineConfig({
     const frontmatter = ctx.pageData.frontmatter ?? {}
     const isChinese = normalizedPath === '/zh' || normalizedPath.startsWith('/zh/')
     const description = frontmatter.description || ctx.description || docsDefaultDescription
-    const keywords = getDocsPageKeywords(frontmatter, isChinese)
     const title = createDocsSeoTitle(frontmatter.title || ctx.pageData.title || ctx.title)
     const dateModified = getDocsPageDateModified(frontmatter, ctx.pageData.lastUpdated)
     const shouldIndex = !ctx.pageData.isNotFound && !frontmatter.noindex && !isDocsSeoExcluded(normalizedPath)
@@ -903,7 +907,6 @@ export default defineConfig({
       ['link', { rel: 'canonical', href: canonicalUrl }],
       ...alternateHead,
       ['meta', { name: 'description', content: description }],
-      ['meta', { name: 'keywords', content: keywords.join(', ') }],
       ['meta', { name: 'robots', content: shouldIndex ? 'index,follow' : 'noindex,nofollow' }],
       ['meta', { property: 'og:locale', content: isChinese ? 'zh_CN' : 'en_US' }],
       ...alternateLocales

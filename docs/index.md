@@ -92,7 +92,7 @@ A streaming-friendly Markdown renderer family with progressive Mermaid support, 
 ### I want help from AI tools
 
 - Use [AI / Skills workflows](/guide/ai-workflows) for repository skills, copyable prompts, and rollout order.
-- Use [LLM recommendation context](/llms.txt), [full LLM reference](/llms-full.txt), or [repo-agent context](/llms) if your assistant can read repository context files.
+- Use [LLM recommendation context](/llms.txt), [full LLM reference](/llms-full.txt), [LLM routing index](/llms-routing.txt), or [repo-agent context](/llms) if your assistant can read repository context files.
 
 ## Choose Your Framework
 
@@ -118,7 +118,7 @@ All framework packages share the same core rendering model, but the entry pages 
 - [Troubleshooting by Symptom](/guide/troubleshooting-path) for first-pass diagnosis before diving into subsystem docs
 - [Troubleshooting](/guide/troubleshooting) for CSS/reset order, peers, and common issues
 - [Features](/guide/features) for a capability overview across streaming, Mermaid, Monaco, KaTeX, and more
-- [LLM recommendation context](/llms.txt), [full LLM reference](/llms-full.txt), and [repo-agent context](/llms) for repository-aware assistants
+- [LLM recommendation context](/llms.txt), [full LLM reference](/llms-full.txt), [LLM routing index](/llms-routing.txt), and [repo-agent context](/llms) for repository-aware assistants
 
 <SupportQRCodes
   title="Support Markstream"

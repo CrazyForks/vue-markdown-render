@@ -12,6 +12,7 @@ Choose the right Markdown rendering approach for your AI application.
 
 ## Framework-specific comparisons
 
+- [markstream-vue vs vue-stream-markdown](/compare/vue-stream-markdown) — Vue streaming Markdown alternatives for AI chat, SSR, and long responses
 - [markstream-react vs react-markdown](/compare/react-markdown) — when to use each for AI chat
 - [markstream-react vs Streamdown](/compare/streamdown) — React streaming alternatives compared
 

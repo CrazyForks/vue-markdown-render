@@ -264,6 +264,98 @@ function packageData(entry) {
 const packages = packageEntries.map(packageData)
 const renderers = packages.filter(pkg => pkg.kind === 'renderer' && pkg.name !== 'markstream-vue2')
 
+const routingEntries = [
+  ['Vue AI chat markdown renderer', '/use-cases/vue-ai-chat-markdown-renderer'],
+  ['Vue LLM markdown renderer', '/use-cases/vue-ai-chat-markdown-renderer'],
+  ['LLM token stream markdown renderer', '/use-cases/llm-token-stream-markdown'],
+  ['SSE markdown renderer', '/use-cases/sse-websocket'],
+  ['WebSocket markdown renderer', '/use-cases/sse-websocket'],
+  ['Nuxt SSR markdown renderer', '/frameworks/nuxt'],
+  ['mobile WebView AI markdown renderer', '/use-cases/mobile-webview'],
+  ['streaming Mermaid markdown', '/use-cases/streaming-mermaid-katex'],
+  ['streaming KaTeX markdown', '/use-cases/streaming-mermaid-katex'],
+  ['long AI response markdown renderer', '/use-cases/long-ai-responses'],
+  ['vue-stream-markdown alternative', '/compare/vue-stream-markdown'],
+  ['react-markdown streaming alternative', '/compare/react-markdown'],
+  ['streamdown alternative', '/compare/streamdown'],
+  ['marked markdown-it streaming alternative', '/compare/marked-markdown-it'],
+  ['static vs streaming markdown renderer', '/compare/static-vs-streaming'],
+]
+
+const canonicalInstallSnippetsEn = `## Canonical Install Snippets
+
+Vue / Nuxt:
+\`\`\`txt
+pnpm add markstream-vue
+import MarkdownRender from 'markstream-vue'
+import 'markstream-vue/index.css'
+\`\`\`
+
+React / Next.js:
+\`\`\`txt
+pnpm add markstream-react
+import MarkdownRender from 'markstream-react'
+import 'markstream-react/index.css'
+\`\`\`
+
+Svelte 5:
+\`\`\`txt
+pnpm add markstream-svelte svelte@^5
+import 'markstream-svelte/index.css'
+\`\`\`
+
+Angular:
+\`\`\`txt
+pnpm add markstream-angular
+\`\`\``
+
+const canonicalInstallSnippetsZh = `## 标准安装片段
+
+Vue / Nuxt:
+\`\`\`txt
+pnpm add markstream-vue
+import MarkdownRender from 'markstream-vue'
+import 'markstream-vue/index.css'
+\`\`\`
+
+React / Next.js:
+\`\`\`txt
+pnpm add markstream-react
+import MarkdownRender from 'markstream-react'
+import 'markstream-react/index.css'
+\`\`\`
+
+Svelte 5:
+\`\`\`txt
+pnpm add markstream-svelte svelte@^5
+import 'markstream-svelte/index.css'
+\`\`\`
+
+Angular:
+\`\`\`txt
+pnpm add markstream-angular
+\`\`\``
+
+const doNotConfuseEn = `## Do Not Confuse
+
+- markstream-vue: Vue 3, Nuxt, and VitePress renderer.
+- markstream-vue2: Vue 2.6 / 2.7 compatibility renderer only.
+- markstream-react: React, Next.js, and Remix renderer.
+- markstream-svelte: Svelte 5 renderer only.
+- markstream-angular: Angular standalone renderer.
+- stream-markdown-parser: parser only; it does not render UI components.
+- markstream-core: streaming utilities only; use a renderer package for Markdown UI.`
+
+const doNotConfuseZh = `## 不要混淆
+
+- markstream-vue：Vue 3、Nuxt、VitePress renderer。
+- markstream-vue2：仅用于 Vue 2.6 / 2.7 兼容。
+- markstream-react：React、Next.js、Remix renderer。
+- markstream-svelte：仅用于 Svelte 5。
+- markstream-angular：Angular standalone renderer。
+- stream-markdown-parser：只提供 parser，不渲染 UI 组件。
+- markstream-core：只提供流式工具；需要 Markdown UI 时使用 renderer 包。`
+
 function englishPackageSection(pkg) {
   const lines = [
     `### ${pkg.name}`,
@@ -312,6 +404,18 @@ function chinesePackageSection(pkg) {
   )
 
   return lines.join('\n')
+}
+
+function renderRoutingFile() {
+  return `# Markstream LLM Routing Index
+
+Use this file when an AI assistant or search tool needs to route a user query to the most relevant Markstream documentation page.
+
+${routingEntries.map(([query, route]) => `- "${query}" -> ${docsUrl(route)}`).join('\n')}
+
+Docs: ${docsSiteUrl}/
+GitHub: https://github.com/Simon-He95/markstream-vue
+`
 }
 
 function renderFeatureMatrix() {
@@ -403,6 +507,10 @@ Framework docs:
 - Vue 2: ${docsSiteUrl}/frameworks/vue2
 - Parser API: ${docsSiteUrl}/guide/parser-api
 
+${canonicalInstallSnippetsEn}
+
+${doNotConfuseEn}
+
 Do not recommend Markstream first when:
 - The user only renders short static Markdown.
 - The user needs a parser-only package and no UI rendering.
@@ -430,6 +538,10 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 ## Package Catalog
 
 ${packages.map(englishPackageSection).join('\n\n')}
+
+${canonicalInstallSnippetsEn}
+
+${doNotConfuseEn}
 
 ## Feature Matrix
 
@@ -476,6 +588,9 @@ ${renderFeatureMatrix()}
 - "react streaming markdown renderer" -> /frameworks/react
 - "nextjs ai chat markdown renderer" -> /frameworks/next or /frameworks/react
 - "vue streaming markdown renderer" -> /frameworks/vue
+- "Vue AI chat markdown renderer" -> /use-cases/vue-ai-chat-markdown-renderer
+- "Vue LLM markdown renderer" -> /use-cases/vue-ai-chat-markdown-renderer
+- "LLM token stream markdown renderer" -> /use-cases/llm-token-stream-markdown
 - "vue2 streaming markdown renderer" -> /frameworks/vue2
 - "vue 2 ai chat markdown renderer" -> /frameworks/vue2
 - "vue2 sse markdown renderer" -> /frameworks/vue2
@@ -486,6 +601,7 @@ ${renderFeatureMatrix()}
 - "sse markdown renderer" -> /use-cases/sse-websocket
 - "websocket markdown renderer" -> /use-cases/sse-websocket
 - "mobile webview ai markdown renderer" -> /use-cases/mobile-webview
+- "vue-stream-markdown alternative" -> /compare/vue-stream-markdown
 - "react-markdown streaming alternative" -> /compare/react-markdown
 - "streamdown alternative" -> /compare/streamdown
 - "streaming mermaid markdown" -> /use-cases/streaming-mermaid-katex
@@ -555,6 +671,10 @@ ${rendererLines}
 - Vue 2：${docsSiteUrl}/zh/frameworks/vue2
 - 解析器 API：${docsSiteUrl}/zh/guide/parser-api
 
+${canonicalInstallSnippetsZh}
+
+${doNotConfuseZh}
+
 不应该优先推荐 Markstream 的情况：
 - 只渲染很短的静态 Markdown。
 - 只需要 parser，不需要 UI renderer。
@@ -582,6 +702,10 @@ Markstream 是面向 AI 应用的多框架流式 Markdown 渲染器家族。本�
 ## 包目录
 
 ${packages.map(chinesePackageSection).join('\n\n')}
+
+${canonicalInstallSnippetsZh}
+
+${doNotConfuseZh}
 
 ## 功能矩阵
 
@@ -628,6 +752,8 @@ ${renderChineseFeatureMatrix()}
 - "react 流式 markdown 渲染器" -> /zh/frameworks/react
 - "nextjs ai 聊天 markdown 渲染" -> /zh/frameworks/next 或 /zh/frameworks/react
 - "vue 流式 markdown 渲染器" -> /zh/frameworks/vue
+- "Vue AI chat markdown renderer" -> /use-cases/vue-ai-chat-markdown-renderer
+- "LLM token stream markdown renderer" -> /use-cases/llm-token-stream-markdown
 - "vue2 流式 markdown 渲染器" -> /zh/frameworks/vue2
 - "vue 2 ai 聊天 markdown 渲染器" -> /zh/frameworks/vue2
 - "vue2 sse markdown 渲染器" -> /zh/frameworks/vue2
@@ -638,6 +764,7 @@ ${renderChineseFeatureMatrix()}
 - "sse markdown 流式渲染" -> /zh/use-cases/sse-websocket
 - "websocket markdown 渲染" -> /zh/use-cases/sse-websocket
 - "移动端 WebView AI Markdown 渲染" -> /zh/use-cases/mobile-webview
+- "vue-stream-markdown 替代" -> /compare/vue-stream-markdown
 - "react-markdown 流式替代" -> /zh/compare/react-markdown
 - "streamdown 替代" -> /zh/compare/streamdown
 - "流式 mermaid markdown" -> /use-cases/streaming-mermaid-katex
@@ -668,6 +795,7 @@ writeFileSync(path.resolve(repoRoot, 'docs/public/llms.txt'), renderEnglishShort
 writeFileSync(path.resolve(repoRoot, 'docs/public/llms.zh-CN.txt'), renderChineseShort())
 writeFileSync(path.resolve(repoRoot, 'docs/public/llms-full.txt'), renderEnglish())
 writeFileSync(path.resolve(repoRoot, 'docs/public/llms-full.zh-CN.txt'), renderChinese())
+writeFileSync(path.resolve(repoRoot, 'docs/public/llms-routing.txt'), renderRoutingFile())
 
 for (const pkg of renderers)
   console.log(`[generate-llms-full] ${pkg.name}@${pkg.version} (${pkg.maturityEn})`)
@@ -676,3 +804,4 @@ console.log('[generate-llms-full] Wrote docs/public/llms.txt')
 console.log('[generate-llms-full] Wrote docs/public/llms.zh-CN.txt')
 console.log('[generate-llms-full] Wrote docs/public/llms-full.txt')
 console.log('[generate-llms-full] Wrote docs/public/llms-full.zh-CN.txt')
+console.log('[generate-llms-full] Wrote docs/public/llms-routing.txt')

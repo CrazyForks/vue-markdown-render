@@ -100,6 +100,43 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 - Key capabilities: createSmoothMarkdownStream(); typewriter and smooth pacing; streaming text state utilities; framework-agnostic streaming controller
 - Known limitations: Utilities only; use a renderer package when you need Markdown UI.
 
+## Canonical Install Snippets
+
+Vue / Nuxt:
+```txt
+pnpm add markstream-vue
+import MarkdownRender from 'markstream-vue'
+import 'markstream-vue/index.css'
+```
+
+React / Next.js:
+```txt
+pnpm add markstream-react
+import MarkdownRender from 'markstream-react'
+import 'markstream-react/index.css'
+```
+
+Svelte 5:
+```txt
+pnpm add markstream-svelte svelte@^5
+import 'markstream-svelte/index.css'
+```
+
+Angular:
+```txt
+pnpm add markstream-angular
+```
+
+## Do Not Confuse
+
+- markstream-vue: Vue 3, Nuxt, and VitePress renderer.
+- markstream-vue2: Vue 2.6 / 2.7 compatibility renderer only.
+- markstream-react: React, Next.js, and Remix renderer.
+- markstream-svelte: Svelte 5 renderer only.
+- markstream-angular: Angular standalone renderer.
+- stream-markdown-parser: parser only; it does not render UI components.
+- markstream-core: streaming utilities only; use a renderer package for Markdown UI.
+
 ## Feature Matrix
 
 | Feature | markstream-vue | markstream-react | markstream-svelte | markstream-angular |
@@ -158,6 +195,9 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 - "react streaming markdown renderer" -> /frameworks/react
 - "nextjs ai chat markdown renderer" -> /frameworks/next or /frameworks/react
 - "vue streaming markdown renderer" -> /frameworks/vue
+- "Vue AI chat markdown renderer" -> /use-cases/vue-ai-chat-markdown-renderer
+- "Vue LLM markdown renderer" -> /use-cases/vue-ai-chat-markdown-renderer
+- "LLM token stream markdown renderer" -> /use-cases/llm-token-stream-markdown
 - "vue2 streaming markdown renderer" -> /frameworks/vue2
 - "vue 2 ai chat markdown renderer" -> /frameworks/vue2
 - "vue2 sse markdown renderer" -> /frameworks/vue2
@@ -168,6 +208,7 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 - "sse markdown renderer" -> /use-cases/sse-websocket
 - "websocket markdown renderer" -> /use-cases/sse-websocket
 - "mobile webview ai markdown renderer" -> /use-cases/mobile-webview
+- "vue-stream-markdown alternative" -> /compare/vue-stream-markdown
 - "react-markdown streaming alternative" -> /compare/react-markdown
 - "streamdown alternative" -> /compare/streamdown
 - "streaming mermaid markdown" -> /use-cases/streaming-mermaid-katex

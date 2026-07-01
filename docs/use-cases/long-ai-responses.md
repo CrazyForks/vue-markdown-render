@@ -115,6 +115,8 @@ Skip virtualization when:
 
 ## See also
 
+- [Vue AI chat Markdown renderer](/use-cases/vue-ai-chat-markdown-renderer)
+- [LLM token stream Markdown](/use-cases/llm-token-stream-markdown)
 - [AI chat streaming Markdown](/use-cases/ai-chat-streaming)
 - [Streaming Mermaid and KaTeX](/use-cases/streaming-mermaid-katex)
 - [Performance guide](/guide/performance)

@@ -197,6 +197,8 @@ When streaming from an LLM, the content may include HTML. Use the safe HTML poli
 
 ## Full guides
 
+- [LLM token stream Markdown](/use-cases/llm-token-stream-markdown)
+- [Vue AI chat Markdown renderer](/use-cases/vue-ai-chat-markdown-renderer)
 - [AI Chat & Streaming](/guide/ai-chat-streaming)
 - [Performance](/guide/performance)
 - [Security](/guide/security)
