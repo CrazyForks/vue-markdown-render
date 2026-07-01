@@ -120,3 +120,20 @@ flowchart LR
 | Long AI responses (>50 KB) | markstream-react |
 | Multi-framework project (React + Vue + Svelte) | markstream-react |
 | Need `content` and pre-parsed `nodes` paths | markstream-react |
+
+## Sources and references
+
+- [Streamdown docs](https://streamdown.ai)
+- [markstream-react framework page](/frameworks/react)
+- [Streaming Mermaid and KaTeX](/use-cases/streaming-mermaid-katex)
+- [Long AI responses](/use-cases/long-ai-responses)
+- [1.0 Benchmark Report](/guide/benchmark-1-0)
+
+## Reproduce this comparison
+
+```bash
+pnpm benchmark:1.0
+pnpm run test:e2e:main-playground-performance
+```
+
+Use real AI output that includes unclosed fences, Mermaid, math, fast token updates, and long responses before deciding which API and rendering model fit your React app.

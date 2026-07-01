@@ -30,6 +30,8 @@ const primaryLandingPaths = [
   '/use-cases',
   '/use-cases/ai-chat-streaming',
   '/use-cases/sse-websocket',
+  '/use-cases/incomplete-markdown-renderer',
+  '/use-cases/streaming-code-blocks',
   '/use-cases/mobile-webview',
   '/use-cases/streaming-mermaid-katex',
   '/use-cases/long-ai-responses',
@@ -261,6 +263,13 @@ function validateFaqPageNode(node, relativePath) {
   }
 }
 
+function validateWebPageNode(node, relativePath) {
+  for (const field of ['name', 'description', 'url', 'dateModified']) {
+    if (!hasNonEmptyString(node[field]))
+      failures.push(`${relativePath} WebPage is missing ${field}`)
+  }
+}
+
 function validateArticleNode(node, relativePath, lastVerified) {
   for (const field of ['headline', 'description', 'url', 'mainEntityOfPage']) {
     if (!hasNonEmptyString(node[field]))
@@ -273,6 +282,9 @@ function validateArticleNode(node, relativePath, lastVerified) {
 
 function validateStructuredDataNodes(relativePath, nodes) {
   for (const node of nodes) {
+    if (structuredDataTypes(node).includes('WebPage'))
+      validateWebPageNode(node, relativePath)
+
     if (structuredDataTypes(node).includes('SoftwareApplication'))
       validateSoftwareApplicationNode(node, relativePath)
   }
@@ -324,6 +336,10 @@ if (isMain) {
       failures.push(`${relativePath} does not contain new docs host ${newHost}`)
   }
 
+  const sitemap = readDistFile('sitemap.xml')
+  if (sitemap && !sitemap.includes('<lastmod>'))
+    failures.push('sitemap.xml is missing lastmod entries')
+
   const redirects = readDistFile('_redirects')
   if (redirects)
     expectContains(redirects, '_redirects', oldHostRedirect, `is missing old docs host redirect ${oldHostRedirect}`)
@@ -337,6 +353,10 @@ if (isMain) {
     const canonicalUrl = `${newHost}${routePath === '/' ? '/' : routePath}`
     expectContains(content, relativePath, `<link rel="canonical" href="${canonicalUrl}">`, `is missing canonical ${canonicalUrl}`)
     expectContains(content, relativePath, `<meta property="og:url" content="${canonicalUrl}">`, `is missing og:url ${canonicalUrl}`)
+
+    const structuredDataNodes = jsonLdNodesByRelativePath.get(relativePath) ?? parseStructuredDataNodes(content, relativePath)
+    if (!hasStructuredDataType(structuredDataNodes, 'WebPage'))
+      failures.push(`${relativePath} is missing WebPage structured data`)
   }
 
   for (const filePath of walkFiles(docsDir, new Set(['.vitepress', 'node_modules']))) {

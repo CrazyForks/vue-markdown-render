@@ -113,3 +113,19 @@ However, for AI chat UIs and streaming surfaces, the streaming features replace 
 6. Install optional peers only if your AI output includes Mermaid, KaTeX, or Monaco blocks
 
 For a full migration guide, see [Migrate from react-markdown](/guide/react-markdown-migration).
+
+## Sources and references
+
+- [react-markdown README](https://github.com/remarkjs/react-markdown)
+- [markstream-react framework page](/frameworks/react)
+- [Migrate from react-markdown](/guide/react-markdown-migration)
+- [1.0 Benchmark Report](/guide/benchmark-1-0)
+
+## Reproduce this comparison
+
+```bash
+pnpm benchmark:1.0
+pnpm run test:e2e:main-playground-performance
+```
+
+Test incomplete code fences, partial tables, partial KaTeX, Mermaid blocks, and long AI responses before choosing a renderer for a streaming UI.

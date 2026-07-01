@@ -1,4 +1,6 @@
-# Markstream
+# markstream-vue / Markstream
+
+Vue, Nuxt, React, Svelte, and Angular streaming Markdown renderers for AI chat and LLM token streams.
 
 Markstream is a streaming Markdown renderer family for AI chat, LLM token streams, SSE/WebSocket output, and long AI responses.
 

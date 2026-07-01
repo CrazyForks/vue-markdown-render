@@ -1,6 +1,6 @@
 ---
-title: 'Install Markstream by framework'
-description: Choose the right Markstream package for Vue, Nuxt, React, Next.js, Svelte, Angular, Vue 2, or parser-only usage.
+title: 'Streaming Markdown renderer by framework: Vue, React, Nuxt, Next.js, Svelte, Angular'
+description: Choose the right Markstream package for streaming Markdown in AI chat apps across Vue, Nuxt, React, Next.js, Svelte, Angular, Vue 2, and parser-only usage.
 keywords:
   - Markstream framework packages
   - streaming Markdown renderer by framework

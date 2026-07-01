@@ -138,6 +138,8 @@ const englishGuideSidebar = [
       { text: 'Use Cases overview', link: '/use-cases/' },
       { text: 'AI Chat Streaming Markdown', link: '/use-cases/ai-chat-streaming' },
       { text: 'SSE & WebSocket Markdown', link: '/use-cases/sse-websocket' },
+      { text: 'Incomplete Markdown', link: '/use-cases/incomplete-markdown-renderer' },
+      { text: 'Streaming Code Blocks', link: '/use-cases/streaming-code-blocks' },
       { text: 'Mobile WebView', link: '/use-cases/mobile-webview' },
       { text: 'Streaming Mermaid & KaTeX', link: '/use-cases/streaming-mermaid-katex' },
       { text: 'Long AI Responses', link: '/use-cases/long-ai-responses' },
@@ -431,6 +433,8 @@ const docsPrimaryLandingPaths = new Set([
   '/compare/static-vs-streaming',
   '/use-cases/ai-chat-streaming',
   '/use-cases/sse-websocket',
+  '/use-cases/incomplete-markdown-renderer',
+  '/use-cases/streaming-code-blocks',
   '/use-cases/mobile-webview',
   '/use-cases/streaming-mermaid-katex',
   '/use-cases/long-ai-responses',
@@ -563,6 +567,26 @@ function getDocsPageKeywords(frontmatter: Record<string, any>, isChinese: boolea
   return keywords.length > 0 ? keywords : isChinese ? docsDefaultKeywordsZh : docsDefaultKeywords
 }
 
+function getDocsPageDateModified(frontmatter: Record<string, any>, pageLastUpdated: unknown) {
+  if (frontmatter.lastUpdated === false)
+    return null
+
+  const frontmatterDate = typeof frontmatter.lastVerified === 'string' && frontmatter.lastVerified.length > 0
+    ? frontmatter.lastVerified
+    : frontmatter.lastUpdated
+
+  if (typeof frontmatterDate === 'string' && frontmatterDate.length > 0)
+    return frontmatterDate
+
+  if (frontmatterDate instanceof Date)
+    return frontmatterDate.toISOString()
+
+  if (typeof pageLastUpdated === 'number' && pageLastUpdated > 0)
+    return new Date(pageLastUpdated).toISOString()
+
+  return null
+}
+
 function frontmatterFaqItems(value: unknown) {
   if (!Array.isArray(value))
     return []
@@ -583,7 +607,7 @@ function frontmatterFaqItems(value: unknown) {
     .filter((item): item is { question: string, answer: string } => Boolean(item))
 }
 
-function createDocsStructuredData(path: string, title: string, description: string, isChinese: boolean, frontmatter: Record<string, any>) {
+function createDocsStructuredData(path: string, title: string, description: string, isChinese: boolean, frontmatter: Record<string, any>, dateModified: string | null) {
   const graph: Record<string, any>[] = []
   const homePath = isChinese ? '/zh' : '/'
   const faqItems = frontmatterFaqItems(frontmatter.faq)
@@ -591,6 +615,26 @@ function createDocsStructuredData(path: string, title: string, description: stri
   const lastVerified = typeof frontmatter.lastVerified === 'string' && frontmatter.lastVerified.length > 0
     ? frontmatter.lastVerified
     : null
+
+  graph.push({
+    '@type': 'WebPage',
+    '@id': `${docsSiteUrl}${path === '/' ? '/' : path}#webpage`,
+    'name': title,
+    'headline': title,
+    'url': `${docsSiteUrl}${path === '/' ? '/' : path}`,
+    description,
+    keywords,
+    'inLanguage': isChinese ? 'zh-CN' : 'en-US',
+    ...(dateModified ? { dateModified } : {}),
+    'isPartOf': {
+      '@id': `${docsSiteUrl}${homePath === '/' ? '/' : homePath}#website`,
+    },
+    'publisher': {
+      '@type': 'Organization',
+      'name': 'Markstream',
+      'url': githubRepoUrl,
+    },
+  })
 
   if (path === homePath) {
     graph.push({
@@ -601,6 +645,7 @@ function createDocsStructuredData(path: string, title: string, description: stri
       'inLanguage': isChinese ? 'zh-CN' : 'en-US',
       description,
       keywords,
+      ...(dateModified ? { dateModified } : {}),
       'publisher': {
         '@type': 'Organization',
         'name': 'Markstream',
@@ -629,6 +674,7 @@ function createDocsStructuredData(path: string, title: string, description: stri
       'license': 'https://opensource.org/licenses/MIT',
       'programmingLanguage': programmingLanguage.length > 0 ? programmingLanguage : ['TypeScript'],
       'runtimePlatform': runtimePlatform,
+      ...(dateModified ? { dateModified } : {}),
       'sameAs': [`https://www.npmjs.com/package/${npmPackage}`],
     })
   }
@@ -643,7 +689,7 @@ function createDocsStructuredData(path: string, title: string, description: stri
       'mainEntityOfPage': `${docsSiteUrl}${path}`,
       'articleSection': isChinese ? 'Markdown 渲染器对比' : 'Markdown renderer comparison',
       'inLanguage': isChinese ? 'zh-CN' : 'en-US',
-      ...(lastVerified ? { dateModified: lastVerified } : {}),
+      ...((lastVerified || dateModified) ? { dateModified: lastVerified || dateModified } : {}),
       'author': {
         '@type': 'Organization',
         'name': 'Markstream',
@@ -697,6 +743,7 @@ export default defineConfig({
   description: docsDefaultDescription,
   base: process.env.VITEPRESS_BASE || '/',
   head: siteHead,
+  lastUpdated: true,
   markdown: {
     languages: ['ts', 'tsx', 'js', 'jsx', 'vue'],
     codeTransformers: [
@@ -821,6 +868,7 @@ export default defineConfig({
     const description = frontmatter.description || ctx.description || docsDefaultDescription
     const keywords = getDocsPageKeywords(frontmatter, isChinese)
     const title = createDocsSeoTitle(frontmatter.title || ctx.pageData.title || ctx.title)
+    const dateModified = getDocsPageDateModified(frontmatter, ctx.pageData.lastUpdated)
     const shouldIndex = !ctx.pageData.isNotFound && !frontmatter.noindex && !isDocsSeoExcluded(normalizedPath)
     const alternates = getDocsAlternatePaths(normalizedPath)
     const alternateHead = []
@@ -847,6 +895,7 @@ export default defineConfig({
           description,
           isChinese,
           frontmatter,
+          dateModified,
         )
       : []
 

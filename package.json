@@ -186,7 +186,7 @@
     "docs:generate-llms": "pnpm run docs:llms:generate",
     "docs:check-llms": "pnpm run docs:llms:check",
     "docs:build": "vitepress build docs",
-    "docs:seo:check": "pnpm docs:build && node scripts/check-docs-seo-output.mjs",
+    "docs:seo:check": "pnpm docs:check-zh && pnpm docs:build && node scripts/check-docs-seo-output.mjs",
     "docs:smoke:production": "node scripts/smoke-docs-production.mjs",
     "docs:build:ci": "pnpm run build:parser && pnpm run build && pnpm docs:seo:check",
     "docs:build:netlify": "VITEPRESS_BASE=/ pnpm docs:build",

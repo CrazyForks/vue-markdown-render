@@ -54,3 +54,20 @@ Use `markstream-vue` when:
 `markstream-vue` is larger at base because it includes the parser and rendering infrastructure. However, all optional peers (Mermaid, KaTeX, Monaco, D2, Infographic) are only loaded when installed. If you don't install them, you pay zero cost for them.
 
 `vue-stream-markdown` is smaller at base but offers fewer features. Choose based on your AI output requirements, not just bundle size.
+
+## Sources and references
+
+- [vue-stream-markdown package](https://www.npmjs.com/package/vue-stream-markdown)
+- [markstream-vue framework page](/frameworks/vue)
+- [SSE and WebSocket Markdown streaming](/use-cases/sse-websocket)
+- [Long AI responses](/use-cases/long-ai-responses)
+- [1.0 Benchmark Report](/guide/benchmark-1-0)
+
+## Reproduce this comparison
+
+```bash
+pnpm benchmark:1.0
+pnpm run test:e2e:main-playground-performance
+```
+
+Use Vue 3 streaming fixtures with unclosed fences, Mermaid, KaTeX, heavy code blocks, and long responses when validating the trade-offs.

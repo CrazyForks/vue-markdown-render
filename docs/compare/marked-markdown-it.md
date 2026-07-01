@@ -99,3 +99,20 @@ const nodes = parseMarkdownToStructure(content, md)
 ```
 
 This gives you the streaming parser without any framework dependency.
+
+## Sources and references
+
+- [marked docs](https://marked.js.org/)
+- [markdown-it demo and docs](https://markdown-it.github.io/)
+- [stream-markdown-parser guide](/guide/parser-api)
+- [Static vs streaming Markdown rendering](/compare/static-vs-streaming)
+- [1.0 Benchmark Report](/guide/benchmark-1-0)
+
+## Reproduce this comparison
+
+```bash
+pnpm benchmark:1.0
+pnpm run test:e2e:main-playground-performance
+```
+
+Include complete static Markdown, unclosed code fences, partial tables, partial KaTeX, Mermaid, and long AI responses in the same test set.

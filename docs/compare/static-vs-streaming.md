@@ -82,3 +82,20 @@ If you currently use a static renderer and want to add streaming support:
 2. **Parse before the component**: for high-frequency streaming, parse Markdown outside the component and pass `nodes` instead of `content`.
 3. **Add `final` prop**: tell the renderer when the stream is complete so it can finalize heavy blocks and clean up mid-states.
 4. **Test with real streaming patterns**: simulate 20-character chunks arriving at 30Hz to verify no flicker.
+
+## Sources and references
+
+- [SSE and WebSocket Markdown streaming](/use-cases/sse-websocket)
+- [Streaming Mermaid and KaTeX](/use-cases/streaming-mermaid-katex)
+- [Long AI responses](/use-cases/long-ai-responses)
+- [Performance guide](/guide/performance)
+- [1.0 Benchmark Report](/guide/benchmark-1-0)
+
+## Reproduce this comparison
+
+```bash
+pnpm benchmark:1.0
+pnpm run test:e2e:main-playground-performance
+```
+
+Compare completed Markdown against token-stream fixtures that include incomplete fences, partial tables, Mermaid, KaTeX, and long AI output.

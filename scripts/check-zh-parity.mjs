@@ -3,32 +3,102 @@ import path from 'node:path'
 import process from 'node:process'
 
 const root = process.cwd()
-const enDir = path.join(root, 'docs', 'guide')
-const zhDir = path.join(root, 'docs', 'zh', 'guide')
 
-async function main() {
-  const files = await fs.readdir(enDir)
-  const mdFiles = files.filter(f => f.endsWith('.md'))
-  const missing = []
-  for (const f of mdFiles) {
-    const zhPath = path.join(zhDir, f)
-    try {
-      await fs.access(zhPath)
+const checks = [
+  {
+    label: 'guide',
+    enDir: path.join(root, 'docs', 'guide'),
+    zhDir: path.join(root, 'docs', 'zh', 'guide'),
+    failOnMissing: true,
+  },
+  {
+    label: 'frameworks',
+    enDir: path.join(root, 'docs', 'frameworks'),
+    zhDir: path.join(root, 'docs', 'zh', 'frameworks'),
+    failOnMissing: false,
+  },
+  {
+    label: 'use-cases',
+    enDir: path.join(root, 'docs', 'use-cases'),
+    zhDir: path.join(root, 'docs', 'zh', 'use-cases'),
+    failOnMissing: false,
+  },
+  {
+    label: 'compare',
+    enDir: path.join(root, 'docs', 'compare'),
+    zhDir: path.join(root, 'docs', 'zh', 'compare'),
+    failOnMissing: false,
+  },
+]
+
+async function listMarkdownFiles(dir, prefix = '') {
+  const files = []
+  const entries = await fs.readdir(dir, { withFileTypes: true })
+
+  for (const entry of entries) {
+    const relativePath = prefix ? path.join(prefix, entry.name) : entry.name
+
+    if (entry.isDirectory()) {
+      files.push(...await listMarkdownFiles(dir, relativePath))
+      continue
     }
-    catch {
-      missing.push(f)
-    }
+
+    if (entry.isFile() && entry.name.endsWith('.md'))
+      files.push(relativePath)
   }
 
-  if (missing.length) {
-    console.error('Missing zh translations for the following docs:')
-    missing.forEach(m => console.error(' -', m))
+  return files
+}
+
+async function fileExists(filePath) {
+  try {
+    await fs.access(filePath)
+    return true
+  }
+  catch {
+    return false
+  }
+}
+
+async function missingZhFiles(check) {
+  const enFiles = await listMarkdownFiles(check.enDir)
+  const missing = []
+
+  for (const file of enFiles) {
+    if (!await fileExists(path.join(check.zhDir, file)))
+      missing.push(file)
+  }
+
+  return missing
+}
+
+async function main() {
+  const failures = []
+  const warnings = []
+
+  for (const check of checks) {
+    const missing = await missingZhFiles(check)
+    if (missing.length === 0)
+      continue
+
+    const message = `${check.label}: missing zh translations for ${missing.join(', ')}`
+    if (check.failOnMissing)
+      failures.push(message)
+    else
+      warnings.push(message)
+  }
+
+  for (const warning of warnings)
+    console.warn(`[zh-parity] warning: ${warning}`)
+
+  if (failures.length > 0) {
+    console.error('Missing required zh translations:')
+    failures.forEach(failure => console.error(` - ${failure}`))
     console.error('\nHint: run `pnpm docs:sync-zh` to create placeholders.')
     process.exit(1)
   }
-  else {
-    console.log('All docs/guide pages have a corresponding docs/zh/guide placeholder.')
-  }
+
+  console.log('Required zh docs parity checks passed.')
 }
 
 main().catch((e) => {
