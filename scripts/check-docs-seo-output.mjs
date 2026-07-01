@@ -340,8 +340,27 @@ if (isMain) {
   }
 
   const sitemap = readDistFile('sitemap.xml')
-  if (sitemap && !sitemap.includes('<lastmod>'))
-    failures.push('sitemap.xml is missing lastmod entries')
+  if (sitemap) {
+    if (!sitemap.includes('<lastmod>'))
+      failures.push('sitemap.xml is missing lastmod entries')
+
+    expectContains(
+      sitemap,
+      'sitemap.xml',
+      `${newHost}/use-cases`,
+      'should include use-cases hub in sitemap',
+    )
+  }
+
+  const compareIndex = readDistFile('compare/index.html')
+  if (compareIndex) {
+    expectContains(
+      compareIndex,
+      'compare/index.html',
+      '/compare/vue-stream-markdown',
+      'should link to vue-stream-markdown comparison page',
+    )
+  }
 
   const redirects = readDistFile('_redirects')
   if (redirects)

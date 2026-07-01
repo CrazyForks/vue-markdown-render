@@ -435,6 +435,7 @@ const docsPrimaryLandingPaths = new Set([
   '/compare/marked-markdown-it',
   '/compare/vue-stream-markdown',
   '/compare/static-vs-streaming',
+  '/use-cases',
   '/use-cases/vue-ai-chat-markdown-renderer',
   '/use-cases/llm-token-stream-markdown',
   '/use-cases/ai-chat-streaming',
