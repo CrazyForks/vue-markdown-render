@@ -950,6 +950,21 @@ function importHeightCache(
 const deferNodes = computed(() => {
   return deferNodesDomRequired.value && viewportPriorityEnabled.value
 })
+const incrementalRenderingConfigured = computed(() => {
+  return !renderAsFragment.value
+    && rendererProps.batchRendering !== false
+    && resolvedBatchSize.value > 0
+    && (rendererProps.maxLiveNodes ?? 0) <= 0
+})
+const stableLayoutDomEnabled = computed(() => {
+  return !renderAsFragment.value
+    && effectiveFinal.value === true
+    && !virtualizationEnabled.value
+    && !virtualScrollRequested.value
+    && !heightExperimentDomRequired.value
+    && !deferNodes.value
+    && !incrementalRenderingConfigured.value
+})
 const shouldObserveSlots = computed(() => !!registerNodeVisibility && (deferNodes.value || virtualizationEnabled.value))
 const scrollListenerEnabled = computed(() => virtualizationEnabled.value || virtualScrollEnabled.value)
 const {
@@ -5813,6 +5828,7 @@ onBeforeUnmount(() => {
       { dark: rendererProps.isDark },
       { virtualized: virtualizationEnabled },
       { 'virtual-scroll-coordinated': virtualScrollDomEnabled },
+      { 'stable-layout': stableLayoutDomEnabled },
       { 'typewriter-simple-cursor': showTypewriterCursor && resolvedTypewriterCursorMode === 'simple' },
     ]"
     :data-custom-id="rendererProps.customId"
@@ -6013,6 +6029,11 @@ onBeforeUnmount(() => {
      already limits DOM cost, so keep it visible to avoid a blank first paint. */
   content-visibility: visible;
   contain-intrinsic-size: auto;
+}
+
+.markdown-renderer.stable-layout {
+  content-visibility: visible;
+  contain-intrinsic-size: none;
 }
 
 .node-slot {
