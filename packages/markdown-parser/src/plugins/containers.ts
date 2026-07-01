@@ -128,6 +128,22 @@ function parseLooseInlineAttrs(input: string): Record<string, unknown> | null {
   return out
 }
 
+function offsetTokenMaps(tokens: Token[], lineOffset: number, maxEndLine: number) {
+  for (const token of tokens) {
+    const mappedToken = token as unknown as MarkdownToken
+    const map = mappedToken.map
+    if (Array.isArray(map) && map.length >= 2) {
+      const startLine = Number(map[0])
+      const endLine = Number(map[1])
+      if (Number.isFinite(startLine) && Number.isFinite(endLine))
+        mappedToken.map = [startLine + lineOffset, Math.min(endLine + lineOffset, maxEndLine)]
+    }
+
+    if (Array.isArray(mappedToken.children))
+      offsetTokenMaps(mappedToken.children as unknown as Token[], lineOffset, maxEndLine)
+  }
+}
+
 export function applyContainers(md: MarkdownIt) {
   ;[
     'admonition',
@@ -266,6 +282,7 @@ export function applyContainers(md: MarkdownIt) {
       const tokenOpen = s.push('vmr_container_open', 'div', 1)
       // `tokenOpen` is runtime token object; keep using runtime helpers.
       tokenOpen.attrSet('class', `vmr-container vmr-container-${name}`)
+      tokenOpen.map = [startLine, found ? nextLine : endLine]
 
       // Mark unclosed containers for downstream consumers (optional).
       tokenOpen.meta = { ...(tokenOpen.meta ?? {}), unclosed: !found && !envFinal }
@@ -333,6 +350,7 @@ export function applyContainers(md: MarkdownIt) {
         const innerTokens: Token[] = []
         // Use the same env as the parent block parser to ensure all block rules are available
         s.md.block.parse(innerSrc, s.md, s.env, innerTokens)
+        offsetTokenMaps(innerTokens, startLine + 1, startLine + 1 + contentLines.length)
         s.tokens.push(...(innerTokens as unknown as MarkdownToken[]))
       }
 

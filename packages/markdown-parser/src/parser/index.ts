@@ -17,6 +17,7 @@ import { parseHardBreak } from './node-parsers/hardbreak-parser'
 import { parseHtmlBlock } from './node-parsers/html-block-parser'
 import { parseList } from './node-parsers/list-parser'
 import { parseParagraph } from './node-parsers/paragraph-parser'
+import { applyNodeSourceMap, createSourceMapFromOffsets } from './node-source-map'
 import { cloneTokenWithMutableChildren } from './token-copy'
 
 type ParsedNodeWithFields = ParsedNode & {
@@ -948,6 +949,16 @@ function buildParagraphFromInlineChildren(children: ParsedNode[]): ParsedNode {
   } as ParsedNode
 }
 
+function inheritSourceMap(nodes: ParsedNode[], sourceNode: ParsedNode) {
+  if (!sourceNode.sourceMap)
+    return
+
+  for (const node of nodes) {
+    if (!node.sourceMap)
+      node.sourceMap = sourceNode.sourceMap
+  }
+}
+
 function maybePromoteCustomNodeFromParagraph(node: ParsedNode, options?: ParseOptions) {
   if (node.type !== 'paragraph')
     return null
@@ -1515,7 +1526,7 @@ function combineStructuredDetailsHtmlBlocks(
       ? openRaw.slice(0, openTagEndIndex + 1)
       : openRaw
 
-    merged.push({
+    const detailsNode = {
       ...node,
       tag: 'details',
       attrs: parseTagAttrs(openRaw.slice(0, openTagEndIndex + 1)),
@@ -1523,7 +1534,12 @@ function combineStructuredDetailsHtmlBlocks(
       content: `${contentPrefix}${renderedMiddle}${renderedCloseRaw}`,
       children: [...prefixChildren, ...children],
       loading: !final && !explicitClose,
-    } as ParsedNode)
+    } as ParsedNode
+
+    if (options.includeSourceMap)
+      detailsNode.sourceMap = createSourceMapFromOffsets(source, openStart, explicitClose ? closeSliceEnd : source.length, options)
+
+    merged.push(detailsNode)
 
     cursor = explicitClose ? closeSliceEnd : source.length
     if (closeIndex === -1 && !selfContained)
@@ -1535,7 +1551,7 @@ function combineStructuredDetailsHtmlBlocks(
   return [merged, cursor]
 }
 
-function mergeSplitTopLevelHtmlBlocks(nodes: ParsedNode[], final: boolean, source: string) {
+function mergeSplitTopLevelHtmlBlocks(nodes: ParsedNode[], final: boolean, source: string, options?: ParseOptions) {
   if (!source)
     return nodes
 
@@ -1583,6 +1599,8 @@ function mergeSplitTopLevelHtmlBlocks(nodes: ParsedNode[], final: boolean, sourc
     node.raw = exact.raw
     node.loading = desiredLoading
     node.attrs = exactAttrs.length ? exactAttrs : undefined
+    if (options?.includeSourceMap)
+      node.sourceMap = createSourceMapFromOffsets(source, exact.start, exact.end, options)
 
     if (!needsExpansion)
       continue
@@ -1839,6 +1857,128 @@ function stripDanglingHtmlLikeTail(markdown: string) {
   if (!isLikelyHtmlTagPrefix(tail))
     return s
   return s.slice(0, lastLt)
+}
+
+function createSourceLineMapper(source: string, parsedSource: string) {
+  if (source === parsedSource)
+    return undefined
+
+  const sourceLines = source.split(/\r?\n/)
+  const parsedLines = parsedSource.split(/\r?\n/)
+  const mappedLines: Array<{ startLine: number, endLine: number }> = []
+  let sourceCursor = 0
+
+  for (let parsedLine = 0; parsedLine < parsedLines.length; parsedLine++) {
+    const line = parsedLines[parsedLine] ?? ''
+
+    if (sourceLines[sourceCursor] === line) {
+      mappedLines[parsedLine] = {
+        startLine: sourceCursor,
+        endLine: sourceCursor + 1,
+      }
+      sourceCursor++
+      continue
+    }
+
+    const sourceLine = sourceLines[sourceCursor] ?? ''
+    if (line !== '' && sourceLine !== line && sourceLine.startsWith(line)) {
+      let joinedLine = line
+      let splitEnd = -1
+      for (let nextParsedLine = parsedLine + 1; nextParsedLine < parsedLines.length; nextParsedLine++) {
+        joinedLine += parsedLines[nextParsedLine] ?? ''
+        if (joinedLine === sourceLine) {
+          splitEnd = nextParsedLine
+          break
+        }
+        if (!sourceLine.startsWith(joinedLine))
+          break
+      }
+
+      if (splitEnd !== -1) {
+        for (let mappedLine = parsedLine; mappedLine <= splitEnd; mappedLine++) {
+          mappedLines[mappedLine] = {
+            startLine: sourceCursor,
+            endLine: sourceCursor + 1,
+          }
+        }
+        sourceCursor++
+        parsedLine = splitEnd
+        continue
+      }
+
+      mappedLines[parsedLine] = {
+        startLine: sourceCursor,
+        endLine: sourceCursor + 1,
+      }
+      continue
+    }
+
+    let collapsedLine = sourceLines[sourceCursor] ?? ''
+    let collapsedEnd = -1
+    for (let sourceLine = sourceCursor + 1; sourceLine < sourceLines.length; sourceLine++) {
+      collapsedLine += `\\n${sourceLines[sourceLine] ?? ''}`
+      if (collapsedLine === line) {
+        collapsedEnd = sourceLine + 1
+        break
+      }
+      if (!line.startsWith(collapsedLine))
+        break
+    }
+
+    if (collapsedEnd !== -1) {
+      mappedLines[parsedLine] = {
+        startLine: sourceCursor,
+        endLine: collapsedEnd,
+      }
+      sourceCursor = collapsedEnd
+      continue
+    }
+
+    let found = -1
+    if (line !== '') {
+      const searchEnd = Math.min(sourceLines.length, sourceCursor + 80)
+      for (let sourceLine = sourceCursor; sourceLine < searchEnd; sourceLine++) {
+        if (sourceLines[sourceLine] === line) {
+          found = sourceLine
+          break
+        }
+      }
+    }
+
+    if (found !== -1) {
+      mappedLines[parsedLine] = {
+        startLine: found,
+        endLine: found + 1,
+      }
+      sourceCursor = found + 1
+      continue
+    }
+
+    const fallbackLine = Math.min(
+      Math.max(0, sourceLines.length - 1),
+      Math.max(0, sourceCursor - 1),
+    )
+    mappedLines[parsedLine] = {
+      startLine: fallbackLine,
+      endLine: fallbackLine + 1,
+    }
+  }
+
+  return (line: number) => {
+    const index = Number.isFinite(line) ? Math.max(0, Math.trunc(line)) : 0
+    if (index < mappedLines.length)
+      return mappedLines[index] ?? { startLine: 0, endLine: 0 }
+
+    const lastMapped = mappedLines[mappedLines.length - 1] ?? {
+      startLine: Math.max(0, sourceLines.length - 1),
+      endLine: sourceLines.length,
+    }
+    const startLine = Math.min(sourceLines.length, lastMapped.endLine + index - mappedLines.length)
+    return {
+      startLine,
+      endLine: Math.min(sourceLines.length, startLine + 1),
+    }
+  }
 }
 
 function ensureBlankLineBeforeInlineMultilineCustomHtmlBlocks(markdown: string, tags: string[]) {
@@ -2740,7 +2880,8 @@ export function parseMarkdownToStructure(
   const isFinal = !!options.final
   // Ensure markdown is a string — guard against null/undefined inputs from callers
   // todo: 下面的特殊 math 其实应该更精确匹配到() 或者 $$ $$ 或者 \[ \] 内部的内容
-  let safeMarkdown = (markdown ?? '').toString().replace(/([^\\])\r(ight|ho)/g, '$1\\r$2').replace(/([^\\])\n(abla|eq|ot|exists)/g, '$1\\n$2')
+  const sourceMarkdown = (markdown ?? '').toString()
+  let safeMarkdown = sourceMarkdown.replace(/([^\\])\r(ight|ho)/g, '$1\\r$2').replace(/([^\\])\r?\n(abla|eq|ot|exists)/g, '$1\\n$2')
 
   if (shouldResetTopLevelStreamCacheForFinalAutoParse(md, options)) {
     md.stream!.reset!()
@@ -2865,6 +3006,14 @@ export function parseMarkdownToStructure(
 
   const standaloneHtmlDocument = parseStandaloneHtmlDocument(safeMarkdown)
   if (standaloneHtmlDocument) {
+    if (options.includeSourceMap) {
+      const sourceMapOptions: InternalParseOptions = {
+        ...options,
+        __sourceLineMapper: createSourceLineMapper(sourceMarkdown, safeMarkdown),
+      }
+      standaloneHtmlDocument[0].sourceMap = createSourceMapFromOffsets(safeMarkdown, 0, safeMarkdown.length, sourceMapOptions)
+    }
+
     // Keep pre/post hooks observable for callers that rely on them for
     // instrumentation, but preserve the full-document html_block shape.
     const preHook = options.preTransformTokens
@@ -2904,6 +3053,9 @@ export function parseMarkdownToStructure(
     ...options,
     validateLink,
     __markdownIt: md,
+    __sourceLineMapper: options.includeSourceMap === true
+      ? createSourceLineMapper(sourceMarkdown, safeMarkdown)
+      : undefined,
     __sourceMarkdown: safeMarkdown,
     __customHtmlBlockCursor: 0,
   }
@@ -2919,7 +3071,11 @@ export function parseMarkdownToStructure(
       const first = (postResult as unknown[])[0] as unknown
       const firstType = (first as Record<string, unknown>)?.type
       if (first && typeof firstType === 'string') {
-        result = processTokensWithTiming(postResult as unknown as MarkdownToken[], undefined, timing)
+        const postProcessOptions: InternalParseOptions = {
+          ...internalOptions,
+          __customHtmlBlockCursor: 0,
+        }
+        result = processTokensWithTiming(postResult as unknown as MarkdownToken[], postProcessOptions, timing)
       }
       else {
         // Otherwise assume it returned ParsedNode[] and use it as-is
@@ -2928,9 +3084,9 @@ export function parseMarkdownToStructure(
     }
   }
 
-  result = mergeSplitTopLevelHtmlBlocks(result, isFinal, safeMarkdown)
-  result = combineStructuredDetailsHtmlBlocks(result, safeMarkdown, md, options, isFinal)[0]
-  result = structureGenericHtmlBlockChildren(result, md, options, isFinal)
+  result = mergeSplitTopLevelHtmlBlocks(result, isFinal, safeMarkdown, internalOptions)
+  result = combineStructuredDetailsHtmlBlocks(result, safeMarkdown, md, internalOptions, isFinal)[0]
+  result = structureGenericHtmlBlockChildren(result, md, internalOptions, isFinal)
 
   if (isFinal) {
     const seen = new WeakSet<object>()
@@ -2974,6 +3130,7 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
 
   const result: ParsedNode[] = []
   const linkifyContext = createLinkifyDemotionContextTracker(options)
+  const includeSourceMap = options?.includeSourceMap === true
   let i = 0
   // Note: table token normalization is applied during markdown-it parsing
   // via the `applyFixTableTokens` plugin (core.ruler.after('block')).
@@ -2995,11 +3152,17 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
       {
         const paragraphRaw = String(tokens[i + 1]?.content ?? '')
         const paragraphNode = parseParagraph(tokens, i, linkifyContext.options(paragraphRaw)) as ParsedNode
+        if (includeSourceMap)
+          applyNodeSourceMap(paragraphNode, token, options)
         const promoted = maybePromoteCustomNodeFromParagraph(paragraphNode, options)
-        if (promoted)
+        if (promoted) {
+          if (includeSourceMap)
+            inheritSourceMap(promoted, paragraphNode)
           result.push(...promoted)
-        else
+        }
+        else {
           result.push(paragraphNode)
+        }
         linkifyContext.remember(paragraphNode.raw)
         i += 3 // Skip paragraph_open, inline, paragraph_close
         break
@@ -3008,6 +3171,8 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
       case 'bullet_list_open':
       case 'ordered_list_open': {
         const [listNode, newIndex] = parseList(tokens, i, linkifyContext.options())
+        if (includeSourceMap)
+          applyNodeSourceMap(listNode, token, options)
         result.push(listNode)
         linkifyContext.remember(listNode.raw)
         i = newIndex
@@ -3016,6 +3181,8 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
 
       case 'blockquote_open': {
         const [blockquoteNode, newIndex] = parseBlockquote(tokens, i, linkifyContext.options())
+        if (includeSourceMap)
+          applyNodeSourceMap(blockquoteNode, token, options)
         result.push(blockquoteNode)
         linkifyContext.remember(blockquoteNode.raw)
         i = newIndex
@@ -3025,11 +3192,14 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
       case 'footnote_anchor':{
         const meta = (token.meta ?? {}) as Record<string, unknown>
         const id = String(meta.label ?? token.content ?? '')
-        result.push({
+        const footnoteAnchorNode = {
           type: 'footnote_anchor',
           id,
           raw: String(token.content ?? ''),
-        } as ParsedNode)
+        } as ParsedNode
+        if (includeSourceMap)
+          applyNodeSourceMap(footnoteAnchorNode, token, options)
+        result.push(footnoteAnchorNode)
         linkifyContext.remember(String(token.content ?? ''))
 
         i++
@@ -3047,13 +3217,16 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
         // In stream mode, markdown-it can occasionally emit a root-level `text`
         // token (e.g. immediately after an HTML/custom block closes). Treat it
         // as a normal paragraph so the content isn't dropped.
-        result.push({
+        const paragraphNode = {
           type: 'paragraph',
           raw: content,
           children: content
             ? [{ type: 'text', content, raw: content } as ParsedNode]
             : [],
-        } as ParsedNode)
+        } as ParsedNode
+        if (includeSourceMap)
+          applyNodeSourceMap(paragraphNode, token, options)
+        result.push(paragraphNode)
         linkifyContext.remember(content)
         i++
         break
@@ -3077,6 +3250,10 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
             // no-op (matches previous behavior)
           }
           else if (parsed.every(n => n.type === 'html_block')) {
+            if (includeSourceMap) {
+              for (const node of parsed)
+                applyNodeSourceMap(node, token, options)
+            }
             result.push(...parsed)
           }
           else {
@@ -3085,11 +3262,17 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
               raw,
               children: parsed,
             } as ParsedNode
+            if (includeSourceMap)
+              applyNodeSourceMap(paragraphNode, token, options)
             const promoted = maybePromoteCustomNodeFromParagraph(paragraphNode, options)
-            if (promoted)
+            if (promoted) {
+              if (includeSourceMap)
+                inheritSourceMap(promoted, paragraphNode)
               result.push(...promoted)
-            else
+            }
+            else {
               result.push(paragraphNode)
+            }
           }
           linkifyContext.remember(raw)
         }

@@ -6,6 +6,16 @@ export interface BaseNode {
   loading?: boolean
   code?: string
   diff?: boolean
+  /**
+   * 0-based source line range from markdown-it token.map.
+   * The end line is exclusive.
+   */
+  sourceMap?: MarkdownNodeSourceMap
+}
+
+export interface MarkdownNodeSourceMap {
+  startLine: number
+  endLine: number
 }
 
 /**
@@ -436,6 +446,12 @@ export interface ParseOptions {
    * output as links.
    */
   validateLink?: (url: string) => boolean
+  /**
+   * When true, attach 0-based source line metadata to parsed block/custom nodes
+   * when token maps or parser source offsets are available. Nested container
+   * children may also be annotated.
+   */
+  includeSourceMap?: boolean
   // When true, log the parsed tree structure for debugging
   debug?: boolean
 }
@@ -450,5 +466,6 @@ export interface InternalParseOptions extends ParseOptions {
     marketTicker?: boolean
   }
   __markdownIt?: MarkdownIt
+  __sourceLineMapper?: (line: number) => MarkdownNodeSourceMap
   __sourceMarkdown?: string
 }

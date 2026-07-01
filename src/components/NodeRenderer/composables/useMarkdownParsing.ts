@@ -119,6 +119,7 @@ const STRUCTURAL_OBJECT_FIELDS = new Set([
   'cells',
   'term',
   'definition',
+  'sourceMap',
 ])
 const TEXT_SIGNATURE_FIELDS = ['raw', 'content', 'code', 'originalCode', 'updatedCode']
 const MAX_SIGNATURE_DEPTH = 6
@@ -169,6 +170,7 @@ function stableParseKey(
     customMarkdownIt: getIdentityKey(customMarkdownIt),
     requireClosingStrong: options.requireClosingStrong === true,
     customHtmlTags: options.customHtmlTags ?? [],
+    includeSourceMap: options.includeSourceMap === true,
     streamParse: options.streamParse ?? 'auto',
     validateLink: getIdentityKey(options.validateLink),
     preTransformTokens: getIdentityKey(options.preTransformTokens),

@@ -211,6 +211,28 @@ describe('useMarkdownParsing performance behavior', () => {
     scope.stop()
   })
 
+  it('flushes pending coalesced content when enabling source maps', () => {
+    vi.useFakeTimers()
+    const initial = 'hello '.repeat(18).trim()
+    const next = `${initial} world`
+    const content = ref(initial)
+    const smooth = ref(true)
+    const { props, scope, state } = createParsingState(content, smooth)
+
+    expect(state.parsedNodes.value[0]?.raw).toBe(initial)
+    expect(state.parsedNodes.value[0]?.sourceMap).toBeUndefined()
+
+    content.value = next
+    expect(state.parsedNodes.value[0]?.raw).toBe(initial)
+
+    props.parseOptions = { includeSourceMap: true }
+
+    expect(state.parsedNodes.value[0]?.raw).toBe(next)
+    expect(state.parsedNodes.value[0]?.sourceMap).toEqual({ startLine: 0, endLine: 1 })
+
+    scope.stop()
+  })
+
   it('uses parseCoalesceMs to pace smooth streaming parse commits', async () => {
     vi.useFakeTimers()
     const initial = 'hello '.repeat(18).trim()
@@ -276,6 +298,29 @@ describe('useMarkdownParsing performance behavior', () => {
     const first = state.parsedNodes.value
 
     content.value = 'alpha\n\nbeta\n\ngamma'
+    const second = state.parsedNodes.value
+
+    expect(second[0]).toBe(first[0])
+    expect(second[1]).toBe(first[1])
+    expect(second[2]).not.toBe(first[2])
+
+    scope.stop()
+  })
+
+  it('reuses unchanged ParsedNode references with source maps enabled after append parses', () => {
+    const content = ref('# alpha\n\nbeta')
+    const { scope, state } = createParsingState(content, ref(false), {
+      parseOptions: {
+        includeSourceMap: true,
+        streamParse: false,
+      },
+    })
+    const first = state.parsedNodes.value
+
+    expect(first[0]?.sourceMap).toEqual({ startLine: 0, endLine: 1 })
+    expect(first[1]?.sourceMap).toEqual({ startLine: 2, endLine: 3 })
+
+    content.value = '# alpha\n\nbeta\n\ngamma'
     const second = state.parsedNodes.value
 
     expect(second[0]).toBe(first[0])
