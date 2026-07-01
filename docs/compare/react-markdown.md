@@ -139,7 +139,9 @@ Tested scenarios:
 - [Migrate from react-markdown](/guide/react-markdown-migration)
 - [1.0 Benchmark Report](/guide/benchmark-1-0)
 
-## Reproduce this comparison
+## Reproduce Markstream scenarios
+
+These commands reproduce the Markstream streaming and performance scenarios used while writing this comparison. They are not a side-by-side benchmark against the alternative package.
 
 ```bash
 pnpm benchmark:1.0

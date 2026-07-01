@@ -50,6 +50,7 @@ import { ref } from 'vue'
 
 const content = ref('')
 const pending = ref('')
+const isDone = ref(false)
 
 let frameId = 0
 
@@ -64,6 +65,19 @@ export function appendTokenChunk(chunk: string) {
     pending.value = ''
     frameId = 0
   })
+}
+
+export function flushTokenChunks() {
+  if (!pending.value)
+    return
+
+  content.value += pending.value
+  pending.value = ''
+
+  if (frameId) {
+    cancelAnimationFrame(frameId)
+    frameId = 0
+  }
 }
 ```
 
@@ -90,6 +104,9 @@ async function streamMarkdownResponse(response: Response) {
   const tail = decoder.decode()
   if (tail)
     appendTokenChunk(tail)
+
+  flushTokenChunks()
+  isDone.value = true
 }
 ```
 
