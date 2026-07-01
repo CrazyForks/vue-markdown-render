@@ -37,14 +37,15 @@ async function listMarkdownFiles(dir, prefix = '') {
 
   for (const entry of entries) {
     const relativePath = prefix ? path.join(prefix, entry.name) : entry.name
+    const absolutePath = path.join(dir, entry.name)
 
     if (entry.isDirectory()) {
-      files.push(...await listMarkdownFiles(dir, relativePath))
+      files.push(...await listMarkdownFiles(absolutePath, relativePath))
       continue
     }
 
     if (entry.isFile() && entry.name.endsWith('.md'))
-      files.push(relativePath)
+      files.push(relativePath.replace(/\\/g, '/'))
   }
 
   return files
