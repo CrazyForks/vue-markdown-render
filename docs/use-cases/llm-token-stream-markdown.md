@@ -86,10 +86,14 @@ async function streamMarkdownResponse(response: Response) {
 
     appendTokenChunk(decoder.decode(value, { stream: true }))
   }
+
+  const tail = decoder.decode()
+  if (tail)
+    appendTokenChunk(tail)
 }
 ```
 
-Set `final` to `true` only after the loop finishes and any pending buffered text has been committed.
+Set `final` to `true` only after the loop finishes, the decoder has been flushed, and any pending buffered text has been committed.
 
 ## Chunking strategy
 

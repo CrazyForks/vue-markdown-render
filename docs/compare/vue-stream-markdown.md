@@ -118,7 +118,7 @@ If AI answers can grow beyond tens of kilobytes, renderer-level controls matter.
 
 ## Bundle and dependency notes
 
-`markstream-vue` is larger at base because it includes the parser and rendering infrastructure. However, all optional peers (Mermaid, KaTeX, Monaco, D2, Infographic) are only loaded when installed. If you don't install them, you pay zero cost for them.
+`markstream-vue` is larger at base because it includes the parser and rendering infrastructure. However, optional peers (Mermaid, KaTeX, Monaco, D2, Infographic) are only loaded when installed and imported. If you do not install or import those optional peers, their library payload is not part of the default dependency path.
 
 `vue-stream-markdown` is smaller at base but offers fewer features. Choose based on your AI output requirements, not just bundle size.
 

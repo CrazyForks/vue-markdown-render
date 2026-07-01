@@ -154,23 +154,11 @@ function createStructuredData(path: string, canonicalUrl: string, seo: RouteSeoC
       ],
     },
     {
-      '@type': 'SoftwareApplication',
+      '@type': 'WebPage',
+      '@id': `${canonicalUrl}#webpage`,
       'name': pageName,
-      'applicationCategory': 'DeveloperApplication',
-      'operatingSystem': 'Web',
       'url': canonicalUrl,
       'description': seo.description,
-      'image': PLAYGROUND_OG_IMAGE_URL,
-      'isAccessibleForFree': true,
-      'offers': {
-        '@type': 'Offer',
-        'price': '0',
-        'priceCurrency': 'USD',
-      },
-      'sameAs': [
-        GITHUB_REPO_URL,
-        `${PLAYGROUND_SITE_URL}/`,
-      ],
       'isPartOf': {
         '@id': `${PLAYGROUND_SITE_URL}/#website`,
       },

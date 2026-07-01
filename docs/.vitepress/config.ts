@@ -589,6 +589,9 @@ function getDocsPageDateModified(frontmatter: Record<string, any>, pageLastUpdat
   if (frontmatterDate instanceof Date)
     return frontmatterDate.toISOString()
 
+  if (typeof frontmatter.gitLastUpdated === 'number' && frontmatter.gitLastUpdated > 0)
+    return new Date(frontmatter.gitLastUpdated).toISOString()
+
   if (typeof pageLastUpdated === 'number' && pageLastUpdated > 0)
     return new Date(pageLastUpdated).toISOString()
 
@@ -867,6 +870,17 @@ export default defineConfig({
         nav: zhNav,
       },
     },
+  },
+  transformPageData(pageData) {
+    if (typeof pageData.lastUpdated !== 'number' || pageData.lastUpdated <= 0)
+      return
+
+    return {
+      frontmatter: {
+        ...pageData.frontmatter,
+        gitLastUpdated: pageData.lastUpdated,
+      },
+    }
   },
   transformHead(ctx) {
     const normalizedPath = normalizeDocsSeoPath(ctx.page)

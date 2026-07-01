@@ -374,6 +374,8 @@ function seoKeywordMapTargets(entry) {
     ...(Array.isArray(entry.targetAlternates) ? entry.targetAlternates : []),
     entry.targetZh,
     ...(Array.isArray(entry.targetZhAlternates) ? entry.targetZhAlternates : []),
+    entry.targetZhFallback,
+    ...(Array.isArray(entry.targetZhFallbackAlternates) ? entry.targetZhFallbackAlternates : []),
   ].filter(Boolean)
 }
 
@@ -394,6 +396,9 @@ if (isMain) {
       failures.push(`${relativePath} still contains old docs host ${oldHost}`)
 
     if (extname(filePath) === '.html') {
+      if (content.includes('VPLastUpdated'))
+        failures.push(`${relativePath} renders the default theme Last updated footer`)
+
       const nodes = parseStructuredDataNodes(content, relativePath)
       jsonLdNodesByRelativePath.set(relativePath, nodes)
       validateStructuredDataNodes(relativePath, nodes)
@@ -448,6 +453,12 @@ if (isMain) {
     for (const [index, entry] of seoKeywordMap.entries()) {
       if (!hasNonEmptyString(entry.query))
         failures.push(`docs/seo-keyword-map.json entry ${index} is missing query`)
+
+      if (entry.targetZh && !entry.targetZh.startsWith('/zh/'))
+        failures.push(`docs/seo-keyword-map.json entry ${index} targetZh must start with /zh/ or use targetZhFallback`)
+
+      if (entry.targetZhFallback && entry.targetZhFallback.startsWith('/zh/'))
+        failures.push(`docs/seo-keyword-map.json entry ${index} targetZhFallback must point to a non-zh fallback route`)
 
       for (const target of seoKeywordMapTargets(entry)) {
         if (typeof target !== 'string' || !target.startsWith('/')) {

@@ -1,5 +1,5 @@
 ---
-title: AI streaming Markdown use cases — Markstream
+title: AI streaming Markdown use cases
 description: "Explore Markstream use cases: AI chat streaming, SSE/WebSocket Markdown, progressive Mermaid and KaTeX, long AI responses, and mobile WebView rendering."
 ---
 # Use cases

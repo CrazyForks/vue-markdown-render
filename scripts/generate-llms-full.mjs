@@ -267,13 +267,15 @@ const seoKeywordMap = readJson('docs/seo-keyword-map.json')
 const routingEntries = seoKeywordMap.map(entry => [entry.query, entry.target])
 
 function formatKeywordMapTarget(entry, locale) {
-  const target = locale === 'zh' ? entry.targetZh || entry.target : entry.target
+  const usesZhFallback = locale === 'zh' && !entry.targetZh && Boolean(entry.targetZhFallback)
+  const target = locale === 'zh' ? entry.targetZh || entry.targetZhFallback || entry.target : entry.target
   const alternates = locale === 'zh'
-    ? entry.targetZhAlternates || entry.targetAlternates || []
+    ? entry.targetZhAlternates || entry.targetZhFallbackAlternates || entry.targetAlternates || []
     : entry.targetAlternates || []
   const separator = locale === 'zh' ? ' 或 ' : ' or '
+  const suffix = usesZhFallback ? '（英文页面 fallback）' : ''
 
-  return [target, ...alternates].join(separator)
+  return `${[target, ...alternates].join(separator)}${suffix}`
 }
 
 function renderSeoKeywordMap(locale) {

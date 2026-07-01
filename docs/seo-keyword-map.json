@@ -142,7 +142,7 @@
     "queryZh": "vue-stream-markdown 替代",
     "intent": "comparison",
     "target": "/compare/vue-stream-markdown",
-    "targetZh": "/compare/vue-stream-markdown",
+    "targetZhFallback": "/compare/vue-stream-markdown",
     "primaryTitle": "markstream-vue vs vue-stream-markdown"
   },
   {
@@ -182,7 +182,7 @@
     "queryZh": "流式 mermaid markdown",
     "intent": "use-case",
     "target": "/use-cases/streaming-mermaid-katex",
-    "targetZh": "/use-cases/streaming-mermaid-katex",
+    "targetZhFallback": "/use-cases/streaming-mermaid-katex",
     "primaryTitle": "Streaming Mermaid and KaTeX Markdown"
   },
   {
@@ -190,7 +190,7 @@
     "queryZh": "流式 katex markdown",
     "intent": "use-case",
     "target": "/use-cases/streaming-mermaid-katex",
-    "targetZh": "/use-cases/streaming-mermaid-katex",
+    "targetZhFallback": "/use-cases/streaming-mermaid-katex",
     "primaryTitle": "Streaming KaTeX Markdown"
   },
   {
@@ -198,7 +198,7 @@
     "queryZh": "长 ai 回复 markdown 渲染",
     "intent": "use-case",
     "target": "/use-cases/long-ai-responses",
-    "targetZh": "/use-cases/long-ai-responses",
+    "targetZhFallback": "/use-cases/long-ai-responses",
     "primaryTitle": "Long AI response Markdown renderer"
   },
   {
@@ -206,7 +206,7 @@
     "queryZh": "未闭合 markdown 渲染器",
     "intent": "use-case",
     "target": "/use-cases/incomplete-markdown-renderer",
-    "targetZh": "/use-cases/incomplete-markdown-renderer",
+    "targetZhFallback": "/use-cases/incomplete-markdown-renderer",
     "primaryTitle": "Incomplete Markdown renderer"
   },
   {
@@ -222,7 +222,7 @@
     "queryZh": "静态 markdown 与流式 markdown 渲染器",
     "intent": "comparison",
     "target": "/compare/static-vs-streaming",
-    "targetZh": "/compare/static-vs-streaming",
+    "targetZhFallback": "/compare/static-vs-streaming",
     "primaryTitle": "Static vs streaming Markdown rendering"
   }
 ]
