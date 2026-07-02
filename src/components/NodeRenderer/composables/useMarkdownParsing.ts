@@ -2,7 +2,7 @@ import type {
   MarkdownIt,
   ParsedNode,
 } from 'stream-markdown-parser'
-import type { ComputedRef, Ref } from 'vue'
+import type { ComputedRef } from 'vue'
 import type { CustomComponents } from '../../../types'
 import type { NodeRendererProps } from '../../../types/node-renderer-props'
 import {
@@ -76,8 +76,8 @@ export interface MarkdownParsingState {
   mdBase: ComputedRef<MarkdownIt>
   mdInstance: ComputedRef<MarkdownIt>
   mergedParseOptions: ComputedRef<RendererParseOptions>
-  parsedNodesDirtyStartIndex: Ref<number>
-  parsedNodesRevision: Ref<number>
+  getParsedNodesDirtyStartIndex: () => number
+  getParsedNodesRevision: () => number
   parsedNodes: ComputedRef<ParsedNode[]>
 }
 
@@ -834,16 +834,14 @@ export function useMarkdownParsing(
   let parseCommitCount = 0
   let parseCoalescedCount = 0
   let lastParseFlushAt = getNow()
+  let parsedNodesDirtyStartIndexValue = -1
   let parsedNodesRevisionCount = 0
-  const parsedNodesDirtyStartIndex = ref(-1)
-  const parsedNodesRevision = ref(0)
 
   function commitParsedNodesDirtyStartIndex(dirtyStartIndex: number) {
-    parsedNodesDirtyStartIndex.value = Number.isInteger(dirtyStartIndex)
+    parsedNodesDirtyStartIndexValue = Number.isInteger(dirtyStartIndex)
       ? dirtyStartIndex
       : 0
     parsedNodesRevisionCount += 1
-    parsedNodesRevision.value = parsedNodesRevisionCount
   }
 
   function clearParseCoalesceTimer() {
@@ -1161,8 +1159,8 @@ export function useMarkdownParsing(
     mdBase,
     mdInstance,
     mergedParseOptions,
-    parsedNodesDirtyStartIndex,
-    parsedNodesRevision,
+    getParsedNodesDirtyStartIndex: () => parsedNodesDirtyStartIndexValue,
+    getParsedNodesRevision: () => parsedNodesRevisionCount,
     parsedNodes,
   }
 }

@@ -285,8 +285,7 @@ describe('node renderer measurement performance', () => {
       return Array.isArray(estimates) ? estimates : estimates.value
     }
     const readDirtyStart = () => {
-      const dirtyStart = state.parsedNodesDirtyStartIndex
-      return typeof dirtyStart === 'number' ? dirtyStart : dirtyStart.value
+      return state.getParsedNodesDirtyStartIndex()
     }
     const initialEstimates = readEstimates()
     const initialPrefixEstimate = initialEstimates[0]

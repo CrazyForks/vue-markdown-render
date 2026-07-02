@@ -610,8 +610,8 @@ const {
   effectiveCustomHtmlTagsSet,
   mergedParseOptions,
   parsedNodes,
-  parsedNodesDirtyStartIndex,
-  parsedNodesRevision,
+  getParsedNodesDirtyStartIndex,
+  getParsedNodesRevision,
 } = useMarkdownParsing(rendererProps, {
   instanceMsgId,
   renderContent,
@@ -1437,7 +1437,7 @@ function clamp(value: number, min: number, max: number) {
 }
 
 function getParsedNodesDirtyStart(total = parsedNodes.value.length) {
-  const dirtyStartIndex = parsedNodesDirtyStartIndex.value
+  const dirtyStartIndex = getParsedNodesDirtyStartIndex()
   if (!Number.isInteger(dirtyStartIndex) || dirtyStartIndex < 0)
     return total
 
@@ -1612,7 +1612,7 @@ watchEffect(() => {
     return
 
   const nodes = parsedNodes.value
-  const parserRevision = parsedNodesRevision.value
+  const parserRevision = getParsedNodesRevision()
   if (!nodes.length || !heightEstimationActive.value) {
     estimatedNodeHeightsCache = []
     estimatedNodeHeightsContext = []
