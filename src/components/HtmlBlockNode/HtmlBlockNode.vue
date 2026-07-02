@@ -3,7 +3,7 @@ import type { HtmlPolicy } from 'stream-markdown-parser'
 import type { NodeRendererProps } from '../../types/node-renderer-props'
 import { isHtmlTagBlocked, NON_STRUCTURING_HTML_TAGS, sanitizeHtmlContent, sanitizeHtmlTokenAttrs, tokenAttrsToRecord } from 'stream-markdown-parser'
 import { computed, defineAsyncComponent, defineComponent, inject, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
-import { useViewportPriority, useViewportPriorityOptions } from '../../composables/viewportPriority'
+import { DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN, useViewportPriority, useViewportPriorityOptions } from '../../composables/viewportPriority'
 import { hasCustomComponents, parseHtmlToVNodes } from '../../utils/htmlRenderer'
 import { useCustomNodeComponents } from '../../utils/nodeComponents'
 
@@ -145,7 +145,7 @@ if (typeof window !== 'undefined') {
       let active = true
       const rootMargin = viewportPriorityOptions?.value.heavyBlockMargin
         ?? viewportPriorityOptions?.value.rootMargin
-        ?? '400px'
+        ?? DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN
       const handle = registerVisibility(el, { rootMargin })
       visibilityHandle.value = handle
       // Latch render readiness once visible so observer reconfiguration does not hide rendered HTML.

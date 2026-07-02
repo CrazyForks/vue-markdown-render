@@ -10,7 +10,7 @@ import {
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
-import { useViewportPriority, useViewportPriorityOptions } from '../../composables/viewportPriority'
+import { DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN, useViewportPriority, useViewportPriorityOptions } from '../../composables/viewportPriority'
 import { isDevEnvironment } from '../../utils/devEnv'
 import {
   languageIconsRevision,
@@ -121,7 +121,7 @@ if (typeof window !== 'undefined') {
       let active = true
       const rootMargin = viewportPriorityOptions?.value.heavyBlockMargin
         ?? viewportPriorityOptions?.value.rootMargin
-        ?? '400px'
+        ?? DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN
       const handle = registerVisibility(el, { rootMargin })
 
       viewportHandle.value = handle

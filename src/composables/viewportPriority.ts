@@ -5,6 +5,7 @@ import { inject, provide, ref, watch } from 'vue'
 // Injection key for viewport-priority registration
 const ViewportPriorityKey = Symbol('ViewportPriority') as InjectionKey<RegisterFn>
 const ViewportPriorityOptionsKey = Symbol('ViewportPriorityOptions') as InjectionKey<ComputedRef<MarkstreamViewportPriorityOptions>>
+export const DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN = '400px'
 
 export interface VisibilityHandle {
   isVisible: Ref<boolean>
@@ -88,7 +89,7 @@ export function provideViewportPriority(
   function normalizeConfig(target?: HTMLElement, opts?: ViewportPriorityRegisterOptions): ObserverConfig {
     return {
       root: getRootEl?.(target ?? null) ?? null,
-      rootMargin: opts?.rootMargin ?? '300px',
+      rootMargin: opts?.rootMargin ?? DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN,
       threshold: opts?.threshold ?? 0,
     }
   }
@@ -357,7 +358,7 @@ export function useViewportPriority() {
   }
 
   const getLocalBucketKey = (opts?: ViewportPriorityRegisterOptions) => [
-    opts?.rootMargin ?? '300px',
+    opts?.rootMargin ?? DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN,
     opts?.threshold ?? 0,
   ].join('\u0000')
 
@@ -430,7 +431,7 @@ export function useViewportPriority() {
     if (existing)
       return { key: bucketKey, bucket: existing }
 
-    const rootMargin = opts?.rootMargin ?? '300px'
+    const rootMargin = opts?.rootMargin ?? DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN
     let io: IntersectionObserver
     try {
       io = new IntersectionObserver((entries) => {

@@ -50,7 +50,7 @@ import TableNode from '../../components/TableNode'
 import TextNode from '../../components/TextNode'
 import ThematicBreakNode from '../../components/ThematicBreakNode'
 import VmrContainerNode from '../../components/VmrContainerNode'
-import { provideViewportPriority, provideViewportPriorityOptions } from '../../composables/viewportPriority'
+import { DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN, provideViewportPriority, provideViewportPriorityOptions } from '../../composables/viewportPriority'
 import {
   buildBlockTextProfile,
   createEmptySimpleTextProbeProfile,
@@ -306,7 +306,7 @@ function resolveViewportPriorityMaxTargets(value: unknown) {
 
 const resolvedViewportPriorityOptions = computed<MarkstreamViewportPriorityOptions>(() => {
   const options = rendererProps.viewportPriorityOptions ?? {}
-  const rootMargin = resolveViewportPriorityRootMargin(options.rootMargin, '400px')
+  const rootMargin = resolveViewportPriorityRootMargin(options.rootMargin, DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN)
 
   return {
     rootMargin,
@@ -314,7 +314,7 @@ const resolvedViewportPriorityOptions = computed<MarkstreamViewportPriorityOptio
     maxTargets: resolveViewportPriorityMaxTargets(options.maxTargets),
   }
 })
-const viewportPriorityRootMargin = computed(() => resolvedViewportPriorityOptions.value.rootMargin ?? '400px')
+const viewportPriorityRootMargin = computed(() => resolvedViewportPriorityOptions.value.rootMargin ?? DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN)
 const viewportPriorityMaxTargets = computed(() => resolvedViewportPriorityOptions.value.maxTargets ?? MAX_VIEWPORT_OBSERVER_TARGETS)
 provideViewportPriorityOptions(resolvedViewportPriorityOptions)
 

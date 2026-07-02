@@ -845,6 +845,46 @@ describe('markdownRender deferNodesUntilVisible', () => {
     }
   })
 
+  it('uses viewportPriorityOptions.rootMargin for deferred node shells', async () => {
+    const OriginalIO = globalThis.IntersectionObserver
+    const benchmarkWindow = window as any
+    vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)
+    benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__ = true
+
+    let wrapper: ReturnType<typeof mount> | null = null
+    try {
+      const MarkdownRender = (await import('../src/components/NodeRenderer')).default
+      const markdown = Array.from({ length: 60 }, (_, i) => `Paragraph ${i + 1}`).join('\n\n')
+
+      wrapper = mount(MarkdownRender, {
+        props: {
+          content: markdown,
+          deferNodesUntilVisible: true,
+          viewportPriority: true,
+          viewportPriorityOptions: {
+            rootMargin: '123px',
+          },
+          initialRenderBatchSize: 40,
+        },
+      })
+
+      await flushAll()
+
+      const slot = wrapper.find('[data-node-index="45"]')
+      expect(slot.exists()).toBe(true)
+      expect(slot.find('.node-placeholder').exists()).toBe(true)
+
+      const observer = FakeIntersectionObserver.instances.find(instance => instance.elements.has(slot.element))
+      expect(observer).toBeTruthy()
+      expect(observer?.options.rootMargin).toBe('123px')
+    }
+    finally {
+      wrapper?.unmount()
+      delete benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__
+      vi.stubGlobal('IntersectionObserver', OriginalIO as any)
+    }
+  })
+
   it('uses viewportPriorityOptions.maxTargets when auto-disabling node deferral', async () => {
     const OriginalIO = globalThis.IntersectionObserver
     vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)

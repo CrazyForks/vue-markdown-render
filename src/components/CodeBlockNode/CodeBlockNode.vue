@@ -7,7 +7,7 @@ import { computed, getCurrentInstance, inject, nextTick, onBeforeUnmount, onUnmo
 import { useSafeI18n } from '../../composables/useSafeI18n'
 // Tooltip is provided as a singleton via composable to avoid many DOM nodes
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
-import { useViewportPriority, useViewportPriorityOptions } from '../../composables/viewportPriority'
+import { DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN, useViewportPriority, useViewportPriorityOptions } from '../../composables/viewportPriority'
 import { languageIconsRevision, languageMap, normalizeLanguageIdentifier, resolveMonacoLanguageId } from '../../utils'
 import { MARKSTREAM_LANGUAGE_ICON_RESOLVER_KEY } from '../../utils/languageIconContext'
 import { resolveLifecycleIndexKey } from '../../utils/lifecycleIndexKey'
@@ -212,7 +212,7 @@ if (typeof window !== 'undefined') {
       let active = true
       const rootMargin = viewportPriorityOptions?.value.heavyBlockMargin
         ?? viewportPriorityOptions?.value.rootMargin
-        ?? '400px'
+        ?? DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN
       const handle = registerVisibility(el, { rootMargin })
 
       viewportHandle.value = handle
