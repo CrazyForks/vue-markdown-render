@@ -630,6 +630,57 @@ describe('markdownRender deferNodesUntilVisible', () => {
     }
   })
 
+  it('restores node deferral after viewportPriorityOptions.maxTargets increases', async () => {
+    const OriginalIO = globalThis.IntersectionObserver
+    vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)
+
+    const createMarkdown = (count: number) =>
+      Array.from({ length: count }, (_, index) => `Paragraph ${index + 1}`).join('\n\n')
+
+    let wrapper: ReturnType<typeof mount> | null = null
+    try {
+      const MarkdownRender = (await import('../src/components/NodeRenderer')).default
+
+      wrapper = mount(MarkdownRender, {
+        props: {
+          content: createMarkdown(220),
+          batchRendering: false,
+          deferNodesUntilVisible: true,
+          viewportPriority: true,
+          viewportPriorityOptions: {
+            maxTargets: 1,
+          },
+          initialRenderBatchSize: 0,
+          maxLiveNodes: 500,
+        },
+      })
+
+      await flushAll()
+
+      expect(wrapper.findAll('.node-placeholder')).toHaveLength(0)
+      expect(FakeIntersectionObserver.instances.every(instance => instance.elements.size === 0)).toBe(true)
+
+      await wrapper.setProps({
+        viewportPriorityOptions: {
+          maxTargets: 300,
+        },
+      })
+      await flushAll()
+      await wrapper.setProps({ content: createMarkdown(221) })
+      await flushAll()
+
+      const tailSlot = wrapper.find('[data-node-index="220"]')
+      expect(tailSlot.exists()).toBe(true)
+      expect(tailSlot.find('.node-placeholder').exists()).toBe(true)
+      expect(tailSlot.find('.node-content').exists()).toBe(false)
+      expect(FakeIntersectionObserver.instances.some(instance => instance.elements.has(tailSlot.element))).toBe(true)
+    }
+    finally {
+      wrapper?.unmount()
+      vi.stubGlobal('IntersectionObserver', OriginalIO as any)
+    }
+  })
+
   it('ignores overflow ancestors that are not actually scrollable when picking the IO root', async () => {
     const OriginalIO = globalThis.IntersectionObserver
     vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)

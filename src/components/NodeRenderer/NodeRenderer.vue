@@ -4494,13 +4494,19 @@ watch(
 
 watch(
   [() => rendererProps.viewportPriority, () => parsedNodes.value.length, viewportPriorityMaxTargets],
-  ([enabled, length]) => {
+  ([enabled, length, maxTargets]) => {
     if (enabled === false) {
       viewportPriorityAutoDisabled.value = false
       return
     }
-    if (viewportPriorityAutoDisabled.value && length <= VIEWPORT_PRIORITY_RECOVERY_COUNT)
+    if (
+      viewportPriorityAutoDisabled.value
+      && (length <= VIEWPORT_PRIORITY_RECOVERY_COUNT || length <= maxTargets)
+    ) {
       viewportPriorityAutoDisabled.value = false
+      for (const [index, el] of nodeSlotElements)
+        setNodeSlotElement(index, el)
+    }
   },
 )
 
