@@ -4451,7 +4451,11 @@ watch(
 )
 
 watch(
-  [viewportPriorityRootMargin, viewportPriorityMaxTargets],
+  [
+    viewportPriorityRootMargin,
+    viewportPriorityMaxTargets,
+    () => resolveVirtualScrollRoot(),
+  ],
   () => {
     for (const [index, el] of nodeSlotElements)
       setNodeSlotElement(index, el)
