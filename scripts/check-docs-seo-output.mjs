@@ -617,6 +617,9 @@ if (isMain) {
     const ogImageWidth = ogImageDimensionValue(frontmatterScalarValue(frontmatter, 'ogImageWidth'), '1200')
     const ogImageHeight = ogImageDimensionValue(frontmatterScalarValue(frontmatter, 'ogImageHeight'), '630')
 
+    if (ogImage && !ogImageAlt)
+      failures.push(`${relativePath} has ogImage but is missing ogImageAlt`)
+
     if (hasFrontmatterKey(frontmatter, 'faq')) {
       checks.push(['FAQPage', 'structured data'])
       checks.push(['markstream-faq', 'visible FAQ section'])

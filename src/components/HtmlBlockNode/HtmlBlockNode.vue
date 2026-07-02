@@ -148,6 +148,7 @@ if (typeof window !== 'undefined') {
         ?? '400px'
       const handle = registerVisibility(el, { rootMargin })
       visibilityHandle.value = handle
+      // Latch render readiness once visible so observer reconfiguration does not hide rendered HTML.
       shouldRender.value = shouldRender.value || handle.isVisible.value
       handle.whenVisible.then(() => {
         if (active && visibilityHandle.value === handle)
