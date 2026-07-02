@@ -48,6 +48,16 @@ function createCodeBlock(index: number) {
   }
 }
 
+function createCodeFence(index: number, lineCount: number) {
+  const lines = Array.from({ length: lineCount }, (_, index) => `console.log(${index + 1})`)
+  return `\`\`\`js\n// block ${index}\n${lines.join('\n')}\n\`\`\``
+}
+
+function createMarkdownWithOpenCodeBlock(tailLineCount: number) {
+  const lines = Array.from({ length: tailLineCount }, (_, index) => `console.log(${index + 1})`)
+  return `${createCodeFence(1, 10)}\n\n\`\`\`js\n// tail\n${lines.join('\n')}`
+}
+
 function installManualMeasurementPlatform() {
   const frames: FrameRequestCallback[] = []
   const heights = new WeakMap<HTMLElement, number>()
@@ -199,6 +209,57 @@ describe('node renderer measurement performance', () => {
     await flushVueOnly()
 
     expect(readEstimates()[0]).toBe(firstEstimate)
+    wrapper.unmount()
+  })
+
+  it('recomputes estimated heights from dirtyStart when node count is unchanged', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => 640)
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: createMarkdownWithOpenCodeBlock(10),
+        codeRenderer: 'pre',
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'estimated-height-dirty-start-same-count',
+        },
+      },
+    })
+
+    await flushAll()
+
+    const state = setupState(wrapper)
+    const readEstimates = () => {
+      const estimates = state.estimatedNodeHeights
+      return Array.isArray(estimates) ? estimates : estimates.value
+    }
+    const readDirtyStart = () => {
+      const dirtyStart = state.parsedNodesDirtyStartIndex
+      return typeof dirtyStart === 'number' ? dirtyStart : dirtyStart.value
+    }
+    const initialEstimates = readEstimates()
+    const initialPrefixEstimate = initialEstimates[0]
+    const initialTailEstimate = initialEstimates[1]
+    const initialVirtualState = (wrapper.vm as any).captureVirtualState()
+
+    expect(initialPrefixEstimate?.kind).toBe('code-block')
+    expect(initialTailEstimate?.kind).toBe('code-block')
+    expect(initialVirtualState?.contentHash).toBeTruthy()
+
+    await wrapper.setProps({ content: createMarkdownWithOpenCodeBlock(40) })
+    await flushAll()
+
+    const updatedEstimates = readEstimates()
+    const updatedVirtualState = (wrapper.vm as any).captureVirtualState()
+
+    expect(updatedEstimates).toHaveLength(initialEstimates.length)
+    expect(readDirtyStart()).toBe(1)
+    expect(updatedEstimates[0]).toStrictEqual(initialPrefixEstimate)
+    expect(updatedEstimates[1]).not.toBe(initialTailEstimate)
+    expect(updatedVirtualState?.contentHash).not.toBe(initialVirtualState?.contentHash)
+
     wrapper.unmount()
   })
 

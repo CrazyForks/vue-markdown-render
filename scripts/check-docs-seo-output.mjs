@@ -10,6 +10,8 @@ const distDir = resolve(docsDir, '.vitepress/dist')
 const newHost = 'https://markstream.simonhe.me'
 const oldHost = 'https://markstream-vue-docs.simonhe.me'
 const oldHostRedirect = `${oldHost}/*  ${newHost}/:splat  301`
+const docsOgImageUrl = `${newHost}/og-image.svg`
+const docsOgImageAlt = 'Markstream streaming Markdown renderer documentation overview'
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 
 const scannedExtensions = new Set(['.html', '.xml', '.txt'])
@@ -124,6 +126,18 @@ function htmlFileForRoute(routePath) {
     return `${routePart}/index.html`
 
   return `${routePart}.html`
+}
+
+function markdownFileForRoute(routePath) {
+  if (routePath === '/')
+    return resolve(docsDir, 'index.md')
+
+  const routePart = routePath.slice(1)
+  const indexFile = resolve(docsDir, routePart, 'index.md')
+  if (existsSync(indexFile))
+    return indexFile
+
+  return resolve(docsDir, `${routePart}.md`)
 }
 
 function readFrontmatter(filePath) {
@@ -548,7 +562,24 @@ if (isMain) {
     const canonicalUrl = `${newHost}${routePath === '/' ? '/' : routePath}`
     expectContains(content, relativePath, `<link rel="canonical" href="${canonicalUrl}">`, `is missing canonical ${canonicalUrl}`)
     expectContains(content, relativePath, `<meta property="og:url" content="${canonicalUrl}">`, `is missing og:url ${canonicalUrl}`)
-    expectOgImageMeta(content, relativePath)
+    const frontmatter = readFrontmatter(markdownFileForRoute(routePath))
+    const ogImage = frontmatterStringValue(frontmatter, 'ogImage')
+    const ogImageAlt = frontmatterStringValue(frontmatter, 'ogImageAlt')
+    const ogImageWidth = frontmatterStringValue(frontmatter, 'ogImageWidth') ?? '1200'
+    const ogImageHeight = frontmatterStringValue(frontmatter, 'ogImageHeight') ?? '630'
+    expectOgImageMeta(content, relativePath, ogImage
+      ? {
+          image: docsAssetUrl(ogImage),
+          alt: ogImageAlt,
+          width: ogImageWidth,
+          height: ogImageHeight,
+        }
+      : {
+          image: docsOgImageUrl,
+          alt: docsOgImageAlt,
+          width: '1200',
+          height: '630',
+        })
 
     const structuredDataNodes = jsonLdNodesByRelativePath.get(relativePath) ?? parseStructuredDataNodes(content, relativePath)
     if (!hasStructuredDataType(structuredDataNodes, 'WebPage'))
