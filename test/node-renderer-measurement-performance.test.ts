@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { nextTick } from 'vue'
+import { defineComponent, nextTick } from 'vue'
+import { removeCustomComponents, setCustomComponents } from '../src/utils/nodeComponents'
 import { flushAll } from './setup/flush-all'
 
 class CountingResizeObserver {
@@ -214,6 +215,50 @@ describe('node renderer measurement performance', () => {
 
     expect(readEstimates()[0]).toBe(firstEstimate)
     wrapper.unmount()
+  })
+
+  it('recomputes estimated heights when custom code block components change', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => 640)
+
+    const customId = 'estimated-height-custom-components'
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId,
+        nodes: [createCodeBlock(1)],
+        codeRenderer: 'pre',
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'estimated-height-custom-components',
+        },
+      },
+    })
+
+    try {
+      await flushAll()
+
+      const state = setupState(wrapper)
+      const readEstimates = () => {
+        const estimates = state.estimatedNodeHeights
+        return Array.isArray(estimates) ? estimates : estimates.value
+      }
+
+      expect(readEstimates()[0]?.kind).toBe('code-block')
+
+      setCustomComponents(customId, {
+        code_block: defineComponent({
+          template: '<div data-custom-code-block="1" />',
+        }),
+      })
+      await flushVueOnly()
+
+      expect(readEstimates()[0]).toBe(null)
+    }
+    finally {
+      wrapper.unmount()
+      removeCustomComponents(customId)
+    }
   })
 
   it('recomputes estimated heights from dirtyStart when node count is unchanged', async () => {

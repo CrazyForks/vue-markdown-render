@@ -1596,6 +1596,7 @@ function getEstimatedNodeHeightContext(width: number) {
     rendererProps.codeBlockMonacoOptions,
     resolveCodeBlockShowHeader(),
     resolvedCodeRenderer.value,
+    customComponentsMap.value,
     heightEstimationExperimentRevision.value,
   ]
 }
