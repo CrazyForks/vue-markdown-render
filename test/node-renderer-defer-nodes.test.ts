@@ -543,6 +543,50 @@ describe('markdownRender deferNodesUntilVisible', () => {
     }
   })
 
+  it('passes viewportPriorityOptions heavyBlockMargin from MarkdownRender to shiki code blocks', async () => {
+    const OriginalIO = globalThis.IntersectionObserver
+    const benchmarkWindow = window as any
+    vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)
+    benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__ = true
+
+    let wrapper: ReturnType<typeof mount> | null = null
+    try {
+      const { default: MarkdownRender } = await import('../src/components/NodeRenderer')
+
+      wrapper = mount(MarkdownRender, {
+        props: {
+          content: [
+            '```ts',
+            'console.log(1)',
+            '```',
+          ].join('\n'),
+          codeRenderer: 'shiki',
+          batchRendering: false,
+          deferNodesUntilVisible: false,
+          final: true,
+          viewportPriority: true,
+          viewportPriorityOptions: {
+            rootMargin: '111px',
+            heavyBlockMargin: '222px',
+          },
+        },
+      })
+
+      for (let attempt = 0; attempt < 10 && !wrapper.find('[data-markstream-code-block="1"]').exists(); attempt++)
+        await flushAll()
+
+      const codeBlock = wrapper.get('[data-markstream-code-block="1"]')
+      const codeBlockObserver = FakeIntersectionObserver.instances.find(instance => instance.elements.has(codeBlock.element))
+      expect(codeBlockObserver).toBeTruthy()
+      expect(codeBlockObserver?.options.rootMargin).toBe('222px')
+    }
+    finally {
+      wrapper?.unmount()
+      delete benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__
+      vi.stubGlobal('IntersectionObserver', OriginalIO as any)
+    }
+  })
+
   it('keeps MarkdownCodeBlockNode ready after viewport priority options change', async () => {
     const OriginalIO = globalThis.IntersectionObserver
     const benchmarkWindow = window as any

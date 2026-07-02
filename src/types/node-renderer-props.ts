@@ -275,8 +275,11 @@ export interface MarkstreamNodeLifecycle {
 
 /** @experimental */
 export interface MarkstreamViewportPriorityOptions {
+  /** Root margin for MarkdownRender node-shell visibility. Default: '400px'. */
   rootMargin?: string
+  /** Root margin for built-in code block renderers and deferred HTML blocks. Defaults to rootMargin. */
   heavyBlockMargin?: string
+  /** Auto-disable threshold for MarkdownRender node-shell deferral only. Default: 640. */
   maxTargets?: number
 }
 
@@ -311,7 +314,7 @@ export interface NodeRendererProps {
   htmlPolicy?: HtmlPolicy
   /** Enable priority rendering for visible viewport area */
   viewportPriority?: boolean
-  /** Viewport priority observer tuning for node shells and heavy child renderers. */
+  /** Experimental viewport priority observer tuning; not part of the 1.x compatibility promise. */
   viewportPriorityOptions?: MarkstreamViewportPriorityOptions
   /**
    * Whether code_block renders should stream updates.
