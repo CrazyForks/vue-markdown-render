@@ -4,6 +4,7 @@ import type { HtmlPolicy } from 'stream-markdown-parser'
 import type { TestLabFrameworkId, TestLabSampleId } from '../../../playground-shared/testLabFixtures'
 import type { TestPageViewMode } from '../../../playground-shared/testPageState'
 import type { SandboxFrameworkId, SandboxRenderSource } from '../../../playground-shared/versionSandbox'
+import type { MarkstreamViewportPriorityOptions } from '../../../src/types/node-renderer-props'
 import type { StreamSliceMode } from '../composables/createLocalTextStream'
 import type { StreamPresetId } from '../composables/streamPresets'
 import type { StreamTransportMode } from '../composables/useStreamSimulator'
@@ -230,6 +231,7 @@ const isDark = useLocalStorage<boolean>('vmr-test-dark', resolveInitialDarkMode(
 const renderMode = useLocalStorage<'monaco' | 'pre' | 'markdown'>('vmr-test-render-mode', 'monaco')
 const codeBlockStream = useLocalStorage<boolean>('vmr-test-code-stream', true)
 const viewportPriority = useLocalStorage<boolean>('vmr-test-viewport-priority', true)
+const codeBlockViewportRootMargin = useLocalStorage<string>('vmr-test-code-block-viewport-root-margin', '')
 const batchRendering = useLocalStorage<boolean>('vmr-test-batch-rendering', true)
 const typewriter = useLocalStorage<boolean>('vmr-test-typewriter', true)
 const debugParse = useLocalStorage<boolean>('vmr-test-debug-parse', false)
@@ -387,6 +389,10 @@ const isPreviewNativePrintPreparing = ref(false)
 let previewPrintAttemptId = 0
 const previewUsesFullRender = computed(() => isPreviewFullscreen.value || isPreviewPrintPreparing.value || isPreviewNativePrintPreparing.value)
 const previewViewportPriority = computed(() => previewUsesFullRender.value ? false : viewportPriority.value)
+const previewViewportPriorityOptions = computed<MarkstreamViewportPriorityOptions | undefined>(() => {
+  const rootMargin = codeBlockViewportRootMargin.value.trim()
+  return rootMargin ? { heavyBlockMargin: rootMargin } : undefined
+})
 const previewBatchRendering = computed(() => isPreviewNativePrintPreparing.value ? false : previewUsesFullRender.value ? true : batchRendering.value)
 const previewMaxLiveNodes = computed(() => previewUsesFullRender.value ? 0 : 220)
 const previewLiveNodeBuffer = computed(() => previewUsesFullRender.value ? 180 : 60)
@@ -3320,6 +3326,7 @@ watch(mermaidEnabled, (enabled) => {
                     :d2-props="previewD2Props"
                     :infographic-props="previewInfographicProps"
                     :viewport-priority="previewViewportPriority"
+                    :viewport-priority-options="previewViewportPriorityOptions"
                     :batch-rendering="previewBatchRendering"
                     :typewriter="typewriter"
                     :code-block-stream="codeBlockStream"

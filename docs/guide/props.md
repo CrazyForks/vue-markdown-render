@@ -12,7 +12,7 @@ Stable props for 1.x: `content`, `nodes`, `final`, `parseOptions`, `customMarkdo
 
 Advanced performance tuning prop: `parseCoalesceMs` is available in 1.x, but its scheduling semantics may be refined.
 
-Experimental/internal props: `indexKey`, `renderAsFragment`, `debugPerformance`, `initialRenderBatchSize`, `renderBatchSize`, `renderBatchDelay`, `renderBatchBudgetMs`, `renderBatchIdleTimeoutMs`, and `viewportPriority`. They are available for advanced integrations and internal tests, but are not part of the 1.x compatibility promise yet.
+Experimental/internal props: `indexKey`, `renderAsFragment`, `debugPerformance`, `initialRenderBatchSize`, `renderBatchSize`, `renderBatchDelay`, `renderBatchBudgetMs`, `renderBatchIdleTimeoutMs`, `viewportPriority`, and `viewportPriorityOptions`. They are available for advanced integrations and internal tests, but are not part of the 1.x compatibility promise yet.
 
 ## Core props on `MarkdownRender`
 
@@ -38,6 +38,7 @@ Experimental/internal props: `indexKey`, `renderAsFragment`, `debugPerformance`,
 | `fade` | `boolean` | `true` | Enables non-code-node enter fade and appended-text fade. Disable if you need zero animation for SSR snapshots. |
 | `node-virtual` | `boolean \| 'auto'` | `'auto'` | Controls node-level virtualization inside this Markdown document only. It does not virtualize a chat or timeline list. |
 | `virtual-scroll` | `MarkstreamVirtualScrollOptions` | – | Advanced host virtual-scroll coordination. Use this when an outer timeline virtualizer needs logical `totalHeight`, restore state, and settle/final events instead of reading the current DOM height. When `enabled=true`, pass a stable `sessionKey`. |
+| `viewport-priority-options` | `{ rootMargin?: string; heavyBlockMargin?: string; maxTargets?: number }` | – | Advanced observer tuning for `viewportPriority`. `rootMargin` controls node-shell visibility, `heavyBlockMargin` controls heavy child renderers such as Monaco code blocks, and `maxTargets` overrides the auto-disable target count. |
 
 Use `typewriter="simple"` for high-frequency streaming or performance-sensitive chat surfaces. Use `typewriter="precise"` when the cursor must closely follow complex inline layout.
 

@@ -312,13 +312,8 @@ const chineseGuideSidebar = [
 const siteHead = [
   ['link', { rel: 'icon', href: '/app-icon.svg', type: 'image/svg+xml' }],
   ['meta', { name: 'theme-color', content: '#111827' }],
-  ['meta', { property: 'og:type', content: 'website' }],
   ['meta', { property: 'og:site_name', content: 'Markstream' }],
-  ['meta', { property: 'og:image', content: docsOgImageUrl }],
-  ['meta', { property: 'og:image:alt', content: docsOgImageAlt }],
   ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
-  ['meta', { name: 'twitter:image', content: docsOgImageUrl }],
-  ['meta', { name: 'twitter:image:alt', content: docsOgImageAlt }],
 ]
 
 const seoExcludedDocsPaths = new Set([
@@ -599,6 +594,32 @@ function getDocsPageDateModified(frontmatter: Record<string, any>, pageLastUpdat
     return new Date(pageLastUpdated).toISOString()
 
   return null
+}
+
+function getDocsAbsoluteAssetUrl(value: string) {
+  if (/^https?:\/\//i.test(value))
+    return value
+
+  return `${docsSiteUrl}${value.startsWith('/') ? value : `/${value}`}`
+}
+
+function getDocsPageOgImage(frontmatter: Record<string, any>) {
+  return typeof frontmatter.ogImage === 'string' && frontmatter.ogImage.length > 0
+    ? getDocsAbsoluteAssetUrl(frontmatter.ogImage)
+    : docsOgImageUrl
+}
+
+function getDocsPageOgImageAlt(frontmatter: Record<string, any>) {
+  return typeof frontmatter.ogImageAlt === 'string' && frontmatter.ogImageAlt.length > 0
+    ? frontmatter.ogImageAlt
+    : docsOgImageAlt
+}
+
+function getDocsPageOgImageDimension(value: unknown, fallback: string) {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0)
+    return String(Math.round(value))
+
+  return typeof value === 'string' && value.length > 0 ? value : fallback
 }
 
 function frontmatterFaqItems(value: unknown) {
@@ -896,6 +917,11 @@ export default defineConfig({
     const structuredDataTitle = normalizedPath === '/' || normalizedPath === '/zh' ? seoTitle : pageTitle
     const dateModified = getDocsPageDateModified(frontmatter, ctx.pageData.lastUpdated)
     const shouldIndex = !ctx.pageData.isNotFound && !frontmatter.noindex && !isDocsSeoExcluded(normalizedPath)
+    const isArticle = normalizedPath.startsWith('/compare/') || normalizedPath.startsWith('/zh/compare/')
+    const ogImageUrl = getDocsPageOgImage(frontmatter)
+    const ogImageAlt = getDocsPageOgImageAlt(frontmatter)
+    const ogImageWidth = getDocsPageOgImageDimension(frontmatter.ogImageWidth, '1200')
+    const ogImageHeight = getDocsPageOgImageDimension(frontmatter.ogImageHeight, '630')
     const alternates = getDocsAlternatePaths(normalizedPath)
     const alternateHead = []
     const alternateLocales = []
@@ -930,6 +956,7 @@ export default defineConfig({
       ...alternateHead,
       ['meta', { name: 'description', content: description }],
       ['meta', { name: 'robots', content: shouldIndex ? 'index,follow' : 'noindex,nofollow' }],
+      ['meta', { property: 'og:type', content: isArticle ? 'article' : 'website' }],
       ['meta', { property: 'og:locale', content: isChinese ? 'zh_CN' : 'en_US' }],
       ...alternateLocales
         .filter(locale => locale !== (isChinese ? 'zh_CN' : 'en_US'))
@@ -937,8 +964,20 @@ export default defineConfig({
       ['meta', { property: 'og:title', content: seoTitle }],
       ['meta', { property: 'og:description', content: description }],
       ['meta', { property: 'og:url', content: canonicalUrl }],
+      ['meta', { property: 'og:image', content: ogImageUrl }],
+      ['meta', { property: 'og:image:alt', content: ogImageAlt }],
+      ['meta', { property: 'og:image:width', content: ogImageWidth }],
+      ['meta', { property: 'og:image:height', content: ogImageHeight }],
+      ...(dateModified
+        ? [
+            ['meta', { property: 'og:updated_time', content: dateModified }],
+            ...(isArticle ? [['meta', { property: 'article:modified_time', content: dateModified }]] : []),
+          ]
+        : []),
       ['meta', { name: 'twitter:title', content: seoTitle }],
       ['meta', { name: 'twitter:description', content: description }],
+      ['meta', { name: 'twitter:image', content: ogImageUrl }],
+      ['meta', { name: 'twitter:image:alt', content: ogImageAlt }],
       ...structuredData,
     ]
   },

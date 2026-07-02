@@ -141,6 +141,7 @@ export type {
   MarkstreamScrollRootLike,
   MarkstreamScrollRootRef,
   MarkstreamScrollRootResolver,
+  MarkstreamViewportPriorityOptions,
   MarkstreamVirtualAnchor,
   MarkstreamVirtualConfidence,
   MarkstreamVirtualMetrics,

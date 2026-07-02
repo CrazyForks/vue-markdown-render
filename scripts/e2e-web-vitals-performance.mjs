@@ -1074,6 +1074,9 @@ async function createScenarioContext(browser, port, shareId, content, renderMode
             { name: 'vmr-test-render-mode', value: renderMode },
             { name: 'vmr-test-code-stream', value: 'false' },
             { name: 'vmr-test-viewport-priority', value: 'true' },
+            ...(options.codeBlockViewportRootMargin
+              ? [{ name: 'vmr-test-code-block-viewport-root-margin', value: options.codeBlockViewportRootMargin }]
+              : []),
             { name: 'vmr-test-batch-rendering', value: 'true' },
             { name: 'vmr-test-typewriter', value: 'false' },
           ],
@@ -1085,11 +1088,6 @@ async function createScenarioContext(browser, port, shareId, content, renderMode
     await context.addInitScript(() => {
       window.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__ = true
     })
-  }
-  if (options.codeBlockViewportRootMargin) {
-    await context.addInitScript((rootMargin) => {
-      window.__MARKSTREAM_CODE_BLOCK_VIEWPORT_ROOT_MARGIN__ = rootMargin
-    }, options.codeBlockViewportRootMargin)
   }
   await installObservers(context)
   await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin })

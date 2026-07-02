@@ -7,7 +7,7 @@ import { computed, getCurrentInstance, inject, nextTick, onBeforeUnmount, onUnmo
 import { useSafeI18n } from '../../composables/useSafeI18n'
 // Tooltip is provided as a singleton via composable to avoid many DOM nodes
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
-import { useViewportPriority } from '../../composables/viewportPriority'
+import { useViewportPriority, useViewportPriorityOptions } from '../../composables/viewportPriority'
 import { languageIconsRevision, languageMap, normalizeLanguageIdentifier, resolveMonacoLanguageId } from '../../utils'
 import { MARKSTREAM_LANGUAGE_ICON_RESOLVER_KEY } from '../../utils/languageIconContext'
 import { resolveLifecycleIndexKey } from '../../utils/lifecycleIndexKey'
@@ -163,7 +163,7 @@ function warnCodeBlockDev(context: string, error: unknown) {
 const instance = getCurrentInstance()
 const hasPreviewListener = computed(() => {
   const props = instance?.vnode.props as Record<string, unknown> | null | undefined
-  return !!(props && (props.onPreviewCode || props.onPreviewCode))
+  return !!(props && (props.onPreviewCode || props['onPreview-code']))
 })
 const { t } = useSafeI18n()
 // No mermaid-specific handling here; NodeRenderer routes mermaid blocks.
@@ -190,20 +190,26 @@ const lastStableCollapsedDiffHeight = ref<number | null>(null)
 let collapsedDiffSettleGuardUntil = 0
 let resumeGuardFrames = 0
 const registerVisibility = useViewportPriority()
+const viewportPriorityOptions = useViewportPriorityOptions()
 const viewportHandle = ref<ReturnType<typeof registerVisibility> | null>(null)
 const viewportReady = ref(typeof window === 'undefined')
 if (typeof window !== 'undefined') {
   watch(
-    () => container.value,
-    (el) => {
+    [
+      () => container.value,
+      () => viewportPriorityOptions?.value.heavyBlockMargin,
+      () => viewportPriorityOptions?.value.rootMargin,
+    ],
+    ([el]) => {
       viewportHandle.value?.destroy()
       viewportHandle.value = null
       if (!el) {
         viewportReady.value = false
         return
       }
-      const configuredRootMargin = (window as any).__MARKSTREAM_CODE_BLOCK_VIEWPORT_ROOT_MARGIN__
-      const rootMargin = typeof configuredRootMargin === 'string' ? configuredRootMargin : '400px'
+      const rootMargin = viewportPriorityOptions?.value.heavyBlockMargin
+        ?? viewportPriorityOptions?.value.rootMargin
+        ?? '400px'
       const handle = registerVisibility(el, { rootMargin })
       viewportHandle.value = handle
       viewportReady.value = handle.isVisible.value

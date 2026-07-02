@@ -2,7 +2,7 @@ import type {
   MarkdownIt,
   ParsedNode,
 } from 'stream-markdown-parser'
-import type { ComputedRef } from 'vue'
+import type { ComputedRef, Ref } from 'vue'
 import type { CustomComponents } from '../../../types'
 import type { NodeRendererProps } from '../../../types/node-renderer-props'
 import {
@@ -76,6 +76,8 @@ export interface MarkdownParsingState {
   mdBase: ComputedRef<MarkdownIt>
   mdInstance: ComputedRef<MarkdownIt>
   mergedParseOptions: ComputedRef<RendererParseOptions>
+  parsedNodesDirtyStartIndex: Ref<number>
+  parsedNodesRevision: Ref<number>
   parsedNodes: ComputedRef<ParsedNode[]>
 }
 
@@ -832,6 +834,17 @@ export function useMarkdownParsing(
   let parseCommitCount = 0
   let parseCoalescedCount = 0
   let lastParseFlushAt = getNow()
+  let parsedNodesRevisionCount = 0
+  const parsedNodesDirtyStartIndex = ref(-1)
+  const parsedNodesRevision = ref(0)
+
+  function commitParsedNodesDirtyStartIndex(dirtyStartIndex: number) {
+    parsedNodesDirtyStartIndex.value = Number.isInteger(dirtyStartIndex)
+      ? dirtyStartIndex
+      : 0
+    parsedNodesRevisionCount += 1
+    parsedNodesRevision.value = parsedNodesRevisionCount
+  }
 
   function clearParseCoalesceTimer() {
     if (!parseCoalesceTimer)
@@ -988,6 +1001,7 @@ export function useMarkdownParsing(
     if (props.nodes?.length) {
       previousParsedNodes = []
       previousContent = ''
+      commitParsedNodesDirtyStartIndex(0)
       return markRaw((props.nodes as unknown as ParsedNode[]).slice())
     }
 
@@ -996,6 +1010,7 @@ export function useMarkdownParsing(
     if (!content) {
       previousParsedNodes = []
       previousContent = ''
+      commitParsedNodesDirtyStartIndex(-1)
       return []
     }
 
@@ -1085,6 +1100,7 @@ export function useMarkdownParsing(
     }
     else {
       parsed = nextParsed
+      stabilizeMetrics = getInitialStabilizeMetrics(parsed.length)
     }
 
     if (signatureTiming)
@@ -1100,6 +1116,7 @@ export function useMarkdownParsing(
     previousParserCacheSemanticKey = currentParserCacheSemanticKey
     previousNodeReuseSemanticKey = currentNodeReuseSemanticKey
     previousParsedNodes = parsed
+    commitParsedNodesDirtyStartIndex(stabilizeMetrics?.dirtyStartIndex ?? 0)
 
     if (collectPerformanceMetrics) {
       const streamStats = readStreamStats(md)
@@ -1144,6 +1161,8 @@ export function useMarkdownParsing(
     mdBase,
     mdInstance,
     mergedParseOptions,
+    parsedNodesDirtyStartIndex,
+    parsedNodesRevision,
     parsedNodes,
   }
 }

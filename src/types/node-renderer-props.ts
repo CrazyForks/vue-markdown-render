@@ -273,6 +273,12 @@ export interface MarkstreamNodeLifecycle {
   markSettled: (indexKey: string | number) => void
 }
 
+export interface MarkstreamViewportPriorityOptions {
+  rootMargin?: string
+  heavyBlockMargin?: string
+  maxTargets?: number
+}
+
 export interface NodeRendererProps {
   /** Raw Markdown input. Omit this when you pass pre-parsed nodes instead. */
   content?: string
@@ -304,6 +310,8 @@ export interface NodeRendererProps {
   htmlPolicy?: HtmlPolicy
   /** Enable priority rendering for visible viewport area */
   viewportPriority?: boolean
+  /** Viewport priority observer tuning for node shells and heavy child renderers. */
+  viewportPriorityOptions?: MarkstreamViewportPriorityOptions
   /**
    * Whether code_block renders should stream updates.
    * When false, code blocks stay in a loading state and render once when final content is ready.

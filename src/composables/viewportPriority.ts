@@ -1,8 +1,10 @@
-import type { Ref } from 'vue'
+import type { ComputedRef, InjectionKey, Ref } from 'vue'
+import type { MarkstreamViewportPriorityOptions } from '../types/node-renderer-props'
 import { inject, provide, ref, watch } from 'vue'
 
 // Injection key for viewport-priority registration
-const ViewportPriorityKey = Symbol('ViewportPriority') as unknown as InjectionKey<RegisterFn>
+const ViewportPriorityKey = Symbol('ViewportPriority') as InjectionKey<RegisterFn>
+const ViewportPriorityOptionsKey = Symbol('ViewportPriorityOptions') as InjectionKey<ComputedRef<MarkstreamViewportPriorityOptions>>
 
 export interface VisibilityHandle {
   isVisible: Ref<boolean>
@@ -12,10 +14,17 @@ export interface VisibilityHandle {
 
 export type RegisterFn = (el: HTMLElement, opts?: { rootMargin?: string, threshold?: number }) => VisibilityHandle
 
-type InjectionKey<T> = symbol & { __type?: T }
 interface IdleDeadlineLike {
   didTimeout: boolean
   timeRemaining: () => number
+}
+
+export function provideViewportPriorityOptions(options: ComputedRef<MarkstreamViewportPriorityOptions>) {
+  provide(ViewportPriorityOptionsKey, options)
+}
+
+export function useViewportPriorityOptions() {
+  return inject(ViewportPriorityOptionsKey, undefined)
 }
 
 /**

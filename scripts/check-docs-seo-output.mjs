@@ -159,6 +159,49 @@ function frontmatterStringValue(frontmatter, key) {
   return value || null
 }
 
+function docsAssetUrl(value) {
+  if (/^https?:\/\//i.test(value))
+    return value
+
+  return `${newHost}${value.startsWith('/') ? value : `/${value}`}`
+}
+
+function parseHtmlAttrs(tag) {
+  const attrs = new Map()
+  const attrPattern = /([:@\w-]+)=(?:"([^"]*)"|'([^']*)')/g
+  let match
+
+  while ((match = attrPattern.exec(tag))) {
+    attrs.set(match[1], match[2] ?? match[3] ?? '')
+  }
+
+  return attrs
+}
+
+function getMetaContent(content, attrName, attrValue) {
+  const metaPattern = /<meta\b[^>]*>/gi
+  let match
+
+  while ((match = metaPattern.exec(content))) {
+    const attrs = parseHtmlAttrs(match[0])
+    if (attrs.get(attrName) === attrValue)
+      return attrs.get('content') ?? null
+  }
+
+  return null
+}
+
+function expectMetaContent(content, relativePath, attrName, attrValue, expectedValue = null) {
+  const actual = getMetaContent(content, attrName, attrValue)
+  if (!actual) {
+    failures.push(`${relativePath} is missing meta ${attrName}="${attrValue}"`)
+    return
+  }
+
+  if (expectedValue != null && actual !== expectedValue)
+    failures.push(`${relativePath} meta ${attrName}="${attrValue}" expected ${expectedValue}, got ${actual}`)
+}
+
 function daysSinceIsoDate(value) {
   const timestamp = Date.parse(`${value}T00:00:00Z`)
   if (!Number.isFinite(timestamp))
@@ -486,6 +529,8 @@ if (isMain) {
     const canonicalUrl = `${newHost}${routePath === '/' ? '/' : routePath}`
     expectContains(content, relativePath, `<link rel="canonical" href="${canonicalUrl}">`, `is missing canonical ${canonicalUrl}`)
     expectContains(content, relativePath, `<meta property="og:url" content="${canonicalUrl}">`, `is missing og:url ${canonicalUrl}`)
+    expectMetaContent(content, relativePath, 'property', 'og:image')
+    expectMetaContent(content, relativePath, 'name', 'twitter:image')
 
     const structuredDataNodes = jsonLdNodesByRelativePath.get(relativePath) ?? parseStructuredDataNodes(content, relativePath)
     if (!hasStructuredDataType(structuredDataNodes, 'WebPage'))
@@ -501,6 +546,7 @@ if (isMain) {
     const relativePath = htmlFileForMarkdown(filePath)
     const checks = []
     const isArticle = routePath.startsWith('/compare/') || routePath.startsWith('/zh/compare/')
+    const ogImage = frontmatterStringValue(frontmatter, 'ogImage')
 
     if (hasFrontmatterKey(frontmatter, 'faq')) {
       checks.push(['FAQPage', 'structured data'])
@@ -514,7 +560,7 @@ if (isMain) {
     if (isArticle)
       checks.push(['Article', 'structured data'])
 
-    if (checks.length === 0)
+    if (checks.length === 0 && !ogImage)
       continue
 
     const content = readDistFile(relativePath)
@@ -537,6 +583,16 @@ if (isMain) {
       validateCompareFreshness(relativePath, lastVerified)
       if (!content.includes('Verification') && !content.includes('核验方式'))
         failures.push(`${relativePath} compare page is missing visible Verification section`)
+      if (lastVerified) {
+        expectMetaContent(content, relativePath, 'property', 'og:updated_time', lastVerified)
+        expectMetaContent(content, relativePath, 'property', 'article:modified_time', lastVerified)
+      }
+    }
+
+    if (ogImage) {
+      const expectedOgImage = docsAssetUrl(ogImage)
+      expectMetaContent(content, relativePath, 'property', 'og:image', expectedOgImage)
+      expectMetaContent(content, relativePath, 'name', 'twitter:image', expectedOgImage)
     }
 
     const softwareSourceCodeNode = findStructuredDataNode(structuredDataNodes, 'SoftwareSourceCode')
@@ -560,5 +616,5 @@ if (isMain) {
     process.exit(1)
   }
 
-  console.log('[docs-seo-output] Docs host output, redirects, canonical tags, LLM files, visible FAQ content, and JSON-LD nodes are valid.')
+  console.log('[docs-seo-output] Docs host output, redirects, canonical tags, OG images, updated-time meta, LLM files, visible FAQ content, and JSON-LD nodes are valid.')
 }

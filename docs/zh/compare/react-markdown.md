@@ -1,6 +1,8 @@
 ---
 title: markstream-react 与 react-markdown 静态基线对比
 description: 对比 markstream-react 和 react-markdown 在静态 React Markdown、remark/rehype 插件链、迁移成本，以及流式 AI 聊天是否需要流式优先渲染器中的取舍。
+ogImage: /og/comparison.svg
+ogImageAlt: markstream-react 与 react-markdown 对比
 lastVerified: '2026-06-12'
 faq:
   - question: 应该把 react-markdown 换成 markstream-react 吗？

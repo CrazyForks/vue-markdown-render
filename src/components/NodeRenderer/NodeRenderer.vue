@@ -8,6 +8,7 @@ import type {
   MarkstreamHeightCache,
   MarkstreamNodeLifecycle,
   MarkstreamRendererHandle,
+  MarkstreamViewportPriorityOptions,
   MarkstreamVirtualAnchor,
   MarkstreamVirtualMetrics,
   MarkstreamVirtualPhase,
@@ -19,7 +20,7 @@ import type {
 } from '../../types/node-renderer-props'
 import type { VirtualHeightSummary } from './composables/useHeightModel'
 import { normalizeShikiLanguage } from 'markstream-core'
-import { computed, defineAsyncComponent, getCurrentInstance, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, getCurrentInstance, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, shallowRef, triggerRef, watch, watchEffect } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
 import CheckboxNode from '../../components/CheckboxNode'
@@ -49,7 +50,7 @@ import TableNode from '../../components/TableNode'
 import TextNode from '../../components/TextNode'
 import ThematicBreakNode from '../../components/ThematicBreakNode'
 import VmrContainerNode from '../../components/VmrContainerNode'
-import { provideViewportPriority } from '../../composables/viewportPriority'
+import { provideViewportPriority, provideViewportPriorityOptions } from '../../composables/viewportPriority'
 import {
   buildBlockTextProfile,
   createEmptySimpleTextProbeProfile,
@@ -202,6 +203,7 @@ const rendererProps = {
   get domMode() { return resolvedDomMode.value },
   get htmlPolicy() { return resolveRendererProp('htmlPolicy') },
   get viewportPriority() { return resolveRendererProp('viewportPriority') },
+  get viewportPriorityOptions() { return resolveRendererProp('viewportPriorityOptions') },
   get codeBlockStream() { return resolveRendererProp('codeBlockStream') },
   get codeBlockDarkTheme() { return resolveRendererProp('codeBlockDarkTheme') },
   get codeBlockLightTheme() { return resolveRendererProp('codeBlockLightTheme') },
@@ -286,6 +288,36 @@ const textStreamState = new Map<string, string>()
 const streamRenderVersion = ref(0)
 const experimentContainerWidth = ref(0)
 const simpleTextProbeProfile = ref(createEmptySimpleTextProbeProfile())
+
+function resolveViewportPriorityRootMargin(value: unknown, fallback: string) {
+  if (typeof value !== 'string')
+    return fallback
+
+  const trimmed = value.trim()
+  return trimmed || fallback
+}
+
+function resolveViewportPriorityMaxTargets(value: unknown) {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) && numeric > 0
+    ? Math.max(1, Math.trunc(numeric))
+    : MAX_VIEWPORT_OBSERVER_TARGETS
+}
+
+const resolvedViewportPriorityOptions = computed<MarkstreamViewportPriorityOptions>(() => {
+  const options = rendererProps.viewportPriorityOptions ?? {}
+  const rootMargin = resolveViewportPriorityRootMargin(options.rootMargin, '400px')
+
+  return {
+    rootMargin,
+    heavyBlockMargin: resolveViewportPriorityRootMargin(options.heavyBlockMargin, rootMargin),
+    maxTargets: resolveViewportPriorityMaxTargets(options.maxTargets),
+  }
+})
+const viewportPriorityRootMargin = computed(() => resolvedViewportPriorityOptions.value.rootMargin ?? '400px')
+const viewportPriorityMaxTargets = computed(() => resolvedViewportPriorityOptions.value.maxTargets ?? MAX_VIEWPORT_OBSERVER_TARGETS)
+provideViewportPriorityOptions(resolvedViewportPriorityOptions)
+
 function resolveVirtualScrollRoot() {
   if (props.virtualScroll?.enabled !== true)
     return null
@@ -578,6 +610,7 @@ const {
   effectiveCustomHtmlTagsSet,
   mergedParseOptions,
   parsedNodes,
+  parsedNodesDirtyStartIndex,
 } = useMarkdownParsing(rendererProps, {
   instanceMsgId,
   renderContent,
@@ -603,6 +636,7 @@ const nestedRendererProps = computed<Partial<NodeRendererProps>>(() => ({
   customMarkdownIt: rendererProps.customMarkdownIt,
   htmlPolicy: resolvedHtmlPolicy.value,
   viewportPriority: rendererProps.viewportPriority,
+  viewportPriorityOptions: resolvedViewportPriorityOptions.value,
   mode: resolvedMode.value,
   domMode: rendererProps.domMode,
   codeRenderer: resolvedCodeRenderer.value,
@@ -1325,6 +1359,14 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
 
+function getParsedNodesDirtyStart(total = parsedNodes.value.length) {
+  const dirtyStartIndex = parsedNodesDirtyStartIndex.value
+  if (!Number.isInteger(dirtyStartIndex) || dirtyStartIndex < 0)
+    return total
+
+  return clamp(dirtyStartIndex, 0, total)
+}
+
 function getProbeRoot(wrapper: HTMLElement | null | undefined) {
   return wrapper?.firstElementChild as HTMLElement | null
 }
@@ -1445,40 +1487,87 @@ function resolveCodeBlockShowHeader() {
 }
 
 const EMPTY_ESTIMATED_NODE_HEIGHTS: Array<EstimatedNodeHeight | null> = []
+let estimatedNodeHeightsCache: Array<EstimatedNodeHeight | null> = []
+let estimatedNodeHeightsContext: unknown[] = []
 
-const estimatedNodeHeights = computed(() => {
+function estimateNodeHeight(node: ParsedNode, index: number, width: number) {
+  const measuredHeight = nodeHeights[index]
+  const hasMeasuredHeight = typeof measuredHeight === 'number' && measuredHeight > 0
+
+  if (textEstimationEnabled.value && !hasMeasuredHeight) {
+    const estimatedText = estimateSimpleTextBlockHeight(node, width, simpleTextProbeProfile.value)
+    if (estimatedText)
+      return estimatedText
+  }
+
+  if (codeBlockEstimationEnabled.value && node.type === 'code_block') {
+    const rendererKind = resolveCodeBlockRendererKind(node)
+    if (rendererKind === 'monaco' || rendererKind === 'markdown' || rendererKind === 'pre') {
+      return estimateCodeBlockHeight(node, {
+        rendererKind,
+        monacoOptions: rendererProps.codeBlockMonacoOptions,
+        showHeader: resolveCodeBlockShowHeader(),
+      })
+    }
+  }
+
+  return null
+}
+
+function getEstimatedNodeHeightContext(width: number) {
+  return [
+    Math.round(width),
+    textEstimationEnabled.value,
+    codeBlockEstimationEnabled.value,
+    simpleTextProbeProfile.value,
+    rendererProps.codeBlockMonacoOptions,
+    resolveCodeBlockShowHeader(),
+    resolvedCodeRenderer.value,
+    heightStats.count,
+    Math.round(heightStats.total),
+    heightEstimationExperimentRevision.value,
+  ]
+}
+
+function hasSameEstimatedNodeHeightContext(previous: unknown[], next: unknown[]) {
+  return previous.length === next.length
+    && previous.every((value, index) => Object.is(value, next[index]))
+}
+
+const estimatedNodeHeightsState = shallowRef<readonly (EstimatedNodeHeight | null)[]>(EMPTY_ESTIMATED_NODE_HEIGHTS)
+
+watchEffect(() => {
   const nodes = parsedNodes.value
-  if (!nodes.length || !heightEstimationActive.value)
-    return EMPTY_ESTIMATED_NODE_HEIGHTS
+  if (!nodes.length || !heightEstimationActive.value) {
+    estimatedNodeHeightsCache = []
+    estimatedNodeHeightsContext = []
+    estimatedNodeHeightsState.value = EMPTY_ESTIMATED_NODE_HEIGHTS
+    return
+  }
 
   const width = experimentContainerWidth.value || readLayout('estimatedNodeHeights.clientWidth', () => containerRef.value?.clientWidth || 0)
-  if (!Number.isFinite(width) || width <= 0)
-    return EMPTY_ESTIMATED_NODE_HEIGHTS
+  if (!Number.isFinite(width) || width <= 0) {
+    estimatedNodeHeightsCache = []
+    estimatedNodeHeightsContext = []
+    estimatedNodeHeightsState.value = EMPTY_ESTIMATED_NODE_HEIGHTS
+    return
+  }
 
-  return nodes.map((node, index) => {
-    const measuredHeight = nodeHeights[index]
-    const hasMeasuredHeight = typeof measuredHeight === 'number' && measuredHeight > 0
+  const context = getEstimatedNodeHeightContext(width)
+  const canReuseCache = estimatedNodeHeightsCache.length <= nodes.length
+    && hasSameEstimatedNodeHeightContext(estimatedNodeHeightsContext, context)
+  const startIndex = canReuseCache ? getParsedNodesDirtyStart(nodes.length) : 0
 
-    if (textEstimationEnabled.value && !hasMeasuredHeight) {
-      const estimatedText = estimateSimpleTextBlockHeight(node, width, simpleTextProbeProfile.value)
-      if (estimatedText)
-        return estimatedText
-    }
+  estimatedNodeHeightsCache.length = nodes.length
+  for (let index = startIndex; index < nodes.length; index++)
+    estimatedNodeHeightsCache[index] = estimateNodeHeight(nodes[index]!, index, width)
 
-    if (codeBlockEstimationEnabled.value && node.type === 'code_block') {
-      const rendererKind = resolveCodeBlockRendererKind(node)
-      if (rendererKind === 'monaco' || rendererKind === 'markdown' || rendererKind === 'pre') {
-        return estimateCodeBlockHeight(node, {
-          rendererKind,
-          monacoOptions: rendererProps.codeBlockMonacoOptions,
-          showHeader: resolveCodeBlockShowHeader(),
-        })
-      }
-    }
+  estimatedNodeHeightsContext = context
+  estimatedNodeHeightsState.value = estimatedNodeHeightsCache
+  triggerRef(estimatedNodeHeightsState)
+}, { flush: 'sync' })
 
-    return null
-  })
-})
+const estimatedNodeHeights = computed(() => estimatedNodeHeightsState.value)
 
 heightModel = useHeightModel({
   parsedNodes,
@@ -2411,6 +2500,8 @@ function stableHeightSignatureValue(
 
 let virtualContentHashRevision = -1
 let virtualContentHashCache = ''
+let virtualContentHashPrefixHashes: number[] = [2166136261]
+let virtualContentHashSignatureCache: string[] = []
 
 function getNodeHeightCacheSignature(index: number) {
   const node = parsedNodes.value[index]
@@ -2420,22 +2511,47 @@ function getNodeHeightCacheSignature(index: number) {
   return hashVirtualString(stableHeightSignatureValue(node))
 }
 
+function hashVirtualSignatureInto(seed: number, signature: string) {
+  let hash = seed
+  for (let index = 0; index < signature.length; index++) {
+    hash ^= signature.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return hash >>> 0
+}
+
 function getVirtualContentHash() {
   const revision = streamRenderVersion.value
   if (virtualContentHashRevision === revision)
     return virtualContentHashCache
 
-  let hash = 2166136261
+  const total = parsedNodes.value.length
+  let startIndex = getParsedNodesDirtyStart(total)
 
-  for (let i = 0; i < parsedNodes.value.length; i++) {
-    const signature = getNodeHeightCacheSignature(i)
-    for (let j = 0; j < signature.length; j++) {
-      hash ^= signature.charCodeAt(j)
-      hash = Math.imul(hash, 16777619)
-    }
+  if (startIndex > total || virtualContentHashPrefixHashes.length < startIndex + 1)
+    startIndex = 0
+
+  if (startIndex === 0) {
+    virtualContentHashPrefixHashes = [2166136261]
+    virtualContentHashSignatureCache = []
+  }
+  else {
+    virtualContentHashPrefixHashes.length = startIndex + 1
+    virtualContentHashSignatureCache.length = startIndex
   }
 
-  virtualContentHashCache = (hash >>> 0).toString(36)
+  for (let index = startIndex; index < total; index++) {
+    const signature = getNodeHeightCacheSignature(index)
+    virtualContentHashSignatureCache[index] = signature
+    virtualContentHashPrefixHashes[index + 1] = hashVirtualSignatureInto(
+      virtualContentHashPrefixHashes[index] ?? 2166136261,
+      signature,
+    )
+  }
+
+  virtualContentHashPrefixHashes.length = total + 1
+  virtualContentHashSignatureCache.length = total
+  virtualContentHashCache = ((virtualContentHashPrefixHashes[total] ?? 2166136261) >>> 0).toString(36)
   virtualContentHashRevision = revision
   return virtualContentHashCache
 }
@@ -3140,12 +3256,16 @@ function invalidateChangedNodeHeights(reason: MarkstreamVirtualReason = 'content
 
   const staleIndices: number[] = []
   const total = parsedNodes.value.length
+  const dirtyStartIndex = getParsedNodesDirtyStart(total)
 
   for (const index of Array.from(nodeHeightSignatures.keys())) {
     if (index >= total) {
       staleIndices.push(index)
       continue
     }
+
+    if (index < dirtyStartIndex)
+      continue
 
     const signature = getNodeHeightCacheSignature(index)
     const previousSignature = nodeHeightSignatures.get(index)
@@ -3759,7 +3879,7 @@ function setNodeSlotElement(index: number, el: HTMLElement | null) {
     !virtualizationEnabled.value
     && deferNodes.value
     && !viewportPriorityAutoDisabled.value
-    && nodeVisibilityHandles.size >= MAX_VIEWPORT_OBSERVER_TARGETS
+    && nodeVisibilityHandles.size >= viewportPriorityMaxTargets.value
   ) {
     autoDisableViewportPriority('too-many-targets')
     if (!shouldObserveSlots.value || !registerNodeVisibility) {
@@ -3788,7 +3908,7 @@ function setNodeSlotElement(index: number, el: HTMLElement | null) {
   }
 
   destroyNodeHandle(index)
-  const handle = registerNodeVisibility(el, { rootMargin: '400px' })
+  const handle = registerNodeVisibility(el, { rootMargin: viewportPriorityRootMargin.value })
   if (!handle)
     return
   nodeVisibilityHandles.set(index, handle)
@@ -4265,7 +4385,16 @@ watch(
 )
 
 watch(
-  [() => rendererProps.viewportPriority, () => parsedNodes.value.length],
+  viewportPriorityRootMargin,
+  () => {
+    for (const [index, el] of nodeSlotElements)
+      setNodeSlotElement(index, el)
+  },
+  { immediate: false },
+)
+
+watch(
+  [() => rendererProps.viewportPriority, () => parsedNodes.value.length, viewportPriorityMaxTargets],
   ([enabled, length]) => {
     if (enabled === false) {
       viewportPriorityAutoDisabled.value = false
