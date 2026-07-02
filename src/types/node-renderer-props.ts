@@ -273,6 +273,7 @@ export interface MarkstreamNodeLifecycle {
   markSettled: (indexKey: string | number) => void
 }
 
+/** @experimental */
 export interface MarkstreamViewportPriorityOptions {
   rootMargin?: string
   heavyBlockMargin?: string

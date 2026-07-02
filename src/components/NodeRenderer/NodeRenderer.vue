@@ -611,6 +611,7 @@ const {
   mergedParseOptions,
   parsedNodes,
   parsedNodesDirtyStartIndex,
+  parsedNodesRevision,
 } = useMarkdownParsing(rendererProps, {
   instanceMsgId,
   renderContent,
@@ -807,6 +808,14 @@ const nodeContentResizeObserverIndexes = new WeakMap<Element, number>()
 let nodeContentResizeObserver: ResizeObserver | null = null
 const codeBlockRenderCache = new WeakMap<object, { signature: string, node: ParsedNode }>()
 const nodeHeightSignatures = new Map<number, string>()
+const EMPTY_ESTIMATED_NODE_HEIGHTS: Array<EstimatedNodeHeight | null> = []
+let estimatedNodeHeightsCache: Array<EstimatedNodeHeight | null> = []
+let estimatedNodeHeightsContext: unknown[] = []
+let estimatedNodeHeightsParserRevision = -1
+const estimatedNodeHeightsState = shallowRef<readonly (EstimatedNodeHeight | null)[]>(EMPTY_ESTIMATED_NODE_HEIGHTS)
+const estimatedHeightDirtyIndices = new Set<number>()
+const estimatedHeightMutationRevision = ref(0)
+let estimatedHeightMutationDepth = 0
 const nodeSlotVersion = ref(0)
 const sortedNodeSlots = computed(() => {
   // Track a manual version so we only rebuild when slots change.
@@ -903,7 +912,7 @@ const {
   heightKnownTree,
   averageNodeHeight,
   resetHeightMeasurements: resetMeasuredHeightMeasurements,
-  pruneHeightMeasurements,
+  pruneHeightMeasurements: pruneMeasuredHeightMeasurements,
   rebuildHeightTrees,
   recordNodeHeight: recordMeasuredNodeHeight,
   removeNodeHeights: removeMeasuredNodeHeights,
@@ -923,8 +932,39 @@ const {
   },
 })
 
+function markEstimatedNodeHeightDirty(index: number) {
+  if (Number.isInteger(index) && index >= 0)
+    estimatedHeightDirtyIndices.add(index)
+}
+
+function markEstimatedNodeHeightsDirty(indices: Iterable<number>) {
+  for (const index of indices)
+    markEstimatedNodeHeightDirty(Number(index))
+}
+
+function runEstimatedHeightMutation<T>(callback: () => T) {
+  estimatedHeightMutationDepth++
+  try {
+    return callback()
+  }
+  finally {
+    estimatedHeightMutationDepth--
+    if (estimatedHeightMutationDepth === 0)
+      estimatedHeightMutationRevision.value++
+  }
+}
+
+function resetEstimatedNodeHeightCache() {
+  estimatedNodeHeightsCache = []
+  estimatedNodeHeightsContext = []
+  estimatedNodeHeightsParserRevision = -1
+  estimatedHeightDirtyIndices.clear()
+  estimatedNodeHeightsState.value = EMPTY_ESTIMATED_NODE_HEIGHTS
+}
+
 function resetHeightMeasurements() {
-  resetMeasuredHeightMeasurements()
+  resetEstimatedNodeHeightCache()
+  runEstimatedHeightMutation(() => resetMeasuredHeightMeasurements())
   nodeHeightSignatures.clear()
 }
 
@@ -946,8 +986,11 @@ function recordNodeHeight(
   options: { allowShrink?: boolean } = {},
 ) {
   const before = nodeHeights[index]
-  recordMeasuredNodeHeight(index, height, options)
+  markEstimatedNodeHeightDirty(index)
+  runEstimatedHeightMutation(() => recordMeasuredNodeHeight(index, height, options))
   const after = nodeHeights[index]
+  if (Object.is(before, after))
+    estimatedHeightDirtyIndices.delete(index)
 
   if (after && after > 0)
     rememberNodeHeightSignature(index)
@@ -970,9 +1013,15 @@ function removeNodeHeights(
   options: { notify?: boolean } = {},
 ) {
   const list = Array.from(indices, Number)
-  const removed = removeMeasuredNodeHeights(list, options)
-  if (removed > 0)
+  markEstimatedNodeHeightsDirty(list)
+  const removed = runEstimatedHeightMutation(() => removeMeasuredNodeHeights(list, options))
+  if (removed > 0) {
     forgetNodeHeightSignatures(list)
+  }
+  else {
+    for (const index of list)
+      estimatedHeightDirtyIndices.delete(index)
+  }
   return removed
 }
 
@@ -980,8 +1029,17 @@ function importHeightCache(
   cache: MarkstreamHeightCache,
   options: { mode?: 'replace' | 'merge' } = {},
 ) {
-  importMeasuredHeightCache(cache, options)
+  if (options.mode !== 'merge')
+    resetEstimatedNodeHeightCache()
+  else
+    markEstimatedNodeHeightsDirty(cache.map(entry => entry.index))
+  runEstimatedHeightMutation(() => importMeasuredHeightCache(cache, options))
   seedCurrentNodeHeightSignatures()
+}
+
+function pruneHeightMeasurements(size: number) {
+  resetEstimatedNodeHeightCache()
+  runEstimatedHeightMutation(() => pruneMeasuredHeightMeasurements(size))
 }
 const deferNodes = computed(() => {
   return deferNodesDomRequired.value && viewportPriorityEnabled.value
@@ -1486,10 +1544,6 @@ function resolveCodeBlockShowHeader() {
   return showHeader !== false
 }
 
-const EMPTY_ESTIMATED_NODE_HEIGHTS: Array<EstimatedNodeHeight | null> = []
-let estimatedNodeHeightsCache: Array<EstimatedNodeHeight | null> = []
-let estimatedNodeHeightsContext: unknown[] = []
-
 function estimateNodeHeight(node: ParsedNode, index: number, width: number) {
   const measuredHeight = nodeHeights[index]
   const hasMeasuredHeight = typeof measuredHeight === 'number' && measuredHeight > 0
@@ -1523,8 +1577,6 @@ function getEstimatedNodeHeightContext(width: number) {
     rendererProps.codeBlockMonacoOptions,
     resolveCodeBlockShowHeader(),
     resolvedCodeRenderer.value,
-    heightStats.count,
-    Math.round(heightStats.total),
     heightEstimationExperimentRevision.value,
   ]
 }
@@ -1534,13 +1586,18 @@ function hasSameEstimatedNodeHeightContext(previous: unknown[], next: unknown[])
     && previous.every((value, index) => Object.is(value, next[index]))
 }
 
-const estimatedNodeHeightsState = shallowRef<readonly (EstimatedNodeHeight | null)[]>(EMPTY_ESTIMATED_NODE_HEIGHTS)
-
 watchEffect(() => {
+  void estimatedHeightMutationRevision.value
+  if (estimatedHeightMutationDepth > 0)
+    return
+
   const nodes = parsedNodes.value
+  const parserRevision = parsedNodesRevision.value
   if (!nodes.length || !heightEstimationActive.value) {
     estimatedNodeHeightsCache = []
     estimatedNodeHeightsContext = []
+    estimatedNodeHeightsParserRevision = -1
+    estimatedHeightDirtyIndices.clear()
     estimatedNodeHeightsState.value = EMPTY_ESTIMATED_NODE_HEIGHTS
     return
   }
@@ -1549,6 +1606,8 @@ watchEffect(() => {
   if (!Number.isFinite(width) || width <= 0) {
     estimatedNodeHeightsCache = []
     estimatedNodeHeightsContext = []
+    estimatedNodeHeightsParserRevision = -1
+    estimatedHeightDirtyIndices.clear()
     estimatedNodeHeightsState.value = EMPTY_ESTIMATED_NODE_HEIGHTS
     return
   }
@@ -1556,13 +1615,25 @@ watchEffect(() => {
   const context = getEstimatedNodeHeightContext(width)
   const canReuseCache = estimatedNodeHeightsCache.length <= nodes.length
     && hasSameEstimatedNodeHeightContext(estimatedNodeHeightsContext, context)
-  const startIndex = canReuseCache ? getParsedNodesDirtyStart(nodes.length) : 0
+  const parserDirtyStart = canReuseCache && estimatedNodeHeightsParserRevision === parserRevision
+    ? nodes.length
+    : canReuseCache ? getParsedNodesDirtyStart(nodes.length) : 0
+  const dirtyIndices = canReuseCache
+    ? Array.from(estimatedHeightDirtyIndices)
+    : []
 
   estimatedNodeHeightsCache.length = nodes.length
-  for (let index = startIndex; index < nodes.length; index++)
+  for (let index = parserDirtyStart; index < nodes.length; index++)
     estimatedNodeHeightsCache[index] = estimateNodeHeight(nodes[index]!, index, width)
 
+  for (const index of dirtyIndices) {
+    if (index >= 0 && index < nodes.length && index < parserDirtyStart)
+      estimatedNodeHeightsCache[index] = estimateNodeHeight(nodes[index]!, index, width)
+  }
+
+  estimatedHeightDirtyIndices.clear()
   estimatedNodeHeightsContext = context
+  estimatedNodeHeightsParserRevision = parserRevision
   estimatedNodeHeightsState.value = estimatedNodeHeightsCache
   triggerRef(estimatedNodeHeightsState)
 }, { flush: 'sync' })
@@ -2501,7 +2572,6 @@ function stableHeightSignatureValue(
 let virtualContentHashRevision = -1
 let virtualContentHashCache = ''
 let virtualContentHashPrefixHashes: number[] = [2166136261]
-let virtualContentHashSignatureCache: string[] = []
 
 function getNodeHeightCacheSignature(index: number) {
   const node = parsedNodes.value[index]
@@ -2533,16 +2603,13 @@ function getVirtualContentHash() {
 
   if (startIndex === 0) {
     virtualContentHashPrefixHashes = [2166136261]
-    virtualContentHashSignatureCache = []
   }
   else {
     virtualContentHashPrefixHashes.length = startIndex + 1
-    virtualContentHashSignatureCache.length = startIndex
   }
 
   for (let index = startIndex; index < total; index++) {
     const signature = getNodeHeightCacheSignature(index)
-    virtualContentHashSignatureCache[index] = signature
     virtualContentHashPrefixHashes[index + 1] = hashVirtualSignatureInto(
       virtualContentHashPrefixHashes[index] ?? 2166136261,
       signature,
@@ -2550,7 +2617,6 @@ function getVirtualContentHash() {
   }
 
   virtualContentHashPrefixHashes.length = total + 1
-  virtualContentHashSignatureCache.length = total
   virtualContentHashCache = ((virtualContentHashPrefixHashes[total] ?? 2166136261) >>> 0).toString(36)
   virtualContentHashRevision = revision
   return virtualContentHashCache

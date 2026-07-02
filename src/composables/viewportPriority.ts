@@ -53,10 +53,21 @@ export function provideViewportPriority(
     threshold: number
   }
 
-  // Lazily created IO bound to the provided root element
-  let io: IntersectionObserver | null = null
-  let currentConfig: ObserverConfig | null = null
-  const targets = new Map<Element, { resolve: () => void, visible: Ref<boolean> }>()
+  interface TargetState {
+    resolve: () => void
+    visible: Ref<boolean>
+    bucketKey: string
+  }
+
+  interface ObserverBucket {
+    io: IntersectionObserver
+    targets: Map<Element, TargetState>
+  }
+
+  const rootIds = new WeakMap<Element, number>()
+  let nextRootId = 1
+  const observerBuckets = new Map<string, ObserverBucket>()
+  const targets = new Map<Element, TargetState>()
   const idleQueue = new Set<Element>()
   let idleJob: number | null = null
 
@@ -68,11 +79,24 @@ export function provideViewportPriority(
     }
   }
 
-  function sameConfig(a: ObserverConfig | null, b: ObserverConfig) {
-    return !!a
-      && a.root === b.root
-      && a.rootMargin === b.rootMargin
-      && a.threshold === b.threshold
+  function getRootId(root: Element | null) {
+    if (!root)
+      return 'viewport'
+
+    let id = rootIds.get(root)
+    if (!id) {
+      id = nextRootId++
+      rootIds.set(root, id)
+    }
+    return String(id)
+  }
+
+  function getConfigKey(config: ObserverConfig) {
+    return [
+      getRootId(config.root),
+      config.rootMargin,
+      config.threshold,
+    ].join('\u0000')
   }
 
   function clearIdleJob() {
@@ -85,16 +109,19 @@ export function provideViewportPriority(
     idleJob = null
   }
 
-  function cleanupObserver() {
-    if (targets.size)
-      return
-    try {
-      io?.disconnect()
+  function cleanupObserver(bucketKey?: string) {
+    if (bucketKey) {
+      const bucket = observerBuckets.get(bucketKey)
+      if (bucket && !bucket.targets.size) {
+        try {
+          bucket.io.disconnect()
+        }
+        catch {}
+        observerBuckets.delete(bucketKey)
+      }
     }
-    catch {}
-    io = null
-    currentConfig = null
-    if (!idleQueue.size)
+
+    if (!targets.size && !idleQueue.size)
       clearIdleJob()
   }
 
@@ -102,6 +129,7 @@ export function provideViewportPriority(
     const data = targets.get(target)
     if (!data)
       return
+    const bucket = observerBuckets.get(data.bucketKey)
     if (!data.visible.value) {
       data.visible.value = true
       try {
@@ -110,12 +138,13 @@ export function provideViewportPriority(
       catch {}
     }
     try {
-      io?.unobserve(target)
+      bucket?.io.unobserve(target)
     }
     catch {}
+    bucket?.targets.delete(target)
     targets.delete(target)
     idleQueue.delete(target)
-    cleanupObserver()
+    cleanupObserver(data.bucketKey)
   }
 
   watch(
@@ -149,39 +178,33 @@ export function provideViewportPriority(
 
   function ensureObserver(target?: HTMLElement, opts?: { rootMargin?: string, threshold?: number }) {
     if (!isBrowser)
-      return io
+      return null
     // Guard: some browser-like environments (e.g., jsdom) don't provide IO
     if (typeof IntersectionObserver === 'undefined')
       return null
 
     const nextConfig = normalizeConfig(target, opts)
-    if (io && sameConfig(currentConfig, nextConfig))
-      return io
+    const bucketKey = getConfigKey(nextConfig)
+    const existing = observerBuckets.get(bucketKey)
+    if (existing)
+      return { key: bucketKey, bucket: existing }
 
-    if (io) {
-      try {
-        io.disconnect()
-      }
-      catch {}
+    const bucket: ObserverBucket = {
+      io: new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          const isVisible = entry.isIntersecting || entry.intersectionRatio > 0
+          if (isVisible)
+            settleTarget(entry.target)
+        }
+      }, {
+        root: nextConfig.root,
+        rootMargin: nextConfig.rootMargin,
+        threshold: nextConfig.threshold,
+      }),
+      targets: new Map(),
     }
-
-    io = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        const isVisible = entry.isIntersecting || entry.intersectionRatio > 0
-        if (isVisible)
-          settleTarget(entry.target)
-      }
-    }, {
-      root: nextConfig.root,
-      rootMargin: nextConfig.rootMargin, // prefetch slightly before entering viewport
-      threshold: nextConfig.threshold,
-    })
-
-    currentConfig = nextConfig
-    for (const el of targets.keys())
-      io.observe(el)
-
-    return io
+    observerBuckets.set(bucketKey, bucket)
+    return { key: bucketKey, bucket }
   }
 
   const register: RegisterFn = (el, opts) => {
@@ -198,13 +221,22 @@ export function provideViewportPriority(
     })
 
     const cleanup = () => {
+      const data = targets.get(el)
+      if (!data) {
+        idleQueue.delete(el)
+        cleanupObserver()
+        return
+      }
+
+      const bucket = observerBuckets.get(data.bucketKey)
       try {
-        io?.unobserve(el)
+        bucket?.io.unobserve(el)
       }
       catch {}
+      bucket?.targets.delete(el)
       targets.delete(el)
       idleQueue.delete(el)
-      cleanupObserver()
+      cleanupObserver(data.bucketKey)
     }
 
     if (!isBrowser || !enabledRef.value) {
@@ -213,15 +245,17 @@ export function provideViewportPriority(
       return { isVisible: visible, whenVisible, destroy: cleanup }
     }
 
-    const obs = ensureObserver(el, opts)
-    if (!obs) {
+    const observer = ensureObserver(el, opts)
+    if (!observer) {
       visible.value = true
       resolve()
       return { isVisible: visible, whenVisible, destroy: cleanup }
     }
 
-    targets.set(el, { resolve, visible })
-    obs.observe(el)
+    const data: TargetState = { resolve, visible, bucketKey: observer.key }
+    targets.set(el, data)
+    observer.bucket.targets.set(el, data)
+    observer.bucket.io.observe(el)
     idleQueue.add(el)
     scheduleIdleDrain()
     return { isVisible: visible, whenVisible, destroy: cleanup }

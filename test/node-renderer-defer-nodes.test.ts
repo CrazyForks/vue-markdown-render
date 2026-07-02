@@ -110,6 +110,81 @@ describe('markdownRender deferNodesUntilVisible', () => {
     }
   })
 
+  it('keeps viewport-priority targets with different observer configs independent', async () => {
+    const OriginalIO = globalThis.IntersectionObserver
+    const benchmarkWindow = window as any
+    vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)
+    benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__ = true
+
+    const Probe = defineComponent({
+      setup() {
+        const shell = ref<HTMLElement | null>(null)
+        const heavy = ref<HTMLElement | null>(null)
+        const shellVisible = ref(false)
+        const heavyVisible = ref(false)
+        const shellResolved = ref(false)
+        const heavyResolved = ref(false)
+        const register = provideViewportPriority(() => null, true)
+
+        onMounted(() => {
+          const shellHandle = register(shell.value!, { rootMargin: '800px' })
+          const heavyHandle = register(heavy.value!, { rootMargin: '0px' })
+
+          shellHandle.whenVisible.then(() => {
+            shellVisible.value = shellHandle.isVisible.value
+            shellResolved.value = true
+          })
+          heavyHandle.whenVisible.then(() => {
+            heavyVisible.value = heavyHandle.isVisible.value
+            heavyResolved.value = true
+          })
+        })
+
+        return { heavy, heavyResolved, heavyVisible, shell, shellResolved, shellVisible }
+      },
+      template: '<div><div ref="shell" data-target="shell" /><div ref="heavy" data-target="heavy" /></div>',
+    })
+
+    let wrapper: ReturnType<typeof mount> | null = null
+    try {
+      wrapper = mount(Probe)
+      await flushAll()
+
+      const shell = wrapper.get('[data-target="shell"]').element
+      const heavy = wrapper.get('[data-target="heavy"]').element
+      const shellObserver = FakeIntersectionObserver.instances.find(instance => instance.options.rootMargin === '800px')
+      const heavyObserver = FakeIntersectionObserver.instances.find(instance => instance.options.rootMargin === '0px')
+
+      expect(shellObserver).toBeTruthy()
+      expect(heavyObserver).toBeTruthy()
+      expect(shellObserver).not.toBe(heavyObserver)
+      expect(shellObserver?.elements.has(shell)).toBe(true)
+      expect(shellObserver?.elements.has(heavy)).toBe(false)
+      expect(heavyObserver?.elements.has(heavy)).toBe(true)
+      expect(heavyObserver?.elements.has(shell)).toBe(false)
+
+      shellObserver?.trigger(shell, true)
+      await flushAll()
+
+      expect(wrapper.vm.shellVisible).toBe(true)
+      expect(wrapper.vm.shellResolved).toBe(true)
+      expect(wrapper.vm.heavyVisible).toBe(false)
+      expect(wrapper.vm.heavyResolved).toBe(false)
+      expect(heavyObserver?.elements.has(heavy)).toBe(true)
+
+      heavyObserver?.trigger(heavy, true)
+      await flushAll()
+
+      expect(wrapper.vm.heavyVisible).toBe(true)
+      expect(wrapper.vm.heavyResolved).toBe(true)
+    }
+    finally {
+      wrapper?.unmount()
+      delete benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__
+      vi.stubGlobal('IntersectionObserver', OriginalIO as any)
+    }
+  })
+
   it('keeps nodes as placeholders until IO marks them visible', async () => {
     const OriginalIO = globalThis.IntersectionObserver
     vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)

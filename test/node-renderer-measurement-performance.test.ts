@@ -167,6 +167,41 @@ describe('node renderer measurement performance', () => {
     wrapper.unmount()
   })
 
+  it('reuses stable estimated height entries after unrelated measurements', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => 640)
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const nodes = Array.from({ length: 4 }, (_, index) => createCodeBlock(index + 1))
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes,
+        codeRenderer: 'pre',
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'estimated-height-cache-reuse',
+        },
+      },
+    })
+
+    await flushAll()
+
+    const state = setupState(wrapper)
+    const readEstimates = () => {
+      const estimates = state.estimatedNodeHeights
+      return Array.isArray(estimates) ? estimates : estimates.value
+    }
+    const firstEstimate = readEstimates()[0]
+
+    expect(firstEstimate?.kind).toBe('code-block')
+
+    state.recordNodeHeight(3, 240)
+    await flushVueOnly()
+
+    expect(readEstimates()[0]).toBe(firstEstimate)
+    wrapper.unmount()
+  })
+
   it('drops pending node height records when the content ref is cleared before rAF flush', async () => {
     const platform = installManualMeasurementPlatform()
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
