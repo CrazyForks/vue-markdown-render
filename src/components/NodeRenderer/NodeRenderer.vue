@@ -942,6 +942,7 @@ function markEstimatedNodeHeightsDirty(indices: Iterable<number>) {
     markEstimatedNodeHeightDirty(Number(index))
 }
 
+// Mutate nodeHeights through this wrapper so estimatedNodeHeightsCache stays coherent.
 function runEstimatedHeightMutation<T>(callback: () => T) {
   estimatedHeightMutationDepth++
   let shouldNotify = true

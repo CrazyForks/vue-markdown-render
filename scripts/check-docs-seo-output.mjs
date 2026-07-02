@@ -173,6 +173,15 @@ function frontmatterStringValue(frontmatter, key) {
   return value || null
 }
 
+function frontmatterScalarValue(frontmatter, key) {
+  const value = frontmatterStringValue(frontmatter, key)
+  if (value == null)
+    return null
+
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : value
+}
+
 function docsAssetUrl(value) {
   if (/^https?:\/\//i.test(value))
     return value
@@ -573,8 +582,8 @@ if (isMain) {
     const frontmatter = readFrontmatter(markdownFileForRoute(routePath))
     const ogImage = frontmatterStringValue(frontmatter, 'ogImage')
     const ogImageAlt = frontmatterStringValue(frontmatter, 'ogImageAlt')
-    const ogImageWidth = ogImageDimensionValue(frontmatterStringValue(frontmatter, 'ogImageWidth'), '1200')
-    const ogImageHeight = ogImageDimensionValue(frontmatterStringValue(frontmatter, 'ogImageHeight'), '630')
+    const ogImageWidth = ogImageDimensionValue(frontmatterScalarValue(frontmatter, 'ogImageWidth'), '1200')
+    const ogImageHeight = ogImageDimensionValue(frontmatterScalarValue(frontmatter, 'ogImageHeight'), '630')
     expectOgImageMeta(content, relativePath, ogImage
       ? {
           image: docsAssetUrl(ogImage),
@@ -605,8 +614,8 @@ if (isMain) {
     const isArticle = routePath.startsWith('/compare/') || routePath.startsWith('/zh/compare/')
     const ogImage = frontmatterStringValue(frontmatter, 'ogImage')
     const ogImageAlt = frontmatterStringValue(frontmatter, 'ogImageAlt')
-    const ogImageWidth = ogImageDimensionValue(frontmatterStringValue(frontmatter, 'ogImageWidth'), '1200')
-    const ogImageHeight = ogImageDimensionValue(frontmatterStringValue(frontmatter, 'ogImageHeight'), '630')
+    const ogImageWidth = ogImageDimensionValue(frontmatterScalarValue(frontmatter, 'ogImageWidth'), '1200')
+    const ogImageHeight = ogImageDimensionValue(frontmatterScalarValue(frontmatter, 'ogImageHeight'), '630')
 
     if (hasFrontmatterKey(frontmatter, 'faq')) {
       checks.push(['FAQPage', 'structured data'])
