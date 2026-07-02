@@ -166,6 +166,16 @@ function docsAssetUrl(value) {
   return `${newHost}${value.startsWith('/') ? value : `/${value}`}`
 }
 
+function expectLocalOgImageAsset(value, relativePath) {
+  if (!value || /^https?:\/\//i.test(value))
+    return
+
+  const normalized = value.replace(/^\//, '')
+  const assetPath = resolve(publicDir, normalized)
+  if (!existsSync(assetPath))
+    failures.push(`${relativePath} ogImage asset is missing: docs/public/${normalized}`)
+}
+
 function parseHtmlAttrs(tag) {
   const attrs = new Map()
   const attrPattern = /([:@\w-]+)=(?:"([^"]*)"|'([^']*)')/g
@@ -602,6 +612,7 @@ if (isMain) {
 
     if (ogImage) {
       const expectedOgImage = docsAssetUrl(ogImage)
+      expectLocalOgImageAsset(ogImage, relativePath)
       expectOgImageMeta(content, relativePath, {
         image: expectedOgImage,
         alt: ogImageAlt,
