@@ -944,12 +944,15 @@ function markEstimatedNodeHeightsDirty(indices: Iterable<number>) {
 
 function runEstimatedHeightMutation<T>(callback: () => T) {
   estimatedHeightMutationDepth++
+  let shouldNotify = true
   try {
-    return callback()
+    const result = callback()
+    shouldNotify = result !== false
+    return result
   }
   finally {
     estimatedHeightMutationDepth--
-    if (estimatedHeightMutationDepth === 0)
+    if (estimatedHeightMutationDepth === 0 && shouldNotify)
       estimatedHeightMutationRevision.value++
   }
 }
@@ -997,13 +1000,17 @@ function recordNodeHeightCore(
   markEstimatedNodeHeightDirty(index)
   recordMeasuredNodeHeight(index, height, options)
   const after = nodeHeights[index]
-  if (Object.is(before, after))
+  if (Object.is(before, after)) {
     estimatedHeightDirtyIndices.delete(index)
+    return false
+  }
 
   if (after && after > 0)
     rememberNodeHeightSignature(index)
   else if (before)
     nodeHeightSignatures.delete(index)
+
+  return true
 }
 
 function getNodeLayoutHeight(index: number, contentEl: HTMLElement) {
@@ -4025,14 +4032,16 @@ function flushPendingHeightMeasurements() {
   heightMeasurementRaf = null
 
   runEstimatedHeightMutation(() => {
+    let changed = false
     for (const [index, pending] of pendingHeightMeasurements) {
       pendingHeightMeasurements.delete(index)
       if (nodeContentElements.get(index) !== pending.el)
         continue
       if (nodeContentVersions.get(index) !== pending.version)
         continue
-      recordNodeHeightCore(index, pending.height, { allowShrink: pending.allowShrink })
+      changed = recordNodeHeightCore(index, pending.height, { allowShrink: pending.allowShrink }) || changed
     }
+    return changed
   })
 }
 
