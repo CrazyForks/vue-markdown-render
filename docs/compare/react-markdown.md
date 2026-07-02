@@ -1,6 +1,8 @@
 ---
 title: markstream-react vs react-markdown for static Markdown and migration
 description: Compare markstream-react and react-markdown for static React Markdown, remark/rehype plugin pipelines, migration trade-offs, and when streaming AI chat needs a streaming-first renderer.
+ogImage: /og/comparison.svg
+ogImageAlt: Markstream React and react-markdown comparison
 lastVerified: '2026-06-12'
 faq:
   - question: Should I replace react-markdown with markstream-react?

@@ -76,6 +76,8 @@ export interface MarkdownParsingState {
   mdBase: ComputedRef<MarkdownIt>
   mdInstance: ComputedRef<MarkdownIt>
   mergedParseOptions: ComputedRef<RendererParseOptions>
+  getParsedNodesDirtyStartIndex: () => number
+  getParsedNodesRevision: () => number
   parsedNodes: ComputedRef<ParsedNode[]>
 }
 
@@ -832,6 +834,15 @@ export function useMarkdownParsing(
   let parseCommitCount = 0
   let parseCoalescedCount = 0
   let lastParseFlushAt = getNow()
+  let parsedNodesDirtyStartIndexValue = -1
+  let parsedNodesRevisionCount = 0
+
+  function commitParsedNodesDirtyStartIndex(dirtyStartIndex: number) {
+    parsedNodesDirtyStartIndexValue = Number.isInteger(dirtyStartIndex)
+      ? dirtyStartIndex
+      : 0
+    parsedNodesRevisionCount += 1
+  }
 
   function clearParseCoalesceTimer() {
     if (!parseCoalesceTimer)
@@ -988,6 +999,7 @@ export function useMarkdownParsing(
     if (props.nodes?.length) {
       previousParsedNodes = []
       previousContent = ''
+      commitParsedNodesDirtyStartIndex(0)
       return markRaw((props.nodes as unknown as ParsedNode[]).slice())
     }
 
@@ -996,6 +1008,7 @@ export function useMarkdownParsing(
     if (!content) {
       previousParsedNodes = []
       previousContent = ''
+      commitParsedNodesDirtyStartIndex(-1)
       return []
     }
 
@@ -1085,6 +1098,7 @@ export function useMarkdownParsing(
     }
     else {
       parsed = nextParsed
+      stabilizeMetrics = getInitialStabilizeMetrics(parsed.length)
     }
 
     if (signatureTiming)
@@ -1100,6 +1114,7 @@ export function useMarkdownParsing(
     previousParserCacheSemanticKey = currentParserCacheSemanticKey
     previousNodeReuseSemanticKey = currentNodeReuseSemanticKey
     previousParsedNodes = parsed
+    commitParsedNodesDirtyStartIndex(stabilizeMetrics?.dirtyStartIndex ?? 0)
 
     if (collectPerformanceMetrics) {
       const streamStats = readStreamStats(md)
@@ -1144,6 +1159,8 @@ export function useMarkdownParsing(
     mdBase,
     mdInstance,
     mergedParseOptions,
+    getParsedNodesDirtyStartIndex: () => parsedNodesDirtyStartIndexValue,
+    getParsedNodesRevision: () => parsedNodesRevisionCount,
     parsedNodes,
   }
 }

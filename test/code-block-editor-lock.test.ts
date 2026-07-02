@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { nextTick, ref } from 'vue'
+import { defineComponent, nextTick, ref } from 'vue'
 import CodeBlockNode from '../src/components/CodeBlockNode/CodeBlockNode.vue'
 import { isCodeBlockRuntimeReady, preloadCodeBlockRuntime } from '../src/components/CodeBlockNode/monaco'
 import { resetCodeBlockRuntimeReadyForTest } from '../src/components/CodeBlockNode/runtime'
@@ -97,9 +97,81 @@ function createDeferred() {
   return { promise, resolve, reject }
 }
 
+function createHtmlPreviewNode() {
+  return {
+    type: 'code_block',
+    language: 'html',
+    code: '<div>preview</div>',
+    raw: '```html\n<div>preview</div>\n```',
+  }
+}
+
+async function clickPreviewMenuItem(wrapper: ReturnType<typeof mount>) {
+  await wrapper.get('button[aria-haspopup="true"]').trigger('click')
+  await nextTick()
+  const previewButton = wrapper.findAll('button[role="menuitem"]').find(button => button.text().includes('Preview'))
+  expect(previewButton).toBeTruthy()
+  await previewButton!.trigger('click')
+  await flushPendingMicrotasks()
+}
+
 describe('codeBlockNode editor creation locking', () => {
   beforeEach(() => {
     resetStreamMonacoHelpers()
+  })
+
+  it('uses external previewCode listener for kebab-case @preview-code templates', async () => {
+    const Parent = defineComponent({
+      components: { CodeBlockNode },
+      setup() {
+        const previewPayload = ref<any>(null)
+        const onPreview = (payload: any) => {
+          previewPayload.value = payload
+        }
+        return {
+          node: createHtmlPreviewNode(),
+          onPreview,
+          previewPayload,
+        }
+      },
+      template: '<CodeBlockNode :node="node" :loading="false" :stream="true" :show-tooltips="false" @preview-code="onPreview" />',
+    })
+
+    const wrapper = mount(Parent)
+    await flushPendingMicrotasks()
+
+    await clickPreviewMenuItem(wrapper)
+
+    expect(wrapper.vm.previewPayload?.artifactType).toBe('text/html')
+    expect(document.body.querySelector('.html-preview-frame')).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('uses external previewCode listener for camel-case @previewCode templates', async () => {
+    const Parent = defineComponent({
+      components: { CodeBlockNode },
+      setup() {
+        const previewPayload = ref<any>(null)
+        const onPreview = (payload: any) => {
+          previewPayload.value = payload
+        }
+        return {
+          node: createHtmlPreviewNode(),
+          onPreview,
+          previewPayload,
+        }
+      },
+      template: '<CodeBlockNode :node="node" :loading="false" :stream="true" :show-tooltips="false" @previewCode="onPreview" />',
+    })
+
+    const wrapper = mount(Parent)
+    await flushPendingMicrotasks()
+
+    await clickPreviewMenuItem(wrapper)
+
+    expect(wrapper.vm.previewPayload?.artifactType).toBe('text/html')
+    expect(document.body.querySelector('.html-preview-frame')).toBeNull()
+    wrapper.unmount()
   })
 
   it('renders a `<pre>` fallback until Monaco finishes mounting', async () => {

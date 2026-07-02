@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { nextTick } from 'vue'
+import { defineComponent, nextTick } from 'vue'
+import { removeCustomComponents, setCustomComponents } from '../src/utils/nodeComponents'
 import { flushAll } from './setup/flush-all'
 
 class CountingResizeObserver {
@@ -46,6 +47,20 @@ function createCodeBlock(index: number) {
     raw: `\`\`\`js\nconsole.log(${index})\n\`\`\``,
     loading: false,
   }
+}
+
+function createCodeFence(index: number, lineCount: number) {
+  const lines = Array.from({ length: lineCount }, (_, index) => `console.log(${index + 1})`)
+  return `\`\`\`js\n// block ${index}\n${lines.join('\n')}\n\`\`\``
+}
+
+function createMarkdownWithOpenCodeBlock(tailLineCount: number) {
+  const lines = Array.from({ length: tailLineCount }, (_, index) => `console.log(${index + 1})`)
+  return `${createCodeFence(1, 10)}\n\n\`\`\`js\n// tail\n${lines.join('\n')}`
+}
+
+function createTwoParagraphMarkdown(first: string, second: string) {
+  return `${first}\n\n${second}`
 }
 
 function installManualMeasurementPlatform() {
@@ -165,6 +180,183 @@ describe('node renderer measurement performance', () => {
     expect(CountingResizeObserver.observeCalls).toBeGreaterThan(0)
     expect(CountingResizeObserver.constructorCalls).toBe(1)
     wrapper.unmount()
+  })
+
+  it('reuses stable estimated height entries after unrelated measurements', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => 640)
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const nodes = Array.from({ length: 4 }, (_, index) => createCodeBlock(index + 1))
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes,
+        codeRenderer: 'pre',
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'estimated-height-cache-reuse',
+        },
+      },
+    })
+
+    await flushAll()
+
+    const state = setupState(wrapper)
+    const readEstimates = () => {
+      const estimates = state.estimatedNodeHeights
+      return Array.isArray(estimates) ? estimates : estimates.value
+    }
+    const firstEstimate = readEstimates()[0]
+
+    expect(firstEstimate?.kind).toBe('code-block')
+
+    state.recordNodeHeight(3, 240)
+    await flushVueOnly()
+
+    expect(readEstimates()[0]).toBe(firstEstimate)
+    wrapper.unmount()
+  })
+
+  it('recomputes estimated heights when custom code block components change', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => 640)
+
+    const customId = 'estimated-height-custom-components'
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId,
+        nodes: [createCodeBlock(1)],
+        codeRenderer: 'pre',
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'estimated-height-custom-components',
+        },
+      },
+    })
+
+    try {
+      await flushAll()
+
+      const state = setupState(wrapper)
+      const readEstimates = () => {
+        const estimates = state.estimatedNodeHeights
+        return Array.isArray(estimates) ? estimates : estimates.value
+      }
+
+      expect(readEstimates()[0]?.kind).toBe('code-block')
+
+      setCustomComponents(customId, {
+        code_block: defineComponent({
+          template: '<div data-custom-code-block="1" />',
+        }),
+      })
+      await flushVueOnly()
+
+      expect(readEstimates()[0]).toBe(null)
+    }
+    finally {
+      wrapper.unmount()
+      removeCustomComponents(customId)
+    }
+  })
+
+  it('recomputes estimated heights from dirtyStart when node count is unchanged', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => 640)
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: createMarkdownWithOpenCodeBlock(10),
+        codeRenderer: 'pre',
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'estimated-height-dirty-start-same-count',
+        },
+      },
+    })
+
+    await flushAll()
+
+    const state = setupState(wrapper)
+    const readEstimates = () => {
+      const estimates = state.estimatedNodeHeights
+      return Array.isArray(estimates) ? estimates : estimates.value
+    }
+    const readDirtyStart = () => {
+      return state.getParsedNodesDirtyStartIndex()
+    }
+    const initialEstimates = readEstimates()
+    const initialPrefixEstimate = initialEstimates[0]
+    const initialTailEstimate = initialEstimates[1]
+    const initialVirtualState = (wrapper.vm as any).captureVirtualState()
+
+    expect(initialPrefixEstimate?.kind).toBe('code-block')
+    expect(initialTailEstimate?.kind).toBe('code-block')
+    expect(initialVirtualState?.contentHash).toBeTruthy()
+
+    await wrapper.setProps({ content: createMarkdownWithOpenCodeBlock(40) })
+    await flushAll()
+
+    const updatedEstimates = readEstimates()
+    const updatedVirtualState = (wrapper.vm as any).captureVirtualState()
+
+    expect(updatedEstimates).toHaveLength(initialEstimates.length)
+    expect(readDirtyStart()).toBe(1)
+    expect(updatedEstimates[0]).toStrictEqual(initialPrefixEstimate)
+    expect(updatedEstimates[1]).not.toBe(initialTailEstimate)
+    expect(updatedVirtualState?.contentHash).not.toBe(initialVirtualState?.contentHash)
+
+    wrapper.unmount()
+  })
+
+  it('does not reuse stale virtual content hash prefixes across skipped revisions', async () => {
+    installManualMeasurementPlatform()
+
+    const initialContent = createTwoParagraphMarkdown('Prefix A', 'Tail A')
+    const skippedContent = createTwoParagraphMarkdown('Prefix B', 'Tail A')
+    const finalContent = createTwoParagraphMarkdown('Prefix B', 'Tail B')
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: initialContent,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'virtual-content-hash-skipped-revisions',
+        },
+      },
+    })
+
+    await nextTick()
+    const initialState = (wrapper.vm as any).captureVirtualState()
+    expect(initialState?.contentHash).toBeTruthy()
+
+    await wrapper.setProps({ content: skippedContent })
+    await nextTick()
+    await wrapper.setProps({ content: finalContent })
+    await nextTick()
+
+    const updatedHash = (wrapper.vm as any).captureVirtualState()?.contentHash
+    wrapper.unmount()
+
+    const freshWrapper = mount(NodeRenderer, {
+      props: {
+        content: finalContent,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'virtual-content-hash-skipped-revisions-fresh',
+        },
+      },
+    })
+
+    await nextTick()
+    const freshHash = (freshWrapper.vm as any).captureVirtualState()?.contentHash
+
+    expect(updatedHash).toBe(freshHash)
+    freshWrapper.unmount()
   })
 
   it('drops pending node height records when the content ref is cleared before rAF flush', async () => {

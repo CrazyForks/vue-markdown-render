@@ -3,12 +3,13 @@
  */
 
 import { mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it } from 'vitest'
-import { defineComponent, h, nextTick } from 'vue'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { computed, defineComponent, h, nextTick } from 'vue'
 import { flushAll } from '../../../test/setup/flush-all'
 import HtmlBlockNode from '../../components/HtmlBlockNode/HtmlBlockNode.vue'
 import HtmlInlineNode from '../../components/HtmlInlineNode/HtmlInlineNode.vue'
 import MarkdownRender from '../../components/NodeRenderer'
+import { provideViewportPriority, provideViewportPriorityOptions } from '../../composables/viewportPriority'
 import { setCustomComponents } from '../../utils/nodeComponents'
 
 // Mock custom components
@@ -35,6 +36,29 @@ const NestedComponent = defineComponent({
   },
 })
 
+class FakeIntersectionObserver {
+  static instances: FakeIntersectionObserver[] = []
+  elements = new Set<Element>()
+  options: IntersectionObserverInit
+
+  constructor(_callback: IntersectionObserverCallback, options: IntersectionObserverInit = {}) {
+    this.options = options
+    FakeIntersectionObserver.instances.push(this)
+  }
+
+  observe(el: Element) {
+    this.elements.add(el)
+  }
+
+  unobserve(el: Element) {
+    this.elements.delete(el)
+  }
+
+  disconnect() {
+    this.elements.clear()
+  }
+}
+
 describe('htmlBlockNode - Custom Components Integration', () => {
   const testId = 'test-html-block'
 
@@ -59,6 +83,49 @@ describe('htmlBlockNode - Custom Components Integration', () => {
     expect(wrapper.find('.test-component').exists()).toBe(true)
     expect(wrapper.find('.test-component').attributes('data-type')).toBe('block')
     expect(wrapper.html()).toContain('Content')
+  })
+
+  it('uses viewportPriorityOptions heavyBlockMargin for deferred HTML blocks', async () => {
+    const OriginalIO = globalThis.IntersectionObserver
+    const benchmarkWindow = window as any
+    FakeIntersectionObserver.instances = []
+    vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)
+    benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__ = true
+
+    const Probe = defineComponent({
+      components: { HtmlBlockNode },
+      setup() {
+        provideViewportPriorityOptions(computed(() => ({
+          rootMargin: '111px',
+          heavyBlockMargin: '222px',
+        })))
+        provideViewportPriority(() => null, true)
+
+        return {
+          node: {
+            content: '<div>Deferred HTML</div>',
+            loading: true,
+          },
+        }
+      },
+      template: '<HtmlBlockNode :node="node" />',
+    })
+
+    let wrapper: ReturnType<typeof mount> | null = null
+    try {
+      wrapper = mount(Probe)
+      await flushAll()
+
+      const observer = FakeIntersectionObserver.instances.find(instance => instance.elements.size > 0)
+      expect(observer).toBeTruthy()
+      expect(observer?.options.rootMargin).toBe('222px')
+    }
+    finally {
+      wrapper?.unmount()
+      delete benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__
+      vi.stubGlobal('IntersectionObserver', OriginalIO as any)
+      FakeIntersectionObserver.instances = []
+    }
   })
 
   it('should render nested custom components', () => {

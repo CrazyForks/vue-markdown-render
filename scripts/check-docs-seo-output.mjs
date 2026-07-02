@@ -10,6 +10,8 @@ const distDir = resolve(docsDir, '.vitepress/dist')
 const newHost = 'https://markstream.simonhe.me'
 const oldHost = 'https://markstream-vue-docs.simonhe.me'
 const oldHostRedirect = `${oldHost}/*  ${newHost}/:splat  301`
+const docsOgImageUrl = docsAssetUrl('/og-image.svg')
+const docsOgImageAlt = 'Markstream streaming Markdown renderer documentation overview'
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 
 const scannedExtensions = new Set(['.html', '.xml', '.txt'])
@@ -126,6 +128,18 @@ function htmlFileForRoute(routePath) {
   return `${routePart}.html`
 }
 
+function markdownFileForRoute(routePath) {
+  if (routePath === '/')
+    return resolve(docsDir, 'index.md')
+
+  const routePart = routePath.slice(1)
+  const indexFile = resolve(docsDir, routePart, 'index.md')
+  if (existsSync(indexFile))
+    return indexFile
+
+  return resolve(docsDir, `${routePart}.md`)
+}
+
 function readFrontmatter(filePath) {
   const source = readFileSync(filePath, 'utf8')
   if (!source.startsWith('---\n'))
@@ -157,6 +171,85 @@ function frontmatterStringValue(frontmatter, key) {
   }
 
   return value || null
+}
+
+function frontmatterScalarValue(frontmatter, key) {
+  const value = frontmatterStringValue(frontmatter, key)
+  if (value == null)
+    return null
+
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : value
+}
+
+function docsAssetUrl(value) {
+  if (/^https?:\/\//i.test(value))
+    return value
+
+  const base = newHost.endsWith('/') ? newHost : `${newHost}/`
+  return new URL(value.replace(/^\//, ''), base).toString()
+}
+
+function ogImageDimensionValue(value, fallback) {
+  const numeric = value == null ? Number.NaN : Number(value)
+  return Number.isFinite(numeric) && numeric > 0
+    ? String(Math.round(numeric))
+    : fallback
+}
+
+function expectLocalOgImageAsset(value, relativePath) {
+  if (!value || /^https?:\/\//i.test(value))
+    return
+
+  const normalized = value.replace(/^\//, '')
+  const assetPath = resolve(publicDir, normalized)
+  if (!existsSync(assetPath))
+    failures.push(`${relativePath} ogImage asset is missing: docs/public/${normalized}`)
+}
+
+function parseHtmlAttrs(tag) {
+  const attrs = new Map()
+  const attrPattern = /([:@\w-]+)=(?:"([^"]*)"|'([^']*)')/g
+  let match
+
+  while ((match = attrPattern.exec(tag))) {
+    attrs.set(match[1], match[2] ?? match[3] ?? '')
+  }
+
+  return attrs
+}
+
+function getMetaContent(content, attrName, attrValue) {
+  const metaPattern = /<meta\b[^>]*>/gi
+  let match
+
+  while ((match = metaPattern.exec(content))) {
+    const attrs = parseHtmlAttrs(match[0])
+    if (attrs.get(attrName) === attrValue)
+      return attrs.get('content') ?? null
+  }
+
+  return null
+}
+
+function expectMetaContent(content, relativePath, attrName, attrValue, expectedValue = null) {
+  const actual = getMetaContent(content, attrName, attrValue)
+  if (!actual) {
+    failures.push(`${relativePath} is missing meta ${attrName}="${attrValue}"`)
+    return
+  }
+
+  if (expectedValue != null && actual !== expectedValue)
+    failures.push(`${relativePath} meta ${attrName}="${attrValue}" expected ${expectedValue}, got ${actual}`)
+}
+
+function expectOgImageMeta(content, relativePath, options = {}) {
+  expectMetaContent(content, relativePath, 'property', 'og:image', options.image ?? null)
+  expectMetaContent(content, relativePath, 'property', 'og:image:alt', options.alt ?? null)
+  expectMetaContent(content, relativePath, 'property', 'og:image:width', options.width ?? '1200')
+  expectMetaContent(content, relativePath, 'property', 'og:image:height', options.height ?? '630')
+  expectMetaContent(content, relativePath, 'name', 'twitter:image', options.image ?? null)
+  expectMetaContent(content, relativePath, 'name', 'twitter:image:alt', options.alt ?? null)
 }
 
 function daysSinceIsoDate(value) {
@@ -486,6 +579,24 @@ if (isMain) {
     const canonicalUrl = `${newHost}${routePath === '/' ? '/' : routePath}`
     expectContains(content, relativePath, `<link rel="canonical" href="${canonicalUrl}">`, `is missing canonical ${canonicalUrl}`)
     expectContains(content, relativePath, `<meta property="og:url" content="${canonicalUrl}">`, `is missing og:url ${canonicalUrl}`)
+    const frontmatter = readFrontmatter(markdownFileForRoute(routePath))
+    const ogImage = frontmatterStringValue(frontmatter, 'ogImage')
+    const ogImageAlt = frontmatterStringValue(frontmatter, 'ogImageAlt')
+    const ogImageWidth = ogImageDimensionValue(frontmatterScalarValue(frontmatter, 'ogImageWidth'), '1200')
+    const ogImageHeight = ogImageDimensionValue(frontmatterScalarValue(frontmatter, 'ogImageHeight'), '630')
+    expectOgImageMeta(content, relativePath, ogImage
+      ? {
+          image: docsAssetUrl(ogImage),
+          alt: ogImageAlt,
+          width: ogImageWidth,
+          height: ogImageHeight,
+        }
+      : {
+          image: docsOgImageUrl,
+          alt: docsOgImageAlt,
+          width: '1200',
+          height: '630',
+        })
 
     const structuredDataNodes = jsonLdNodesByRelativePath.get(relativePath) ?? parseStructuredDataNodes(content, relativePath)
     if (!hasStructuredDataType(structuredDataNodes, 'WebPage'))
@@ -501,6 +612,13 @@ if (isMain) {
     const relativePath = htmlFileForMarkdown(filePath)
     const checks = []
     const isArticle = routePath.startsWith('/compare/') || routePath.startsWith('/zh/compare/')
+    const ogImage = frontmatterStringValue(frontmatter, 'ogImage')
+    const ogImageAlt = frontmatterStringValue(frontmatter, 'ogImageAlt')
+    const ogImageWidth = ogImageDimensionValue(frontmatterScalarValue(frontmatter, 'ogImageWidth'), '1200')
+    const ogImageHeight = ogImageDimensionValue(frontmatterScalarValue(frontmatter, 'ogImageHeight'), '630')
+
+    if (ogImage && !ogImageAlt)
+      failures.push(`${relativePath} has ogImage but is missing ogImageAlt`)
 
     if (hasFrontmatterKey(frontmatter, 'faq')) {
       checks.push(['FAQPage', 'structured data'])
@@ -514,7 +632,7 @@ if (isMain) {
     if (isArticle)
       checks.push(['Article', 'structured data'])
 
-    if (checks.length === 0)
+    if (checks.length === 0 && !ogImage)
       continue
 
     const content = readDistFile(relativePath)
@@ -537,6 +655,21 @@ if (isMain) {
       validateCompareFreshness(relativePath, lastVerified)
       if (!content.includes('Verification') && !content.includes('核验方式'))
         failures.push(`${relativePath} compare page is missing visible Verification section`)
+      if (lastVerified) {
+        expectMetaContent(content, relativePath, 'property', 'og:updated_time', lastVerified)
+        expectMetaContent(content, relativePath, 'property', 'article:modified_time', lastVerified)
+      }
+    }
+
+    if (ogImage) {
+      const expectedOgImage = docsAssetUrl(ogImage)
+      expectLocalOgImageAsset(ogImage, relativePath)
+      expectOgImageMeta(content, relativePath, {
+        image: expectedOgImage,
+        alt: ogImageAlt,
+        width: ogImageWidth,
+        height: ogImageHeight,
+      })
     }
 
     const softwareSourceCodeNode = findStructuredDataNode(structuredDataNodes, 'SoftwareSourceCode')
@@ -560,5 +693,5 @@ if (isMain) {
     process.exit(1)
   }
 
-  console.log('[docs-seo-output] Docs host output, redirects, canonical tags, LLM files, visible FAQ content, and JSON-LD nodes are valid.')
+  console.log('[docs-seo-output] Docs host output, redirects, canonical tags, OG images, updated-time meta, LLM files, visible FAQ content, and JSON-LD nodes are valid.')
 }

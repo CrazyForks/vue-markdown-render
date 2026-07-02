@@ -10,7 +10,7 @@ import {
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
-import { useViewportPriority } from '../../composables/viewportPriority'
+import { DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN, useViewportPriority, useViewportPriorityOptions } from '../../composables/viewportPriority'
 import { isDevEnvironment } from '../../utils/devEnv'
 import {
   languageIconsRevision,
@@ -98,13 +98,18 @@ let lastCommittedRenderSignature = ''
 let rendererMutationVersion = 0
 let pendingRenderSignature: string | null = null
 const registerVisibility = useViewportPriority()
+const viewportPriorityOptions = useViewportPriorityOptions()
 const viewportHandle = shallowRef<ReturnType<typeof registerVisibility> | null>(null)
 const viewportReady = ref(typeof window === 'undefined')
 
 if (typeof window !== 'undefined') {
   watch(
-    () => container.value,
-    (el, _oldEl, onCleanup) => {
+    [
+      () => container.value,
+      () => viewportPriorityOptions?.value.heavyBlockMargin,
+      () => viewportPriorityOptions?.value.rootMargin,
+    ],
+    ([el], _oldValue, onCleanup) => {
       viewportHandle.value?.destroy()
       viewportHandle.value = null
 
@@ -114,10 +119,14 @@ if (typeof window !== 'undefined') {
       }
 
       let active = true
-      const handle = registerVisibility(el, { rootMargin: '400px' })
+      const rootMargin = viewportPriorityOptions?.value.heavyBlockMargin
+        ?? viewportPriorityOptions?.value.rootMargin
+        ?? DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN
+      const handle = registerVisibility(el, { rootMargin })
 
       viewportHandle.value = handle
-      viewportReady.value = handle.isVisible.value
+      // Latch readiness once visible so observer reconfiguration does not hide an enhanced block.
+      viewportReady.value = viewportReady.value || handle.isVisible.value
 
       handle.whenVisible
         .then(() => {

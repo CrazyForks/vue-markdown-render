@@ -273,6 +273,16 @@ export interface MarkstreamNodeLifecycle {
   markSettled: (indexKey: string | number) => void
 }
 
+/** @experimental */
+export interface MarkstreamViewportPriorityOptions {
+  /** Root margin for MarkdownRender node-shell visibility. Default: '400px'. */
+  rootMargin?: string
+  /** Root margin for built-in code block renderers and deferred HTML blocks. Defaults to rootMargin. */
+  heavyBlockMargin?: string
+  /** Auto-disable threshold for MarkdownRender node-shell deferral only. Default: 640. */
+  maxTargets?: number
+}
+
 export interface NodeRendererProps {
   /** Raw Markdown input. Omit this when you pass pre-parsed nodes instead. */
   content?: string
@@ -304,6 +314,8 @@ export interface NodeRendererProps {
   htmlPolicy?: HtmlPolicy
   /** Enable priority rendering for visible viewport area */
   viewportPriority?: boolean
+  /** Experimental viewport priority observer tuning; not part of the 1.x compatibility promise. */
+  viewportPriorityOptions?: MarkstreamViewportPriorityOptions
   /**
    * Whether code_block renders should stream updates.
    * When false, code blocks stay in a loading state and render once when final content is ready.

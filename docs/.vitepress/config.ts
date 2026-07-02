@@ -6,7 +6,7 @@ import { transformerTwoslash } from '@shikijs/vitepress-twoslash'
 import { defineConfig } from 'vitepress'
 
 const docsSiteUrl = process.env.VITEPRESS_SITE_URL || 'https://markstream.simonhe.me'
-const docsOgImageUrl = `${docsSiteUrl}/og-image.svg`
+const docsOgImageUrl = getDocsAbsoluteAssetUrl('/og-image.svg')
 const docsOgImageAlt = 'Markstream streaming Markdown renderer documentation overview'
 const docsDefaultDescription = 'Streaming Markdown renderers for AI apps across Vue, React, Svelte, Angular, Nuxt, and Next.js'
 const githubRepoUrl = 'https://github.com/Simon-He95/markstream-vue'
@@ -312,13 +312,8 @@ const chineseGuideSidebar = [
 const siteHead = [
   ['link', { rel: 'icon', href: '/app-icon.svg', type: 'image/svg+xml' }],
   ['meta', { name: 'theme-color', content: '#111827' }],
-  ['meta', { property: 'og:type', content: 'website' }],
   ['meta', { property: 'og:site_name', content: 'Markstream' }],
-  ['meta', { property: 'og:image', content: docsOgImageUrl }],
-  ['meta', { property: 'og:image:alt', content: docsOgImageAlt }],
   ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
-  ['meta', { name: 'twitter:image', content: docsOgImageUrl }],
-  ['meta', { name: 'twitter:image:alt', content: docsOgImageAlt }],
 ]
 
 const seoExcludedDocsPaths = new Set([
@@ -599,6 +594,38 @@ function getDocsPageDateModified(frontmatter: Record<string, any>, pageLastUpdat
     return new Date(pageLastUpdated).toISOString()
 
   return null
+}
+
+function getDocsAbsoluteAssetUrl(value: string) {
+  if (/^https?:\/\//i.test(value))
+    return value
+
+  const base = docsSiteUrl.endsWith('/') ? docsSiteUrl : `${docsSiteUrl}/`
+  return new URL(value.replace(/^\//, ''), base).toString()
+}
+
+function getDocsPageOgImage(frontmatter: Record<string, any>) {
+  return typeof frontmatter.ogImage === 'string' && frontmatter.ogImage.length > 0
+    ? getDocsAbsoluteAssetUrl(frontmatter.ogImage)
+    : docsOgImageUrl
+}
+
+function getDocsPageOgImageAlt(frontmatter: Record<string, any>) {
+  return typeof frontmatter.ogImageAlt === 'string' && frontmatter.ogImageAlt.length > 0
+    ? frontmatter.ogImageAlt
+    : docsOgImageAlt
+}
+
+function getDocsPageOgImageDimension(value: unknown, fallback: string) {
+  const numeric = typeof value === 'number'
+    ? value
+    : typeof value === 'string' && value.trim().length > 0
+      ? Number(value)
+      : Number.NaN
+
+  return Number.isFinite(numeric) && numeric > 0
+    ? String(Math.round(numeric))
+    : fallback
 }
 
 function frontmatterFaqItems(value: unknown) {
@@ -896,6 +923,11 @@ export default defineConfig({
     const structuredDataTitle = normalizedPath === '/' || normalizedPath === '/zh' ? seoTitle : pageTitle
     const dateModified = getDocsPageDateModified(frontmatter, ctx.pageData.lastUpdated)
     const shouldIndex = !ctx.pageData.isNotFound && !frontmatter.noindex && !isDocsSeoExcluded(normalizedPath)
+    const isArticle = normalizedPath.startsWith('/compare/') || normalizedPath.startsWith('/zh/compare/')
+    const ogImageUrl = getDocsPageOgImage(frontmatter)
+    const ogImageAlt = getDocsPageOgImageAlt(frontmatter)
+    const ogImageWidth = getDocsPageOgImageDimension(frontmatter.ogImageWidth, '1200')
+    const ogImageHeight = getDocsPageOgImageDimension(frontmatter.ogImageHeight, '630')
     const alternates = getDocsAlternatePaths(normalizedPath)
     const alternateHead = []
     const alternateLocales = []
@@ -930,6 +962,7 @@ export default defineConfig({
       ...alternateHead,
       ['meta', { name: 'description', content: description }],
       ['meta', { name: 'robots', content: shouldIndex ? 'index,follow' : 'noindex,nofollow' }],
+      ['meta', { property: 'og:type', content: isArticle ? 'article' : 'website' }],
       ['meta', { property: 'og:locale', content: isChinese ? 'zh_CN' : 'en_US' }],
       ...alternateLocales
         .filter(locale => locale !== (isChinese ? 'zh_CN' : 'en_US'))
@@ -937,8 +970,20 @@ export default defineConfig({
       ['meta', { property: 'og:title', content: seoTitle }],
       ['meta', { property: 'og:description', content: description }],
       ['meta', { property: 'og:url', content: canonicalUrl }],
+      ['meta', { property: 'og:image', content: ogImageUrl }],
+      ['meta', { property: 'og:image:alt', content: ogImageAlt }],
+      ['meta', { property: 'og:image:width', content: ogImageWidth }],
+      ['meta', { property: 'og:image:height', content: ogImageHeight }],
+      ...(dateModified
+        ? [
+            ['meta', { property: 'og:updated_time', content: dateModified }],
+            ...(isArticle ? [['meta', { property: 'article:modified_time', content: dateModified }]] : []),
+          ]
+        : []),
       ['meta', { name: 'twitter:title', content: seoTitle }],
       ['meta', { name: 'twitter:description', content: description }],
+      ['meta', { name: 'twitter:image', content: ogImageUrl }],
+      ['meta', { name: 'twitter:image:alt', content: ogImageAlt }],
       ...structuredData,
     ]
   },

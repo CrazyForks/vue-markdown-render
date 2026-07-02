@@ -8,6 +8,7 @@ import type {
   MarkstreamHeightCache,
   MarkstreamNodeLifecycle,
   MarkstreamRendererHandle,
+  MarkstreamViewportPriorityOptions,
   MarkstreamVirtualAnchor,
   MarkstreamVirtualMetrics,
   MarkstreamVirtualPhase,
@@ -19,7 +20,7 @@ import type {
 } from '../../types/node-renderer-props'
 import type { VirtualHeightSummary } from './composables/useHeightModel'
 import { normalizeShikiLanguage } from 'markstream-core'
-import { computed, defineAsyncComponent, getCurrentInstance, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, getCurrentInstance, inject, markRaw, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, shallowRef, triggerRef, watch, watchEffect } from 'vue'
 import AdmonitionNode from '../../components/AdmonitionNode'
 import BlockquoteNode from '../../components/BlockquoteNode'
 import CheckboxNode from '../../components/CheckboxNode'
@@ -49,7 +50,7 @@ import TableNode from '../../components/TableNode'
 import TextNode from '../../components/TextNode'
 import ThematicBreakNode from '../../components/ThematicBreakNode'
 import VmrContainerNode from '../../components/VmrContainerNode'
-import { provideViewportPriority } from '../../composables/viewportPriority'
+import { DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN, provideViewportPriority, provideViewportPriorityOptions } from '../../composables/viewportPriority'
 import {
   buildBlockTextProfile,
   createEmptySimpleTextProbeProfile,
@@ -202,6 +203,7 @@ const rendererProps = {
   get domMode() { return resolvedDomMode.value },
   get htmlPolicy() { return resolveRendererProp('htmlPolicy') },
   get viewportPriority() { return resolveRendererProp('viewportPriority') },
+  get viewportPriorityOptions() { return resolveRendererProp('viewportPriorityOptions') },
   get codeBlockStream() { return resolveRendererProp('codeBlockStream') },
   get codeBlockDarkTheme() { return resolveRendererProp('codeBlockDarkTheme') },
   get codeBlockLightTheme() { return resolveRendererProp('codeBlockLightTheme') },
@@ -286,6 +288,36 @@ const textStreamState = new Map<string, string>()
 const streamRenderVersion = ref(0)
 const experimentContainerWidth = ref(0)
 const simpleTextProbeProfile = ref(createEmptySimpleTextProbeProfile())
+
+function resolveViewportPriorityRootMargin(value: unknown, fallback: string) {
+  if (typeof value !== 'string')
+    return fallback
+
+  const trimmed = value.trim()
+  return trimmed || fallback
+}
+
+function resolveViewportPriorityMaxTargets(value: unknown) {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) && numeric > 0
+    ? Math.max(1, Math.trunc(numeric))
+    : MAX_VIEWPORT_OBSERVER_TARGETS
+}
+
+const resolvedViewportPriorityOptions = computed<MarkstreamViewportPriorityOptions>(() => {
+  const options = rendererProps.viewportPriorityOptions ?? {}
+  const rootMargin = resolveViewportPriorityRootMargin(options.rootMargin, DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN)
+
+  return {
+    rootMargin,
+    heavyBlockMargin: resolveViewportPriorityRootMargin(options.heavyBlockMargin, rootMargin),
+    maxTargets: resolveViewportPriorityMaxTargets(options.maxTargets),
+  }
+})
+const viewportPriorityRootMargin = computed(() => resolvedViewportPriorityOptions.value.rootMargin ?? DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN)
+const viewportPriorityMaxTargets = computed(() => resolvedViewportPriorityOptions.value.maxTargets ?? MAX_VIEWPORT_OBSERVER_TARGETS)
+provideViewportPriorityOptions(resolvedViewportPriorityOptions)
+
 function resolveVirtualScrollRoot() {
   if (props.virtualScroll?.enabled !== true)
     return null
@@ -578,6 +610,8 @@ const {
   effectiveCustomHtmlTagsSet,
   mergedParseOptions,
   parsedNodes,
+  getParsedNodesDirtyStartIndex,
+  getParsedNodesRevision,
 } = useMarkdownParsing(rendererProps, {
   instanceMsgId,
   renderContent,
@@ -603,6 +637,7 @@ const nestedRendererProps = computed<Partial<NodeRendererProps>>(() => ({
   customMarkdownIt: rendererProps.customMarkdownIt,
   htmlPolicy: resolvedHtmlPolicy.value,
   viewportPriority: rendererProps.viewportPriority,
+  viewportPriorityOptions: resolvedViewportPriorityOptions.value,
   mode: resolvedMode.value,
   domMode: rendererProps.domMode,
   codeRenderer: resolvedCodeRenderer.value,
@@ -773,6 +808,14 @@ const nodeContentResizeObserverIndexes = new WeakMap<Element, number>()
 let nodeContentResizeObserver: ResizeObserver | null = null
 const codeBlockRenderCache = new WeakMap<object, { signature: string, node: ParsedNode }>()
 const nodeHeightSignatures = new Map<number, string>()
+const EMPTY_ESTIMATED_NODE_HEIGHTS: Array<EstimatedNodeHeight | null> = []
+let estimatedNodeHeightsCache: Array<EstimatedNodeHeight | null> = []
+let estimatedNodeHeightsContext: unknown[] = []
+let estimatedNodeHeightsParserRevision = -1
+const estimatedNodeHeightsState = shallowRef<readonly (EstimatedNodeHeight | null)[]>(EMPTY_ESTIMATED_NODE_HEIGHTS)
+const estimatedHeightDirtyIndices = new Set<number>()
+const estimatedHeightMutationRevision = ref(0)
+let estimatedHeightMutationDepth = 0
 const nodeSlotVersion = ref(0)
 const sortedNodeSlots = computed(() => {
   // Track a manual version so we only rebuild when slots change.
@@ -869,7 +912,7 @@ const {
   heightKnownTree,
   averageNodeHeight,
   resetHeightMeasurements: resetMeasuredHeightMeasurements,
-  pruneHeightMeasurements,
+  pruneHeightMeasurements: pruneMeasuredHeightMeasurements,
   rebuildHeightTrees,
   recordNodeHeight: recordMeasuredNodeHeight,
   removeNodeHeights: removeMeasuredNodeHeights,
@@ -889,8 +932,43 @@ const {
   },
 })
 
+function markEstimatedNodeHeightDirty(index: number) {
+  if (Number.isInteger(index) && index >= 0)
+    estimatedHeightDirtyIndices.add(index)
+}
+
+function markEstimatedNodeHeightsDirty(indices: Iterable<number>) {
+  for (const index of indices)
+    markEstimatedNodeHeightDirty(Number(index))
+}
+
+// Mutate nodeHeights through this wrapper so estimatedNodeHeightsCache stays coherent.
+function runEstimatedHeightMutation<T>(callback: () => T) {
+  estimatedHeightMutationDepth++
+  let shouldNotify = true
+  try {
+    const result = callback()
+    shouldNotify = result !== false
+    return result
+  }
+  finally {
+    estimatedHeightMutationDepth--
+    if (estimatedHeightMutationDepth === 0 && shouldNotify)
+      estimatedHeightMutationRevision.value++
+  }
+}
+
+function resetEstimatedNodeHeightCache() {
+  estimatedNodeHeightsCache = []
+  estimatedNodeHeightsContext = []
+  estimatedNodeHeightsParserRevision = -1
+  estimatedHeightDirtyIndices.clear()
+  estimatedNodeHeightsState.value = EMPTY_ESTIMATED_NODE_HEIGHTS
+}
+
 function resetHeightMeasurements() {
-  resetMeasuredHeightMeasurements()
+  resetEstimatedNodeHeightCache()
+  runEstimatedHeightMutation(() => resetMeasuredHeightMeasurements())
   nodeHeightSignatures.clear()
 }
 
@@ -911,14 +989,29 @@ function recordNodeHeight(
   height: number,
   options: { allowShrink?: boolean } = {},
 ) {
+  runEstimatedHeightMutation(() => recordNodeHeightCore(index, height, options))
+}
+
+function recordNodeHeightCore(
+  index: number,
+  height: number,
+  options: { allowShrink?: boolean } = {},
+) {
   const before = nodeHeights[index]
+  markEstimatedNodeHeightDirty(index)
   recordMeasuredNodeHeight(index, height, options)
   const after = nodeHeights[index]
+  if (Object.is(before, after)) {
+    estimatedHeightDirtyIndices.delete(index)
+    return false
+  }
 
   if (after && after > 0)
     rememberNodeHeightSignature(index)
   else if (before)
     nodeHeightSignatures.delete(index)
+
+  return true
 }
 
 function getNodeLayoutHeight(index: number, contentEl: HTMLElement) {
@@ -936,9 +1029,19 @@ function removeNodeHeights(
   options: { notify?: boolean } = {},
 ) {
   const list = Array.from(indices, Number)
-  const removed = removeMeasuredNodeHeights(list, options)
-  if (removed > 0)
+  markEstimatedNodeHeightsDirty(list)
+  let removed = 0
+  runEstimatedHeightMutation(() => {
+    removed = removeMeasuredNodeHeights(list, options)
+    return removed > 0
+  })
+  if (removed > 0) {
     forgetNodeHeightSignatures(list)
+  }
+  else {
+    for (const index of list)
+      estimatedHeightDirtyIndices.delete(index)
+  }
   return removed
 }
 
@@ -946,8 +1049,17 @@ function importHeightCache(
   cache: MarkstreamHeightCache,
   options: { mode?: 'replace' | 'merge' } = {},
 ) {
-  importMeasuredHeightCache(cache, options)
+  if (options.mode !== 'merge')
+    resetEstimatedNodeHeightCache()
+  else
+    markEstimatedNodeHeightsDirty(cache.map(entry => entry.index))
+  runEstimatedHeightMutation(() => importMeasuredHeightCache(cache, options))
   seedCurrentNodeHeightSignatures()
+}
+
+function pruneHeightMeasurements(size: number) {
+  resetEstimatedNodeHeightCache()
+  runEstimatedHeightMutation(() => pruneMeasuredHeightMeasurements(size))
 }
 const deferNodes = computed(() => {
   return deferNodesDomRequired.value && viewportPriorityEnabled.value
@@ -1325,6 +1437,14 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
 
+function getParsedNodesDirtyStart(total = parsedNodes.value.length) {
+  const dirtyStartIndex = getParsedNodesDirtyStartIndex()
+  if (!Number.isInteger(dirtyStartIndex) || dirtyStartIndex < 0)
+    return total
+
+  return clamp(dirtyStartIndex, 0, total)
+}
+
 function getProbeRoot(wrapper: HTMLElement | null | undefined) {
   return wrapper?.firstElementChild as HTMLElement | null
 }
@@ -1444,41 +1564,102 @@ function resolveCodeBlockShowHeader() {
   return showHeader !== false
 }
 
-const EMPTY_ESTIMATED_NODE_HEIGHTS: Array<EstimatedNodeHeight | null> = []
+function estimateNodeHeight(node: ParsedNode, index: number, width: number) {
+  const measuredHeight = nodeHeights[index]
+  const hasMeasuredHeight = typeof measuredHeight === 'number' && measuredHeight > 0
 
-const estimatedNodeHeights = computed(() => {
+  if (textEstimationEnabled.value && !hasMeasuredHeight) {
+    const estimatedText = estimateSimpleTextBlockHeight(node, width, simpleTextProbeProfile.value)
+    if (estimatedText)
+      return estimatedText
+  }
+
+  if (codeBlockEstimationEnabled.value && node.type === 'code_block') {
+    const rendererKind = resolveCodeBlockRendererKind(node)
+    if (rendererKind === 'monaco' || rendererKind === 'markdown' || rendererKind === 'pre') {
+      return estimateCodeBlockHeight(node, {
+        rendererKind,
+        monacoOptions: rendererProps.codeBlockMonacoOptions,
+        showHeader: resolveCodeBlockShowHeader(),
+      })
+    }
+  }
+
+  return null
+}
+
+function getEstimatedNodeHeightContext(width: number) {
+  return [
+    Math.round(width),
+    textEstimationEnabled.value,
+    codeBlockEstimationEnabled.value,
+    simpleTextProbeProfile.value,
+    rendererProps.codeBlockMonacoOptions,
+    resolveCodeBlockShowHeader(),
+    resolvedCodeRenderer.value,
+    customComponentsMap.value,
+    heightEstimationExperimentRevision.value,
+  ]
+}
+
+function hasSameEstimatedNodeHeightContext(previous: unknown[], next: unknown[]) {
+  return previous.length === next.length
+    && previous.every((value, index) => Object.is(value, next[index]))
+}
+
+watchEffect(() => {
+  void estimatedHeightMutationRevision.value
+  if (estimatedHeightMutationDepth > 0)
+    return
+
   const nodes = parsedNodes.value
-  if (!nodes.length || !heightEstimationActive.value)
-    return EMPTY_ESTIMATED_NODE_HEIGHTS
+  const parserRevision = getParsedNodesRevision()
+  if (!nodes.length || !heightEstimationActive.value) {
+    estimatedNodeHeightsCache = []
+    estimatedNodeHeightsContext = []
+    estimatedNodeHeightsParserRevision = -1
+    estimatedHeightDirtyIndices.clear()
+    estimatedNodeHeightsState.value = EMPTY_ESTIMATED_NODE_HEIGHTS
+    return
+  }
 
   const width = experimentContainerWidth.value || readLayout('estimatedNodeHeights.clientWidth', () => containerRef.value?.clientWidth || 0)
-  if (!Number.isFinite(width) || width <= 0)
-    return EMPTY_ESTIMATED_NODE_HEIGHTS
+  if (!Number.isFinite(width) || width <= 0) {
+    estimatedNodeHeightsCache = []
+    estimatedNodeHeightsContext = []
+    estimatedNodeHeightsParserRevision = -1
+    estimatedHeightDirtyIndices.clear()
+    estimatedNodeHeightsState.value = EMPTY_ESTIMATED_NODE_HEIGHTS
+    return
+  }
 
-  return nodes.map((node, index) => {
-    const measuredHeight = nodeHeights[index]
-    const hasMeasuredHeight = typeof measuredHeight === 'number' && measuredHeight > 0
+  const context = getEstimatedNodeHeightContext(width)
+  const canReuseCache = estimatedNodeHeightsCache.length <= nodes.length
+    && hasSameEstimatedNodeHeightContext(estimatedNodeHeightsContext, context)
+  const parserDirtyStart = canReuseCache && estimatedNodeHeightsParserRevision === parserRevision
+    ? nodes.length
+    : canReuseCache ? getParsedNodesDirtyStart(nodes.length) : 0
+  const dirtyIndices = canReuseCache
+    ? Array.from(estimatedHeightDirtyIndices)
+    : []
 
-    if (textEstimationEnabled.value && !hasMeasuredHeight) {
-      const estimatedText = estimateSimpleTextBlockHeight(node, width, simpleTextProbeProfile.value)
-      if (estimatedText)
-        return estimatedText
-    }
+  estimatedNodeHeightsCache.length = nodes.length
+  for (let index = parserDirtyStart; index < nodes.length; index++)
+    estimatedNodeHeightsCache[index] = estimateNodeHeight(nodes[index]!, index, width)
 
-    if (codeBlockEstimationEnabled.value && node.type === 'code_block') {
-      const rendererKind = resolveCodeBlockRendererKind(node)
-      if (rendererKind === 'monaco' || rendererKind === 'markdown' || rendererKind === 'pre') {
-        return estimateCodeBlockHeight(node, {
-          rendererKind,
-          monacoOptions: rendererProps.codeBlockMonacoOptions,
-          showHeader: resolveCodeBlockShowHeader(),
-        })
-      }
-    }
+  for (const index of dirtyIndices) {
+    if (index >= 0 && index < nodes.length && index < parserDirtyStart)
+      estimatedNodeHeightsCache[index] = estimateNodeHeight(nodes[index]!, index, width)
+  }
 
-    return null
-  })
-})
+  estimatedHeightDirtyIndices.clear()
+  estimatedNodeHeightsContext = context
+  estimatedNodeHeightsParserRevision = parserRevision
+  estimatedNodeHeightsState.value = estimatedNodeHeightsCache
+  triggerRef(estimatedNodeHeightsState)
+}, { flush: 'sync' })
+
+const estimatedNodeHeights = computed(() => estimatedNodeHeightsState.value)
 
 heightModel = useHeightModel({
   parsedNodes,
@@ -2411,6 +2592,7 @@ function stableHeightSignatureValue(
 
 let virtualContentHashRevision = -1
 let virtualContentHashCache = ''
+let virtualContentHashPrefixHashes: number[] = [2166136261]
 
 function getNodeHeightCacheSignature(index: number) {
   const node = parsedNodes.value[index]
@@ -2420,22 +2602,48 @@ function getNodeHeightCacheSignature(index: number) {
   return hashVirtualString(stableHeightSignatureValue(node))
 }
 
+function hashVirtualSignatureInto(seed: number, signature: string) {
+  let hash = seed
+  for (let index = 0; index < signature.length; index++) {
+    hash ^= signature.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return hash >>> 0
+}
+
 function getVirtualContentHash() {
   const revision = streamRenderVersion.value
   if (virtualContentHashRevision === revision)
     return virtualContentHashCache
 
-  let hash = 2166136261
+  const total = parsedNodes.value.length
+  let startIndex = getParsedNodesDirtyStart(total)
 
-  for (let i = 0; i < parsedNodes.value.length; i++) {
-    const signature = getNodeHeightCacheSignature(i)
-    for (let j = 0; j < signature.length; j++) {
-      hash ^= signature.charCodeAt(j)
-      hash = Math.imul(hash, 16777619)
-    }
+  if (
+    virtualContentHashRevision !== revision - 1
+    || startIndex > total
+    || virtualContentHashPrefixHashes.length < startIndex + 1
+  ) {
+    startIndex = 0
   }
 
-  virtualContentHashCache = (hash >>> 0).toString(36)
+  if (startIndex === 0) {
+    virtualContentHashPrefixHashes = [2166136261]
+  }
+  else {
+    virtualContentHashPrefixHashes.length = startIndex + 1
+  }
+
+  for (let index = startIndex; index < total; index++) {
+    const signature = getNodeHeightCacheSignature(index)
+    virtualContentHashPrefixHashes[index + 1] = hashVirtualSignatureInto(
+      virtualContentHashPrefixHashes[index] ?? 2166136261,
+      signature,
+    )
+  }
+
+  virtualContentHashPrefixHashes.length = total + 1
+  virtualContentHashCache = ((virtualContentHashPrefixHashes[total] ?? 2166136261) >>> 0).toString(36)
   virtualContentHashRevision = revision
   return virtualContentHashCache
 }
@@ -3140,12 +3348,16 @@ function invalidateChangedNodeHeights(reason: MarkstreamVirtualReason = 'content
 
   const staleIndices: number[] = []
   const total = parsedNodes.value.length
+  const dirtyStartIndex = getParsedNodesDirtyStart(total)
 
   for (const index of Array.from(nodeHeightSignatures.keys())) {
     if (index >= total) {
       staleIndices.push(index)
       continue
     }
+
+    if (index < dirtyStartIndex)
+      continue
 
     const signature = getNodeHeightCacheSignature(index)
     const previousSignature = nodeHeightSignatures.get(index)
@@ -3759,7 +3971,7 @@ function setNodeSlotElement(index: number, el: HTMLElement | null) {
     !virtualizationEnabled.value
     && deferNodes.value
     && !viewportPriorityAutoDisabled.value
-    && nodeVisibilityHandles.size >= MAX_VIEWPORT_OBSERVER_TARGETS
+    && nodeVisibilityHandles.size >= viewportPriorityMaxTargets.value
   ) {
     autoDisableViewportPriority('too-many-targets')
     if (!shouldObserveSlots.value || !registerNodeVisibility) {
@@ -3788,7 +4000,7 @@ function setNodeSlotElement(index: number, el: HTMLElement | null) {
   }
 
   destroyNodeHandle(index)
-  const handle = registerNodeVisibility(el, { rootMargin: '400px' })
+  const handle = registerNodeVisibility(el, { rootMargin: viewportPriorityRootMargin.value })
   if (!handle)
     return
   nodeVisibilityHandles.set(index, handle)
@@ -3825,14 +4037,18 @@ function setNodeSlotElement(index: number, el: HTMLElement | null) {
 function flushPendingHeightMeasurements() {
   heightMeasurementRaf = null
 
-  for (const [index, pending] of pendingHeightMeasurements) {
-    pendingHeightMeasurements.delete(index)
-    if (nodeContentElements.get(index) !== pending.el)
-      continue
-    if (nodeContentVersions.get(index) !== pending.version)
-      continue
-    recordNodeHeight(index, pending.height, { allowShrink: pending.allowShrink })
-  }
+  runEstimatedHeightMutation(() => {
+    let changed = false
+    for (const [index, pending] of pendingHeightMeasurements) {
+      pendingHeightMeasurements.delete(index)
+      if (nodeContentElements.get(index) !== pending.el)
+        continue
+      if (nodeContentVersions.get(index) !== pending.version)
+        continue
+      changed = recordNodeHeightCore(index, pending.height, { allowShrink: pending.allowShrink }) || changed
+    }
+    return changed
+  })
 }
 
 function clearPendingHeightMeasurements() {
@@ -4265,14 +4481,34 @@ watch(
 )
 
 watch(
-  [() => rendererProps.viewportPriority, () => parsedNodes.value.length],
-  ([enabled, length]) => {
+  [
+    viewportPriorityRootMargin,
+    viewportPriorityMaxTargets,
+    () => resolveVirtualScrollRoot(),
+  ],
+  () => {
+    registerNodeVisibility.refresh?.()
+    for (const [index, el] of nodeSlotElements)
+      setNodeSlotElement(index, el)
+  },
+  { immediate: false },
+)
+
+watch(
+  [() => rendererProps.viewportPriority, () => parsedNodes.value.length, viewportPriorityMaxTargets],
+  ([enabled, length, maxTargets]) => {
     if (enabled === false) {
       viewportPriorityAutoDisabled.value = false
       return
     }
-    if (viewportPriorityAutoDisabled.value && length <= VIEWPORT_PRIORITY_RECOVERY_COUNT)
+    if (
+      viewportPriorityAutoDisabled.value
+      && (length <= VIEWPORT_PRIORITY_RECOVERY_COUNT || length <= maxTargets)
+    ) {
       viewportPriorityAutoDisabled.value = false
+      for (const [index, el] of nodeSlotElements)
+        setNodeSlotElement(index, el)
+    }
   },
 )
 

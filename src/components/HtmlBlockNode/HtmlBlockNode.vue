@@ -2,8 +2,8 @@
 import type { HtmlPolicy } from 'stream-markdown-parser'
 import type { NodeRendererProps } from '../../types/node-renderer-props'
 import { isHtmlTagBlocked, NON_STRUCTURING_HTML_TAGS, sanitizeHtmlContent, sanitizeHtmlTokenAttrs, tokenAttrsToRecord } from 'stream-markdown-parser'
-import { computed, defineAsyncComponent, defineComponent, inject, onBeforeUnmount, ref, watch } from 'vue'
-import { useViewportPriority } from '../../composables/viewportPriority'
+import { computed, defineAsyncComponent, defineComponent, inject, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
+import { DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN, useViewportPriority, useViewportPriorityOptions } from '../../composables/viewportPriority'
 import { hasCustomComponents, parseHtmlToVNodes } from '../../utils/htmlRenderer'
 import { useCustomNodeComponents } from '../../utils/nodeComponents'
 
@@ -119,13 +119,18 @@ const renderMode = computed(() => {
 })
 
 const registerVisibility = useViewportPriority()
-const visibilityHandle = ref<ReturnType<typeof registerVisibility> | null>(null)
+const viewportPriorityOptions = useViewportPriorityOptions()
+const visibilityHandle = shallowRef<ReturnType<typeof registerVisibility> | null>(null)
 const isDeferred = !!props.node.loading
 
 if (typeof window !== 'undefined') {
   watch(
-    htmlRef,
-    (el) => {
+    [
+      () => htmlRef.value,
+      () => viewportPriorityOptions?.value.heavyBlockMargin,
+      () => viewportPriorityOptions?.value.rootMargin,
+    ],
+    ([el], _oldValue, onCleanup) => {
       visibilityHandle.value?.destroy?.()
       visibilityHandle.value = null
       if (!isDeferred) {
@@ -137,11 +142,25 @@ if (typeof window !== 'undefined') {
         shouldRender.value = false
         return
       }
-      const handle = registerVisibility(el, { rootMargin: '400px' })
+      let active = true
+      const rootMargin = viewportPriorityOptions?.value.heavyBlockMargin
+        ?? viewportPriorityOptions?.value.rootMargin
+        ?? DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN
+      const handle = registerVisibility(el, { rootMargin })
       visibilityHandle.value = handle
-      shouldRender.value = handle.isVisible.value
+      // Latch render readiness once visible so observer reconfiguration does not hide rendered HTML.
+      shouldRender.value = shouldRender.value || handle.isVisible.value
       handle.whenVisible.then(() => {
-        shouldRender.value = true
+        if (active && visibilityHandle.value === handle)
+          shouldRender.value = true
+      })
+
+      onCleanup(() => {
+        active = false
+        handle.destroy()
+
+        if (visibilityHandle.value === handle)
+          visibilityHandle.value = null
       })
     },
     { immediate: true },

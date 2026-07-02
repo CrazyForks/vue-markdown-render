@@ -1,6 +1,8 @@
 ---
 title: AI 聊天流式 Markdown 渲染
 description: 在 AI 聊天 UI 中使用 Markstream 渲染 LLM token 流、SSE/WebSocket 输出、未闭合 Markdown、Mermaid、KaTeX 和长回答。
+ogImage: /og/ai-chat-streaming.svg
+ogImageAlt: AI 聊天流式 Markdown 模式，适用于 LLM token 输出
 keywords:
   - AI 聊天流式 Markdown
   - LLM Markdown 渲染器

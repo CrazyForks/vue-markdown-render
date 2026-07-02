@@ -143,7 +143,7 @@ describe('release dependency gates', () => {
   it('requires offscreen Monaco blocks to stay deferred before scripted scroll', () => {
     const webVitalsScript = readFileSync(resolve(process.cwd(), 'scripts/e2e-web-vitals-performance.mjs'), 'utf8')
 
-    expect(webVitalsScript).toContain('__MARKSTREAM_CODE_BLOCK_VIEWPORT_ROOT_MARGIN__')
+    expect(webVitalsScript).toContain('vmr-test-code-block-viewport-root-margin')
     expect(webVitalsScript).toContain('codeBlockViewportRootMargin: \'0px\'')
     expect(webVitalsScript).toContain('offscreenEnhancedCodeBlockCount !== 0')
     expect(webVitalsScript).toContain('expected all offscreen code blocks to remain deferred')
