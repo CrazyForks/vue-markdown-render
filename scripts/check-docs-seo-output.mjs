@@ -202,6 +202,15 @@ function expectMetaContent(content, relativePath, attrName, attrValue, expectedV
     failures.push(`${relativePath} meta ${attrName}="${attrValue}" expected ${expectedValue}, got ${actual}`)
 }
 
+function expectOgImageMeta(content, relativePath, options = {}) {
+  expectMetaContent(content, relativePath, 'property', 'og:image', options.image ?? null)
+  expectMetaContent(content, relativePath, 'property', 'og:image:alt', options.alt ?? null)
+  expectMetaContent(content, relativePath, 'property', 'og:image:width', options.width ?? '1200')
+  expectMetaContent(content, relativePath, 'property', 'og:image:height', options.height ?? '630')
+  expectMetaContent(content, relativePath, 'name', 'twitter:image', options.image ?? null)
+  expectMetaContent(content, relativePath, 'name', 'twitter:image:alt', options.alt ?? null)
+}
+
 function daysSinceIsoDate(value) {
   const timestamp = Date.parse(`${value}T00:00:00Z`)
   if (!Number.isFinite(timestamp))
@@ -529,8 +538,7 @@ if (isMain) {
     const canonicalUrl = `${newHost}${routePath === '/' ? '/' : routePath}`
     expectContains(content, relativePath, `<link rel="canonical" href="${canonicalUrl}">`, `is missing canonical ${canonicalUrl}`)
     expectContains(content, relativePath, `<meta property="og:url" content="${canonicalUrl}">`, `is missing og:url ${canonicalUrl}`)
-    expectMetaContent(content, relativePath, 'property', 'og:image')
-    expectMetaContent(content, relativePath, 'name', 'twitter:image')
+    expectOgImageMeta(content, relativePath)
 
     const structuredDataNodes = jsonLdNodesByRelativePath.get(relativePath) ?? parseStructuredDataNodes(content, relativePath)
     if (!hasStructuredDataType(structuredDataNodes, 'WebPage'))
@@ -547,6 +555,9 @@ if (isMain) {
     const checks = []
     const isArticle = routePath.startsWith('/compare/') || routePath.startsWith('/zh/compare/')
     const ogImage = frontmatterStringValue(frontmatter, 'ogImage')
+    const ogImageAlt = frontmatterStringValue(frontmatter, 'ogImageAlt')
+    const ogImageWidth = frontmatterStringValue(frontmatter, 'ogImageWidth') ?? '1200'
+    const ogImageHeight = frontmatterStringValue(frontmatter, 'ogImageHeight') ?? '630'
 
     if (hasFrontmatterKey(frontmatter, 'faq')) {
       checks.push(['FAQPage', 'structured data'])
@@ -591,8 +602,12 @@ if (isMain) {
 
     if (ogImage) {
       const expectedOgImage = docsAssetUrl(ogImage)
-      expectMetaContent(content, relativePath, 'property', 'og:image', expectedOgImage)
-      expectMetaContent(content, relativePath, 'name', 'twitter:image', expectedOgImage)
+      expectOgImageMeta(content, relativePath, {
+        image: expectedOgImage,
+        alt: ogImageAlt,
+        width: ogImageWidth,
+        height: ogImageHeight,
+      })
     }
 
     const softwareSourceCodeNode = findStructuredDataNode(structuredDataNodes, 'SoftwareSourceCode')

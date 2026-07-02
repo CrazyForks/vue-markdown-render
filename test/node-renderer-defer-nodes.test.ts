@@ -42,6 +42,14 @@ class FakeIntersectionObserver {
   }
 }
 
+class ThrowingRootMarginIntersectionObserver extends FakeIntersectionObserver {
+  constructor(cb: (entries: Entry[]) => void, options: ObserverInit = {}) {
+    if (options.rootMargin === 'invalid-root-margin')
+      throw new TypeError('invalid rootMargin')
+    super(cb, options)
+  }
+}
+
 beforeEach(() => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
@@ -248,6 +256,90 @@ describe('markdownRender deferNodesUntilVisible', () => {
     finally {
       wrapper?.unmount()
       delete benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__
+      vi.stubGlobal('IntersectionObserver', OriginalIO as any)
+    }
+  })
+
+  it('settles provider registrations immediately when rootMargin is invalid', async () => {
+    const OriginalIO = globalThis.IntersectionObserver
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.stubGlobal('IntersectionObserver', ThrowingRootMarginIntersectionObserver as any)
+
+    const Probe = defineComponent({
+      setup() {
+        const target = ref<HTMLElement | null>(null)
+        const visible = ref(false)
+        const resolved = ref(false)
+        const register = provideViewportPriority(() => null, true)
+
+        onMounted(() => {
+          const handle = register(target.value!, { rootMargin: 'invalid-root-margin' })
+          visible.value = handle.isVisible.value
+          handle.whenVisible.then(() => {
+            visible.value = handle.isVisible.value
+            resolved.value = true
+          })
+        })
+
+        return { resolved, target, visible }
+      },
+      template: '<div><div ref="target" data-target="1" /></div>',
+    })
+
+    let wrapper: ReturnType<typeof mount> | null = null
+    try {
+      wrapper = mount(Probe)
+      await flushAll()
+
+      expect(wrapper.vm.visible).toBe(true)
+      expect(wrapper.vm.resolved).toBe(true)
+      expect(FakeIntersectionObserver.instances).toHaveLength(0)
+    }
+    finally {
+      wrapper?.unmount()
+      warn.mockRestore()
+      vi.stubGlobal('IntersectionObserver', OriginalIO as any)
+    }
+  })
+
+  it('settles fallback registrations immediately when rootMargin is invalid', async () => {
+    const OriginalIO = globalThis.IntersectionObserver
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.stubGlobal('IntersectionObserver', ThrowingRootMarginIntersectionObserver as any)
+
+    const Probe = defineComponent({
+      setup() {
+        const target = ref<HTMLElement | null>(null)
+        const visible = ref(false)
+        const resolved = ref(false)
+        const register = useViewportPriority()
+
+        onMounted(() => {
+          const handle = register(target.value!, { rootMargin: 'invalid-root-margin' })
+          visible.value = handle.isVisible.value
+          handle.whenVisible.then(() => {
+            visible.value = handle.isVisible.value
+            resolved.value = true
+          })
+        })
+
+        return { resolved, target, visible }
+      },
+      template: '<div><div ref="target" data-target="1" /></div>',
+    })
+
+    let wrapper: ReturnType<typeof mount> | null = null
+    try {
+      wrapper = mount(Probe)
+      await flushAll()
+
+      expect(wrapper.vm.visible).toBe(true)
+      expect(wrapper.vm.resolved).toBe(true)
+      expect(FakeIntersectionObserver.instances).toHaveLength(0)
+    }
+    finally {
+      wrapper?.unmount()
+      warn.mockRestore()
       vi.stubGlobal('IntersectionObserver', OriginalIO as any)
     }
   })

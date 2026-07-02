@@ -4451,7 +4451,7 @@ watch(
 )
 
 watch(
-  viewportPriorityRootMargin,
+  [viewportPriorityRootMargin, viewportPriorityMaxTargets],
   () => {
     for (const [index, el] of nodeSlotElements)
       setNodeSlotElement(index, el)

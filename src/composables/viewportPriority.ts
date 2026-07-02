@@ -19,6 +19,11 @@ interface IdleDeadlineLike {
   timeRemaining: () => number
 }
 
+function warnInvalidViewportPriorityRootMargin(rootMargin: string, error: unknown) {
+  if (import.meta.env?.DEV)
+    console.warn('[markstream-vue] invalid viewportPriorityOptions rootMargin:', rootMargin, error)
+}
+
 export function provideViewportPriorityOptions(options: ComputedRef<MarkstreamViewportPriorityOptions>) {
   provide(ViewportPriorityOptionsKey, options)
 }
@@ -189,8 +194,9 @@ export function provideViewportPriority(
     if (existing)
       return { key: bucketKey, bucket: existing }
 
-    const bucket: ObserverBucket = {
-      io: new IntersectionObserver((entries) => {
+    let io: IntersectionObserver
+    try {
+      io = new IntersectionObserver((entries) => {
         for (const entry of entries) {
           const isVisible = entry.isIntersecting || entry.intersectionRatio > 0
           if (isVisible)
@@ -200,9 +206,14 @@ export function provideViewportPriority(
         root: nextConfig.root,
         rootMargin: nextConfig.rootMargin,
         threshold: nextConfig.threshold,
-      }),
-      targets: new Map(),
+      })
     }
+    catch (error) {
+      warnInvalidViewportPriorityRootMargin(nextConfig.rootMargin, error)
+      return null
+    }
+
+    const bucket: ObserverBucket = { io, targets: new Map() }
     observerBuckets.set(bucketKey, bucket)
     return { key: bucketKey, bucket }
   }
@@ -381,15 +392,23 @@ export function useViewportPriority() {
     if (existing)
       return { key: bucketKey, bucket: existing }
 
-    const bucket: LocalObserverBucket = {
-      io: new IntersectionObserver((entries) => {
+    const rootMargin = opts?.rootMargin ?? '300px'
+    let io: IntersectionObserver
+    try {
+      io = new IntersectionObserver((entries) => {
         for (const e of entries) {
           const vis = e.isIntersecting || e.intersectionRatio > 0
           if (vis)
             settleLocalTarget(e.target)
         }
-      }, { root: null, rootMargin: opts?.rootMargin ?? '300px', threshold: opts?.threshold ?? 0 }),
+      }, { root: null, rootMargin, threshold: opts?.threshold ?? 0 })
     }
+    catch (error) {
+      warnInvalidViewportPriorityRootMargin(rootMargin, error)
+      return null
+    }
+
+    const bucket: LocalObserverBucket = { io }
     localBuckets.set(bucketKey, bucket)
     return { key: bucketKey, bucket }
   }
