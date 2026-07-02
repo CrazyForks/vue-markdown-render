@@ -6,7 +6,7 @@ import { transformerTwoslash } from '@shikijs/vitepress-twoslash'
 import { defineConfig } from 'vitepress'
 
 const docsSiteUrl = process.env.VITEPRESS_SITE_URL || 'https://markstream.simonhe.me'
-const docsOgImageUrl = `${docsSiteUrl}/og-image.svg`
+const docsOgImageUrl = getDocsAbsoluteAssetUrl('/og-image.svg')
 const docsOgImageAlt = 'Markstream streaming Markdown renderer documentation overview'
 const docsDefaultDescription = 'Streaming Markdown renderers for AI apps across Vue, React, Svelte, Angular, Nuxt, and Next.js'
 const githubRepoUrl = 'https://github.com/Simon-He95/markstream-vue'
@@ -600,7 +600,8 @@ function getDocsAbsoluteAssetUrl(value: string) {
   if (/^https?:\/\//i.test(value))
     return value
 
-  return `${docsSiteUrl}${value.startsWith('/') ? value : `/${value}`}`
+  const base = docsSiteUrl.endsWith('/') ? docsSiteUrl : `${docsSiteUrl}/`
+  return new URL(value.replace(/^\//, ''), base).toString()
 }
 
 function getDocsPageOgImage(frontmatter: Record<string, any>) {

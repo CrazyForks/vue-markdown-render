@@ -543,6 +543,211 @@ describe('markdownRender deferNodesUntilVisible', () => {
     }
   })
 
+  it('keeps MarkdownCodeBlockNode ready after viewport priority options change', async () => {
+    const OriginalIO = globalThis.IntersectionObserver
+    const benchmarkWindow = window as any
+    vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)
+    benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__ = true
+
+    let wrapper: ReturnType<typeof mount> | null = null
+    try {
+      const { default: MarkdownCodeBlockNode } = await import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue')
+      const viewportPriority = await import('../src/composables/viewportPriority')
+      const Probe = defineComponent({
+        components: { MarkdownCodeBlockNode },
+        setup() {
+          const viewportPriorityOptions = ref({
+            rootMargin: '111px',
+            heavyBlockMargin: '222px',
+          })
+          viewportPriority.provideViewportPriorityOptions(computed(() => viewportPriorityOptions.value))
+          viewportPriority.provideViewportPriority(() => null, true)
+
+          function updateMargin() {
+            viewportPriorityOptions.value = {
+              rootMargin: '111px',
+              heavyBlockMargin: '333px',
+            }
+          }
+
+          return {
+            node: {
+              type: 'code_block',
+              language: 'ts',
+              code: 'console.log(1)',
+              raw: '```ts\nconsole.log(1)\n```',
+            },
+            updateMargin,
+          }
+        },
+        template: '<MarkdownCodeBlockNode :node="node" :loading="false" :stream="false" />',
+      })
+
+      wrapper = mount(Probe)
+      await flushAll()
+
+      const codeBlock = wrapper.get('[data-markstream-code-block="1"]')
+      const component = wrapper.findComponent(MarkdownCodeBlockNode as any)
+      const initialObserver = FakeIntersectionObserver.instances.find(instance => instance.elements.has(codeBlock.element))
+      expect(initialObserver).toBeTruthy()
+      expect((component.vm as any).viewportReady).toBe(false)
+
+      initialObserver?.trigger(codeBlock.element, true)
+      await flushAll()
+      expect((component.vm as any).viewportReady).toBe(true)
+
+      ;(wrapper.vm as any).updateMargin()
+      await flushAll()
+
+      const updatedObserver = FakeIntersectionObserver.instances.find(instance =>
+        instance.options.rootMargin === '333px' && instance.elements.has(codeBlock.element),
+      )
+      expect(updatedObserver).toBeTruthy()
+      expect((component.vm as any).viewportReady).toBe(true)
+    }
+    finally {
+      wrapper?.unmount()
+      delete benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__
+      vi.stubGlobal('IntersectionObserver', OriginalIO as any)
+    }
+  })
+
+  it('keeps CodeBlockNode ready after viewport priority options change', async () => {
+    const OriginalIO = globalThis.IntersectionObserver
+    const benchmarkWindow = window as any
+    vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)
+    benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__ = true
+
+    let wrapper: ReturnType<typeof mount> | null = null
+    try {
+      const { default: CodeBlockNode } = await import('../src/components/CodeBlockNode/CodeBlockNode.vue')
+      const viewportPriority = await import('../src/composables/viewportPriority')
+      const Probe = defineComponent({
+        components: { CodeBlockNode },
+        setup() {
+          const viewportPriorityOptions = ref({
+            rootMargin: '111px',
+            heavyBlockMargin: '222px',
+          })
+          viewportPriority.provideViewportPriorityOptions(computed(() => viewportPriorityOptions.value))
+          viewportPriority.provideViewportPriority(() => null, true)
+
+          function updateMargin() {
+            viewportPriorityOptions.value = {
+              rootMargin: '111px',
+              heavyBlockMargin: '333px',
+            }
+          }
+
+          return {
+            node: {
+              type: 'code_block',
+              language: 'ts',
+              code: 'console.log(1)',
+              raw: '```ts\nconsole.log(1)\n```',
+            },
+            updateMargin,
+          }
+        },
+        template: '<CodeBlockNode :node="node" :loading="false" :stream="false" />',
+      })
+
+      wrapper = mount(Probe)
+      await flushAll()
+
+      const codeBlock = wrapper.get('[data-markstream-code-block="1"]')
+      const component = wrapper.findComponent(CodeBlockNode as any)
+      const initialObserver = FakeIntersectionObserver.instances.find(instance => instance.elements.has(codeBlock.element))
+      expect(initialObserver).toBeTruthy()
+      expect((component.vm as any).viewportReady).toBe(false)
+
+      initialObserver?.trigger(codeBlock.element, true)
+      await flushAll()
+      expect((component.vm as any).viewportReady).toBe(true)
+
+      ;(wrapper.vm as any).updateMargin()
+      await flushAll()
+
+      const updatedObserver = FakeIntersectionObserver.instances.find(instance =>
+        instance.options.rootMargin === '333px' && instance.elements.has(codeBlock.element),
+      )
+      expect(updatedObserver).toBeTruthy()
+      expect((component.vm as any).viewportReady).toBe(true)
+    }
+    finally {
+      wrapper?.unmount()
+      delete benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__
+      vi.stubGlobal('IntersectionObserver', OriginalIO as any)
+    }
+  })
+
+  it('keeps deferred HtmlBlockNode rendered after viewport priority options change', async () => {
+    const OriginalIO = globalThis.IntersectionObserver
+    const benchmarkWindow = window as any
+    vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)
+    benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__ = true
+
+    let wrapper: ReturnType<typeof mount> | null = null
+    try {
+      const { default: HtmlBlockNode } = await import('../src/components/HtmlBlockNode/HtmlBlockNode.vue')
+      const viewportPriority = await import('../src/composables/viewportPriority')
+      const Probe = defineComponent({
+        components: { HtmlBlockNode },
+        setup() {
+          const viewportPriorityOptions = ref({
+            rootMargin: '111px',
+            heavyBlockMargin: '222px',
+          })
+          viewportPriority.provideViewportPriorityOptions(computed(() => viewportPriorityOptions.value))
+          viewportPriority.provideViewportPriority(() => null, true)
+
+          function updateMargin() {
+            viewportPriorityOptions.value = {
+              rootMargin: '111px',
+              heavyBlockMargin: '333px',
+            }
+          }
+
+          return {
+            node: {
+              content: '<div>Deferred HTML</div>',
+              loading: true,
+            },
+            updateMargin,
+          }
+        },
+        template: '<HtmlBlockNode :node="node" />',
+      })
+
+      wrapper = mount(Probe)
+      await flushAll()
+
+      const htmlBlock = wrapper.get('.html-block-node')
+      const component = wrapper.findComponent(HtmlBlockNode as any)
+      const initialObserver = FakeIntersectionObserver.instances.find(instance => instance.elements.has(htmlBlock.element))
+      expect(initialObserver).toBeTruthy()
+      expect((component.vm as any).shouldRender).toBe(false)
+
+      initialObserver?.trigger(htmlBlock.element, true)
+      await flushAll()
+      expect((component.vm as any).shouldRender).toBe(true)
+
+      ;(wrapper.vm as any).updateMargin()
+      await flushAll()
+
+      const updatedObserver = FakeIntersectionObserver.instances.find(instance =>
+        instance.options.rootMargin === '333px' && instance.elements.has(htmlBlock.element),
+      )
+      expect(updatedObserver).toBeTruthy()
+      expect((component.vm as any).shouldRender).toBe(true)
+    }
+    finally {
+      wrapper?.unmount()
+      delete benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__
+      vi.stubGlobal('IntersectionObserver', OriginalIO as any)
+    }
+  })
+
   it('keeps nodes as placeholders until IO marks them visible', async () => {
     const OriginalIO = globalThis.IntersectionObserver
     vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)

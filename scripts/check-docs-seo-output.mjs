@@ -10,7 +10,7 @@ const distDir = resolve(docsDir, '.vitepress/dist')
 const newHost = 'https://markstream.simonhe.me'
 const oldHost = 'https://markstream-vue-docs.simonhe.me'
 const oldHostRedirect = `${oldHost}/*  ${newHost}/:splat  301`
-const docsOgImageUrl = `${newHost}/og-image.svg`
+const docsOgImageUrl = docsAssetUrl('/og-image.svg')
 const docsOgImageAlt = 'Markstream streaming Markdown renderer documentation overview'
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 
@@ -177,7 +177,8 @@ function docsAssetUrl(value) {
   if (/^https?:\/\//i.test(value))
     return value
 
-  return `${newHost}${value.startsWith('/') ? value : `/${value}`}`
+  const base = newHost.endsWith('/') ? newHost : `${newHost}/`
+  return new URL(value.replace(/^\//, ''), base).toString()
 }
 
 function ogImageDimensionValue(value, fallback) {

@@ -125,7 +125,7 @@ if (typeof window !== 'undefined') {
       const handle = registerVisibility(el, { rootMargin })
 
       viewportHandle.value = handle
-      viewportReady.value = handle.isVisible.value
+      viewportReady.value = viewportReady.value || handle.isVisible.value
 
       handle.whenVisible
         .then(() => {

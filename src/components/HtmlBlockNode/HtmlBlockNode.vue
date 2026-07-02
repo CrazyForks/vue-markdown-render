@@ -148,7 +148,7 @@ if (typeof window !== 'undefined') {
         ?? '400px'
       const handle = registerVisibility(el, { rootMargin })
       visibilityHandle.value = handle
-      shouldRender.value = handle.isVisible.value
+      shouldRender.value = shouldRender.value || handle.isVisible.value
       handle.whenVisible.then(() => {
         if (active && visibilityHandle.value === handle)
           shouldRender.value = true
