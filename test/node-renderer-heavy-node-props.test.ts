@@ -1,26 +1,40 @@
 import { mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, inject } from 'vue'
 import MermaidBlockNode from '../src/components/MermaidBlockNode'
 import NodeRenderer from '../src/components/NodeRenderer'
 import { removeCustomComponents, setCustomComponents } from '../src/utils/nodeComponents'
 import { flushAll } from './setup/flush-all'
 
-vi.mock('../src/components/MarkdownCodeBlockNode', async () => {
-  const { defineComponent, h } = await import('vue')
-  return {
-    default: defineComponent({
-      name: 'MarkdownCodeBlockNodeProbe',
-      inheritAttrs: false,
-      setup(_, { attrs }) {
-        return () => h('div', {
-          'class': 'code-block-container',
-          'data-has-monaco-options': String(Object.prototype.hasOwnProperty.call(attrs, 'monacoOptions')),
-          'data-langs': JSON.stringify(attrs.langs ?? null),
-        })
-      },
-    }),
-  }
+const markdownCodeBlockNodeMock = vi.hoisted(() => ({
+  factory: async () => {
+    const { defineComponent, h } = await import('vue')
+    return {
+      default: defineComponent({
+        name: 'MarkdownCodeBlockNodeProbe',
+        inheritAttrs: false,
+        setup(_, { attrs }) {
+          return () => h('div', {
+            'class': 'code-block-container',
+            'data-has-monaco-options': String(Object.prototype.hasOwnProperty.call(attrs, 'monacoOptions')),
+            'data-langs': JSON.stringify(attrs.langs ?? null),
+          })
+        },
+      }),
+    }
+  },
+}))
+
+vi.mock('../src/components/MarkdownCodeBlockNode', markdownCodeBlockNodeMock.factory)
+vi.mock('../src/components/MarkdownCodeBlockNode/index.ts', markdownCodeBlockNodeMock.factory)
+vi.mock('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue', markdownCodeBlockNodeMock.factory)
+
+beforeAll(async () => {
+  await Promise.all([
+    import('../src/components/MarkdownCodeBlockNode'),
+    import('../src/components/MarkdownCodeBlockNode/index.ts'),
+    import('../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue'),
+  ])
 })
 
 const customId = 'vue3-heavy-props-test'
