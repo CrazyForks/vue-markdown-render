@@ -274,8 +274,18 @@ export function useViewportPriority() {
   if (injected)
     return injected
 
-  const localTargets = new WeakMap<Element, { resolve: () => void, visible: Ref<boolean> }>()
-  let localIo: IntersectionObserver | null = null
+  interface LocalTargetState {
+    resolve: () => void
+    visible: Ref<boolean>
+    bucketKey: string
+  }
+
+  interface LocalObserverBucket {
+    io: IntersectionObserver
+  }
+
+  const localTargets = new WeakMap<Element, LocalTargetState>()
+  const localBuckets = new Map<string, LocalObserverBucket>()
   const localIdleQueue = new Set<Element>()
   let localIdleJob: number | null = null
   const requestIdle = typeof window !== 'undefined'
@@ -297,10 +307,37 @@ export function useViewportPriority() {
     localIdleJob = null
   }
 
+  const getLocalBucketKey = (opts?: { rootMargin?: string, threshold?: number }) => [
+    opts?.rootMargin ?? '300px',
+    opts?.threshold ?? 0,
+  ].join('\u0000')
+
+  const cleanupLocalBucket = (bucketKey?: string) => {
+    if (!bucketKey)
+      return
+
+    const bucket = localBuckets.get(bucketKey)
+    if (!bucket)
+      return
+
+    for (const target of localIdleQueue) {
+      const data = localTargets.get(target)
+      if (data?.bucketKey === bucketKey)
+        return
+    }
+
+    try {
+      bucket.io.disconnect()
+    }
+    catch {}
+    localBuckets.delete(bucketKey)
+  }
+
   const settleLocalTarget = (target: Element) => {
     const data = localTargets.get(target)
     if (!data)
       return
+    const bucket = localBuckets.get(data.bucketKey)
     if (!data.visible.value) {
       data.visible.value = true
       try {
@@ -309,11 +346,12 @@ export function useViewportPriority() {
       catch {}
     }
     try {
-      localIo?.unobserve(target)
+      bucket?.io.unobserve(target)
     }
     catch {}
     localTargets.delete(target)
     localIdleQueue.delete(target)
+    cleanupLocalBucket(data.bucketKey)
     if (!localIdleQueue.size)
       clearLocalIdleJob()
   }
@@ -335,22 +373,28 @@ export function useViewportPriority() {
     }, { timeout: 1200 })
   }
 
-  const ensureLocal = () => {
-    if (localIo)
-      return localIo
+  const ensureLocal = (opts?: { rootMargin?: string, threshold?: number }) => {
     if (typeof window === 'undefined' || typeof IntersectionObserver === 'undefined')
       return null
-    localIo = new IntersectionObserver((entries) => {
-      for (const e of entries) {
-        const vis = e.isIntersecting || e.intersectionRatio > 0
-        if (vis)
-          settleLocalTarget(e.target)
-      }
-    }, { root: null, rootMargin: '300px', threshold: 0 })
-    return localIo
+    const bucketKey = getLocalBucketKey(opts)
+    const existing = localBuckets.get(bucketKey)
+    if (existing)
+      return { key: bucketKey, bucket: existing }
+
+    const bucket: LocalObserverBucket = {
+      io: new IntersectionObserver((entries) => {
+        for (const e of entries) {
+          const vis = e.isIntersecting || e.intersectionRatio > 0
+          if (vis)
+            settleLocalTarget(e.target)
+        }
+      }, { root: null, rootMargin: opts?.rootMargin ?? '300px', threshold: opts?.threshold ?? 0 }),
+    }
+    localBuckets.set(bucketKey, bucket)
+    return { key: bucketKey, bucket }
   }
 
-  const register: RegisterFn = (el) => {
+  const register: RegisterFn = (el, opts) => {
     const isVisible = ref(false)
     let settled = false
     let resolve!: () => void
@@ -363,23 +407,32 @@ export function useViewportPriority() {
       }
     })
     const cleanup = () => {
+      const data = localTargets.get(el)
+      if (!data) {
+        localIdleQueue.delete(el)
+        if (!localIdleQueue.size)
+          clearLocalIdleJob()
+        return
+      }
+      const bucket = localBuckets.get(data.bucketKey)
       try {
-        localIo?.unobserve(el)
+        bucket?.io.unobserve(el)
       }
       catch {}
       localTargets.delete(el)
       localIdleQueue.delete(el)
+      cleanupLocalBucket(data.bucketKey)
       if (!localIdleQueue.size)
         clearLocalIdleJob()
     }
-    const obs = ensureLocal()
-    if (!obs) {
+    const observer = ensureLocal(opts)
+    if (!observer) {
       isVisible.value = true
       resolve()
       return { isVisible, whenVisible, destroy: cleanup }
     }
-    localTargets.set(el, { resolve, visible: isVisible })
-    obs.observe(el)
+    localTargets.set(el, { resolve, visible: isVisible, bucketKey: observer.key })
+    observer.bucket.io.observe(el)
     localIdleQueue.add(el)
     scheduleLocalIdleDrain()
     return { isVisible, whenVisible, destroy: cleanup }

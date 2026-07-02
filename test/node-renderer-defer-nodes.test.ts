@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, onMounted, ref } from 'vue'
-import { provideViewportPriority } from '../src/composables/viewportPriority'
+import { provideViewportPriority, useViewportPriority } from '../src/composables/viewportPriority'
 import { flushAll } from './setup/flush-all'
 
 interface Entry { target: Element, isIntersecting: boolean, intersectionRatio: number }
@@ -177,6 +177,73 @@ describe('markdownRender deferNodesUntilVisible', () => {
 
       expect(wrapper.vm.heavyVisible).toBe(true)
       expect(wrapper.vm.heavyResolved).toBe(true)
+    }
+    finally {
+      wrapper?.unmount()
+      delete benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__
+      vi.stubGlobal('IntersectionObserver', OriginalIO as any)
+    }
+  })
+
+  it('honors rootMargin and threshold in viewport-priority fallback without a provider', async () => {
+    const OriginalIO = globalThis.IntersectionObserver
+    const benchmarkWindow = window as any
+    vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)
+    benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__ = true
+
+    const Probe = defineComponent({
+      setup() {
+        const shell = ref<HTMLElement | null>(null)
+        const heavy = ref<HTMLElement | null>(null)
+        const shellVisible = ref(false)
+        const heavyVisible = ref(false)
+        const register = useViewportPriority()
+
+        onMounted(() => {
+          const shellHandle = register(shell.value!, { rootMargin: '900px', threshold: 0.25 })
+          const heavyHandle = register(heavy.value!, { rootMargin: '0px', threshold: 0 })
+
+          shellHandle.whenVisible.then(() => {
+            shellVisible.value = shellHandle.isVisible.value
+          })
+          heavyHandle.whenVisible.then(() => {
+            heavyVisible.value = heavyHandle.isVisible.value
+          })
+        })
+
+        return { heavy, heavyVisible, shell, shellVisible }
+      },
+      template: '<div><div ref="shell" data-target="shell" /><div ref="heavy" data-target="heavy" /></div>',
+    })
+
+    let wrapper: ReturnType<typeof mount> | null = null
+    try {
+      wrapper = mount(Probe)
+      await flushAll()
+
+      const shell = wrapper.get('[data-target="shell"]').element
+      const heavy = wrapper.get('[data-target="heavy"]').element
+      const shellObserver = FakeIntersectionObserver.instances.find(instance =>
+        instance.options.rootMargin === '900px' && instance.options.threshold === 0.25,
+      )
+      const heavyObserver = FakeIntersectionObserver.instances.find(instance =>
+        instance.options.rootMargin === '0px' && instance.options.threshold === 0,
+      )
+
+      expect(shellObserver).toBeTruthy()
+      expect(heavyObserver).toBeTruthy()
+      expect(shellObserver).not.toBe(heavyObserver)
+      expect(shellObserver?.elements.has(shell)).toBe(true)
+      expect(shellObserver?.elements.has(heavy)).toBe(false)
+      expect(heavyObserver?.elements.has(heavy)).toBe(true)
+      expect(heavyObserver?.elements.has(shell)).toBe(false)
+
+      shellObserver?.trigger(shell, true)
+      await flushAll()
+
+      expect(wrapper.vm.shellVisible).toBe(true)
+      expect(wrapper.vm.heavyVisible).toBe(false)
+      expect(heavyObserver?.elements.has(heavy)).toBe(true)
     }
     finally {
       wrapper?.unmount()
