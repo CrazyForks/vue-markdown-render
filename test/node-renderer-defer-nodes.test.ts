@@ -302,6 +302,61 @@ describe('markdownRender deferNodesUntilVisible', () => {
     }
   })
 
+  it('refreshes provider registrations when the resolved root changes', async () => {
+    const OriginalIO = globalThis.IntersectionObserver
+    const benchmarkWindow = window as any
+    vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)
+    benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__ = true
+
+    const Probe = defineComponent({
+      setup() {
+        const activeRoot = ref<HTMLElement | null>(null)
+        const rootElement = ref<HTMLElement | null>(null)
+        const target = ref<HTMLElement | null>(null)
+        const register = provideViewportPriority(() => activeRoot.value, true)
+
+        onMounted(() => {
+          register(target.value!, { rootMargin: '0px' })
+        })
+
+        function activateRoot() {
+          activeRoot.value = rootElement.value
+          register.refresh?.()
+        }
+
+        return { activateRoot, rootElement, target }
+      },
+      template: '<div><div ref="rootElement" data-root="1"><div ref="target" data-target="1" /></div></div>',
+    })
+
+    let wrapper: ReturnType<typeof mount> | null = null
+    try {
+      wrapper = mount(Probe)
+      await flushAll()
+
+      const target = wrapper.get('[data-target="1"]').element
+      const root = wrapper.get('[data-root="1"]').element
+      const initialObserver = FakeIntersectionObserver.instances.find(instance => instance.elements.has(target))
+
+      expect(initialObserver).toBeTruthy()
+      expect(initialObserver?.options.root).toBe(null)
+
+      wrapper.vm.activateRoot()
+      await flushAll()
+
+      const migratedObserver = FakeIntersectionObserver.instances.find(instance => instance.elements.has(target))
+      expect(migratedObserver).toBeTruthy()
+      expect(migratedObserver).not.toBe(initialObserver)
+      expect(migratedObserver?.options.root).toBe(root)
+      expect(initialObserver?.elements.has(target)).toBe(false)
+    }
+    finally {
+      wrapper?.unmount()
+      delete benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__
+      vi.stubGlobal('IntersectionObserver', OriginalIO as any)
+    }
+  })
+
   it('settles fallback registrations immediately when rootMargin is invalid', async () => {
     const OriginalIO = globalThis.IntersectionObserver
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -340,6 +395,102 @@ describe('markdownRender deferNodesUntilVisible', () => {
     finally {
       wrapper?.unmount()
       warn.mockRestore()
+      vi.stubGlobal('IntersectionObserver', OriginalIO as any)
+    }
+  })
+
+  it('refreshes child viewport targets when virtual scroll root changes', async () => {
+    const OriginalIO = globalThis.IntersectionObserver
+    const benchmarkWindow = window as any
+    const customId = 'viewport-priority-root-migration'
+    vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)
+    benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__ = true
+
+    let wrapper: ReturnType<typeof mount> | null = null
+    let removeCustomComponentsForTest: (() => void) | null = null
+    try {
+      const MarkdownRender = (await import('../src/components/NodeRenderer')).default
+      const viewportPriority = await import('../src/composables/viewportPriority')
+      const nodeComponents = await import('../src/utils/nodeComponents')
+      const HeavyChild = defineComponent({
+        setup() {
+          const target = ref<HTMLElement | null>(null)
+          const register = viewportPriority.useViewportPriority()
+
+          onMounted(() => {
+            register(target.value!, { rootMargin: '222px' })
+          })
+
+          return { target }
+        },
+        template: '<div ref="target" data-heavy-child="1" />',
+      })
+      nodeComponents.setCustomComponents(customId, { viewport_probe: HeavyChild })
+      removeCustomComponentsForTest = () => nodeComponents.removeCustomComponents(customId)
+
+      const Probe = defineComponent({
+        components: { MarkdownRender },
+        setup() {
+          const scrollRoot = ref<HTMLElement | null>(null)
+          const rootElement = ref<HTMLElement | null>(null)
+          const virtualScroll = ref({
+            enabled: true,
+            sessionKey: 'viewport-priority-root-migration',
+            scrollRoot: null as HTMLElement | null,
+          })
+
+          function activateRoot() {
+            scrollRoot.value = rootElement.value
+            virtualScroll.value = {
+              ...virtualScroll.value,
+              scrollRoot: scrollRoot.value,
+            }
+          }
+
+          return {
+            activateRoot,
+            customId,
+            rootElement,
+            virtualScroll,
+          }
+        },
+        template: `
+          <div ref="rootElement" data-scroll-root="1">
+            <MarkdownRender
+              :nodes="[{ type: 'viewport_probe', raw: '<viewport_probe />' }]"
+              :custom-id="customId"
+              :virtual-scroll="virtualScroll"
+              :viewport-priority="true"
+            />
+          </div>
+        `,
+      })
+
+      wrapper = mount(Probe)
+      await flushAll()
+
+      const child = wrapper.get('[data-heavy-child="1"]')
+      const root = wrapper.get('[data-scroll-root="1"]').element
+      const initialObserver = FakeIntersectionObserver.instances.find(instance => instance.elements.has(child.element))
+
+      expect(initialObserver).toBeTruthy()
+      expect(initialObserver?.options.root).toBe(null)
+      expect(initialObserver?.options.rootMargin).toBe('222px')
+
+      wrapper.vm.activateRoot()
+      await flushAll()
+
+      const migratedObserver = FakeIntersectionObserver.instances.find(instance => instance.elements.has(child.element))
+      expect(migratedObserver).toBeTruthy()
+      expect(migratedObserver).not.toBe(initialObserver)
+      expect(migratedObserver?.options.root).toBe(root)
+      expect(migratedObserver?.options.rootMargin).toBe('222px')
+      expect(initialObserver?.elements.has(child.element)).toBe(false)
+    }
+    finally {
+      wrapper?.unmount()
+      removeCustomComponentsForTest?.()
+      delete benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__
       vi.stubGlobal('IntersectionObserver', OriginalIO as any)
     }
   })

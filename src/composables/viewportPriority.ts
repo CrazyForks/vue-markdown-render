@@ -12,7 +12,15 @@ export interface VisibilityHandle {
   destroy: () => void
 }
 
-export type RegisterFn = (el: HTMLElement, opts?: { rootMargin?: string, threshold?: number }) => VisibilityHandle
+export interface ViewportPriorityRegisterOptions {
+  rootMargin?: string
+  threshold?: number
+}
+
+export interface RegisterFn {
+  (el: HTMLElement, opts?: ViewportPriorityRegisterOptions): VisibilityHandle
+  refresh?: () => void
+}
 
 interface IdleDeadlineLike {
   didTimeout: boolean
@@ -62,6 +70,7 @@ export function provideViewportPriority(
     resolve: () => void
     visible: Ref<boolean>
     bucketKey: string
+    opts?: ViewportPriorityRegisterOptions
   }
 
   interface ObserverBucket {
@@ -76,7 +85,7 @@ export function provideViewportPriority(
   const idleQueue = new Set<Element>()
   let idleJob: number | null = null
 
-  function normalizeConfig(target?: HTMLElement, opts?: { rootMargin?: string, threshold?: number }): ObserverConfig {
+  function normalizeConfig(target?: HTMLElement, opts?: ViewportPriorityRegisterOptions): ObserverConfig {
     return {
       root: getRootEl?.(target ?? null) ?? null,
       rootMargin: opts?.rootMargin ?? '300px',
@@ -181,7 +190,7 @@ export function provideViewportPriority(
     }, { timeout: 1200 })
   }
 
-  function ensureObserver(target?: HTMLElement, opts?: { rootMargin?: string, threshold?: number }) {
+  function ensureObserver(target?: HTMLElement, opts?: ViewportPriorityRegisterOptions) {
     if (!isBrowser)
       return null
     // Guard: some browser-like environments (e.g., jsdom) don't provide IO
@@ -216,6 +225,34 @@ export function provideViewportPriority(
     const bucket: ObserverBucket = { io, targets: new Map() }
     observerBuckets.set(bucketKey, bucket)
     return { key: bucketKey, bucket }
+  }
+
+  function refreshTargets() {
+    if (!isBrowser || !enabledRef.value)
+      return
+
+    for (const [target, data] of Array.from(targets.entries())) {
+      const observer = ensureObserver(target as HTMLElement, data.opts)
+      if (!observer) {
+        settleTarget(target)
+        continue
+      }
+
+      if (observer.key === data.bucketKey)
+        continue
+
+      const previousBucketKey = data.bucketKey
+      const previousBucket = observerBuckets.get(previousBucketKey)
+      try {
+        previousBucket?.io.unobserve(target)
+      }
+      catch {}
+      previousBucket?.targets.delete(target)
+      data.bucketKey = observer.key
+      observer.bucket.targets.set(target, data)
+      observer.bucket.io.observe(target)
+      cleanupObserver(previousBucketKey)
+    }
   }
 
   const register: RegisterFn = (el, opts) => {
@@ -263,7 +300,7 @@ export function provideViewportPriority(
       return { isVisible: visible, whenVisible, destroy: cleanup }
     }
 
-    const data: TargetState = { resolve, visible, bucketKey: observer.key }
+    const data: TargetState = { resolve, visible, bucketKey: observer.key, opts }
     targets.set(el, data)
     observer.bucket.targets.set(el, data)
     observer.bucket.io.observe(el)
@@ -271,6 +308,7 @@ export function provideViewportPriority(
     scheduleIdleDrain()
     return { isVisible: visible, whenVisible, destroy: cleanup }
   }
+  register.refresh = refreshTargets
 
   provide(ViewportPriorityKey, register)
   return register
@@ -318,7 +356,7 @@ export function useViewportPriority() {
     localIdleJob = null
   }
 
-  const getLocalBucketKey = (opts?: { rootMargin?: string, threshold?: number }) => [
+  const getLocalBucketKey = (opts?: ViewportPriorityRegisterOptions) => [
     opts?.rootMargin ?? '300px',
     opts?.threshold ?? 0,
   ].join('\u0000')
@@ -384,7 +422,7 @@ export function useViewportPriority() {
     }, { timeout: 1200 })
   }
 
-  const ensureLocal = (opts?: { rootMargin?: string, threshold?: number }) => {
+  const ensureLocal = (opts?: ViewportPriorityRegisterOptions) => {
     if (typeof window === 'undefined' || typeof IntersectionObserver === 'undefined')
       return null
     const bucketKey = getLocalBucketKey(opts)

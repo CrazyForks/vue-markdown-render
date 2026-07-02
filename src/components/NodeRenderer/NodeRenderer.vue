@@ -4485,6 +4485,7 @@ watch(
     () => resolveVirtualScrollRoot(),
   ],
   () => {
+    registerNodeVisibility.refresh?.()
     for (const [index, el] of nodeSlotElements)
       setNodeSlotElement(index, el)
   },
