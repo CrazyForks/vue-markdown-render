@@ -616,10 +616,15 @@ function getDocsPageOgImageAlt(frontmatter: Record<string, any>) {
 }
 
 function getDocsPageOgImageDimension(value: unknown, fallback: string) {
-  if (typeof value === 'number' && Number.isFinite(value) && value > 0)
-    return String(Math.round(value))
+  const numeric = typeof value === 'number'
+    ? value
+    : typeof value === 'string' && value.trim().length > 0
+      ? Number(value)
+      : Number.NaN
 
-  return typeof value === 'string' && value.length > 0 ? value : fallback
+  return Number.isFinite(numeric) && numeric > 0
+    ? String(Math.round(numeric))
+    : fallback
 }
 
 function frontmatterFaqItems(value: unknown) {
