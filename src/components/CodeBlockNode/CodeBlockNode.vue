@@ -3,7 +3,7 @@ import type { CodeBlockMonacoTheme, CodeBlockNodeProps, CodeBlockPreviewPayload 
 import type { MonacoDiffEditorViewLike, MonacoDisposableLike, MonacoEditorViewLike, MonacoNamespaceLike, MonacoRuntimeOptions } from './monaco'
 // Avoid static import of `stream-monaco` for types so the runtime bundle
 // doesn't get a reference. Define minimal local types we need here.
-import { computed, getCurrentInstance, inject, nextTick, onBeforeUnmount, onUnmounted, ref, useAttrs, watch } from 'vue'
+import { computed, getCurrentInstance, inject, nextTick, onBeforeUnmount, onUnmounted, ref, shallowRef, useAttrs, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 // Tooltip is provided as a singleton via composable to avoid many DOM nodes
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
@@ -191,7 +191,7 @@ let collapsedDiffSettleGuardUntil = 0
 let resumeGuardFrames = 0
 const registerVisibility = useViewportPriority()
 const viewportPriorityOptions = useViewportPriorityOptions()
-const viewportHandle = ref<ReturnType<typeof registerVisibility> | null>(null)
+const viewportHandle = shallowRef<ReturnType<typeof registerVisibility> | null>(null)
 const viewportReady = ref(typeof window === 'undefined')
 if (typeof window !== 'undefined') {
   watch(
@@ -200,21 +200,37 @@ if (typeof window !== 'undefined') {
       () => viewportPriorityOptions?.value.heavyBlockMargin,
       () => viewportPriorityOptions?.value.rootMargin,
     ],
-    ([el]) => {
+    ([el], _oldValue, onCleanup) => {
       viewportHandle.value?.destroy()
       viewportHandle.value = null
+
       if (!el) {
         viewportReady.value = false
         return
       }
+
+      let active = true
       const rootMargin = viewportPriorityOptions?.value.heavyBlockMargin
         ?? viewportPriorityOptions?.value.rootMargin
         ?? '400px'
       const handle = registerVisibility(el, { rootMargin })
+
       viewportHandle.value = handle
       viewportReady.value = handle.isVisible.value
-      handle.whenVisible.then(() => {
-        viewportReady.value = true
+
+      handle.whenVisible
+        .then(() => {
+          if (active && viewportHandle.value === handle)
+            viewportReady.value = true
+        })
+        .catch(() => {})
+
+      onCleanup(() => {
+        active = false
+        handle.destroy()
+
+        if (viewportHandle.value === handle)
+          viewportHandle.value = null
       })
     },
     { immediate: true },

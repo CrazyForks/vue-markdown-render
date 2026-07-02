@@ -58,6 +58,10 @@ function createMarkdownWithOpenCodeBlock(tailLineCount: number) {
   return `${createCodeFence(1, 10)}\n\n\`\`\`js\n// tail\n${lines.join('\n')}`
 }
 
+function createTwoParagraphMarkdown(first: string, second: string) {
+  return `${first}\n\n${second}`
+}
+
 function installManualMeasurementPlatform() {
   const frames: FrameRequestCallback[] = []
   const heights = new WeakMap<HTMLElement, number>()
@@ -261,6 +265,54 @@ describe('node renderer measurement performance', () => {
     expect(updatedVirtualState?.contentHash).not.toBe(initialVirtualState?.contentHash)
 
     wrapper.unmount()
+  })
+
+  it('does not reuse stale virtual content hash prefixes across skipped revisions', async () => {
+    installManualMeasurementPlatform()
+
+    const initialContent = createTwoParagraphMarkdown('Prefix A', 'Tail A')
+    const skippedContent = createTwoParagraphMarkdown('Prefix B', 'Tail A')
+    const finalContent = createTwoParagraphMarkdown('Prefix B', 'Tail B')
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: initialContent,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'virtual-content-hash-skipped-revisions',
+        },
+      },
+    })
+
+    await nextTick()
+    const initialState = (wrapper.vm as any).captureVirtualState()
+    expect(initialState?.contentHash).toBeTruthy()
+
+    await wrapper.setProps({ content: skippedContent })
+    await nextTick()
+    await wrapper.setProps({ content: finalContent })
+    await nextTick()
+
+    const updatedHash = (wrapper.vm as any).captureVirtualState()?.contentHash
+    wrapper.unmount()
+
+    const freshWrapper = mount(NodeRenderer, {
+      props: {
+        content: finalContent,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'virtual-content-hash-skipped-revisions-fresh',
+        },
+      },
+    })
+
+    await nextTick()
+    const freshHash = (freshWrapper.vm as any).captureVirtualState()?.contentHash
+
+    expect(updatedHash).toBe(freshHash)
+    freshWrapper.unmount()
   })
 
   it('drops pending node height records when the content ref is cleared before rAF flush', async () => {

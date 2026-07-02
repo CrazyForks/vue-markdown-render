@@ -985,9 +985,17 @@ function recordNodeHeight(
   height: number,
   options: { allowShrink?: boolean } = {},
 ) {
+  runEstimatedHeightMutation(() => recordNodeHeightCore(index, height, options))
+}
+
+function recordNodeHeightCore(
+  index: number,
+  height: number,
+  options: { allowShrink?: boolean } = {},
+) {
   const before = nodeHeights[index]
   markEstimatedNodeHeightDirty(index)
-  runEstimatedHeightMutation(() => recordMeasuredNodeHeight(index, height, options))
+  recordMeasuredNodeHeight(index, height, options)
   const after = nodeHeights[index]
   if (Object.is(before, after))
     estimatedHeightDirtyIndices.delete(index)
@@ -2598,8 +2606,13 @@ function getVirtualContentHash() {
   const total = parsedNodes.value.length
   let startIndex = getParsedNodesDirtyStart(total)
 
-  if (startIndex > total || virtualContentHashPrefixHashes.length < startIndex + 1)
+  if (
+    virtualContentHashRevision !== revision - 1
+    || startIndex > total
+    || virtualContentHashPrefixHashes.length < startIndex + 1
+  ) {
     startIndex = 0
+  }
 
   if (startIndex === 0) {
     virtualContentHashPrefixHashes = [2166136261]
@@ -4011,14 +4024,16 @@ function setNodeSlotElement(index: number, el: HTMLElement | null) {
 function flushPendingHeightMeasurements() {
   heightMeasurementRaf = null
 
-  for (const [index, pending] of pendingHeightMeasurements) {
-    pendingHeightMeasurements.delete(index)
-    if (nodeContentElements.get(index) !== pending.el)
-      continue
-    if (nodeContentVersions.get(index) !== pending.version)
-      continue
-    recordNodeHeight(index, pending.height, { allowShrink: pending.allowShrink })
-  }
+  runEstimatedHeightMutation(() => {
+    for (const [index, pending] of pendingHeightMeasurements) {
+      pendingHeightMeasurements.delete(index)
+      if (nodeContentElements.get(index) !== pending.el)
+        continue
+      if (nodeContentVersions.get(index) !== pending.version)
+        continue
+      recordNodeHeightCore(index, pending.height, { allowShrink: pending.allowShrink })
+    }
+  })
 }
 
 function clearPendingHeightMeasurements() {
