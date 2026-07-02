@@ -445,6 +445,40 @@ describe('markdownRender deferNodesUntilVisible', () => {
     }
   })
 
+  it('uses viewportPriorityOptions.maxTargets when auto-disabling node deferral', async () => {
+    const OriginalIO = globalThis.IntersectionObserver
+    vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)
+
+    let wrapper: ReturnType<typeof mount> | null = null
+    try {
+      const MarkdownRender = (await import('../src/components/NodeRenderer')).default
+
+      wrapper = mount(MarkdownRender, {
+        props: {
+          content: 'First paragraph\n\nSecond paragraph',
+          deferNodesUntilVisible: true,
+          viewportPriority: true,
+          viewportPriorityOptions: {
+            maxTargets: 1,
+          },
+          initialRenderBatchSize: 0,
+          maxLiveNodes: 20,
+        },
+      })
+
+      await flushAll()
+
+      expect(wrapper.findAll('.node-placeholder')).toHaveLength(0)
+      expect(wrapper.find('[data-node-index="0"] .node-content').exists()).toBe(true)
+      expect(wrapper.find('[data-node-index="1"] .node-content').exists()).toBe(true)
+      expect(FakeIntersectionObserver.instances.every(instance => instance.elements.size === 0)).toBe(true)
+    }
+    finally {
+      wrapper?.unmount()
+      vi.stubGlobal('IntersectionObserver', OriginalIO as any)
+    }
+  })
+
   it('ignores overflow ancestors that are not actually scrollable when picking the IO root', async () => {
     const OriginalIO = globalThis.IntersectionObserver
     vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)

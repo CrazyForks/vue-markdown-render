@@ -1029,7 +1029,11 @@ function removeNodeHeights(
 ) {
   const list = Array.from(indices, Number)
   markEstimatedNodeHeightsDirty(list)
-  const removed = runEstimatedHeightMutation(() => removeMeasuredNodeHeights(list, options))
+  let removed = 0
+  runEstimatedHeightMutation(() => {
+    removed = removeMeasuredNodeHeights(list, options)
+    return removed > 0
+  })
   if (removed > 0) {
     forgetNodeHeightSignatures(list)
   }
