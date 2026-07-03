@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/ng-packagr/ng-package.schema.json",
+  "dest": "dist",
+  "allowedNonPeerDependencies": [
+    "@floating-ui/dom",
+    "markstream-core",
+    "stream-markdown-parser"
+  ],
+  "assets": [
+    {
+      "glob": "index.css",
+      "input": "src",
+      "output": "."
+    }
+  ],
+  "lib": {
+    "entryFile": "src/index.ts"
+  }
+}

@@ -53,21 +53,21 @@
   ],
   "exports": {
     ".": {
-      "types": "./dist/types/index.d.ts",
-      "import": "./dist/index.js"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/fesm2022/markstream-angular.mjs"
     },
     "./index.css": "./dist/index.css",
     "./workers/katexRenderer.worker": "./dist/workers/katexRenderer.worker.js",
     "./workers/mermaidParser.worker": "./dist/workers/mermaidParser.worker.js"
   },
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/types/index.d.ts",
+  "main": "./dist/fesm2022/markstream-angular.mjs",
+  "module": "./dist/fesm2022/markstream-angular.mjs",
+  "types": "./dist/index.d.ts",
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "pnpm --dir ../markstream-core build && vite build --mode npm",
+    "build": "pnpm --dir ../markdown-parser build && pnpm --dir ../markstream-core build && ng-packagr -p ng-package.json -c tsconfig.build.json && vite build --config vite.config.workers.ts --mode npm",
     "dev": "vite dev",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
@@ -108,7 +108,12 @@
     "stream-markdown-parser": "workspace:*"
   },
   "devDependencies": {
+    "@angular/common": "^20.3.25",
+    "@angular/compiler": "^20.3.25",
+    "@angular/compiler-cli": "^20.3.25",
+    "@angular/core": "^20.3.25",
     "@types/node": "^18.19.130",
+    "ng-packagr": "^20.3.2",
     "rollup": "^3.30.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.5",
