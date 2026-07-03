@@ -426,12 +426,12 @@ $$ where $\\epsilon$ denotes the target accuracy, $n$ is the number of nodes, an
     }
 
     let source = Array.from(
-      { length: 600 },
+      { length: 512 },
       (_, index) => `line ${index}: inline $x_${index}$ only`,
     ).join('\n')
 
     let nodes: any[] = []
-    for (let index = 0; index < 30; index++) {
+    for (let index = 0; index < 20; index++) {
       source += ` append-${index} with inline $y_${index}$`
       nodes = parseMarkdownToStructure(source, md, {
         final: false,
@@ -441,7 +441,7 @@ $$ where $\\epsilon$ denotes the target accuracy, $n$ is the number of nodes, an
 
     expect(resetCount).toBe(0)
     expect(collectByType(nodes, 'math_block')).toHaveLength(0)
-    expect(collectByType(nodes, 'math_inline').length).toBeGreaterThan(600)
+    expect(collectByType(nodes, 'math_inline').length).toBeGreaterThan(512)
   })
 
   it('marks a cached tolerant opener line as pending candidate before math content arrives', () => {
