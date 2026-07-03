@@ -1,9 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "paths": {},
     "declaration": true,
-    "emitDeclarationOnly": false,
-    "paths": {}
+    "emitDeclarationOnly": false
   },
   "angularCompilerOptions": {
     "compilationMode": "partial"
