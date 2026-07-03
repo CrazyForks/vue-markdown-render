@@ -37,6 +37,13 @@ describe('link and image URL policy', () => {
     expect(isUnsafeHtmlUrl('jav\u009Fascript:alert(1)', { attrName: 'href', tagName: 'a' })).toBe(true)
   })
 
+  it('keeps plain http URLs on the safe path without bypassing normalized payloads', () => {
+    expect(isUnsafeHtmlUrl('https://example.com/a?b=1', { attrName: 'href', tagName: 'a' })).toBe(false)
+    expect(isUnsafeHtmlUrl('http://example.com/a.png', { attrName: 'src', tagName: 'img' })).toBe(false)
+    expect(isUnsafeHtmlUrl('java&#x0A;script:alert(1)', { attrName: 'href', tagName: 'a' })).toBe(true)
+    expect(isUnsafeHtmlUrl('java script:alert(1)', { attrName: 'href', tagName: 'a' })).toBe(true)
+  })
+
   it('omits unsafe href values from direct link nodes', async () => {
     const wrapper = mount(NodeRenderer, {
       props: {

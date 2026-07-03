@@ -85,6 +85,17 @@ function shouldAllowMarkdownShrink(metrics: MarkstreamVirtualMetrics) {
     || metrics.confidence === 'final'
 }
 
+function shouldReleaseRestoredMarkdownFloor(metrics: MarkstreamVirtualMetrics) {
+  if (metrics.phase === 'final')
+    return true
+
+  if (!metrics.stable)
+    return false
+
+  return metrics.confidence === 'measured'
+    || metrics.confidence === 'final'
+}
+
 const layoutReadCounts = new Map<string, number>()
 
 function recordLayoutRead(label: string) {
@@ -139,6 +150,7 @@ interface TimelineRecord {
 
 interface ReconcileRecordSizeOptions {
   allowMarkdownShrink?: boolean
+  allowRestoredFloorShrink?: boolean
   markdownLogicalHeight?: number
   rememberThreadKey?: string
   source?: TimelineItemSizeSource
@@ -155,6 +167,7 @@ type TimelineItemSizeSource = NonNullable<MarkstreamThreadVirtualState['itemSize
 
 interface PendingMarkdownReconcile {
   allowMarkdownShrink: boolean
+  allowRestoredFloorShrink: boolean
   itemSizeSource: TimelineItemSizeSource
   logicalHeight: number
   threadKey?: string
@@ -1220,6 +1233,7 @@ function flushMarkdownReconciles() {
     const updateLayout = (pending.threadKey ?? '') === (normalizedThreadKey.value ?? '')
     reconcileRecordSize(record, {
       allowMarkdownShrink: pending.allowMarkdownShrink,
+      allowRestoredFloorShrink: pending.allowRestoredFloorShrink,
       markdownLogicalHeight: pending.logicalHeight,
       rememberThreadKey: pending.threadKey,
       source: pending.itemSizeSource,
@@ -1313,7 +1327,10 @@ function reconcileRecordSize(
       && !restoringThread.value
       && (
         restoredFloor <= 0
-        || shouldReleaseRestoredMarkdownFloorForShrink(record.key, markdown, restoredFloor)
+        || (
+          options.allowRestoredFloorShrink
+          && shouldReleaseRestoredMarkdownFloorForShrink(record.key, markdown, restoredFloor)
+        )
       )
     ) {
       clearRestoredItemHeightFloor(record.key)
@@ -1424,10 +1441,12 @@ function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProp
       })
 
       const allowMarkdownShrink = shouldAllowMarkdownShrink(metrics)
+      const allowRestoredFloorShrink = shouldReleaseRestoredMarkdownFloor(metrics)
       const logicalHeight = Math.ceil(metrics.totalHeight)
 
       scheduleMarkdownReconcile(record, {
         allowMarkdownShrink,
+        allowRestoredFloorShrink,
         itemSizeSource: getItemSizeSource(record),
         logicalHeight,
         threadKey: normalizedThreadKey.value,

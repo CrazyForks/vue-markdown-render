@@ -1709,6 +1709,19 @@ describe('virtual timeline API', () => {
       measuredHeight = 140
 
       const markdownProps = slotProps.find(props => props.kind === 'assistant-markdown').markdownProps
+      markdownProps.onHeightChange({
+        ...createMetrics(140, 'thread-a:a1:1'),
+        phase: 'settling',
+        stable: false,
+        confidence: 'measured',
+      })
+
+      await nextTick()
+      await vi.advanceTimersByTimeAsync(20)
+      await nextTick()
+
+      expect((wrapper.vm as any).getItemSize('a1')).toBe(1060)
+
       markdownProps.onHeightChange(createMetrics(140, 'thread-a:a1:1'))
 
       await nextTick()

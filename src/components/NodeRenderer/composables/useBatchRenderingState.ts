@@ -6,6 +6,7 @@ export interface BatchRenderingStateOptions {
   isClient: boolean
   isTestEnv: boolean
   renderAsFragment: ComputedRef<boolean>
+  forceFullRenderFinalContent?: ComputedRef<boolean>
 }
 
 export interface BatchRenderingState {
@@ -70,7 +71,9 @@ export function useBatchRenderingState(
   )
 
   const incrementalRenderingActive = computed(() => {
-    return batchingEnabled.value && (props.maxLiveNodes ?? 0) <= 0
+    return batchingEnabled.value
+      && !options.forceFullRenderFinalContent?.value
+      && (props.maxLiveNodes ?? 0) <= 0
   })
 
   const previousBatchConfig = ref({

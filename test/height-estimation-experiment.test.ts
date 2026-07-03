@@ -70,6 +70,25 @@ describe('height estimation experiment internals', () => {
     expect(estimated?.height).toBeGreaterThan(estimated?.contentHeight ?? 0)
   })
 
+  it('estimates standalone pre code blocks without shell header height', () => {
+    const estimated = estimateCodeBlockHeight(
+      {
+        type: 'code_block',
+        language: 'ts',
+        code: 'one\ntwo\nthree',
+        raw: '```ts\none\ntwo\nthree\n```',
+      } as any,
+      {
+        rendererKind: 'pre',
+        showHeader: true,
+      },
+    )
+
+    expect(estimated?.rendererKind).toBe('pre')
+    expect(estimated?.contentHeight).toBe(84)
+    expect(estimated?.height).toBe(84)
+  })
+
   it('does not count a terminal newline as an extra ordinary code line', () => {
     const withoutTerminalNewline = estimateCodeBlockHeight(
       {

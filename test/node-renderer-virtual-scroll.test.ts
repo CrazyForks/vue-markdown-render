@@ -646,7 +646,7 @@ describe('node renderer virtual-scroll coordination', () => {
     const metrics = await (wrapper.vm as any).forceMeasure('manual')
 
     expect(metrics.nodeCount).toBe(8)
-    expect(metrics.totalHeight).toBe(320)
+    expect(metrics.totalHeight).toBe(272)
     expect(metrics.totalHeight).toBeLessThan(1000)
 
     wrapper.unmount()
@@ -4016,7 +4016,7 @@ describe('node renderer virtual-scroll coordination', () => {
 
     await flushAll()
 
-    expect((await (wrapper.vm as any).forceMeasure('manual')).totalHeight).toBe(300)
+    expect((await (wrapper.vm as any).forceMeasure('manual')).totalHeight).toBe(228)
 
     wrapper.unmount()
   })

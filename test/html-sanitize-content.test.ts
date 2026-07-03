@@ -1,4 +1,4 @@
-import { sanitizeHtmlContent } from 'stream-markdown-parser'
+import { sanitizeHtmlContent, sanitizeHtmlTokenAttrs, tokenAttrsToRecord } from 'stream-markdown-parser'
 import { describe, expect, it } from 'vitest'
 
 describe('sanitizeHtmlContent', () => {
@@ -56,6 +56,18 @@ describe('sanitizeHtmlContent', () => {
 
     expect(html).toContain('href="https://example.com"')
     expect(html).not.toContain('ping=')
+  })
+
+  it('drops DOM content override attrs before binding sanitized token attrs', () => {
+    const attrs = sanitizeHtmlTokenAttrs([
+      ['innerHTML', '<img src=x onerror=alert(1)>'],
+      ['outerHTML', '<img src=x onerror=alert(1)>'],
+      ['textContent', 'owned'],
+      ['innerText', 'owned'],
+      ['class', 'safe'],
+    ], 'safe', 'summary')
+
+    expect(tokenAttrsToRecord(attrs)).toEqual({ class: 'safe' })
   })
 
   it('can preserve broader HTML tags for trusted content', () => {

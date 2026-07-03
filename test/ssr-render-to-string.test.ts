@@ -167,7 +167,7 @@ Footnotes are server-rendered.[^1]
     try {
       const html = await renderComponent(MarkdownRender, {
         domMode: 'minimal',
-        final: true,
+        final: false,
         mode: 'minimal',
         nodes: [
           paragraphNode([textNode('SSR minimal batching')]),
@@ -615,6 +615,76 @@ Footnotes are server-rendered.[^1]
     expect(html).not.toContain('data-node-index=')
     expect(html).not.toContain('<template>')
     expect(html).toMatch(/<p dir="auto" class="paragraph-node"[^>]*>.*?<span[^>]*><span[^>]*>body<\/span>/)
+  })
+
+  it('renders closed details summary synchronously before structured body nodes', async () => {
+    const html = await renderComponent(HtmlBlockNode, {
+      node: {
+        type: 'html_block',
+        tag: 'details',
+        content: '<details><summary>Optional advanced setup</summary><p>body</p></details>',
+        attrs: [],
+        children: [
+          {
+            type: 'html_block',
+            tag: 'summary',
+            content: '<summary>Optional advanced setup</summary>',
+            children: [
+              {
+                type: 'text',
+                content: 'Optional advanced setup',
+                raw: 'Optional advanced setup',
+              },
+            ],
+          },
+          {
+            type: 'paragraph',
+            raw: 'body',
+            children: [{ type: 'text', content: 'body', raw: 'body' }],
+          },
+        ],
+      },
+    })
+
+    expect(html).toMatch(/<details[^>]*class="html-block-node"[^>]*>(?:<!--\[-->|<!--\]-->)*<summary[^>]*>Optional advanced setup<\/summary>/)
+    expect(html).not.toContain('<summary class="html-block-node"')
+    expect(html).toMatch(/<p dir="auto" class="paragraph-node"[^>]*>.*?<span[^>]*><span[^>]*>body<\/span>/)
+  })
+
+  it('does not bind DOM content override attrs on synchronized details summary', async () => {
+    const html = await renderComponent(HtmlBlockNode, {
+      node: {
+        type: 'html_block',
+        tag: 'details',
+        content: '<details><summary innerHTML="<img src=x onerror=alert(1)>" class="safe">Safe summary</summary><p>body</p></details>',
+        attrs: [],
+        children: [
+          {
+            type: 'html_block',
+            tag: 'summary',
+            content: '<summary innerHTML="<img src=x onerror=alert(1)>" class="safe">Safe summary</summary>',
+            attrs: [['innerHTML', '<img src=x onerror=alert(1)>'], ['class', 'safe']],
+            children: [
+              {
+                type: 'text',
+                content: 'Safe summary',
+                raw: 'Safe summary',
+              },
+            ],
+          },
+          {
+            type: 'paragraph',
+            raw: 'body',
+            children: [{ type: 'text', content: 'body', raw: 'body' }],
+          },
+        ],
+      },
+    })
+
+    expect(html).toMatch(/<summary class="safe"[^>]*>Safe summary<\/summary>/)
+    expect(html).not.toContain('innerHTML')
+    expect(html).not.toContain('onerror')
+    expect(html).not.toContain('<img')
   })
 
   it('renders an explicit SSR matrix for the lighter built-in node components', async () => {

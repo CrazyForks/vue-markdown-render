@@ -157,6 +157,10 @@ export const DANGEROUS_HTML_ATTR_NAMES = [
   'oninput',
   'oninvalid',
   'onsearch',
+  'innerhtml',
+  'outerhtml',
+  'textcontent',
+  'innertext',
   'srcdoc',
   'ping',
 ] as const
@@ -286,6 +290,21 @@ function getUrlScheme(normalized: string) {
   return match?.[1]?.toLowerCase() ?? ''
 }
 
+const PLAIN_SAFE_HTTP_URL_RE = /^https?:\/\//i
+
+function isPlainSafeHttpUrl(value: string) {
+  if (!PLAIN_SAFE_HTTP_URL_RE.test(value))
+    return false
+
+  for (const ch of value) {
+    const code = ch.charCodeAt(0)
+    if (ch === '&' || code <= 0x20 || (code >= 0x7F && code <= 0x9F) || (code > 0x7F && /\s/u.test(ch)))
+      return false
+  }
+
+  return true
+}
+
 function isSafeLocalFileHref(normalized: string, tagName: string, attrName: string) {
   if (!isLinkHrefUrlContext(tagName, attrName) || !normalized.startsWith('file:///'))
     return false
@@ -331,6 +350,9 @@ function getAllowedUrlProtocols(tagName: string, attrName: string) {
 }
 
 export function isUnsafeHtmlUrl(value: string, context: HtmlUrlContext = {}) {
+  if (isPlainSafeHttpUrl(value))
+    return false
+
   const normalized = stripHtmlControlAndWhitespace(decodeHtmlUrlEntities(value)).toLowerCase()
   const tagName = String(context.tagName ?? '').toLowerCase()
   const attrName = String(context.attrName ?? '').toLowerCase()

@@ -90,6 +90,7 @@ const CODE_BLOCK_HEADER_HEIGHT = 40
 const CODE_BLOCK_DEFAULT_CAP = 500
 const MARKDOWN_CODE_LINE_HEIGHT = 21
 const MARKDOWN_CODE_VERTICAL_PADDING = 32
+const PRE_CODE_LINE_HEIGHT = 28
 const MONACO_LINE_EXTRA = 1.5
 
 interface PreparedCacheEntry {
@@ -387,7 +388,7 @@ export function estimateCodeBlockHeight(
     return null
 
   const rendererKind = options.rendererKind
-  const showHeader = options.showHeader !== false
+  const showHeader = rendererKind !== 'pre' && options.showHeader !== false
   const lineCount = getCodeBlockVisibleLineCount(node)
   const isDiff = Boolean((node as any).diff)
   let contentHeight = 0
@@ -408,7 +409,7 @@ export function estimateCodeBlockHeight(
     contentHeight = Math.round(lineCount * MARKDOWN_CODE_LINE_HEIGHT + MARKDOWN_CODE_VERTICAL_PADDING)
   }
   else {
-    contentHeight = Math.round(lineCount * MARKDOWN_CODE_LINE_HEIGHT + MARKDOWN_CODE_VERTICAL_PADDING)
+    contentHeight = Math.round(lineCount * PRE_CODE_LINE_HEIGHT)
     cap = Number.POSITIVE_INFINITY
   }
 
