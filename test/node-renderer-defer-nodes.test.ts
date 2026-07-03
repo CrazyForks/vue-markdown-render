@@ -551,6 +551,7 @@ describe('markdownRender deferNodesUntilVisible', () => {
 
     let wrapper: ReturnType<typeof mount> | null = null
     try {
+      await import('../src/components/MarkdownCodeBlockNode')
       const { default: MarkdownRender } = await import('../src/components/NodeRenderer')
 
       wrapper = mount(MarkdownRender, {
