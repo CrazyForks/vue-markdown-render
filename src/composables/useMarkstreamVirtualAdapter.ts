@@ -20,6 +20,13 @@ function shouldAllowMarkdownShrink(metrics: MarkstreamVirtualMetrics) {
   if (metrics.phase === 'final')
     return true
 
+  if (
+    metrics.final === true
+    && (metrics.confidence === 'measured' || metrics.confidence === 'final')
+  ) {
+    return true
+  }
+
   if (!metrics.stable)
     return false
 

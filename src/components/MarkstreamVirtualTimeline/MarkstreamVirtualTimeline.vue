@@ -71,6 +71,13 @@ function shouldAllowMarkdownShrink(metrics: MarkstreamVirtualMetrics) {
   if (metrics.phase === 'final')
     return true
 
+  if (
+    metrics.final === true
+    && (metrics.confidence === 'measured' || metrics.confidence === 'final')
+  ) {
+    return true
+  }
+
   if (!metrics.stable)
     return false
 
@@ -163,6 +170,7 @@ const itemSizes = reactive(new Map<string, number>()) as Map<string, number>
 const itemSizeSources = new Map<string, TimelineItemSizeSource>()
 const restoredItemHeightFloors = new Map<string, number>()
 const restoredItemHeightFloorSources = new Map<string, TimelineItemSizeSource>()
+const restoredMarkdownLogicalHeights = new Map<string, number>()
 const markdownStates = reactive(new Map<string, MarkstreamVirtualState>()) as Map<string, MarkstreamVirtualState>
 const markdownLogicalHeights = reactive(new Map<string, number>()) as Map<string, number>
 const markdownLogicalHeightSources = new Map<string, MarkdownLogicalHeightSource>()
@@ -1017,12 +1025,27 @@ function clearRestoredItemHeightFloorIfSourceChanged(
   if (floorSource && !isSameRestoredItemHeightFloorSource(floorSource, source)) {
     restoredItemHeightFloors.delete(key)
     restoredItemHeightFloorSources.delete(key)
+    restoredMarkdownLogicalHeights.delete(key)
   }
 }
 
 function clearRestoredItemHeightFloor(key: string) {
   restoredItemHeightFloors.delete(key)
   restoredItemHeightFloorSources.delete(key)
+  restoredMarkdownLogicalHeights.delete(key)
+}
+
+function shouldReleaseRestoredMarkdownFloorForShrink(
+  key: string,
+  markdown: number,
+  restoredFloor: number,
+) {
+  const restoredMarkdown = restoredMarkdownLogicalHeights.get(key)
+  if (!Number.isFinite(restoredMarkdown) || restoredMarkdown == null || restoredMarkdown <= 0)
+    return true
+
+  const restoredChrome = Math.max(0, restoredFloor - restoredMarkdown)
+  return markdown + restoredChrome < restoredFloor - ITEM_SIZE_RECONCILE_DEADBAND_PX
 }
 
 function setItemSize(
@@ -1282,10 +1305,19 @@ function reconcileRecordSize(
       next = Math.max(next, cachedSize)
 
     const restoredFloor = getRestoredItemHeightFloor(record.key, itemSizeSource)
-    if (restoredFloor > 0 && markdown > restoredFloor + ITEM_SIZE_RECONCILE_DEADBAND_PX && !restoringThread.value)
+    if (restoredFloor > 0 && markdown > restoredFloor + ITEM_SIZE_RECONCILE_DEADBAND_PX && !restoringThread.value) {
       clearRestoredItemHeightFloor(record.key)
-    else if (options.allowMarkdownShrink && !restoringThread.value)
+    }
+    else if (
+      options.allowMarkdownShrink
+      && !restoringThread.value
+      && (
+        restoredFloor <= 0
+        || shouldReleaseRestoredMarkdownFloorForShrink(record.key, markdown, restoredFloor)
+      )
+    ) {
       clearRestoredItemHeightFloor(record.key)
+    }
 
     if (next > 0)
       setItemSize(record.key, next, itemSizeSource, options)
@@ -2429,6 +2461,7 @@ function restoreThreadState(
   itemSizeSources.clear()
   restoredItemHeightFloors.clear()
   restoredItemHeightFloorSources.clear()
+  restoredMarkdownLogicalHeights.clear()
   markdownStates.clear()
   markdownLogicalHeights.clear()
   markdownLogicalHeightSources.clear()
@@ -2443,7 +2476,9 @@ function restoreThreadState(
 
   for (const [key, markdownState] of Object.entries(state?.markdownStates ?? {})) {
     markdownStates.set(key, markdownState)
-    seedMarkdownLogicalHeightFromState(key, markdownState)
+    const restoredMarkdown = seedMarkdownLogicalHeightFromState(key, markdownState)
+    if (restoredMarkdown > 0)
+      restoredMarkdownLogicalHeights.set(key, restoredMarkdown)
   }
 
   rebuildLayoutRecords()
@@ -2549,6 +2584,7 @@ function cleanupObservers() {
   itemSizeSources.clear()
   restoredItemHeightFloors.clear()
   restoredItemHeightFloorSources.clear()
+  restoredMarkdownLogicalHeights.clear()
   markdownLogicalHeights.clear()
   markdownLogicalHeightSources.clear()
   rootResizeObserver?.disconnect()

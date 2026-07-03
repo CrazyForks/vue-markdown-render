@@ -4227,6 +4227,10 @@ onUnmounted(() => {
   padding-bottom: var(--markstream-pre-diff-pane-bottom-padding, 10px);
 }
 
+.code-block-container.is-diff :deep(pre.code-pre-fallback.markstream-pre--diff-preview:not(.markstream-pre--diff-inline) .markstream-pre__diff-pane) {
+  padding-bottom: calc(var(--markstream-pre-diff-pane-bottom-padding, 10px) - 1px);
+}
+
 :deep(pre.code-pre-fallback.is-fading-out) {
   opacity: 0;
   pointer-events: none;
