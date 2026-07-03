@@ -60,6 +60,20 @@ interface ParsedNodeStabilizeResult {
   metrics: ParsedNodeStabilizeMetrics
 }
 
+interface ParsedNodeStabilizeOptions {
+  reuseDirtyTail?: boolean
+  scanStartIndex?: number
+}
+
+interface StablePrefixReuseContext {
+  content: string
+  previousContent: string
+  previousDirtyStartIndex: number
+  parseOptions: RendererParseOptions
+  customMarkdownIt: NodeRendererProps['customMarkdownIt']
+  md: MarkdownIt
+}
+
 export interface MarkdownParsingOptions {
   instanceMsgId: string
   renderContent: ComputedRef<string>
@@ -507,6 +521,86 @@ function getDirtyTailNodeCount(
     : Math.max(nextNodes.length, previousNodes.length) - dirtyStartIndex
 }
 
+function mayContainGlobalReferenceDefinition(value: string) {
+  let labelStartIndex = -1
+
+  for (let index = 0; index < value.length; index++) {
+    const char = value.charCodeAt(index)
+
+    if (labelStartIndex < 0) {
+      if (char === 91)
+        labelStartIndex = index
+      continue
+    }
+
+    if (char === 92) {
+      index += 1
+      continue
+    }
+
+    if (char === 91) {
+      labelStartIndex = index
+      continue
+    }
+
+    if (char !== 93)
+      continue
+
+    let cursor = index + 1
+    while (cursor < value.length) {
+      const nextChar = value.charCodeAt(cursor)
+      if (nextChar !== 9 && nextChar !== 32)
+        break
+      cursor += 1
+    }
+
+    if (value.charCodeAt(cursor) === 58)
+      return true
+
+    labelStartIndex = -1
+  }
+
+  return false
+}
+
+function appendMayDefineGlobalReferences(previous: string, next: string) {
+  if (!previous || !next.startsWith(previous) || next.length <= previous.length)
+    return false
+
+  return mayContainGlobalReferenceDefinition(next)
+}
+
+function hasRegisteredMarkdownPlugins(md: MarkdownIt) {
+  return Number((md as unknown as Record<string, unknown>).__markstreamRegisteredPluginCount ?? 0) > 0
+}
+
+function getStablePrefixScanStartIndex(context: StablePrefixReuseContext) {
+  if (context.previousDirtyStartIndex <= 0)
+    return 0
+  if (!context.content.startsWith(context.previousContent) || context.content.length <= context.previousContent.length)
+    return 0
+  if (context.parseOptions.final === true)
+    return 0
+  if (context.customMarkdownIt)
+    return 0
+  if (hasRegisteredMarkdownPlugins(context.md))
+    return 0
+  if (appendMayDefineGlobalReferences(context.previousContent, context.content))
+    return 0
+
+  const options = context.parseOptions
+  if (
+    typeof options.preTransformTokens === 'function'
+    || typeof options.postTransformTokens === 'function'
+    || typeof options.postTransformNodes === 'function'
+    || (options.customHtmlTags?.length ?? 0) > 0
+  ) {
+    return 0
+  }
+
+  return context.previousDirtyStartIndex
+}
+
 function compareCheapStringIfSafe(previous: string, next: string) {
   return previous.length === next.length && previous === next
 }
@@ -651,10 +745,11 @@ function areTopLevelNodesStableWithMetrics(
   return isParsedNodeStableWithMetrics(previous, next, signatureTiming)
 }
 
-function findDirtyStartIndex(nextNodes: ParsedNode[], previousNodes: ParsedNode[]) {
+function findDirtyStartIndex(nextNodes: ParsedNode[], previousNodes: ParsedNode[], scanStartIndex = 0) {
   const limit = Math.min(nextNodes.length, previousNodes.length)
+  const startIndex = Math.min(limit, Math.max(0, scanStartIndex))
 
-  for (let index = 0; index < limit; index++) {
+  for (let index = startIndex; index < limit; index++) {
     const previous = previousNodes[index]
     const next = nextNodes[index]
 
@@ -669,10 +764,12 @@ function findDirtyStartIndexWithMetrics(
   nextNodes: ParsedNode[],
   previousNodes: ParsedNode[],
   signatureTiming: ParsedNodeSignatureTimingMetrics,
+  scanStartIndex = 0,
 ) {
   const limit = Math.min(nextNodes.length, previousNodes.length)
+  const startIndex = Math.min(limit, Math.max(0, scanStartIndex))
 
-  for (let index = 0; index < limit; index++) {
+  for (let index = startIndex; index < limit; index++) {
     const previous = previousNodes[index]
     const next = nextNodes[index]
 
@@ -684,7 +781,11 @@ function findDirtyStartIndexWithMetrics(
   return nextNodes.length === previousNodes.length ? -1 : limit
 }
 
-function stabilizeParsedNodes(nextNodes: ParsedNode[], previousNodes: ParsedNode[]): ParsedNodeStabilizeResult {
+function stabilizeParsedNodes(
+  nextNodes: ParsedNode[],
+  previousNodes: ParsedNode[],
+  options: ParsedNodeStabilizeOptions = {},
+): ParsedNodeStabilizeResult {
   if (!previousNodes.length) {
     return {
       nodes: nextNodes,
@@ -692,7 +793,9 @@ function stabilizeParsedNodes(nextNodes: ParsedNode[], previousNodes: ParsedNode
     }
   }
 
-  const dirtyStartIndex = findDirtyStartIndex(nextNodes, previousNodes)
+  const scanStartIndex = options.scanStartIndex ?? 0
+  const reuseDirtyTail = options.reuseDirtyTail !== false
+  const dirtyStartIndex = findDirtyStartIndex(nextNodes, previousNodes, scanStartIndex)
 
   if (dirtyStartIndex < 0) {
     return {
@@ -712,13 +815,15 @@ function stabilizeParsedNodes(nextNodes: ParsedNode[], previousNodes: ParsedNode
   for (let index = 0; index < dirtyStartIndex; index++)
     stableNodes[index] = previousNodes[index]!
 
-  for (let index = dirtyStartIndex; index < nextNodes.length; index++) {
-    const previous = previousNodes[index]
-    const next = nextNodes[index]
+  if (reuseDirtyTail) {
+    for (let index = dirtyStartIndex; index < nextNodes.length; index++) {
+      const previous = previousNodes[index]
+      const next = nextNodes[index]
 
-    if (previous && isParsedNodeStable(previous, next)) {
-      stableNodes[index] = previous
-      reusedNodeCount += 1
+      if (previous && isParsedNodeStable(previous, next)) {
+        stableNodes[index] = previous
+        reusedNodeCount += 1
+      }
     }
   }
 
@@ -737,6 +842,7 @@ function stabilizeParsedNodesWithMetrics(
   nextNodes: ParsedNode[],
   previousNodes: ParsedNode[],
   signatureTiming: ParsedNodeSignatureTimingMetrics,
+  options: ParsedNodeStabilizeOptions = {},
 ): ParsedNodeStabilizeResult {
   if (!previousNodes.length) {
     return {
@@ -745,7 +851,9 @@ function stabilizeParsedNodesWithMetrics(
     }
   }
 
-  const dirtyStartIndex = findDirtyStartIndexWithMetrics(nextNodes, previousNodes, signatureTiming)
+  const scanStartIndex = options.scanStartIndex ?? 0
+  const reuseDirtyTail = options.reuseDirtyTail !== false
+  const dirtyStartIndex = findDirtyStartIndexWithMetrics(nextNodes, previousNodes, signatureTiming, scanStartIndex)
 
   if (dirtyStartIndex < 0) {
     return {
@@ -765,13 +873,15 @@ function stabilizeParsedNodesWithMetrics(
   for (let index = 0; index < dirtyStartIndex; index++)
     stableNodes[index] = previousNodes[index]!
 
-  for (let index = dirtyStartIndex; index < nextNodes.length; index++) {
-    const previous = previousNodes[index]
-    const next = nextNodes[index]
+  if (reuseDirtyTail) {
+    for (let index = dirtyStartIndex; index < nextNodes.length; index++) {
+      const previous = previousNodes[index]
+      const next = nextNodes[index]
 
-    if (previous && isParsedNodeStableWithMetrics(previous, next, signatureTiming)) {
-      stableNodes[index] = previous
-      reusedNodeCount += 1
+      if (previous && isParsedNodeStableWithMetrics(previous, next, signatureTiming)) {
+        stableNodes[index] = previous
+        reusedNodeCount += 1
+      }
     }
   }
 
@@ -1079,22 +1189,42 @@ export function useMarkdownParsing(
       const stabilizeStart = collectPerformanceMetrics
         ? getNow()
         : 0
+      const scanStartIndex = getStablePrefixScanStartIndex({
+        content,
+        previousContent,
+        previousDirtyStartIndex: parsedNodesDirtyStartIndexValue,
+        parseOptions: mergedParseOptions.value,
+        customMarkdownIt: props.customMarkdownIt,
+        md,
+      })
+      const reuseDirtyTail = scanStartIndex <= 0
       if (signatureTiming) {
-        const result = stabilizeParsedNodesWithMetrics(nextParsed, previousParsedNodes, signatureTiming)
+        const result = stabilizeParsedNodesWithMetrics(nextParsed, previousParsedNodes, signatureTiming, {
+          reuseDirtyTail,
+          scanStartIndex,
+        })
         parsed = result.nodes
         stabilizeMetrics = result.metrics
       }
       else {
-        const result = stabilizeParsedNodes(nextParsed, previousParsedNodes)
+        const result = stabilizeParsedNodes(nextParsed, previousParsedNodes, {
+          reuseDirtyTail,
+          scanStartIndex,
+        })
         parsed = result.nodes
         stabilizeMetrics = result.metrics
       }
       stabilizeMs = collectPerformanceMetrics
         ? getNow() - stabilizeStart
         : 0
-      primeStartIndex = stabilizeMetrics?.dirtyStartIndex == null || stabilizeMetrics.dirtyStartIndex < 0
-        ? parsed.length
-        : stabilizeMetrics.dirtyStartIndex
+      if (!reuseDirtyTail) {
+        primeStartIndex = parsed.length
+      }
+      else {
+        primeStartIndex = stabilizeMetrics?.dirtyStartIndex == null || stabilizeMetrics.dirtyStartIndex < 0
+          ? parsed.length
+          : stabilizeMetrics.dirtyStartIndex
+      }
     }
     else {
       parsed = nextParsed

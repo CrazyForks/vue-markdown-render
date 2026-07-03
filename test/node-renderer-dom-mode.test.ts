@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
 import NodeRenderer from '../src/components/NodeRenderer'
 import { removeCustomComponents, setCustomComponents } from '../src/exports'
@@ -16,6 +16,16 @@ function paragraphNode(index: number) {
         raw: `Paragraph ${index}`,
       },
     ],
+  }
+}
+
+function codeBlockNode(lines: number) {
+  const code = Array.from({ length: lines }, (_, index) => `line ${index + 1}`).join('\n')
+  return {
+    type: 'code_block',
+    language: 'ts',
+    code,
+    raw: `\`\`\`ts\n${code}\n\`\`\``,
   }
 }
 
@@ -170,6 +180,79 @@ describe('node renderer domMode', () => {
     }
     finally {
       wrapper.unmount()
+      process.env.NODE_ENV = originalNodeEnv
+    }
+  })
+
+  it('renders final non-virtual content without incremental placeholders', async () => {
+    const originalNodeEnv = process.env.NODE_ENV
+    process.env.NODE_ENV = 'development'
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: 'Paragraph 1\n\nParagraph 2\n\nParagraph 3',
+        final: true,
+        batchRendering: true,
+        deferNodesUntilVisible: false,
+        fade: false,
+        initialRenderBatchSize: 1,
+        maxLiveNodes: 0,
+        nodeVirtual: false,
+        renderBatchDelay: 100000,
+        renderBatchSize: 1,
+        typewriter: false,
+        viewportPriority: false,
+      },
+    })
+
+    try {
+      await flushAll()
+
+      expect(wrapper.findAll('.node-slot')).toHaveLength(3)
+      expect(wrapper.findAll('.node-content')).toHaveLength(3)
+      expect(wrapper.findAll('.node-placeholder')).toHaveLength(0)
+      expect(wrapper.text()).toContain('Paragraph 3')
+    }
+    finally {
+      wrapper.unmount()
+      process.env.NODE_ENV = originalNodeEnv
+    }
+  })
+
+  it('uses code block estimates for incremental batch placeholders', async () => {
+    const originalNodeEnv = process.env.NODE_ENV
+    process.env.NODE_ENV = 'development'
+    const clientWidth = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(640)
+    let wrapper: ReturnType<typeof mount> | undefined
+
+    try {
+      wrapper = mount(NodeRenderer, {
+        props: {
+          nodes: [paragraphNode(1), codeBlockNode(10)],
+          batchRendering: true,
+          deferNodesUntilVisible: false,
+          domMode: 'minimal',
+          fade: false,
+          initialRenderBatchSize: 1,
+          maxLiveNodes: 0,
+          nodeVirtual: false,
+          renderBatchDelay: 100000,
+          renderBatchSize: 1,
+          renderCodeBlocksAsPre: true,
+          typewriter: false,
+          viewportPriority: false,
+        },
+      })
+      await flushAll()
+
+      const placeholder = wrapper.get('.node-slot[data-node-index="1"] .node-placeholder')
+      const height = Number.parseFloat((placeholder.element as HTMLElement).style.height)
+
+      expect(height).toBeGreaterThan(270)
+    }
+    finally {
+      wrapper?.unmount()
+      clientWidth.mockRestore()
       process.env.NODE_ENV = originalNodeEnv
     }
   })

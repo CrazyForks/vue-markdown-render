@@ -1,10 +1,31 @@
 import { describe, expect, it } from 'vitest'
 import { getMarkdown, parseMarkdownToStructure } from '../packages/markdown-parser/src'
+import { inferLinkifyDemotionContext } from '../packages/markdown-parser/src/parser/linkifyHeuristics'
 import { collect, links, textIncludes } from './utils/midstate-utils'
 
 const md = getMarkdown('issue-402')
 
 describe('issue #402 filename-like linkify regression', () => {
+  it('infers filename and ticker linkify demotion context trigger vocabulary', () => {
+    expect(inferLinkifyDemotionContext('文件名：')).toMatchObject({
+      explicitFilename: true,
+      filename: true,
+    })
+    expect(inferLinkifyDemotionContext('file names:')).toMatchObject({
+      explicitFilename: true,
+      filename: true,
+    })
+    expect(inferLinkifyDemotionContext('股票代码：')).toMatchObject({
+      marketTicker: true,
+    })
+    expect(inferLinkifyDemotionContext('tickers:')).toMatchObject({
+      marketTicker: true,
+    })
+
+    const falsePositive = inferLinkifyDemotionContext('profiled release notes')
+    expect(falsePositive.filename || falsePositive.explicitFilename || falsePositive.marketTicker).toBeFalsy()
+  })
+
   it('keeps filename cells as plain text inside markdown tables', () => {
     const input = `当前可用的文件如下:
 

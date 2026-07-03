@@ -6,6 +6,7 @@ import { computed, defineAsyncComponent, defineComponent, inject, onBeforeUnmoun
 import { DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN, useViewportPriority, useViewportPriorityOptions } from '../../composables/viewportPriority'
 import { hasCustomComponents, parseHtmlToVNodes } from '../../utils/htmlRenderer'
 import { useCustomNodeComponents } from '../../utils/nodeComponents'
+import { getPlainTextContent } from '../SimpleInlineRenderer/simpleInline'
 
 const props = defineProps<{
   node: {
@@ -74,6 +75,35 @@ const shouldRender = ref(typeof window === 'undefined')
 const renderContent = ref(props.node.content)
 const structuredChildren = computed(() => Array.isArray(props.node.children) ? props.node.children : [])
 const structuredTag = computed(() => String(props.node.tag || 'div'))
+const detailsSummaryNode = computed(() => {
+  if (structuredTag.value.trim().toLowerCase() !== 'details')
+    return null
+  if (props.node.attrs?.some(([name]) => String(name).toLowerCase() === 'open'))
+    return null
+
+  const first = structuredChildren.value[0]
+  return first?.type === 'html_block' && String(first.tag || '').toLowerCase() === 'summary'
+    ? first
+    : null
+})
+const detailsSummaryText = computed(() => getPlainTextContent(detailsSummaryNode.value?.children))
+const detailsSummaryAttrs = computed(() => {
+  const summary = detailsSummaryNode.value
+  if (!summary)
+    return undefined
+
+  const attrs = sanitizeHtmlTokenAttrs(summary.attrs, resolvedHtmlPolicy.value, 'summary')
+  if (!attrs)
+    return undefined
+
+  const record = tokenAttrsToRecord(attrs)
+  return Object.keys(record).length > 0 ? record : undefined
+})
+const structuredRenderChildren = computed(() => {
+  return detailsSummaryText.value == null
+    ? structuredChildren.value
+    : structuredChildren.value.slice(1)
+})
 const isBlockedStructuredTag = computed(() => {
   const tag = structuredTag.value.trim().toLowerCase()
   return NON_STRUCTURING_HTML_TAGS.has(tag) || isHtmlTagBlocked(tag, resolvedHtmlPolicy.value)
@@ -193,14 +223,29 @@ onBeforeUnmount(() => {
     v-bind="isStructured ? structuredBoundAttrs : undefined"
   >
     <template v-if="shouldRender">
-      <StructuredNodeRenderer
-        v-if="renderMode.mode === 'structured'"
-        v-bind="nestedRendererProps"
-        :nodes="structuredChildren"
-        :batch-rendering="false"
-        :defer-nodes-until-visible="false"
-        :render-as-fragment="true"
-      />
+      <template v-if="renderMode.mode === 'structured'">
+        <template v-if="detailsSummaryText !== null">
+          <summary v-bind="detailsSummaryAttrs">
+            {{ detailsSummaryText }}
+          </summary>
+          <StructuredNodeRenderer
+            v-if="structuredRenderChildren.length"
+            v-bind="nestedRendererProps"
+            :nodes="structuredRenderChildren"
+            :batch-rendering="false"
+            :defer-nodes-until-visible="false"
+            :render-as-fragment="true"
+          />
+        </template>
+        <StructuredNodeRenderer
+          v-else
+          v-bind="nestedRendererProps"
+          :nodes="structuredChildren"
+          :batch-rendering="false"
+          :defer-nodes-until-visible="false"
+          :render-as-fragment="true"
+        />
+      </template>
       <!-- Use dynamic rendering for custom components -->
       <DynamicRenderer v-else-if="renderMode.mode === 'dynamic'" :nodes="renderMode.nodes" />
       <pre v-else-if="renderMode.mode === 'text'" class="html-block-node__raw">{{ renderMode.content }}</pre>

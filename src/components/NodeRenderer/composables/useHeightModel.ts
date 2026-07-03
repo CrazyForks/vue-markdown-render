@@ -31,6 +31,7 @@ export interface HeightModelOptions {
   heightEstimationActive: ComputedRef<boolean>
   estimatedNodeHeights: ComputedRef<readonly (EstimatedNodeHeight | null)[]>
   getContainerWidth: () => number
+  hasCustomParagraphComponent?: () => boolean
   getPrefixCacheKeyParts: () => readonly unknown[]
   fenwickRangeSum: (tree: number[], start: number, end: number) => number
 }
@@ -42,11 +43,34 @@ export interface BuildVirtualHeightSummaryOptions {
 }
 
 type HeightFallbackNode = ParsedNode & {
+  code?: unknown
+  header?: { cells?: unknown[] }
   content?: string
+  level?: unknown
+  depth?: unknown
   rows?: unknown[]
   children?: unknown[]
   items?: unknown[]
+  cells?: unknown[]
+  text?: string
 }
+
+const TEXT_LIKE_PARAGRAPH_LEAF_TYPES = new Set([
+  'text',
+  'inline_code',
+  'emoji',
+  'footnote_reference',
+])
+const TEXT_LIKE_PARAGRAPH_CONTAINER_TYPES = new Set([
+  'strong',
+  'emphasis',
+  'strikethrough',
+  'highlight',
+  'insert',
+  'subscript',
+  'superscript',
+  'link',
+])
 
 export function getHeightCacheWidthBucket(width: unknown) {
   const numeric = Number(width)
@@ -74,6 +98,203 @@ export function estimateTextFallbackHeight(
   return Math.max(minHeight, Math.ceil(lines * lineHeight + 12))
 }
 
+function estimateParagraphFallbackHeight(text: string, width: number) {
+  const source = String(text ?? '')
+  if (!source)
+    return 28
+
+  const charsPerLine = Math.max(18, Math.floor(Math.max(320, width) / 8))
+  const hardLines = source.split(/\r?\n/).length
+  const softLines = Math.ceil(source.length / charsPerLine)
+  const lines = Math.max(1, hardLines, softLines)
+  if (lines <= 1)
+    return 28
+
+  return estimateTextFallbackHeight(source, width, 34)
+}
+
+function estimateHtmlBlockFallbackHeight(raw: string, width: number) {
+  const details = raw.match(/^\s*<details\b([^>]*)>/i)
+  if (details && !/\bopen(?:\s|=|$)/i.test(details[1] ?? '')) {
+    const summary = raw.match(/<summary\b[^>]*>([\s\S]*?)<\/summary>/i)?.[1]
+      ?.replace(/<[^>]*>/g, '')
+      .trim()
+    return estimateTextFallbackHeight(summary || 'Details', width, 28, 28)
+  }
+
+  return estimateTextFallbackHeight(raw, width, 96)
+}
+
+function estimateHeadingFallbackHeight(node: HeightFallbackNode) {
+  const level = Number(node.level ?? node.depth)
+  if (level >= 4)
+    return 20
+  if (level === 3)
+    return 30
+  if (level === 2)
+    return 32
+  return 44
+}
+
+function isTextLikeParagraphFallbackChild(value: unknown): boolean {
+  if (!value || typeof value !== 'object')
+    return false
+
+  const node = value as HeightFallbackNode
+  const type = String(node.type ?? '')
+  if (TEXT_LIKE_PARAGRAPH_LEAF_TYPES.has(type))
+    return true
+  if (!TEXT_LIKE_PARAGRAPH_CONTAINER_TYPES.has(type))
+    return false
+
+  const children = node.children
+  if (!Array.isArray(children) || !children.length)
+    return true
+
+  return children.every(isTextLikeParagraphFallbackChild)
+}
+
+function canTrustParagraphStaticFallback(node: HeightFallbackNode, hasCustomParagraphComponent: boolean) {
+  if (hasCustomParagraphComponent)
+    return false
+
+  const children = node.children
+  if (!Array.isArray(children) || !children.length)
+    return true
+
+  return children.every(isTextLikeParagraphFallbackChild)
+}
+
+function shouldSkipCustomParagraphEstimate(
+  type: string | undefined,
+  estimate: EstimatedNodeHeight | null | undefined,
+  hasCustomParagraphComponent: boolean,
+) {
+  return Boolean(
+    hasCustomParagraphComponent
+    && estimate?.kind === 'simple-text'
+    && (type === 'paragraph' || type === 'list_item' || type === 'list'),
+  )
+}
+
+function extractVisibleFallbackText(value: unknown): string {
+  if (!value || typeof value !== 'object')
+    return ''
+
+  const node = value as HeightFallbackNode
+  const type = String(node.type ?? '')
+  if (type === 'text')
+    return String(node.content ?? node.raw ?? '')
+  if (type === 'inline_code')
+    return String(node.code ?? node.content ?? node.raw ?? '')
+  if (type === 'emoji')
+    return String((node as HeightFallbackNode & { name?: unknown }).name ?? node.raw ?? '')
+  if (typeof node.text === 'string')
+    return node.text
+
+  const parts: string[] = []
+  for (const key of ['children', 'items', 'cells', 'rows'] as const) {
+    const child = node[key]
+    if (Array.isArray(child)) {
+      const text = child.map(extractVisibleFallbackText).filter(Boolean).join(' ')
+      if (text)
+        parts.push(text)
+    }
+  }
+
+  return parts.join(' ').replace(/\s+/g, ' ').trim()
+}
+
+function containsInlineCodeFallback(value: unknown): boolean {
+  if (!value || typeof value !== 'object')
+    return false
+
+  const node = value as HeightFallbackNode
+  if (node.type === 'inline_code')
+    return true
+
+  return (['children', 'items', 'cells', 'rows'] as const).some((key) => {
+    const child = node[key]
+    return Array.isArray(child) && child.some(containsInlineCodeFallback)
+  })
+}
+
+function estimateListItemFallbackHeight(text: string, width: number) {
+  if (!text)
+    return 30
+
+  const charsPerLine = Math.max(18, Math.floor(Math.max(320, width) / 8))
+  const hardLines = text.split(/\r?\n/).length
+  const softLines = Math.ceil(text.length / charsPerLine)
+  const lines = Math.max(1, hardLines, softLines)
+
+  return 30 + Math.max(0, lines - 1) * 26
+}
+
+function estimateListFallbackHeight(node: HeightFallbackNode, width: number) {
+  const items = Array.isArray(node.items) ? node.items : []
+  if (!items.length)
+    return 48
+
+  const baseHeight = Math.max(48, items.length * 30 + 12)
+  let textHeight = 12
+  for (const item of items) {
+    const text = extractVisibleFallbackText(item) || String((item as HeightFallbackNode).raw ?? '')
+    textHeight += estimateListItemFallbackHeight(text, width)
+  }
+
+  const wrappedExtra = Math.max(0, textHeight - baseHeight)
+  if (items.length > 20) {
+    const longListExtra = Math.round(items.length * 2.4)
+    return Math.round(baseHeight + Math.max(longListExtra, Math.min(wrappedExtra, items.length * 3)))
+  }
+
+  if (wrappedExtra <= 0)
+    return baseHeight
+
+  const maxExtra = items.length > 8
+    ? items.length * 8
+    : wrappedExtra
+
+  return Math.round(baseHeight + Math.min(wrappedExtra, maxExtra))
+}
+
+function getTableRowCells(row: unknown) {
+  return Array.isArray((row as HeightFallbackNode | undefined)?.cells)
+    ? ((row as HeightFallbackNode).cells ?? [])
+    : []
+}
+
+function estimateTableRowFallbackHeight(cells: unknown[], width: number) {
+  const columnCount = Math.max(1, cells.length)
+  const cellWidth = Math.max(80, (width - 32) / columnCount)
+  const charsPerLine = Math.max(10, Math.floor(cellWidth / 8))
+  const maxLines = Math.max(1, ...cells.map((cell) => {
+    const text = extractVisibleFallbackText(cell) || String((cell as HeightFallbackNode | undefined)?.raw ?? '')
+    return Math.ceil(text.length / charsPerLine) || 1
+  }))
+
+  return 54 + Math.max(0, maxLines - 1) * 34 + (columnCount <= 3 && cells.some(containsInlineCodeFallback) ? 14 : 0)
+}
+
+function estimateTableFallbackHeight(node: HeightFallbackNode, width: number) {
+  const rows: unknown[] = [
+    ...(node.header ? [node.header] : []),
+    ...(Array.isArray(node.rows) ? node.rows : []),
+  ]
+  if (!rows.length) {
+    const rowCount = Array.isArray(node.children) ? node.children.length : 3
+    return Math.max(120, rowCount * 38 + 48)
+  }
+
+  return Math.max(
+    120,
+    Math.round(4 + rows.reduce<number>((total, row) => {
+      return total + estimateTableRowFallbackHeight(getTableRowCells(row), width)
+    }, 0)),
+  )
+}
+
 export function estimateStaticNodeHeightFallback(node: ParsedNode | undefined, width: number) {
   if (!node || typeof node !== 'object')
     return 32
@@ -84,18 +305,16 @@ export function estimateStaticNodeHeightFallback(node: ParsedNode | undefined, w
 
   switch (type) {
     case 'heading':
-      return 44
+      return estimateHeadingFallbackHeight(fallbackNode)
 
     case 'paragraph':
-      return estimateTextFallbackHeight(
+      return estimateParagraphFallbackHeight(
         String(fallbackNode.raw ?? fallbackNode.content ?? ''),
         fallbackWidth,
-        34,
       )
 
     case 'list': {
-      const items = Array.isArray(fallbackNode.items) ? fallbackNode.items.length : 1
-      return Math.max(48, items * 30 + 12)
+      return estimateListFallbackHeight(fallbackNode, fallbackWidth)
     }
 
     case 'list_item':
@@ -113,12 +332,7 @@ export function estimateStaticNodeHeightFallback(node: ParsedNode | undefined, w
       )
 
     case 'table': {
-      const rowCount = Array.isArray(fallbackNode.rows)
-        ? fallbackNode.rows.length
-        : Array.isArray(fallbackNode.children)
-          ? fallbackNode.children.length
-          : 3
-      return Math.max(120, rowCount * 38 + 48)
+      return estimateTableFallbackHeight(fallbackNode, fallbackWidth)
     }
 
     case 'code_block':
@@ -138,10 +352,9 @@ export function estimateStaticNodeHeightFallback(node: ParsedNode | undefined, w
     case 'admonition':
     case 'vmr_container':
     case 'html_block':
-      return estimateTextFallbackHeight(
+      return estimateHtmlBlockFallbackHeight(
         String(fallbackNode.raw ?? fallbackNode.content ?? ''),
         fallbackWidth,
-        96,
       )
 
     case 'thematic_break':
@@ -170,17 +383,38 @@ export function useHeightModel(options: HeightModelOptions) {
     if (Number.isFinite(measured) && measured > 0)
       return measured
 
-    const estimated = options.estimatedNodeHeights.value[index]?.height
-    if (Number.isFinite(estimated) && estimated > 0)
+    const node = options.parsedNodes.value[index]
+    const type = (node as HeightFallbackNode | undefined)?.type
+    const hasCustomParagraphComponent = Boolean(options.hasCustomParagraphComponent?.())
+    const estimate = options.estimatedNodeHeights.value[index]
+    const estimated = estimate?.height
+    if (
+      !shouldSkipCustomParagraphEstimate(type, estimate, hasCustomParagraphComponent)
+      && Number.isFinite(estimated)
+      && estimated > 0
+    ) {
       return estimated
+    }
 
-    return Math.max(
-      options.averageNodeHeight.value,
-      estimateStaticNodeHeightFallback(
-        options.parsedNodes.value[index],
-        options.getContainerWidth() || 640,
-      ),
+    const staticHeight = estimateStaticNodeHeightFallback(
+      node,
+      options.getContainerWidth() || 640,
     )
+    if (
+      type === 'heading'
+      || (
+        type === 'paragraph'
+        && staticHeight <= 28
+        && canTrustParagraphStaticFallback(
+          node as HeightFallbackNode,
+          hasCustomParagraphComponent,
+        )
+      )
+    ) {
+      return staticHeight
+    }
+
+    return Math.max(options.averageNodeHeight.value, staticHeight)
   }
 
   function getFallbackHeightPrefix() {

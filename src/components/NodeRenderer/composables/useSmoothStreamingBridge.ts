@@ -6,6 +6,14 @@ import { isTypewriterEnabled } from '../../../utils/typewriter'
 
 type RendererParseOptions = NonNullable<NodeRendererProps['parseOptions']>
 
+const DEFAULT_RENDERER_SMOOTH_STREAMING_OPTIONS = {
+  maxCharsPerSecond: 1800,
+  maxCommitFps: 30,
+  maxCharsPerCommit: 96,
+  catchUpLatencyMs: 220,
+  catchUpThreshold: 400,
+}
+
 export interface SmoothStreamingBridgeOptions {
   isClient: boolean
   inheritedSmoothStreaming?: { value?: boolean }
@@ -24,7 +32,10 @@ export function useSmoothStreamingBridge(
   props: Readonly<NodeRendererProps>,
   options: SmoothStreamingBridgeOptions,
 ): SmoothStreamingBridge {
-  const smoothStream = useSmoothMarkdownStream(props.smoothStreamingOptions)
+  const smoothStream = useSmoothMarkdownStream({
+    ...DEFAULT_RENDERER_SMOOTH_STREAMING_OPTIONS,
+    ...props.smoothStreamingOptions,
+  })
 
   const smoothStreamingEligible = computed(() => {
     if (props.smoothStreaming === false)

@@ -716,10 +716,6 @@ const textEstimationEnabled = computed(() => {
   return heightEstimationActive.value
     && heightExperimentConfig.value?.textEstimation !== false
 })
-const codeBlockEstimationEnabled = computed(() => {
-  return heightEstimationActive.value
-    && heightExperimentConfig.value?.codeBlockEstimation !== false
-})
 function getMeasuredContainerWidth() {
   const width = experimentContainerWidth.value || readLayout(
     'getMeasuredContainerWidth.clientWidth',
@@ -781,6 +777,7 @@ const {
 } = useSchedulerPlatform({
   isClient,
 })
+const forceFullRenderFinalContent = computed(() => effectiveFinal.value === true && !virtualScrollRequested.value)
 const {
   resolvedBatchSize,
   resolvedInitialBatch,
@@ -794,6 +791,7 @@ const {
   isClient,
   isTestEnv,
   renderAsFragment,
+  forceFullRenderFinalContent,
 })
 const incrementalRenderingDomRequired = computed(() => {
   return !renderAsFragment.value
@@ -801,6 +799,13 @@ const incrementalRenderingDomRequired = computed(() => {
     && resolvedBatchSize.value > 0
     && !isTestEnv
     && (rendererProps.maxLiveNodes ?? 0) <= 0
+    && !forceFullRenderFinalContent.value
+})
+const placeholderHeightEstimationActive = computed(() => incrementalRenderingDomRequired.value)
+const nodeHeightEstimationActive = computed(() => heightEstimationActive.value || placeholderHeightEstimationActive.value)
+const codeBlockEstimationEnabled = computed(() => {
+  return nodeHeightEstimationActive.value
+    && heightExperimentConfig.value?.codeBlockEstimation !== false
 })
 const nodeSlotElements = new Map<number, HTMLElement | null>()
 const nodeContentResizeObserverTargets = new Map<number, HTMLElement>()
@@ -1564,11 +1569,22 @@ function resolveCodeBlockShowHeader() {
   return showHeader !== false
 }
 
+function isParagraphTextEstimateAffectedByCustomComponent(node: ParsedNode) {
+  if (!customComponentsMap.value.paragraph)
+    return false
+
+  return node.type === 'paragraph' || node.type === 'list_item' || node.type === 'list'
+}
+
 function estimateNodeHeight(node: ParsedNode, index: number, width: number) {
   const measuredHeight = nodeHeights[index]
   const hasMeasuredHeight = typeof measuredHeight === 'number' && measuredHeight > 0
 
-  if (textEstimationEnabled.value && !hasMeasuredHeight) {
+  if (
+    textEstimationEnabled.value
+    && !hasMeasuredHeight
+    && !isParagraphTextEstimateAffectedByCustomComponent(node)
+  ) {
     const estimatedText = estimateSimpleTextBlockHeight(node, width, simpleTextProbeProfile.value)
     if (estimatedText)
       return estimatedText
@@ -1614,7 +1630,7 @@ watchEffect(() => {
 
   const nodes = parsedNodes.value
   const parserRevision = getParsedNodesRevision()
-  if (!nodes.length || !heightEstimationActive.value) {
+  if (!nodes.length || !nodeHeightEstimationActive.value) {
     estimatedNodeHeightsCache = []
     estimatedNodeHeightsContext = []
     estimatedNodeHeightsParserRevision = -1
@@ -1672,6 +1688,7 @@ heightModel = useHeightModel({
   heightEstimationActive,
   estimatedNodeHeights,
   getContainerWidth: getMeasuredContainerWidth,
+  hasCustomParagraphComponent: () => Boolean(customComponentsMap.value.paragraph),
   getPrefixCacheKeyParts: () => {
     const width = experimentContainerWidth.value || readLayout('getFallbackHeightPrefix.clientWidth', () => containerRef.value?.clientWidth || 0)
     const widthBucket = getHeightCacheWidthBucket(width)
@@ -1689,6 +1706,7 @@ heightModel = useHeightModel({
       heightEstimationActive.value ? 1 : 0,
       heightEstimationExperimentRevision.value,
       streamRenderVersion.value,
+      customComponentsMap.value.paragraph ? 1 : 0,
     ]
   },
   fenwickRangeSum,
@@ -5317,7 +5335,7 @@ const renderedItems = computed(() => {
       && component === PreCodeNode
       && !getCustomCodeLanguageComponent(customComponentsMap.value, language)
     let bindings = { ...getBindingsFor(node, language, component) } as Record<string, unknown>
-    const estimatedHeight = estimatedNodeHeights.value[item.index]
+    const estimatedHeight = heightEstimationActive.value ? estimatedNodeHeights.value[item.index] : null
     if (node.type === 'code_block' && estimatedHeight?.kind === 'code-block') {
       if (usesPreCodeBindings) {
         bindings = {

@@ -1337,6 +1337,14 @@ function structureGenericHtmlBlockChildren(
   })
 }
 
+function hasTopLevelHtmlBlock(nodes: ParsedNode[]) {
+  for (const node of nodes) {
+    if (node?.type === 'html_block')
+      return true
+  }
+  return false
+}
+
 function parseDetailsFragmentChildren(
   fragment: string,
   md: MarkdownIt,
@@ -3084,9 +3092,11 @@ export function parseMarkdownToStructure(
     }
   }
 
-  result = mergeSplitTopLevelHtmlBlocks(result, isFinal, safeMarkdown, internalOptions)
-  result = combineStructuredDetailsHtmlBlocks(result, safeMarkdown, md, internalOptions, isFinal)[0]
-  result = structureGenericHtmlBlockChildren(result, md, internalOptions, isFinal)
+  if (hasTopLevelHtmlBlock(result)) {
+    result = mergeSplitTopLevelHtmlBlocks(result, isFinal, safeMarkdown, internalOptions)
+    result = combineStructuredDetailsHtmlBlocks(result, safeMarkdown, md, internalOptions, isFinal)[0]
+    result = structureGenericHtmlBlockChildren(result, md, internalOptions, isFinal)
+  }
 
   if (isFinal) {
     const seen = new WeakSet<object>()

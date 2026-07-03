@@ -214,6 +214,59 @@ describe('node renderer smooth streaming', () => {
     wrapper.unmount()
   })
 
+  it('uses faster renderer defaults while preserving explicit smooth streaming options', async () => {
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    async function renderedLengthAfterFrames(smoothStreamingOptions?: Record<string, number>) {
+      const wrapper = mount(NodeRenderer, {
+        props: {
+          content: '',
+          typewriter: true,
+          smoothStreaming: true,
+          smoothStreamingOptions,
+          batchRendering: false,
+          viewportPriority: false,
+          deferNodesUntilVisible: false,
+        },
+      })
+
+      await nextTick()
+      queuedFrames.length = 0
+      await wrapper.setProps({ content: 'x'.repeat(2200) })
+      await nextTick()
+
+      const baseline = performance.now()
+      for (let step = 1; step <= 24 && queuedFrames.length > 0; step++) {
+        queuedFrames.shift()?.(baseline + step * 40)
+        await nextTick()
+      }
+
+      const length = wrapper.text().length
+      wrapper.unmount()
+      queuedFrames.length = 0
+      return length
+    }
+
+    const defaultLength = await renderedLengthAfterFrames()
+    const partialOverrideLength = await renderedLengthAfterFrames({
+      maxCharsPerCommit: 80,
+    })
+    const explicitLength = await renderedLengthAfterFrames({
+      maxCharsPerSecond: 1000,
+      maxCharsPerCommit: 80,
+      catchUpLatencyMs: 350,
+      catchUpThreshold: 600,
+    })
+
+    expect(defaultLength).toBeGreaterThan(explicitLength)
+    expect(partialOverrideLength).toBeGreaterThan(explicitLength)
+  })
+
   it('smoothStreaming="auto" does not enable without typewriter or maxLiveNodes<=0', async () => {
     const wrapper = mount(NodeRenderer, {
       props: {

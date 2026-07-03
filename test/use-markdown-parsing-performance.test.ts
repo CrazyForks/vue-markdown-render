@@ -1,6 +1,6 @@
 import type { Ref } from 'vue'
 import type { NodeRendererProps } from '../src/types/node-renderer-props'
-import { getMarkdown, parseMarkdownToStructure } from 'stream-markdown-parser'
+import { clearRegisteredMarkdownPlugins, getMarkdown, parseMarkdownToStructure, registerMarkdownPlugin } from 'stream-markdown-parser'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { computed, effectScope, reactive, ref, watch } from 'vue'
 import { useMarkdownParsing } from '../src/components/NodeRenderer/composables/useMarkdownParsing'
@@ -107,6 +107,7 @@ function createFootnoteAndAdmonitionTokens(text: string) {
 
 describe('useMarkdownParsing performance behavior', () => {
   afterEach(() => {
+    clearRegisteredMarkdownPlugins()
     vi.useRealTimers()
     vi.restoreAllMocks()
   })
@@ -1093,6 +1094,260 @@ describe('useMarkdownParsing performance behavior', () => {
       stablePrefixNodeCount: 6,
       dirtyTailNodeCount: 1,
       primeSignatureCallCount: 1,
+    })
+
+    scope.stop()
+  })
+
+  it('skips repeated signature scans for a previously stable append prefix', () => {
+    const content = ref(buildParagraphs(20))
+    const logPerf = vi.fn()
+    const { scope, state } = createParsingState(content, ref(false), {}, ref(true), logPerf)
+
+    expect(state.parsedNodes.value.length).toBe(20)
+
+    content.value = `${content.value}\n\nFirst appended paragraph.`
+    expect(state.parsedNodes.value.length).toBe(21)
+
+    const firstAppendData = logPerf.mock.calls.at(-1)?.[1]
+    expect(firstAppendData).toMatchObject({
+      dirtyStartIndex: 20,
+      stablePrefixNodeCount: 20,
+    })
+
+    logPerf.mockClear()
+    content.value = `${content.value}\n\nSecond appended paragraph.`
+    expect(state.parsedNodes.value.length).toBe(22)
+
+    const secondAppendData = logPerf.mock.calls.at(-1)?.[1]
+    expect(secondAppendData).toMatchObject({
+      dirtyStartIndex: 21,
+      stablePrefixNodeCount: 21,
+    })
+    expect(secondAppendData?.stabilizeSignatureCallCount).toBeLessThanOrEqual(2)
+
+    scope.stop()
+  })
+
+  it('does not skip prefix scans when appended reference definitions can affect earlier nodes', () => {
+    const content = ref('[foo][bar]\n\nstable tail')
+    const logPerf = vi.fn()
+    const { scope, state } = createParsingState(content, ref(false), {}, ref(true), logPerf)
+
+    const firstParagraph = state.parsedNodes.value[0]
+    expect(paragraphChildren(firstParagraph).some(child => child.type === 'link')).toBe(false)
+
+    content.value = `${content.value}\n\nappend`
+    expect(state.parsedNodes.value.at(-1)?.raw).toBe('append')
+
+    logPerf.mockClear()
+    content.value = `${content.value}\n\n[bar]: https://example.com\n`
+    const secondParagraph = state.parsedNodes.value[0]
+    const data = logPerf.mock.calls.at(-1)?.[1]
+
+    expect(secondParagraph).not.toBe(firstParagraph)
+    expect(paragraphChildren(secondParagraph).some(child => child.type === 'link')).toBe(true)
+    expect(data).toMatchObject({
+      dirtyStartIndex: 0,
+      stablePrefixNodeCount: 0,
+    })
+
+    scope.stop()
+  })
+
+  it('does not skip prefix scans when escaped reference definitions can affect earlier nodes', () => {
+    const content = ref('[x][foo\\]bar]\n\nstable tail')
+    const logPerf = vi.fn()
+    const { scope, state } = createParsingState(content, ref(false), {}, ref(true), logPerf)
+
+    const firstParagraph = state.parsedNodes.value[0]
+    expect(paragraphChildren(firstParagraph).some(child => child.type === 'link')).toBe(false)
+
+    content.value = `${content.value}\n\nappend`
+    expect(state.parsedNodes.value.at(-1)?.raw).toBe('append')
+
+    logPerf.mockClear()
+    content.value = `${content.value}\n\n[foo\\]bar]: https://example.com\n`
+    const secondParagraph = state.parsedNodes.value[0]
+    const data = logPerf.mock.calls.at(-1)?.[1]
+
+    expect(secondParagraph).not.toBe(firstParagraph)
+    expect(paragraphChildren(secondParagraph).some(child => child.type === 'link')).toBe(true)
+    expect(data).toMatchObject({
+      dirtyStartIndex: 0,
+      stablePrefixNodeCount: 0,
+    })
+
+    scope.stop()
+  })
+
+  it('does not skip prefix scans when multiline reference definitions can affect earlier nodes', () => {
+    const content = ref('[x][foo bar]\n\nstable tail')
+    const logPerf = vi.fn()
+    const { scope, state } = createParsingState(content, ref(false), {
+      parseOptions: {
+        streamParse: false,
+      },
+    }, ref(true), logPerf)
+
+    const firstParagraph = state.parsedNodes.value[0]
+    expect(paragraphChildren(firstParagraph).some(child => child.type === 'link')).toBe(false)
+
+    content.value = `${content.value}\n\nappend`
+    expect(state.parsedNodes.value.at(-1)?.raw).toBe('append')
+
+    logPerf.mockClear()
+    content.value = `${content.value}\n\n[foo\nbar]: https://example.com\n`
+    const secondParagraph = state.parsedNodes.value[0]
+    const data = logPerf.mock.calls.at(-1)?.[1]
+
+    expect(secondParagraph).not.toBe(firstParagraph)
+    expect(paragraphChildren(secondParagraph).some(child => child.type === 'link')).toBe(true)
+    expect(data).toMatchObject({
+      dirtyStartIndex: 0,
+      stablePrefixNodeCount: 0,
+    })
+
+    scope.stop()
+  })
+
+  it('does not skip prefix scans when an append completes a pending reference definition', () => {
+    for (const [partialDefinition, completion] of [
+      ['[bar]: <https://example.com', '>'],
+      [`[bar]:${' '.repeat(5000)}`, 'https://example.com'],
+    ]) {
+      const content = ref('[foo][bar]\n\nstable tail')
+      const logPerf = vi.fn()
+      const { scope, state } = createParsingState(content, ref(false), {
+        parseOptions: {
+          streamParse: false,
+        },
+      }, ref(true), logPerf)
+
+      const firstParagraph = state.parsedNodes.value[0]
+      expect(paragraphChildren(firstParagraph).some(child => child.type === 'link')).toBe(false)
+
+      content.value = `${content.value}\n\n${partialDefinition}`
+      expect(paragraphChildren(state.parsedNodes.value[0]).some(child => child.type === 'link')).toBe(false)
+
+      logPerf.mockClear()
+      content.value = `${content.value}${completion}`
+      const secondParagraph = state.parsedNodes.value[0]
+      const data = logPerf.mock.calls.at(-1)?.[1]
+
+      expect(secondParagraph).not.toBe(firstParagraph)
+      expect(paragraphChildren(secondParagraph).some(child => child.type === 'link')).toBe(true)
+      expect(data).toMatchObject({
+        dirtyStartIndex: 0,
+        stablePrefixNodeCount: 0,
+      })
+
+      scope.stop()
+    }
+  })
+
+  it('does not skip prefix scans when container reference definitions can affect earlier nodes', () => {
+    for (const definition of [
+      '> [bar]: https://example.com',
+      '- [bar]: https://example.com',
+      '1. [bar]: https://example.com',
+    ]) {
+      const content = ref('[foo][bar]\n\nstable tail')
+      const logPerf = vi.fn()
+      const { scope, state } = createParsingState(content, ref(false), {
+        parseOptions: {
+          streamParse: false,
+        },
+      }, ref(true), logPerf)
+
+      const firstParagraph = state.parsedNodes.value[0]
+      expect(paragraphChildren(firstParagraph).some(child => child.type === 'link')).toBe(false)
+
+      content.value = `${content.value}\n\nappend`
+      expect(state.parsedNodes.value.at(-1)?.raw).toBe('append')
+
+      logPerf.mockClear()
+      content.value = `${content.value}\n\n${definition}\n`
+      const secondParagraph = state.parsedNodes.value[0]
+      const data = logPerf.mock.calls.at(-1)?.[1]
+
+      expect(secondParagraph).not.toBe(firstParagraph)
+      expect(paragraphChildren(secondParagraph).some(child => child.type === 'link')).toBe(true)
+      expect(data).toMatchObject({
+        dirtyStartIndex: 0,
+        stablePrefixNodeCount: 0,
+      })
+
+      scope.stop()
+    }
+  })
+
+  it('does not skip prefix scans when final parsing can change earlier nodes', () => {
+    const content = ref('alpha *open\n\nstable tail')
+    const logPerf = vi.fn()
+    const { final, scope, state } = createParsingState(content, ref(false), {}, ref(true), logPerf)
+
+    const firstParagraph = state.parsedNodes.value[0]
+    expect(paragraphChildren(firstParagraph).some(child => child.type === 'emphasis')).toBe(true)
+
+    content.value = `${content.value}\n\nappend`
+    expect(state.parsedNodes.value.at(-1)?.raw).toBe('append')
+
+    logPerf.mockClear()
+    final.value = true
+    const secondParagraph = state.parsedNodes.value[0]
+    const data = logPerf.mock.calls.at(-1)?.[1]
+
+    expect(secondParagraph).not.toBe(firstParagraph)
+    expect(paragraphChildren(secondParagraph).some(child => child.type === 'emphasis')).toBe(false)
+    expect(data).toMatchObject({
+      dirtyStartIndex: 0,
+      stablePrefixNodeCount: 0,
+    })
+
+    scope.stop()
+  })
+
+  it('does not skip prefix scans when registered markdown plugins can affect earlier nodes', () => {
+    registerMarkdownPlugin((md: any) => {
+      md.core.ruler.push('test_global_prefix_mutation', (parserState: any) => {
+        if (!String(parserState.src ?? '').includes('mutate-prefix'))
+          return
+
+        for (const token of parserState.tokens ?? []) {
+          if (token.type === 'inline' && token.content === 'alpha') {
+            token.content = 'alpha changed'
+            token.children = [{ type: 'text', content: 'alpha changed' }]
+            break
+          }
+        }
+      })
+    })
+
+    const content = ref('alpha\n\nstable tail')
+    const logPerf = vi.fn()
+    const { scope, state } = createParsingState(content, ref(false), {
+      parseOptions: {
+        streamParse: false,
+      },
+    }, ref(true), logPerf)
+
+    const firstParagraph = state.parsedNodes.value[0]
+    expect(firstParagraph?.raw).toBe('alpha')
+
+    content.value = `${content.value}\n\nappend`
+    expect(state.parsedNodes.value.at(-1)?.raw).toBe('append')
+
+    logPerf.mockClear()
+    content.value = `${content.value}\n\nmutate-prefix`
+    const secondParagraph = state.parsedNodes.value[0]
+    const data = logPerf.mock.calls.at(-1)?.[1]
+
+    expect(secondParagraph).not.toBe(firstParagraph)
+    expect(secondParagraph?.raw).toBe('alpha changed')
+    expect(data).toMatchObject({
+      dirtyStartIndex: 0,
+      stablePrefixNodeCount: 0,
     })
 
     scope.stop()

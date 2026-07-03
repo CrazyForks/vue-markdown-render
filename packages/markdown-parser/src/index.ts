@@ -91,6 +91,7 @@ function makeSafeDomId(value: string) {
 export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: GetMarkdownOptions = {}) {
   // keep legacy behaviour but delegate to new factory and reapply project-specific rules
   const md = factory(options)
+  ;(md as unknown as Record<string, unknown>).__markstreamRegisteredPluginCount = _registeredMarkdownPlugins.length
 
   // Setup i18n translator function
   const defaultTranslations: Record<string, string> = {

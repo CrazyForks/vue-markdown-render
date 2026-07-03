@@ -13,6 +13,9 @@ const MARKET_TICKER_CONTEXT_SYMBOL_RE = /^(?=.{1,12}$)[A-Z0-9]+(?:[-.][A-Z0-9]+)
 const EXPLICIT_FILENAME_CONTEXT_RE = /文件名\s*[:：]?|附件\s*[:：]?|路径\s*[:：]?|路徑\s*[:：]?|文件列表\s*[:：]?|文档列表\s*[:：]?|文檔列表\s*[:：]?|\bfile\s*names?\b\s*[:：]?|\battachments?\b\s*[:：]?|\bpaths?\b\s*[:：]?|\bfile\s+lists?\b\s*[:：]?|\bdocument\s+lists?\b\s*[:：]?/iu
 const FILENAME_CONTEXT_RE = /文件名\s*[:：]?|文件\s*[:：]?|附件\s*[:：]?|档案\s*[:：]?|檔案\s*[:：]?|文档\s*[:：]?|文檔\s*[:：]?|资料\s*[:：]?|資料\s*[:：]?|路径\s*[:：]?|路徑\s*[:：]?|\bfile\s*name\b\s*[:：]?|\battachments?\b\s*[:：]?|\bfiles?\b\s*[:：]?|\bdocuments?\b\s*[:：]?|\bdocs?\b\s*[:：]?|\bpaths?\b\s*[:：]?/iu
 const MARKET_TICKER_CONTEXT_RE = /股票代码|股票代碼|证券代码|證券代碼|(?:代码|代碼|交易所|后缀|後綴|市场|市場)(?=$|[\s:：/|,，、()（）])|\btickers?\b|\bsymbols?\b|\bexchanges?\b/iu
+const LINKIFY_DEMOTION_CONTEXT_CACHE_LIMIT = 2000
+const LINKIFY_DEMOTION_CONTEXT_CACHE_MAX_TEXT_LENGTH = 512
+const EMPTY_LINKIFY_DEMOTION_CONTEXT: LinkifyDemotionContext = {}
 const AMBIGUOUS_BARE_DOMAIN_EXTENSIONS = new Set([
   'ai',
   'md',
@@ -144,6 +147,22 @@ export interface LinkifyDemotionContext {
   filename?: boolean
   explicitFilename?: boolean
   marketTicker?: boolean
+}
+
+const linkifyDemotionContextCache = new Map<string, LinkifyDemotionContext>()
+
+function rememberLinkifyDemotionContext(text: string, context: LinkifyDemotionContext) {
+  if (!text || text.length > LINKIFY_DEMOTION_CONTEXT_CACHE_MAX_TEXT_LENGTH)
+    return context
+
+  linkifyDemotionContextCache.set(text, context)
+  while (linkifyDemotionContextCache.size > LINKIFY_DEMOTION_CONTEXT_CACHE_LIMIT) {
+    const oldestKey = linkifyDemotionContextCache.keys().next().value
+    if (!oldestKey)
+      break
+    linkifyDemotionContextCache.delete(oldestKey)
+  }
+  return context
 }
 
 function hasLinkifyDemotionContext(context?: LinkifyDemotionContext) {
@@ -278,14 +297,65 @@ export function isDecodedFromRawPunycode(linkText: string, href: string, raw?: s
     && String(raw ?? '').toLowerCase().includes(authority.toLowerCase())
 }
 
+function mayContainLinkifyDemotionContext(text: string) {
+  if (!text)
+    return false
+
+  if (
+    text.includes('文件')
+    || text.includes('附件')
+    || text.includes('路径')
+    || text.includes('路徑')
+    || text.includes('文档')
+    || text.includes('文檔')
+    || text.includes('档案')
+    || text.includes('檔案')
+    || text.includes('资料')
+    || text.includes('資料')
+    || text.includes('股票')
+    || text.includes('证券')
+    || text.includes('證券')
+    || text.includes('代码')
+    || text.includes('代碼')
+    || text.includes('交易所')
+    || text.includes('后缀')
+    || text.includes('後綴')
+    || text.includes('市场')
+    || text.includes('市場')
+  ) {
+    return true
+  }
+
+  const lower = text.toLowerCase()
+  return lower.includes('file')
+    || lower.includes('attachment')
+    || lower.includes('document')
+    || lower.includes('doc')
+    || lower.includes('path')
+    || lower.includes('ticker')
+    || lower.includes('symbol')
+    || lower.includes('exchange')
+}
+
 export function inferLinkifyDemotionContext(contextText?: string): LinkifyDemotionContext {
   const text = String(contextText ?? '')
+  const cached = linkifyDemotionContextCache.get(text)
+  if (cached) {
+    linkifyDemotionContextCache.delete(text)
+    linkifyDemotionContextCache.set(text, cached)
+    return cached
+  }
+
+  if (!mayContainLinkifyDemotionContext(text))
+    return rememberLinkifyDemotionContext(text, EMPTY_LINKIFY_DEMOTION_CONTEXT)
+
   const explicitFilename = EXPLICIT_FILENAME_CONTEXT_RE.test(text)
-  return {
+  const context = {
     explicitFilename,
     filename: FILENAME_CONTEXT_RE.test(text),
     marketTicker: MARKET_TICKER_CONTEXT_RE.test(text),
   }
+  return rememberLinkifyDemotionContext(text, context)
 }
 
 function hasDomainAuthorityPrefix(text: string) {
