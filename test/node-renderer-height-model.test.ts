@@ -163,6 +163,16 @@ describe('useHeightModel', () => {
     expect(open).toBeGreaterThan(closed)
   })
 
+  it('does not treat data-open as an open details attribute', () => {
+    const hidden = 'hidden\n'.repeat(50)
+    const closed = estimateStaticNodeHeightFallback({
+      type: 'html_block',
+      raw: `<details data-open="false">\n<summary>Optional setup</summary>\n\n${hidden}</details>`,
+    } as ParsedNode, 640)
+
+    expect(closed).toBe(40)
+  })
+
   it('uses measured Fenwick trees for range and offset lookup when estimation is inactive', () => {
     const { measurements, model } = createModel({
       nodes: [

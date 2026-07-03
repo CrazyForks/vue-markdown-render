@@ -115,7 +115,7 @@ function estimateParagraphFallbackHeight(text: string, width: number) {
 
 function estimateHtmlBlockFallbackHeight(raw: string, width: number) {
   const details = raw.match(/^\s*<details\b([^>]*)>/i)
-  if (details && !/\bopen(?:\s|=|$)/i.test(details[1] ?? '')) {
+  if (details && !/(?:^|\s)open(?:\s|=|$)/i.test(details[1] ?? '')) {
     const summary = raw.match(/<summary\b[^>]*>([\s\S]*?)<\/summary>/i)?.[1]
       ?.replace(/<[^>]*>/g, '')
       .trim()
