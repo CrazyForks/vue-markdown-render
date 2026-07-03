@@ -1,7 +1,3 @@
-import './index.css'
-import './workers/katexRenderer.worker?worker'
-import './workers/mermaidParser.worker?worker'
-
 export { AdmonitionNodeComponent as AdmonitionNode } from './components/AdmonitionNode/AdmonitionNode.component'
 export { BlockquoteNodeComponent as BlockquoteNode } from './components/BlockquoteNode/BlockquoteNode.component'
 export { CheckboxNodeComponent as CheckboxNode } from './components/CheckboxNode/CheckboxNode.component'

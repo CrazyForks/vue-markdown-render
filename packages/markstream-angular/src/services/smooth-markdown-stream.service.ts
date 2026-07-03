@@ -1,9 +1,11 @@
 import type { OnDestroy } from '@angular/core'
 import type { SmoothMarkdownStreamOptions, SmoothMarkdownStreamSnapshot } from 'markstream-core'
+import { Injectable } from '@angular/core'
 import { createSmoothMarkdownStream } from 'markstream-core'
 
 export type { SmoothMarkdownStreamOptions }
 
+@Injectable()
 export class SmoothMarkdownStreamService implements OnDestroy {
   private controller: ReturnType<typeof createSmoothMarkdownStream> | null = null
   private snapshot: SmoothMarkdownStreamSnapshot = {

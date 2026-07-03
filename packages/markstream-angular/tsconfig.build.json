@@ -2,7 +2,12 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "declaration": true,
-    "emitDeclarationOnly": false
+    "emitDeclarationOnly": false,
+    "paths": {}
   },
-  "include": ["src/**/*.ts"]
+  "angularCompilerOptions": {
+    "compilationMode": "partial"
+  },
+  "files": ["src/index.ts"],
+  "exclude": ["src/**/*.worker.ts"]
 }
