@@ -90,7 +90,7 @@ Keep the default when scroll and height stability are more important than showin
 | **Where it operates** | String / content layer | DOM / visual layer |
 | **Best for** | Streaming / real-time token output | Static or history content |
 
-Enabling both simultaneously causes **visual flicker**: smooth-streaming updates `content` in small batches every frame (~30 fps), and each batch triggers a new fade animation on the delta text. Because the next batch arrives before the 280 ms animation finishes, the delta is snapped from ~8 % opacity to 100 % on every frame — producing a rapid flicker instead of a smooth fade.
+Enabling both simultaneously causes **visual flicker**: smooth-streaming updates `content` in small batches frequently (~20 fps by default), and each batch triggers a new fade animation on the delta text. Because the next batch arrives before the 280 ms animation finishes, the delta is snapped from ~8 % opacity to 100 % on every frame — producing a rapid flicker instead of a smooth fade.
 
 **Recommended combinations:**
 

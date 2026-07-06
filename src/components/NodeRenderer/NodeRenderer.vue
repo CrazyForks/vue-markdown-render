@@ -266,6 +266,8 @@ function emitRenderFinal(metrics: MarkstreamVirtualMetrics) {
 const MAX_DEFERRED_NODE_COUNT = 900
 const MAX_VIEWPORT_OBSERVER_TARGETS = 640
 const VIEWPORT_PRIORITY_RECOVERY_COUNT = 200
+const FINAL_RESTORE_AUTO_MAX_LIVE_NODES = 60
+const FINAL_RESTORE_AUTO_LIVE_NODE_BUFFER = 20
 const CONTENT_STREAMING_TAIL_IDLE_MS = 1200
 const BOTTOM_ANCHOR_CAPTURE_MAX_DISTANCE_PX = 160
 const BOTTOM_ANCHOR_SCROLL_ROOT_MAX_DISTANCE_PX = 64
@@ -384,6 +386,7 @@ const {
 const stableLayoutInitiallyFinal = requestedFinal.value === true
 provide('markstreamSmoothStreaming', smoothStreamingEnabled)
 const contentStreamingTailActive = ref(false)
+const hasObservedNonFinalContent = ref(false)
 let previousContentStreamValue = ''
 let hasSeenContentStreamValue = false
 let contentStreamingTailIdleTimer: number | null = null
@@ -417,16 +420,41 @@ function clearContentStreamingTailActive() {
 }
 
 watch(
-  [renderContent, () => props.nodes, effectiveFinal],
-  ([content, nodes, final]) => {
+  [() => rendererProps.indexKey, () => rendererProps.customId],
+  () => {
+    clearContentStreamingTailActive()
+    hasObservedNonFinalContent.value = !props.nodes?.length
+      && requestedFinal.value !== true
+      && Boolean(props.content)
+    previousContentStreamValue = renderContent.value ?? ''
+    hasSeenContentStreamValue = previousContentStreamValue.length > 0
+  },
+  { flush: 'sync' },
+)
+
+watch(
+  [() => props.content, () => props.nodes, requestedFinal],
+  ([content, nodes, finalRequested]) => {
+    if (!nodes?.length && finalRequested !== true && Boolean(content))
+      hasObservedNonFinalContent.value = true
+  },
+  { flush: 'sync', immediate: true },
+)
+
+watch(
+  [renderContent, () => props.nodes, requestedFinal],
+  ([content, nodes, finalRequested]) => {
     const nextContent = content ?? ''
 
-    if (nodes?.length || final === true) {
+    if (nodes?.length || finalRequested === true) {
       clearContentStreamingTailActive()
       previousContentStreamValue = nextContent
       hasSeenContentStreamValue = true
       return
     }
+
+    if (nextContent.length > 0)
+      hasObservedNonFinalContent.value = true
 
     if (!hasSeenContentStreamValue) {
       previousContentStreamValue = nextContent
@@ -728,13 +756,32 @@ const experimentProbeWidth = computed(() => {
   const measured = getMeasuredContainerWidth()
   return measured > 0 ? Math.max(1, Math.round(measured)) : 640
 })
-const maxLiveNodesResolved = computed(() => Math.max(1, rendererProps.maxLiveNodes ?? 320))
+const finalRestoreAutoVirtualEnabled = computed(() => {
+  return effectiveFinal.value === true
+    && !virtualScrollRequested.value
+    && (resolvedMode.value === 'chat' || resolvedMode.value === 'minimal')
+    && !hasOwnRendererProp('maxLiveNodes')
+    && !hasOwnRendererProp('liveNodeBuffer')
+    && !props.nodes?.length
+    && !hasObservedNonFinalContent.value
+    && (rendererProps.maxLiveNodes ?? 0) <= 0
+})
+const maxLiveNodesResolved = computed(() => {
+  if (finalRestoreAutoVirtualEnabled.value)
+    return FINAL_RESTORE_AUTO_MAX_LIVE_NODES
+  return Math.max(1, rendererProps.maxLiveNodes ?? 320)
+})
+const liveNodeBufferResolved = computed(() => {
+  if (finalRestoreAutoVirtualEnabled.value)
+    return FINAL_RESTORE_AUTO_LIVE_NODE_BUFFER
+  return Math.max(0, rendererProps.liveNodeBuffer ?? 60)
+})
 const virtualizationEnabled = computed(() => {
   if (renderAsFragment.value)
     return false
   if (rendererProps.nodeVirtual === false)
     return false
-  if ((rendererProps.maxLiveNodes ?? 0) <= 0)
+  if ((rendererProps.maxLiveNodes ?? 0) <= 0 && !finalRestoreAutoVirtualEnabled.value)
     return false
   if (rendererProps.nodeVirtual === true)
     return parsedNodes.value.length > 0
@@ -1088,7 +1135,6 @@ const stableLayoutDomEnabled = computed(() => {
 const shouldObserveSlots = computed(() => !!registerNodeVisibility && (deferNodes.value || virtualizationEnabled.value))
 const scrollListenerEnabled = computed(() => virtualizationEnabled.value || virtualScrollEnabled.value)
 const {
-  liveNodeBufferResolved,
   focusIndex,
   liveRange,
   updateLiveRange,
@@ -1096,6 +1142,7 @@ const {
   parsedNodeCount,
   virtualizationEnabled,
   maxLiveNodesResolved,
+  liveNodeBufferResolved,
   clamp,
 })
 const nodeContentElements = new Map<number, HTMLElement | null>()

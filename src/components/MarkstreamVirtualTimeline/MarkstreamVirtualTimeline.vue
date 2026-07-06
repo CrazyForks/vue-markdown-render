@@ -48,6 +48,8 @@ const emit = defineEmits<{
 
 const TIMELINE_MARKDOWN_EMIT_INTERVAL_MS = 96
 const TIMELINE_MARKDOWN_HEIGHT_DIFF_THRESHOLD_PX = 4
+const TIMELINE_MARKDOWN_MAX_LIVE_NODES = 60
+const TIMELINE_MARKDOWN_LIVE_NODE_BUFFER = 20
 
 /* eslint-disable vue/custom-event-name-casing -- Public timeline events are kebab-case. */
 function emitHeightChange(payload: { itemKey: string, metrics: MarkstreamVirtualMetrics }) {
@@ -67,22 +69,44 @@ function emitThreadStateChange(payload: MarkstreamThreadVirtualState) {
 }
 /* eslint-enable vue/custom-event-name-casing */
 
+function isMeasuredOrFinalConfidence(confidence: MarkstreamVirtualMetrics['confidence'] | undefined) {
+  return confidence === 'measured' || confidence === 'final'
+}
+
+function isFinalVirtualMetricsReady(metrics: MarkstreamVirtualMetrics | undefined) {
+  if (!metrics)
+    return false
+
+  const nodeCount = Number(metrics.nodeCount)
+  const measuredCount = Number(metrics.measuredCount)
+  const liveStart = Math.max(0, Number(metrics.liveRange?.start ?? 0))
+  const liveEnd = Math.min(nodeCount, Math.max(liveStart, Number(metrics.liveRange?.end ?? 0)))
+  const liveRangeCount = Math.max(0, liveEnd - liveStart)
+
+  return metrics.final === true
+    && metrics.confidence === 'mixed'
+    && nodeCount > 0
+    && measuredCount > 0
+    && measuredCount < nodeCount
+    && (liveRangeCount <= 0 || measuredCount >= liveRangeCount)
+}
+
+function isStableFinalVirtualMetrics(metrics: MarkstreamVirtualMetrics | undefined) {
+  return metrics?.stable === true && isFinalVirtualMetricsReady(metrics)
+}
+
 function shouldAllowMarkdownShrink(metrics: MarkstreamVirtualMetrics) {
   if (metrics.phase === 'final')
     return true
 
-  if (
-    metrics.final === true
-    && (metrics.confidence === 'measured' || metrics.confidence === 'final')
-  ) {
+  if (metrics.final === true && isMeasuredOrFinalConfidence(metrics.confidence))
     return true
-  }
 
   if (!metrics.stable)
     return false
 
-  return metrics.confidence === 'measured'
-    || metrics.confidence === 'final'
+  return isMeasuredOrFinalConfidence(metrics.confidence)
+    || isStableFinalVirtualMetrics(metrics)
 }
 
 function shouldReleaseRestoredMarkdownFloor(metrics: MarkstreamVirtualMetrics) {
@@ -92,8 +116,8 @@ function shouldReleaseRestoredMarkdownFloor(metrics: MarkstreamVirtualMetrics) {
   if (!metrics.stable)
     return false
 
-  return metrics.confidence === 'measured'
-    || metrics.confidence === 'final'
+  return isMeasuredOrFinalConfidence(metrics.confidence)
+    || isStableFinalVirtualMetrics(metrics)
 }
 
 const layoutReadCounts = new Map<string, number>()
@@ -153,6 +177,7 @@ interface ReconcileRecordSizeOptions {
   allowRestoredFloorShrink?: boolean
   markdownLogicalHeight?: number
   rememberThreadKey?: string
+  releaseRestoredFloor?: boolean
   source?: TimelineItemSizeSource
   updateLayout?: boolean
 }
@@ -184,6 +209,7 @@ const itemSizeSources = new Map<string, TimelineItemSizeSource>()
 const restoredItemHeightFloors = new Map<string, number>()
 const restoredItemHeightFloorSources = new Map<string, TimelineItemSizeSource>()
 const restoredMarkdownLogicalHeights = new Map<string, number>()
+const pendingRestoredMarkdownFloorReleaseKeys = new Set<string>()
 const markdownStates = reactive(new Map<string, MarkstreamVirtualState>()) as Map<string, MarkstreamVirtualState>
 const markdownLogicalHeights = reactive(new Map<string, number>()) as Map<string, number>
 const markdownLogicalHeightSources = new Map<string, MarkdownLogicalHeightSource>()
@@ -1039,6 +1065,7 @@ function clearRestoredItemHeightFloorIfSourceChanged(
     restoredItemHeightFloors.delete(key)
     restoredItemHeightFloorSources.delete(key)
     restoredMarkdownLogicalHeights.delete(key)
+    pendingRestoredMarkdownFloorReleaseKeys.delete(key)
   }
 }
 
@@ -1046,6 +1073,7 @@ function clearRestoredItemHeightFloor(key: string) {
   restoredItemHeightFloors.delete(key)
   restoredItemHeightFloorSources.delete(key)
   restoredMarkdownLogicalHeights.delete(key)
+  pendingRestoredMarkdownFloorReleaseKeys.delete(key)
 }
 
 function shouldReleaseRestoredMarkdownFloorForShrink(
@@ -1065,15 +1093,18 @@ function setItemSize(
   key: string,
   size: number,
   source?: TimelineItemSizeSource,
-  options: { rememberThreadKey?: string, updateLayout?: boolean } = {},
+  options: { rememberThreadKey?: string, releaseRestoredFloor?: boolean, updateLayout?: boolean } = {},
 ) {
   if (!Number.isFinite(size) || size <= 0)
     return
 
   const previous = itemSizes.get(key)
   const sourceChanged = source && !isSameItemSizeSource(itemSizeSources.get(key), source)
+  const releaseRestoredFloor = options.releaseRestoredFloor === true
 
   clearRestoredItemHeightFloorIfSourceChanged(key, source)
+  if (releaseRestoredFloor)
+    clearRestoredItemHeightFloor(key)
 
   const restoredFloor = getRestoredItemHeightFloor(key, source)
   const next = restoredFloor > 0
@@ -1088,6 +1119,8 @@ function setItemSize(
     && Math.abs(previous - next) <= ITEM_SIZE_RECONCILE_DEADBAND_PX
     && !sourceChanged
   ) {
+    if (releaseRestoredFloor)
+      layoutRevision.value += 1
     return
   }
 
@@ -1319,8 +1352,22 @@ function reconcileRecordSize(
       next = Math.max(next, cachedSize)
 
     const restoredFloor = getRestoredItemHeightFloor(record.key, itemSizeSource)
-    if (restoredFloor > 0 && markdown > restoredFloor + ITEM_SIZE_RECONCILE_DEADBAND_PX && !restoringThread.value) {
-      clearRestoredItemHeightFloor(record.key)
+    const growsPastRestoredFloor = restoredFloor > 0
+      && next > restoredFloor + ITEM_SIZE_RECONCILE_DEADBAND_PX
+    const readyToReleaseRestoredFloor = record.markdown
+      && restoredFloor > 0
+      && (options.allowRestoredFloorShrink === true || growsPastRestoredFloor)
+
+    if (readyToReleaseRestoredFloor) {
+      if (restoringThread.value) {
+        pendingRestoredMarkdownFloorReleaseKeys.add(record.key)
+      }
+      else {
+        options = {
+          ...options,
+          releaseRestoredFloor: true,
+        }
+      }
     }
     else if (
       options.allowMarkdownShrink
@@ -1426,7 +1473,13 @@ function getMarkdownProps(record: TimelineRecord): MarkstreamVirtualMarkdownProp
     final,
     mode: markdownMode,
     codeRenderer: markdownCodeRenderer,
-    nodeVirtual: false,
+    ...(final
+      ? {
+          nodeVirtual: 'auto' as const,
+          maxLiveNodes: TIMELINE_MARKDOWN_MAX_LIVE_NODES,
+          liveNodeBuffer: TIMELINE_MARKDOWN_LIVE_NODE_BUFFER,
+        }
+      : {}),
     fade: props.markdownFade === true,
     indexKey: getSessionKey(record),
     virtualScroll,
@@ -1913,9 +1966,6 @@ function isRestoredMarkdownFloorTailVisible(
   contentRoot: HTMLElement,
   rootRect: DOMRect,
 ) {
-  if (activeThreadRestoreAnchor?.type !== 'bottom')
-    return false
-
   if (!hasTrustedRestoredItemHeightFloor(record))
     return false
 
@@ -2006,16 +2056,19 @@ function hasReadyMarkdownRestoreMetrics(record: TimelineRecord, el: HTMLElement)
   const hasCompleteMeasurement = nodeCount <= 0
     || (measuredCount >= nodeCount && estimatedCount <= 0)
 
-  const hasMeasuredOrFinalConfidence = metrics?.confidence === 'measured'
-    || metrics?.confidence === 'final'
+  const hasMeasuredOrFinalConfidence = isMeasuredOrFinalConfidence(metrics?.confidence)
+  const hasStableFinalVirtualMetrics = isStableFinalVirtualMetrics(metrics)
 
   const hasStableHeight = metrics?.stable === true
     || hasMeasuredOrFinalConfidence
+    || hasStableFinalVirtualMetrics
 
   if (activeThreadRestoreRequiresColdMarkdownMetrics) {
-    return hasCompleteMeasurement
-      && metrics?.final === true
-      && hasMeasuredOrFinalConfidence
+    return metrics?.final === true
+      && (
+        (hasCompleteMeasurement && hasMeasuredOrFinalConfidence)
+        || hasStableFinalVirtualMetrics
+      )
   }
 
   return hasStableHeight || metrics?.final === true
@@ -2420,6 +2473,8 @@ function finishThreadRestore(seq: number) {
   if (seq !== threadRestoreSeq)
     return
 
+  flushMarkdownReconciles()
+  const pendingMarkdownFloorReleaseKeys = new Set(pendingRestoredMarkdownFloorReleaseKeys)
   clearThreadRestoreSchedule()
   applyThreadRestorePass(seq, activeThreadRestoreAnchor)
   restoringThread.value = false
@@ -2429,10 +2484,28 @@ function finishThreadRestore(seq: number) {
   activeThreadRestoreSeq = 0
 
   for (const record of layout.value.records) {
-    if (!record.markdown)
+    if (!record.markdown || pendingMarkdownFloorReleaseKeys.has(record.key))
       clearRestoredItemHeightFloor(record.key)
   }
 
+  for (const key of pendingMarkdownFloorReleaseKeys) {
+    const record = layoutRecordByKey.get(key)
+    if (!record) {
+      clearRestoredItemHeightFloor(key)
+      continue
+    }
+
+    reconcileRecordSize(record, {
+      allowMarkdownShrink: true,
+      allowRestoredFloorShrink: true,
+      markdownLogicalHeight: getKnownMarkdownLogicalHeight(record.key),
+      source: getItemSizeSource(record),
+      updateLayout: true,
+    })
+  }
+  pendingRestoredMarkdownFloorReleaseKeys.clear()
+
+  flushScrollReconcile()
   updateScrollMetrics({ remember: false })
   markRestorePaintReady()
   markInitialThreadRestoreCompleted()
@@ -2481,6 +2554,7 @@ function restoreThreadState(
   restoredItemHeightFloors.clear()
   restoredItemHeightFloorSources.clear()
   restoredMarkdownLogicalHeights.clear()
+  pendingRestoredMarkdownFloorReleaseKeys.clear()
   markdownStates.clear()
   markdownLogicalHeights.clear()
   markdownLogicalHeightSources.clear()
@@ -2604,6 +2678,7 @@ function cleanupObservers() {
   restoredItemHeightFloors.clear()
   restoredItemHeightFloorSources.clear()
   restoredMarkdownLogicalHeights.clear()
+  pendingRestoredMarkdownFloorReleaseKeys.clear()
   markdownLogicalHeights.clear()
   markdownLogicalHeightSources.clear()
   rootResizeObserver?.disconnect()
@@ -2755,9 +2830,13 @@ defineExpose({
       v-for="record in visibleWindow.records"
       :key="record.renderKey"
       class="markstream-virtual-timeline__item"
+      :class="{ 'is-restored-height-floor': hasTrustedRestoredItemHeightFloor(record) }"
       :data-markstream-item-key="record.key"
       :data-markstream-item-kind="record.kind"
-      :style="{ minHeight: `${record.size}px` }"
+      :style="{
+        'minHeight': `${record.size}px`,
+        '--markstream-virtual-item-size': `${record.size}px`,
+      }"
     >
       <slot
         v-bind="getSlotProps(record)"
@@ -2830,6 +2909,12 @@ defineExpose({
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
+}
+
+.markstream-virtual-timeline.is-restoring-thread > .markstream-virtual-timeline__item,
+.markstream-virtual-timeline__item.is-restored-height-floor {
+  height: var(--markstream-virtual-item-size);
+  overflow: hidden;
 }
 
 .markstream-virtual-timeline__restore-loading {

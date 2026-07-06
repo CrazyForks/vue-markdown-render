@@ -1160,6 +1160,217 @@ describe('node renderer virtual-scroll coordination', () => {
     }
   })
 
+  it('auto-virtualizes standalone final chat content restore', async () => {
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      attachTo: document.body,
+      props: {
+        content: makeSameShapeContent('restore'),
+        final: true,
+        mode: 'chat',
+        smoothStreaming: false,
+        fade: false,
+        viewportPriority: false,
+      },
+    })
+
+    await flushAll()
+
+    expect(wrapper.classes()).toContain('virtualized')
+    expect(getRootNodeContentElements(wrapper.element).length).toBe(60)
+
+    wrapper.unmount()
+  })
+
+  it('auto-virtualizes async standalone final chat restore with default smooth streaming', async () => {
+    const frames: FrameRequestCallback[] = []
+    let nextFrameId = 1
+    vi.stubGlobal('requestAnimationFrame', ((callback: FrameRequestCallback) => {
+      frames.push(callback)
+      return nextFrameId++
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      attachTo: document.body,
+      props: {
+        content: '',
+        final: true,
+        mode: 'chat',
+        fade: false,
+        viewportPriority: false,
+      },
+    })
+
+    await flushAll()
+    await wrapper.setProps({ content: makeSameShapeContent('async-restore') })
+
+    const baseline = performance.now()
+    for (let step = 1; step <= 520 && frames.length > 0; step++) {
+      const callback = frames.shift()!
+      callback(baseline + step * 80)
+      await nextTick()
+    }
+
+    await flushAll()
+
+    expect(wrapper.classes()).toContain('virtualized')
+    expect(getRootNodeContentElements(wrapper.element).length).toBe(60)
+
+    wrapper.unmount()
+  })
+
+  it('keeps explicit maxLiveNodes=0 as standalone final chat virtualization opt-out', async () => {
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      attachTo: document.body,
+      props: {
+        content: makeSameShapeContent('restore'),
+        final: true,
+        mode: 'chat',
+        smoothStreaming: false,
+        fade: false,
+        viewportPriority: false,
+        maxLiveNodes: 0,
+      },
+    })
+
+    await flushAll()
+
+    expect(wrapper.classes()).not.toContain('virtualized')
+    expect(getRootNodeContentElements(wrapper.element).length).toBeGreaterThan(60)
+
+    wrapper.unmount()
+  })
+
+  it('does not auto-virtualize a standalone chat stream after final flips true', async () => {
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      attachTo: document.body,
+      props: {
+        content: makeSameShapeContent('stream'),
+        final: false,
+        mode: 'chat',
+        smoothStreaming: false,
+        fade: false,
+        viewportPriority: false,
+      },
+    })
+
+    await flushAll()
+    await wrapper.setProps({ final: true })
+    await flushAll()
+
+    expect(wrapper.classes()).not.toContain('virtualized')
+    expect(getRootNodeContentElements(wrapper.element).length).toBeGreaterThan(60)
+
+    wrapper.unmount()
+  })
+
+  it('auto-virtualizes standalone final chat restore after renderer identity changes', async () => {
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      attachTo: document.body,
+      props: {
+        content: makeSameShapeContent('stream'),
+        final: false,
+        indexKey: 'stream-message',
+        mode: 'chat',
+        smoothStreaming: false,
+        fade: false,
+        viewportPriority: false,
+      },
+    })
+
+    await flushAll()
+    await wrapper.setProps({ final: true })
+    await flushAll()
+
+    expect(wrapper.classes()).not.toContain('virtualized')
+    expect(getRootNodeContentElements(wrapper.element).length).toBeGreaterThan(60)
+
+    await wrapper.setProps({
+      content: makeSameShapeContent('restore'),
+      indexKey: 'restore-message',
+    })
+    await flushAll()
+
+    expect(wrapper.classes()).toContain('virtualized')
+    expect(getRootNodeContentElements(wrapper.element).length).toBe(60)
+
+    wrapper.unmount()
+  })
+
+  it('does not auto-virtualize a standalone chat stream when identity changes before final', async () => {
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      attachTo: document.body,
+      props: {
+        content: makeSameShapeContent('stream'),
+        final: false,
+        indexKey: 'stream-message-temp',
+        mode: 'chat',
+        smoothStreaming: false,
+        fade: false,
+        viewportPriority: false,
+      },
+    })
+
+    await flushAll()
+    await wrapper.setProps({ indexKey: 'stream-message-final' })
+    await flushAll()
+    await wrapper.setProps({ final: true })
+    await flushAll()
+
+    expect(wrapper.classes()).not.toContain('virtualized')
+    expect(getRootNodeContentElements(wrapper.element).length).toBeGreaterThan(60)
+
+    wrapper.unmount()
+  })
+
+  it('does not auto-virtualize a default smooth chat stream when final flips before visible catches up', async () => {
+    const frames: FrameRequestCallback[] = []
+    let nextFrameId = 1
+    vi.stubGlobal('requestAnimationFrame', ((callback: FrameRequestCallback) => {
+      frames.push(callback)
+      return nextFrameId++
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      attachTo: document.body,
+      props: {
+        content: '',
+        final: false,
+        indexKey: 'stream-message-temp',
+        mode: 'chat',
+        fade: false,
+        viewportPriority: false,
+      },
+    })
+
+    await flushAll()
+    await wrapper.setProps({ indexKey: 'stream-message-final' })
+    await wrapper.setProps({ content: makeSameShapeContent('stream') })
+    await wrapper.setProps({ final: true })
+
+    const baseline = performance.now()
+    for (let step = 1; step <= 520 && frames.length > 0; step++) {
+      const callback = frames.shift()!
+      callback(baseline + step * 80)
+      await nextTick()
+    }
+
+    await flushAll()
+
+    expect(wrapper.classes()).not.toContain('virtualized')
+    expect(getRootNodeContentElements(wrapper.element).length).toBeGreaterThan(60)
+
+    wrapper.unmount()
+  })
+
   it('keeps full-render batches cancellable before all nodes mount', async () => {
     const originalNodeEnv = process.env.NODE_ENV
     const frames = new Map<number, FrameRequestCallback>()

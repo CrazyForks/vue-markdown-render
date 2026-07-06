@@ -1231,10 +1231,12 @@ export function useMarkdownParsing(
       stabilizeMetrics = getInitialStabilizeMetrics(parsed.length)
     }
 
-    if (signatureTiming)
-      primeParsedNodeSignaturesWithMetrics(parsed, signatureTiming, primeStartIndex)
-    else
-      primeParsedNodeSignatures(parsed, primeStartIndex)
+    if (options.effectiveFinal.value !== true) {
+      if (signatureTiming)
+        primeParsedNodeSignaturesWithMetrics(parsed, signatureTiming, primeStartIndex)
+      else
+        primeParsedNodeSignatures(parsed, primeStartIndex)
+    }
 
     const nodeReuseMs = collectPerformanceMetrics
       ? getNow() - reuseStart

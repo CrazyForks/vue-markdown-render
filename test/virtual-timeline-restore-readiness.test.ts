@@ -106,9 +106,16 @@ function createMetrics(totalHeight: number, sessionKey: string): MarkstreamVirtu
   }
 }
 
-function markMarkdownMetricsReady(markdownProps: any, totalHeight = 360) {
+function markMarkdownMetricsReady(
+  markdownProps: any,
+  totalHeight = 360,
+  patch: Partial<MarkstreamVirtualMetrics> = {},
+) {
   const sessionKey = markdownProps.virtualScroll.sessionKey
-  const metrics = createMetrics(totalHeight, sessionKey)
+  const metrics = {
+    ...createMetrics(totalHeight, sessionKey),
+    ...patch,
+  }
 
   markdownProps.onHeightChange(metrics)
   markdownProps.onVirtualStateChange({
@@ -821,6 +828,134 @@ describe('virtual timeline restore visual readiness', () => {
     }
   })
 
+  it('reveals item-anchor restore when only the restored markdown floor tail is visible', async () => {
+    vi.useFakeTimers()
+    let wrapper: ReturnType<typeof mount> | undefined
+
+    try {
+      stubTimelineDom(600)
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+        const el = this as HTMLElement
+        const root = el.closest?.('[data-testid="markstream-virtual-timeline"]') as HTMLElement | null
+        const scrollTop = root?.scrollTop || 0
+
+        if (el.matches?.('[data-testid="markstream-virtual-timeline"]')) {
+          return {
+            x: 0,
+            y: 0,
+            top: 0,
+            right: 800,
+            bottom: 300,
+            left: 0,
+            width: 800,
+            height: 300,
+            toJSON: () => ({}),
+          } as DOMRect
+        }
+
+        if (el.hasAttribute('data-markstream-item-key')) {
+          const top = -scrollTop
+
+          return {
+            x: 0,
+            y: top,
+            top,
+            right: 800,
+            bottom: top + 600,
+            left: 0,
+            width: 800,
+            height: 600,
+            toJSON: () => ({}),
+          } as DOMRect
+        }
+
+        if (el.hasAttribute('data-test-top')) {
+          const top = Number(el.dataset.testTop ?? '0') - scrollTop
+          const height = Number(el.dataset.testHeight ?? '80')
+
+          return {
+            x: 0,
+            y: top,
+            top,
+            right: 800,
+            bottom: top + height,
+            left: 0,
+            width: 800,
+            height,
+            toJSON: () => ({}),
+          } as DOMRect
+        }
+
+        return {
+          x: 0,
+          y: -scrollTop,
+          top: -scrollTop,
+          right: 800,
+          bottom: 80 - scrollTop,
+          left: 0,
+          width: 800,
+          height: 80,
+          toJSON: () => ({}),
+        } as DOMRect
+      })
+
+      wrapper = mount(MarkstreamVirtualTimeline, {
+        attachTo: document.body,
+        props: {
+          items: [
+            { kind: 'assistant-markdown', id: 'm1', content: '# Ready', final: true, revision: 1 },
+          ],
+          threadKey: 'thread-a',
+          stickToBottom: false,
+          initialThreadState: {
+            threadKey: 'thread-a',
+            measurementKey: ':800',
+            widthBucket: 800,
+            outerAnchor: { type: 'item', itemKey: 'm1', offsetWithinItemPx: 520 },
+            itemHeights: { m1: 600 },
+            itemSizeSources: { m1: timelineMarkdownItemSource('thread-a', 'm1', 1) },
+            markdownStates: {},
+          },
+        },
+        slots: {
+          default(props: any) {
+            return h('div', { ref: props.measureRef }, [
+              h('div', {
+                'class': 'markdown-renderer',
+                'data-test-top': '0',
+                'data-test-height': '40',
+              }, [
+                h('div', {
+                  'class': 'node-slot',
+                  'data-node-index': '0',
+                  'data-node-type': 'heading',
+                  'data-test-top': '0',
+                  'data-test-height': '20',
+                }, [
+                  h('div', { class: 'node-content' }, '# Ready'),
+                ]),
+              ]),
+            ])
+          },
+        },
+      })
+
+      await nextTick()
+
+      const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+
+      await vi.advanceTimersByTimeAsync(1200)
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(false)
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('keeps restore loading on first cold thread switch until routed mermaid content is ready', async () => {
     vi.useFakeTimers()
     let wrapper: ReturnType<typeof mount> | undefined
@@ -990,6 +1125,100 @@ describe('virtual timeline restore visual readiness', () => {
       expect(root.classList.contains('is-restoring-thread')).toBe(true)
 
       markMarkdownMetricsReady(latestMarkdownProps)
+      await vi.advanceTimersByTimeAsync(700)
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(false)
+      expect(wrapper.find('[data-testid="restore-loading"]').exists()).toBe(false)
+    }
+    finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
+  it('waits for stable mixed virtual markdown metrics before revealing cold restored thread', async () => {
+    vi.useFakeTimers()
+    let wrapper: ReturnType<typeof mount> | undefined
+
+    try {
+      stubTimelineDom(920)
+      installRestoreGeometryStub(920)
+
+      let latestMarkdownProps: any
+
+      wrapper = mount(MarkstreamVirtualTimeline, {
+        attachTo: document.body,
+        props: {
+          items: [
+            { kind: 'assistant-markdown', id: 'm1', content: '# Cold thread\n\nLong final transcript', final: true, revision: 1 },
+          ],
+          threadKey: 'thread-b',
+          stickToBottom: false,
+        },
+        slots: {
+          default(props: any) {
+            latestMarkdownProps = props.markdownProps
+
+            return h('article', {
+              'ref': props.measureRef,
+              'data-markstream-item-key': props.itemKey,
+            }, [
+              h('div', { class: 'markdown-renderer' }, [
+                h('div', {
+                  'class': 'node-slot',
+                  'data-node-index': '0',
+                  'data-node-type': 'heading',
+                }, [
+                  h('div', { class: 'node-content' }, '# Cold thread'),
+                ]),
+              ]),
+            ])
+          },
+          'restore-loading': () => h('div', { 'data-testid': 'restore-loading' }, 'Restoring'),
+        },
+      })
+
+      await nextTick()
+
+      ;(wrapper.vm as any).restoreThreadState(null, { threadSwitch: true })
+
+      await nextTick()
+      const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+      expect(wrapper.find('[data-testid="restore-loading"]').exists()).toBe(true)
+
+      markMarkdownMetricsReady(latestMarkdownProps, 920, {
+        phase: 'settling',
+        nodeCount: 90,
+        liveRange: { start: 0, end: 60 },
+        renderedCount: 80,
+        measuredCount: 60,
+        estimatedCount: 22,
+        averageNodeHeight: 10,
+        visibleDomHeight: 640,
+        stable: false,
+        confidence: 'mixed',
+      })
+      await vi.advanceTimersByTimeAsync(700)
+      await nextTick()
+
+      expect(root.classList.contains('is-restoring-thread')).toBe(true)
+      expect(wrapper.find('[data-testid="restore-loading"]').exists()).toBe(true)
+
+      markMarkdownMetricsReady(latestMarkdownProps, 920, {
+        phase: 'settling',
+        nodeCount: 90,
+        liveRange: { start: 0, end: 60 },
+        renderedCount: 80,
+        measuredCount: 60,
+        estimatedCount: 22,
+        averageNodeHeight: 10,
+        visibleDomHeight: 640,
+        stable: true,
+        confidence: 'mixed',
+      })
       await vi.advanceTimersByTimeAsync(700)
       await nextTick()
 

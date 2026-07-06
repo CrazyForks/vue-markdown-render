@@ -7,9 +7,9 @@ import { isTypewriterEnabled } from '../../../utils/typewriter'
 type RendererParseOptions = NonNullable<NodeRendererProps['parseOptions']>
 
 const DEFAULT_RENDERER_SMOOTH_STREAMING_OPTIONS = {
-  maxCharsPerSecond: 1800,
-  maxCommitFps: 30,
-  maxCharsPerCommit: 96,
+  maxCharsPerSecond: 3000,
+  maxCommitFps: 20,
+  maxCharsPerCommit: 160,
   catchUpLatencyMs: 220,
   catchUpThreshold: 400,
 }

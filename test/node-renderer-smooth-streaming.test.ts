@@ -242,7 +242,7 @@ describe('node renderer smooth streaming', () => {
 
       const baseline = performance.now()
       for (let step = 1; step <= 24 && queuedFrames.length > 0; step++) {
-        queuedFrames.shift()?.(baseline + step * 40)
+        queuedFrames.shift()?.(baseline + step * 50)
         await nextTick()
       }
 
@@ -257,7 +257,7 @@ describe('node renderer smooth streaming', () => {
       maxCharsPerCommit: 80,
     })
     const explicitLength = await renderedLengthAfterFrames({
-      maxCharsPerSecond: 1000,
+      maxCharsPerSecond: 1,
       maxCharsPerCommit: 80,
       catchUpLatencyMs: 350,
       catchUpThreshold: 600,
