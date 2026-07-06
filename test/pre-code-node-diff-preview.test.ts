@@ -123,6 +123,18 @@ describe('pre code node diff preview', () => {
     expect(source).toContain('width: var(--markstream-pre-diff-gutter-marker-width, 4px);')
   })
 
+  it('keeps diff fallback line fills square', () => {
+    const source = readFileSync(
+      'src/components/PreCodeNode/PreCodeNode.vue',
+      'utf8',
+    )
+
+    expect(source).toContain('.markstream-pre__diff-line::before')
+    expect(source).toContain('border-radius: 0;')
+    expect(source).toContain('.markstream-pre__diff-line--added::before')
+    expect(source).toContain('.markstream-pre__diff-line--removed::before')
+  })
+
   it('lets side-by-side diff fallback panes scroll horizontally when wrap is disabled', () => {
     const source = readFileSync(
       'src/components/PreCodeNode/PreCodeNode.vue',

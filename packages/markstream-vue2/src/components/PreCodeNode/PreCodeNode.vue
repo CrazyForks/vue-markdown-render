@@ -473,6 +473,7 @@ const diffPreviewPanes = computed(() => isDiffPreview.value ? buildDiffPanes(isI
   height: var(--markstream-pre-diff-line-height, 18px);
   z-index: 0;
   pointer-events: none;
+  border-radius: 0;
   background: transparent;
 }
 
