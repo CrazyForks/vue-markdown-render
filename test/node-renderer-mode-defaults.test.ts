@@ -30,8 +30,9 @@ describe('rendererModeDefaults', () => {
       showTooltips: false,
       fade: false,
       initialRenderBatchSize: 16,
-      renderBatchSize: 16,
+      renderBatchSize: 24,
       maxLiveNodes: 0,
+      liveNodeBuffer: 0,
     })
     expect(RENDERER_MODE_DEFAULTS.minimal).toMatchObject(RENDERER_MODE_DEFAULTS.chat)
   })

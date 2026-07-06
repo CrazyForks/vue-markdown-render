@@ -11,6 +11,7 @@ export interface LiveRangeStateOptions {
   parsedNodeCount: ComputedRef<number>
   virtualizationEnabled: ComputedRef<boolean>
   maxLiveNodesResolved: ComputedRef<number>
+  liveNodeBufferResolved?: ComputedRef<number>
   clamp: (value: number, min: number, max: number) => number
 }
 
@@ -29,12 +30,11 @@ export function useLiveRangeState(
     parsedNodeCount,
     virtualizationEnabled,
     maxLiveNodesResolved,
+    liveNodeBufferResolved: overrideLiveNodeBufferResolved,
     clamp,
   } = options
 
-  const liveNodeBufferResolved = computed(() => {
-    return Math.max(0, props.liveNodeBuffer ?? 60)
-  })
+  const liveNodeBufferResolved = overrideLiveNodeBufferResolved ?? computed(() => Math.max(0, props.liveNodeBuffer ?? 60))
 
   const focusIndex = ref(0)
 

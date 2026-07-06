@@ -75,6 +75,173 @@ Turn it off per surface with `:smooth-streaming="false"` if you want raw chunk c
 
 ## 4. Common upgrade paths
 
+### Auto-scroll a live chat without per-token scroll writes
+
+If the chat should follow the latest assistant output, batch scroll writes with `requestAnimationFrame` and only follow while the user is already near the bottom. Avoid `scrollIntoView({ behavior: 'smooth' })` on every chunk; it creates overlapping scroll animations during streaming.
+
+```vue
+<script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+
+interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  final: boolean
+}
+
+const messages = ref<ChatMessage[]>([])
+const scrollRoot = ref<HTMLElement | null>(null)
+const contentRoot = ref<HTMLElement | null>(null)
+const bottomPinned = ref(true)
+
+const BOTTOM_THRESHOLD_PX = 64
+let scrollFrame = 0
+let resizeObserver: ResizeObserver | undefined
+
+const latestOutputSignal = computed(() => {
+  const latest = messages.value[messages.value.length - 1]
+  return latest
+    ? `${messages.value.length}:${latest.id}:${latest.content.length}:${latest.final}`
+    : '0'
+})
+
+function isNearBottom(element: HTMLElement) {
+  return element.scrollHeight - element.clientHeight - element.scrollTop <= BOTTOM_THRESHOLD_PX
+}
+
+function updateBottomPinned() {
+  const root = scrollRoot.value
+  bottomPinned.value = !root || isNearBottom(root)
+}
+
+function scrollToBottomNow() {
+  const root = scrollRoot.value
+  if (!root)
+    return
+
+  root.scrollTo({
+    top: root.scrollHeight,
+    behavior: 'auto',
+  })
+}
+
+function scheduleScrollToBottom() {
+  if (!bottomPinned.value || scrollFrame)
+    return
+
+  scrollFrame = requestAnimationFrame(() => {
+    scrollFrame = 0
+    if (!bottomPinned.value)
+      return
+
+    scrollToBottomNow()
+  })
+}
+
+watch(
+  latestOutputSignal,
+  async () => {
+    await nextTick()
+    scheduleScrollToBottom()
+  },
+  { flush: 'post' },
+)
+
+onMounted(() => {
+  updateBottomPinned()
+  resizeObserver = new ResizeObserver(scheduleScrollToBottom)
+
+  if (contentRoot.value)
+    resizeObserver.observe(contentRoot.value)
+})
+
+onBeforeUnmount(() => {
+  if (scrollFrame)
+    cancelAnimationFrame(scrollFrame)
+
+  resizeObserver?.disconnect()
+})
+</script>
+
+<template>
+  <div ref="scrollRoot" class="chat-scroll" @scroll.passive="updateBottomPinned">
+    <div ref="contentRoot" class="chat-list">
+      <article
+        v-for="message in messages"
+        :key="message.id"
+        class="chat-message"
+        :class="`chat-message--${message.role}`"
+      >
+        <MarkdownRender
+          v-if="message.role === 'assistant'"
+          custom-id="chat"
+          mode="chat"
+          :content="message.content"
+          :final="message.final"
+          :smooth-streaming="message.final ? false : 'auto'"
+          :fade="message.final"
+          :typewriter="!message.final"
+          v-bind="message.final ? {} : { maxLiveNodes: 0 }"
+        />
+        <p v-else class="user-text">
+          {{ message.content }}
+        </p>
+      </article>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.chat-scroll {
+  height: min(70vh, 720px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.chat-list {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.chat-message {
+  max-width: min(720px, 88%);
+}
+
+.chat-message--user {
+  align-self: flex-end;
+}
+
+.chat-message--assistant {
+  align-self: flex-start;
+}
+</style>
+```
+
+The important details are:
+
+- `latestOutputSignal` watches the last message, so a long transcript does not trigger deep watchers on every token.
+- `nextTick()` waits for the current Vue render pass before reading `scrollHeight`; later smooth-streaming frames are handled by `ResizeObserver`.
+- `requestAnimationFrame` coalesces many chunk updates into at most one scroll write per frame.
+- `ResizeObserver` catches late height changes from images, KaTeX, code blocks, and fonts while the user is still bottom-pinned.
+- `bottomPinned` turns off auto-follow when the user scrolls up, then turns it back on when they return near the bottom.
+- For an already-loaded transcript, choose separately whether first mount should jump to the latest message or restore a saved scroll position.
+
+For long mixed timelines, prefer the built-in virtual timeline. Its default `stick-to-bottom="auto"` follows the same product behavior: follow while pinned, respect manual scrollback.
+
+```vue
+<MarkstreamVirtualTimeline
+  :items="timelineItems"
+  :thread-key="activeThreadId"
+  stick-to-bottom="auto"
+/>
+```
+
 ### Better code blocks
 
 - Want a lighter docs-style look: use `MarkdownCodeBlockNode` with `stream-markdown`
@@ -202,7 +369,7 @@ const isStreaming = computed(() => !final.value)
     :smooth-streaming="isStreaming ? 'auto' : false"
     :fade="!isStreaming"
     :typewriter="isStreaming"
-    :max-live-nodes="isStreaming ? 0 : undefined"
+    v-bind="isStreaming ? { maxLiveNodes: 0 } : {}"
   />
 </template>
 ```

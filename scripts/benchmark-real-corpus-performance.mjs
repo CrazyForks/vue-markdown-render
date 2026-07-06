@@ -29,6 +29,40 @@ const browserSmoothStreamingOptions = readJsonObjectEnv('MARKSTREAM_REAL_CORPUS_
 const browserViewportWidth = readPositiveIntEnv('MARKSTREAM_REAL_CORPUS_BROWSER_VIEWPORT_WIDTH', 1280)
 const browserViewportHeight = readPositiveIntEnv('MARKSTREAM_REAL_CORPUS_BROWSER_VIEWPORT_HEIGHT', 900)
 const browserCpuThrottleRate = readPositiveIntEnv('MARKSTREAM_REAL_CORPUS_BROWSER_CPU_THROTTLE_RATE', 1)
+const browserCoreSmoothStreamingDefaults = {
+  minCharsPerSecond: 40,
+  maxCharsPerSecond: 1000,
+  targetLatencyMs: 900,
+  catchUpLatencyMs: 350,
+  catchUpThreshold: 600,
+  maxCommitFps: 30,
+  startDelayMs: 80,
+  maxCharsPerCommit: 80,
+  flushOnFinish: false,
+}
+const browserRendererSmoothStreamingDefaults = {
+  maxCharsPerSecond: 3000,
+  maxCommitFps: 20,
+  maxCharsPerCommit: 160,
+  catchUpLatencyMs: 220,
+  catchUpThreshold: 400,
+}
+const browserEffectiveSmoothStreamingOptions = {
+  ...browserCoreSmoothStreamingDefaults,
+  ...browserRendererSmoothStreamingDefaults,
+  ...(browserSmoothStreamingOptions ?? {}),
+}
+const browserRendererOptions = {
+  initialRenderBatchSize: 16,
+  renderBatchSize: 24,
+  renderBatchDelay: 8,
+  parseCoalesceMs: 32,
+}
+const browserFinalTimelineMarkdownOptions = {
+  nodeVirtual: 'auto',
+  maxLiveNodes: 60,
+  liveNodeBuffer: 20,
+}
 
 const corpusDefinitions = [
   { id: 'ai-chat-streaming', label: 'Docs AI chat streaming', path: 'docs/guide/ai-chat-streaming.md' },
@@ -40,6 +74,25 @@ const corpusDefinitions = [
   { id: 'changelog', label: 'CHANGELOG full restore', path: 'CHANGELOG.md' },
 ]
 
+const chatTranscriptDefinitions = [
+  {
+    id: 'docs-chat-thread',
+    label: 'Real docs multi-message chat restore',
+    items: [
+      { kind: 'system-divider', text: 'Thread restored from persisted chat state' },
+      { kind: 'user-message', text: 'Show the Vue streaming Markdown renderer guide.' },
+      { kind: 'assistant-markdown', corpusId: 'ai-chat-streaming' },
+      { kind: 'tool-call', status: 'read', label: 'Loaded docs/guide/performance.md' },
+      { kind: 'user-message', text: 'Now include performance and React integration details.' },
+      { kind: 'assistant-markdown', corpusId: 'docs-performance' },
+      { kind: 'assistant-markdown', corpusId: 'react-components' },
+      { kind: 'user-message', text: 'Attach the package README and latest release notes.' },
+      { kind: 'assistant-markdown', corpusId: 'readme-en' },
+      { kind: 'assistant-markdown', corpusId: 'changelog' },
+    ],
+  },
+]
+
 const selectedParserCaseIds = readCaseListEnv('MARKSTREAM_REAL_CORPUS_PARSER_CASES', corpusDefinitions.map(item => item.id))
 const selectedBrowserRestoreCaseIds = readCaseListEnv(
   'MARKSTREAM_REAL_CORPUS_BROWSER_RESTORE_CASES',
@@ -48,6 +101,10 @@ const selectedBrowserRestoreCaseIds = readCaseListEnv(
 const selectedBrowserStreamCaseIds = readCaseListEnv(
   'MARKSTREAM_REAL_CORPUS_BROWSER_STREAM_CASES',
   ['ai-chat-streaming', 'readme-en'],
+)
+const selectedBrowserChatRestoreCaseIds = readCaseListEnv(
+  'MARKSTREAM_REAL_CORPUS_BROWSER_CHAT_RESTORE_CASES',
+  ['docs-chat-thread'],
 )
 
 function readPositiveIntEnv(name, fallback) {
@@ -98,6 +155,13 @@ function validateCaseIds(ids, label) {
     throw new Error(`Unknown ${label} case id(s): ${missing.join(', ')}`)
 }
 
+function validateChatCaseIds(ids, label) {
+  const known = new Set(chatTranscriptDefinitions.map(item => item.id))
+  const missing = ids.filter(id => !known.has(id))
+  if (missing.length)
+    throw new Error(`Unknown ${label} case id(s): ${missing.join(', ')}`)
+}
+
 function round(value, digits = 3) {
   return Number(Number(value || 0).toFixed(digits))
 }
@@ -141,6 +205,57 @@ function readCorpus() {
 function selectCases(corpus, ids) {
   const byId = new Map(corpus.map(item => [item.id, item]))
   return ids.map(id => byId.get(id)).filter(Boolean)
+}
+
+function selectChatTranscriptCases(cases, ids) {
+  const byId = new Map(cases.map(item => [item.id, item]))
+  return ids.map(id => byId.get(id)).filter(Boolean)
+}
+
+function getChatEndMarker(caseId) {
+  return `MARKSTREAM_REAL_CHAT_RESTORE_END_${caseId}`
+}
+
+function createChatTranscriptCases(corpus) {
+  const byId = new Map(corpus.map(item => [item.id, item]))
+  return chatTranscriptDefinitions.map((definition) => {
+    let bytes = 0
+    let chars = 0
+    let markdownItemCount = 0
+    const paths = []
+
+    for (const item of definition.items) {
+      if (item.corpusId) {
+        const corpusItem = byId.get(item.corpusId)
+        if (!corpusItem)
+          throw new Error(`Unknown corpus id in chat transcript ${definition.id}: ${item.corpusId}`)
+        bytes += corpusItem.bytes
+        chars += corpusItem.chars
+        markdownItemCount += 1
+        paths.push(corpusItem.path)
+      }
+      else {
+        const text = `${item.status ? `${item.status} ` : ''}${item.label ?? item.text ?? ''}`
+        bytes += Buffer.byteLength(text)
+        chars += text.length
+      }
+    }
+
+    const endMarker = getChatEndMarker(definition.id)
+    bytes += Buffer.byteLength(endMarker)
+    chars += endMarker.length
+
+    return {
+      id: definition.id,
+      label: definition.label,
+      path: Array.from(new Set(paths)).join(', '),
+      bytes,
+      chars,
+      items: definition.items,
+      itemCount: definition.items.length + 1,
+      markdownItemCount,
+    }
+  })
 }
 
 function getNewestSourceMtimeMs(dir) {
@@ -413,6 +528,16 @@ function writeFixture(corpus) {
     'body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f7f8fa; color: #18202f; }',
     '.bench-shell { width: min(920px, calc(100vw - 48px)); margin: 0 auto; padding: 24px 0 72px; }',
     '.bench-host { background: #fff; border: 1px solid #dde2ea; padding: 24px; }',
+    '.bench-host--timeline { height: 760px; padding: 0; overflow: hidden; }',
+    '.bench-chat-timeline { height: 100%; background: #fff; }',
+    '.bench-chat-row { box-sizing: border-box; max-width: 100%; }',
+    '.bench-system-row { margin: 14px 20px; color: #667085; font-size: 12px; text-align: center; }',
+    '.bench-user-row { width: fit-content; max-width: min(680px, calc(100% - 96px)); margin: 16px 20px 16px auto; padding: 10px 14px; border-radius: 8px; background: #e8f2ff; color: #0f2742; }',
+    '.bench-tool-row { width: fit-content; margin: 10px 20px; padding: 8px 10px; border: 1px solid #d7dde6; border-radius: 6px; background: #f8fafc; color: #475467; font-size: 13px; }',
+    '.bench-tool-row span { margin-right: 8px; font-weight: 600; text-transform: uppercase; }',
+    '.bench-assistant-row { margin: 18px 20px; }',
+    '.bench-assistant-markdown { max-width: 100%; }',
+    '.bench-restore-loading { display: inline-flex; align-items: center; padding: 8px 12px; border: 1px solid #d7dde6; border-radius: 6px; background: #fff; color: #475467; font-size: 13px; }',
   ].join('\n'))
   writeFileSync(
     path.join(sourceDir, 'corpus.json'),
@@ -429,7 +554,7 @@ function writeFixture(corpus) {
 }
 
 function getFixtureMainSource() {
-  return String.raw`import MarkdownRender from 'markstream-vue'
+  return String.raw`import MarkdownRender, { MarkstreamVirtualTimeline } from 'markstream-vue'
 import { createApp, defineComponent, h, nextTick, ref } from 'vue'
 import corpus from './corpus.json'
 import 'markstream-vue/index.css'
@@ -439,8 +564,18 @@ const content = ref('')
 const final = ref(true)
 const smoothStreaming = ref(false)
 const mode = ref('chat')
+const surface = ref('markdown')
 const renderKey = ref(0)
+const timelineItems = ref([])
+const timelineInitialState = ref(null)
+const timelineThreadKey = ref('')
+const timelineRef = ref(null)
 const smoothStreamingOptions = ${JSON.stringify(browserSmoothStreamingOptions)}
+const rendererOptions = ${JSON.stringify(browserRendererOptions)}
+const finalTimelineMarkdownOptions = ${JSON.stringify(browserFinalTimelineMarkdownOptions)}
+const chatTranscriptDefinitions = ${JSON.stringify(chatTranscriptDefinitions)}
+const preparedChatStates = new Map()
+const chatTranscriptCache = new Map()
 
 function waitFrame() {
   return new Promise(resolve => requestAnimationFrame(resolve))
@@ -576,10 +711,13 @@ function diffParsePerformance(after, before) {
 
 function startRunObservers(root) {
   const state = {
+    startedAt: performance.now(),
+    elapsedMs: 0,
     mutationCount: 0,
     longTasks: [],
     layoutShifts: [],
     heightSamples: [],
+    frameIntervals: [],
   }
   const pushHeightSample = (height) => {
     if (!Number.isFinite(height) || height <= 0)
@@ -627,8 +765,23 @@ function startRunObservers(root) {
   }
   catch {}
 
+  let frameRaf = null
+  let previousFrameAt = performance.now()
+  const sampleFrame = (timestamp) => {
+    const delta = timestamp - previousFrameAt
+    previousFrameAt = timestamp
+    if (Number.isFinite(delta) && delta > 0)
+      state.frameIntervals.push(delta)
+    frameRaf = requestAnimationFrame(sampleFrame)
+  }
+  if (typeof requestAnimationFrame === 'function')
+    frameRaf = requestAnimationFrame(sampleFrame)
+
   return {
     stop() {
+      state.elapsedMs = performance.now() - state.startedAt
+      if (frameRaf != null)
+        cancelAnimationFrame(frameRaf)
       state.mutationCount += mutationObserver.takeRecords().length
       mutationObserver.disconnect()
       longTaskObserver?.disconnect()
@@ -648,29 +801,66 @@ function getRoot() {
 
 function measureSlots() {
   const root = getRoot()
+  const scrollRoot = root.querySelector('[data-markstream-virtual-timeline="1"]') || root
+  const scrollRootRect = scrollRoot.getBoundingClientRect()
+  const timelineRestoring = scrollRoot.classList?.contains('is-restoring-thread') === true
+  const keyOccurrences = new Map()
+  const intersects = (a, b) => {
+    return a.width > 0
+      && a.height > 0
+      && b.width > 0
+      && b.height > 0
+      && a.bottom > b.top
+      && a.top < b.bottom
+      && a.right > b.left
+      && a.left < b.right
+  }
+
   return Array.from(root.querySelectorAll('.node-slot')).map((slot) => {
-    const rect = slot.getBoundingClientRect()
+    const content = slot.querySelector(':scope > .node-content')
+    let measuredElement = content || slot
+    let rect = measuredElement.getBoundingClientRect()
+    if (content && rect.width === 0 && rect.height === 0 && content.firstElementChild) {
+      measuredElement = content.firstElementChild
+      rect = measuredElement.getBoundingClientRect()
+    }
+    const slotRect = slot.getBoundingClientRect()
+    const timelineItem = slot.closest('[data-markstream-item-key]')
+    const itemClipsChildren = timelineRestoring
+      || timelineItem?.classList?.contains('is-restored-height-floor') === true
+    const visibleInScrollRoot = intersects(slotRect, scrollRootRect)
+    const visibleInItem = !itemClipsChildren
+      || (timelineItem && intersects(slotRect, timelineItem.getBoundingClientRect()))
     const type = String(slot.getAttribute('data-node-type') || '')
+    const index = Number(slot.getAttribute('data-node-index') || -1)
+    const timelineItemKey = timelineItem?.getAttribute('data-markstream-item-key') ?? ''
+    const baseKey = timelineItemKey ? timelineItemKey + ':' + index : String(index)
+    const occurrence = keyOccurrences.get(baseKey) ?? 0
+    keyOccurrences.set(baseKey, occurrence + 1)
     const ignored = type === 'image'
       || type === 'math_block'
       || Boolean(slot.querySelector('.katex, [data-markstream-math]'))
       || Boolean(slot.querySelector('img, .image-node-container, .image-placeholder, .image-shimmer-overlay'))
     return {
-      index: Number(slot.getAttribute('data-node-index') || -1),
+      key: occurrence === 0 ? baseKey : baseKey + '#' + occurrence,
+      index,
+      timelineItemKey,
       type,
       height: Math.round(rect.height * 10) / 10,
+      visible: Boolean(visibleInScrollRoot && visibleInItem),
       ignored,
     }
   })
 }
 
 function summarizeHeightChanges(before, after, thresholdPx = 1) {
-  const beforeByIndex = new Map(before.map(item => [item.index, item]))
+  const beforeByKey = new Map(before.map(item => [item.key, item]))
   const changes = []
   const nonIgnoredChanges = []
+  const visibleNonIgnoredChanges = []
 
   for (const next of after) {
-    const prev = beforeByIndex.get(next.index)
+    const prev = beforeByKey.get(next.key)
     if (!prev)
       continue
     const delta = next.height - prev.height
@@ -678,16 +868,22 @@ function summarizeHeightChanges(before, after, thresholdPx = 1) {
     if (absDelta <= thresholdPx)
       continue
     const row = {
+      key: next.key,
       index: next.index,
+      timelineItemKey: next.timelineItemKey,
       type: next.type,
       before: prev.height,
       after: next.height,
       delta: Math.round(delta * 10) / 10,
       ignored: next.ignored || prev.ignored,
+      visible: Boolean(prev.visible || next.visible),
     }
     changes.push(row)
-    if (!row.ignored)
+    if (!row.ignored) {
       nonIgnoredChanges.push(row)
+      if (row.visible)
+        visibleNonIgnoredChanges.push(row)
+    }
   }
 
   const byType = new Map()
@@ -708,8 +904,10 @@ function summarizeHeightChanges(before, after, thresholdPx = 1) {
   return {
     changedSlots: changes.length,
     nonIgnoredChangedSlots: nonIgnoredChanges.length,
+    visibleNonIgnoredChangedSlots: visibleNonIgnoredChanges.length,
     maxAbsDeltaPx: Math.round(Math.max(0, ...changes.map(item => Math.abs(item.delta))) * 10) / 10,
     nonIgnoredMaxAbsDeltaPx: Math.round(Math.max(0, ...nonIgnoredChanges.map(item => Math.abs(item.delta))) * 10) / 10,
+    visibleNonIgnoredMaxAbsDeltaPx: Math.round(Math.max(0, ...visibleNonIgnoredChanges.map(item => Math.abs(item.delta))) * 10) / 10,
     nonIgnoredChangesByType: Array.from(byType.values())
       .map(item => ({
         ...item,
@@ -722,6 +920,10 @@ function summarizeHeightChanges(before, after, thresholdPx = 1) {
       .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
       .slice(0, 10),
     topNonIgnoredChanges: nonIgnoredChanges
+      .slice()
+      .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
+      .slice(0, 10),
+    topVisibleNonIgnoredChanges: visibleNonIgnoredChanges
       .slice()
       .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
       .slice(0, 10),
@@ -738,6 +940,26 @@ function getDomSnapshot() {
     placeholders: root.querySelectorAll('.node-placeholder').length,
     pendingMath: root.querySelectorAll('[data-markstream-math][data-markstream-pending="true"], .math-loading-overlay').length,
     pendingImages: root.querySelectorAll('.image-shimmer-overlay, .image-placeholder').length,
+  }
+}
+
+function getTimelineSnapshot() {
+  const root = getRoot()
+  const timeline = root.querySelector('[data-testid="markstream-virtual-timeline"]')
+  if (!timeline)
+    return null
+
+  const visibleRange = timelineRef.value?.getVisibleRange?.() ?? null
+  const totalHeight = timelineRef.value?.getTotalHeight?.()
+  return {
+    scrollHeight: Math.round(timeline.scrollHeight),
+    clientHeight: Math.round(timeline.clientHeight),
+    scrollTop: Math.round(timeline.scrollTop),
+    totalHeight: Math.round(Number.isFinite(totalHeight) ? totalHeight : timeline.scrollHeight),
+    domItems: timeline.querySelectorAll('.markstream-virtual-timeline__item').length,
+    markdownItems: timeline.querySelectorAll('[data-markstream-item-kind="assistant-markdown"]').length,
+    visibleRange,
+    restoring: timeline.classList.contains('is-restoring-thread'),
   }
 }
 
@@ -775,16 +997,22 @@ async function waitForStableRender(timeoutMs = 20000, requiredText = '') {
     await nextTick()
     await waitFrames(1)
     snapshot = getDomSnapshot()
+    const timelineSnapshot = getTimelineSnapshot()
     const key = [
       snapshot.scrollHeight,
       snapshot.domNodes,
       snapshot.slots,
       snapshot.placeholders,
+      timelineSnapshot?.scrollHeight ?? '',
+      timelineSnapshot?.totalHeight ?? '',
+      timelineSnapshot?.domItems ?? '',
+      timelineSnapshot?.restoring ? 1 : 0,
     ].join(':')
 
     const hasRequiredText = !requiredText || getRoot().textContent.includes(requiredText)
+    const timelineReady = !timelineSnapshot || !timelineSnapshot.restoring
 
-    if (hasRequiredText && snapshot.placeholders === 0 && snapshot.pendingMath === 0 && key === previousKey) {
+    if (hasRequiredText && timelineReady && snapshot.placeholders === 0 && snapshot.pendingMath === 0 && key === previousKey) {
       stableFrames += 1
       if (stableFrames >= 4)
         break
@@ -803,15 +1031,50 @@ async function waitForStableRender(timeoutMs = 20000, requiredText = '') {
   }
 }
 
+async function waitForTimelineReady(timeoutMs = 20000, requiredText = '') {
+  const startedAt = performance.now()
+  let snapshot = getDomSnapshot()
+  let timelineSnapshot = getTimelineSnapshot()
+
+  while (performance.now() - startedAt < timeoutMs) {
+    await nextTick()
+    await waitFrames(1)
+    snapshot = getDomSnapshot()
+    timelineSnapshot = getTimelineSnapshot()
+
+    const hasRequiredText = !requiredText || getRoot().textContent.includes(requiredText)
+    if (hasRequiredText && (!timelineSnapshot || !timelineSnapshot.restoring))
+      break
+  }
+
+  return {
+    elapsedMs: performance.now() - startedAt,
+    timedOut: performance.now() - startedAt >= timeoutMs,
+    snapshot,
+    timelineSnapshot,
+  }
+}
+
 function summarizeObserverState(state) {
   const longTaskDurations = state.longTasks.map(entry => entry.duration)
+  const frameIntervals = state.frameIntervals.filter(Number.isFinite)
+  const droppedFrameEstimate = frameIntervals.reduce((total, delta) => {
+    return total + Math.max(0, Math.round(delta / 16.67) - 1)
+  }, 0)
+  const longTaskTotalMs = Math.round(longTaskDurations.reduce((total, value) => total + value, 0) * 10) / 10
+  const elapsedMs = Number.isFinite(state.elapsedMs) && state.elapsedMs > 0 ? state.elapsedMs : 0
   return {
     mutationCount: state.mutationCount,
     longTaskCount: state.longTasks.length,
-    longTaskTotalMs: Math.round(longTaskDurations.reduce((total, value) => total + value, 0) * 10) / 10,
+    longTaskTotalMs,
     longTaskMaxMs: Math.round(Math.max(0, ...longTaskDurations) * 10) / 10,
     cls: Math.round(state.layoutShifts.reduce((total, entry) => total + entry.value, 0) * 100000) / 100000,
     heightSampleCount: state.heightSamples.length,
+    frameSampleCount: frameIntervals.length,
+    frameP95Ms: Math.round(percentile(frameIntervals, 0.95) * 10) / 10,
+    frameMaxMs: Math.round(Math.max(0, ...frameIntervals) * 10) / 10,
+    droppedFrameEstimate,
+    longTaskBusyRatio: elapsedMs > 0 ? Math.round((longTaskTotalMs / elapsedMs) * 10000) / 10000 : 0,
   }
 }
 
@@ -821,11 +1084,89 @@ function countHeightJumps(heightSamples) {
   }, 0)
 }
 
+function assertWaitCompleted(label, result) {
+  if (result?.timedOut)
+    throw new Error(label + ' timed out.')
+}
+
 function findCase(caseId) {
   const item = corpus.find(entry => entry.id === caseId)
   if (!item)
     throw new Error('Unknown corpus case: ' + caseId)
   return item
+}
+
+function findChatTranscriptDefinition(caseId) {
+  const definition = chatTranscriptDefinitions.find(entry => entry.id === caseId)
+  if (!definition)
+    throw new Error('Unknown chat transcript case: ' + caseId)
+  return definition
+}
+
+function buildChatTranscript(caseId) {
+  const cached = chatTranscriptCache.get(caseId)
+  if (cached)
+    return cached
+
+  const definition = findChatTranscriptDefinition(caseId)
+  const items = []
+  const paths = new Set()
+  let bytes = 0
+  let chars = 0
+  let markdownItemCount = 0
+
+  for (const [index, source] of definition.items.entries()) {
+    const id = caseId + '-' + index + '-' + source.kind
+
+    if (source.kind === 'assistant-markdown') {
+      const corpusItem = findCase(source.corpusId)
+      paths.add(corpusItem.path)
+      bytes += corpusItem.bytes
+      chars += corpusItem.chars
+      markdownItemCount += 1
+      items.push({
+        id,
+        kind: source.kind,
+        content: corpusItem.markdown,
+        final: true,
+        revision: corpusItem.bytes + ':' + corpusItem.chars,
+        label: corpusItem.label,
+      })
+      continue
+    }
+
+    const text = (source.status ? source.status + ' ' : '') + (source.label ?? source.text ?? source.message ?? '')
+    bytes += new TextEncoder().encode(text).length
+    chars += text.length
+    items.push({
+      id,
+      ...source,
+    })
+  }
+
+  const endMarker = 'MARKSTREAM_REAL_CHAT_RESTORE_END_' + caseId
+  bytes += new TextEncoder().encode(endMarker).length
+  chars += endMarker.length
+  items.push({
+    id: caseId + '-end-marker',
+    kind: 'system-divider',
+    text: endMarker,
+  })
+
+  const transcript = {
+    id: definition.id,
+    label: definition.label,
+    path: Array.from(paths).join(', '),
+    bytes,
+    chars,
+    threadKey: 'real-chat-' + definition.id,
+    endMarker,
+    items,
+    itemCount: items.length,
+    markdownItemCount,
+  }
+  chatTranscriptCache.set(caseId, transcript)
+  return transcript
 }
 
 function makeChunks(markdown, count) {
@@ -841,6 +1182,10 @@ async function resetRenderer(nextMode, nextSmoothStreaming) {
   final.value = true
   mode.value = nextMode
   smoothStreaming.value = nextSmoothStreaming
+  surface.value = 'markdown'
+  timelineItems.value = []
+  timelineInitialState.value = null
+  timelineThreadKey.value = ''
   renderKey.value += 1
   await nextTick()
   await waitFrames(2)
@@ -865,6 +1210,7 @@ async function runRestore(options) {
   const totalMs = performance.now() - startedAt
   const observerState = observers.stop()
   const parseAfter = readParsePerformance()
+  assertWaitCompleted('Restore stable render for ' + item.id, stable)
 
   return {
     id: item.id,
@@ -877,6 +1223,106 @@ async function runRestore(options) {
     settledSnapshot: stable.snapshot,
     stable,
     heightStability: summarizeHeightChanges(firstSlots, settledSlots),
+    observers: summarizeObserverState(observerState),
+    parsePerformance: diffParsePerformance(parseAfter, parseBefore),
+  }
+}
+
+async function prepareChatRestore(options) {
+  const item = buildChatTranscript(options.caseId)
+  const cached = preparedChatStates.get(item.id)
+  if (cached)
+    return cached.summary
+
+  await resetRenderer('chat', false)
+  resetParsePerformance()
+  const startedAt = performance.now()
+  surface.value = 'timeline'
+  timelineThreadKey.value = item.threadKey
+  timelineInitialState.value = null
+  timelineItems.value = item.items
+  renderKey.value += 1
+  await nextTick()
+  await waitFrames(2)
+  const stable = await waitForStableRender(options.timeoutMs ?? 30000, item.endMarker)
+  assertWaitCompleted('Prepare chat restore stable render for ' + item.id, stable)
+  const state = timelineRef.value?.captureThreadState?.() ?? null
+  const snapshot = getDomSnapshot()
+  const timelineSnapshot = getTimelineSnapshot()
+  if (!state)
+    throw new Error('Failed to capture chat restore state for ' + item.id)
+
+  const summary = {
+    elapsedMs: performance.now() - startedAt,
+    stable,
+    snapshot,
+    timelineSnapshot,
+    itemHeightCount: Object.keys(state.itemHeights ?? {}).length,
+    markdownStateCount: Object.keys(state.markdownStates ?? {}).length,
+  }
+  preparedChatStates.set(item.id, { state, summary })
+  await resetRenderer('chat', false)
+  return summary
+}
+
+async function runChatRestore(options) {
+  const item = buildChatTranscript(options.caseId)
+  const prepared = preparedChatStates.get(item.id) ?? {
+    state: null,
+    summary: await prepareChatRestore(options),
+  }
+  const preparedState = prepared.state ?? preparedChatStates.get(item.id)?.state
+  if (!preparedState)
+    throw new Error('Missing prepared chat restore state for ' + item.id)
+
+  await resetRenderer('chat', false)
+  const root = getRoot()
+  resetParsePerformance()
+  const parseBefore = readParsePerformance()
+  const observers = startRunObservers(root)
+  const startedAt = performance.now()
+  surface.value = 'timeline'
+  timelineThreadKey.value = item.threadKey
+  timelineInitialState.value = preparedState
+  timelineItems.value = item.items
+  renderKey.value += 1
+  await nextTick()
+  await waitFrames(2)
+  const firstSnapshot = getDomSnapshot()
+  const firstTimelineSnapshot = getTimelineSnapshot()
+  const hiddenRestoreSlots = measureSlots()
+  const restoreReady = await waitForTimelineReady(options.timeoutMs ?? 30000, item.endMarker)
+  const firstVisibleSnapshot = getDomSnapshot()
+  const firstVisibleTimelineSnapshot = getTimelineSnapshot()
+  const firstVisibleSlots = measureSlots()
+  const stable = await waitForStableRender(options.timeoutMs ?? 30000, item.endMarker)
+  const settledSlots = measureSlots()
+  const totalMs = performance.now() - startedAt
+  const observerState = observers.stop()
+  const parseAfter = readParsePerformance()
+  assertWaitCompleted('Chat restore ready for ' + item.id, restoreReady)
+  assertWaitCompleted('Chat restore stable render for ' + item.id, stable)
+
+  return {
+    id: item.id,
+    label: item.label,
+    path: item.path,
+    bytes: item.bytes,
+    chars: item.chars,
+    itemCount: item.itemCount,
+    markdownItemCount: item.markdownItemCount,
+    totalMs,
+    firstSnapshot,
+    firstVisibleSnapshot,
+    settledSnapshot: stable.snapshot,
+    firstTimelineSnapshot,
+    firstVisibleTimelineSnapshot,
+    settledTimelineSnapshot: getTimelineSnapshot(),
+    stable,
+    restoreReady,
+    prepare: prepared.summary,
+    heightStability: summarizeHeightChanges(firstVisibleSlots, settledSlots),
+    hiddenRestoreHeightStability: summarizeHeightChanges(hiddenRestoreSlots, settledSlots),
     observers: summarizeObserverState(observerState),
     parsePerformance: diffParsePerformance(parseAfter, parseBefore),
   }
@@ -920,6 +1366,8 @@ async function runStream(options) {
   const totalMs = performance.now() - startedAt
   const observerState = observers.stop()
   const parseAfter = readParsePerformance()
+  assertWaitCompleted('Stream marker wait for ' + item.id, markerWait)
+  assertWaitCompleted('Stream stable render for ' + item.id, stable)
   const sortedUpdates = updateDurations.slice().sort((a, b) => a - b)
   const heightJumps = countHeightJumps(observerState.heightSamples)
 
@@ -946,32 +1394,112 @@ async function runStream(options) {
 }
 
 window.__runRealCorpusBenchmark = async (options) => {
+  if (options.mode === 'chat-restore')
+    return runChatRestore(options)
   if (options.mode === 'stream')
     return runStream(options)
   return runRestore(options)
 }
 
+window.__prepareRealCorpusBenchmark = async (options) => {
+  if (options.mode === 'chat-restore')
+    return prepareChatRestore(options)
+  return null
+}
+
 window.__ready = true
+
+function renderTimelineItem(props) {
+  const item = props.item ?? {}
+
+  if (props.kind === 'assistant-markdown') {
+    return h('article', {
+      ref: props.measureRef,
+      class: 'bench-chat-row bench-assistant-row',
+    }, [
+      h(MarkdownRender, {
+        ...props.markdownProps,
+        ...(props.markdownProps.final ? finalTimelineMarkdownOptions : {}),
+        class: 'bench-assistant-markdown',
+        debugPerformance: true,
+        renderCodeBlocksAsPre: true,
+        smoothStreamingOptions,
+        batchRendering: true,
+        ...rendererOptions,
+      }),
+    ])
+  }
+
+  if (props.kind === 'user-message') {
+    return h('article', {
+      ref: props.measureRef,
+      class: 'bench-chat-row bench-user-row',
+    }, item.text ?? '')
+  }
+
+  if (props.kind === 'tool-call') {
+    return h('div', {
+      ref: props.measureRef,
+      class: 'bench-chat-row bench-tool-row',
+    }, [
+      h('span', item.status ?? ''),
+      item.label ?? '',
+    ])
+  }
+
+  return h('div', {
+    ref: props.measureRef,
+    class: 'bench-chat-row bench-system-row',
+  }, item.text ?? item.message ?? item.label ?? '')
+}
 
 const App = defineComponent({
   setup() {
+    function renderBenchmarkSurface() {
+      if (surface.value === 'timeline') {
+        return h(MarkstreamVirtualTimeline, {
+          ref: timelineRef,
+          key: 'timeline-' + renderKey.value,
+          class: 'bench-chat-timeline',
+          items: timelineItems.value,
+          threadKey: timelineThreadKey.value,
+          initialThreadState: timelineInitialState.value,
+          overscan: 1000000,
+          overscanPx: 1000000,
+          stickToBottom: false,
+          markdownMode: 'chat',
+          markdownCodeRenderer: 'pre',
+          markdownFade: false,
+          restoreMaxLoadingMs: false,
+          debug: true,
+        }, {
+          default: renderTimelineItem,
+          'restore-loading': ({ threadKey }) => h('div', { class: 'bench-restore-loading' }, 'Restoring ' + threadKey),
+        })
+      }
+
+      return h(MarkdownRender, {
+        key: 'markdown-' + renderKey.value,
+        content: content.value,
+        final: final.value,
+        mode: mode.value,
+        smoothStreaming: smoothStreaming.value,
+        smoothStreamingOptions,
+        debugPerformance: true,
+        renderCodeBlocksAsPre: true,
+        batchRendering: true,
+        ...rendererOptions,
+      })
+    }
+
     return () => h('main', { class: 'bench-shell' }, [
-      h('section', { class: 'bench-host' }, [
-        h(MarkdownRender, {
-          key: renderKey.value,
-          content: content.value,
-          final: final.value,
-          mode: mode.value,
-          smoothStreaming: smoothStreaming.value,
-          smoothStreamingOptions,
-          debugPerformance: true,
-          renderCodeBlocksAsPre: true,
-          batchRendering: true,
-          initialRenderBatchSize: 16,
-          renderBatchSize: 16,
-          renderBatchDelay: 8,
-          parseCoalesceMs: 32,
-        }),
+      h('section', {
+        class: [
+          'bench-host',
+          surface.value === 'timeline' ? 'bench-host--timeline' : '',
+        ],
+      }, [
+        renderBenchmarkSurface(),
       ]),
     ])
   },
@@ -1001,6 +1529,105 @@ async function createBenchmarkServer(corpus) {
   return { server, port }
 }
 
+const observerNumericKeys = [
+  'mutationCount',
+  'longTaskCount',
+  'longTaskTotalMs',
+  'longTaskMaxMs',
+  'cls',
+  'heightSampleCount',
+  'frameSampleCount',
+  'frameP95Ms',
+  'frameMaxMs',
+  'droppedFrameEstimate',
+  'longTaskBusyRatio',
+]
+
+const parsePerformanceNumericKeys = [
+  'parseCommitCount',
+  'parseCoalescedCount',
+  'streamCommitCount',
+  'syncCommitCount',
+  'tokenCloneMs',
+  'processTokensMs',
+  'parseMarkdownToStructureTotalMs',
+  'nodeReuseMs',
+  'signatureMs',
+  'stabilizeSignatureMs',
+  'primeSignatureMs',
+  'signatureCallCount',
+  'stabilizeSignatureCallCount',
+  'primeSignatureCallCount',
+  'stabilizeMs',
+  'reusedNodeCount',
+  'dirtyTailNodeCount',
+]
+
+function medianRunNumber(runs, read) {
+  const values = runs.map(read).filter(Number.isFinite)
+  return values.length ? round(median(values)) : undefined
+}
+
+function summarizeNumericObject(runs, read, keys) {
+  const output = {}
+  for (const key of keys) {
+    const value = medianRunNumber(runs, run => read(run)?.[key])
+    if (value !== undefined)
+      output[key] = value
+  }
+  return output
+}
+
+function summarizeTimedResult(runs, medianRun, key) {
+  const source = medianRun[key]
+  if (!source)
+    return source
+
+  const elapsedMs = medianRunNumber(runs, run => run[key]?.elapsedMs)
+  return {
+    ...source,
+    ...(elapsedMs !== undefined ? { elapsedMs } : {}),
+    timedOut: runs.some(run => run[key]?.timedOut === true),
+  }
+}
+
+function summarizeHeightStabilityWorst(runs, key) {
+  const read = (run, metric) => Number(run[key]?.[metric])
+  return {
+    changedSlots: Math.max(0, ...runs.map(run => read(run, 'changedSlots')).filter(Number.isFinite)),
+    nonIgnoredChangedSlots: Math.max(0, ...runs.map(run => read(run, 'nonIgnoredChangedSlots')).filter(Number.isFinite)),
+    visibleNonIgnoredChangedSlots: Math.max(0, ...runs.map(run => read(run, 'visibleNonIgnoredChangedSlots')).filter(Number.isFinite)),
+    maxAbsDeltaPx: round(Math.max(0, ...runs.map(run => read(run, 'maxAbsDeltaPx')).filter(Number.isFinite))),
+    nonIgnoredMaxAbsDeltaPx: round(Math.max(0, ...runs.map(run => read(run, 'nonIgnoredMaxAbsDeltaPx')).filter(Number.isFinite))),
+    visibleNonIgnoredMaxAbsDeltaPx: round(Math.max(0, ...runs.map(run => read(run, 'visibleNonIgnoredMaxAbsDeltaPx')).filter(Number.isFinite))),
+  }
+}
+
+function hasRunTimedOut(run) {
+  return Boolean(
+    run.stable?.timedOut
+    || run.restoreReady?.timedOut
+    || run.markerWait?.timedOut
+    || run.prepare?.stable?.timedOut,
+  )
+}
+
+function summarizeParsePerformance(runs, medianRun) {
+  const source = medianRun.parsePerformance
+  if (!source)
+    return source
+
+  return {
+    ...source,
+    ...summarizeNumericObject(runs, run => run.parsePerformance, parsePerformanceNumericKeys),
+    stream: summarizeNumericObject(
+      runs,
+      run => run.parsePerformance?.stream,
+      Array.from(new Set(runs.flatMap(run => Object.keys(run.parsePerformance?.stream ?? {})))),
+    ),
+  }
+}
+
 function summarizeBrowserRuns(runs) {
   const sortedByTotal = runs.slice().sort((a, b) => a.totalMs - b.totalMs)
   const numericKeys = [
@@ -1024,12 +1651,22 @@ function summarizeBrowserRuns(runs) {
 
   const medianRun = sortedByTotal[Math.floor(sortedByTotal.length / 2)]
   output.firstSnapshot = medianRun.firstSnapshot
+  output.firstVisibleSnapshot = medianRun.firstVisibleSnapshot
   output.finalSnapshot = medianRun.finalSnapshot
   output.settledSnapshot = medianRun.settledSnapshot
+  output.firstTimelineSnapshot = medianRun.firstTimelineSnapshot
+  output.firstVisibleTimelineSnapshot = medianRun.firstVisibleTimelineSnapshot
+  output.settledTimelineSnapshot = medianRun.settledTimelineSnapshot
   output.heightStability = medianRun.heightStability
-  output.observers = medianRun.observers
-  output.parsePerformance = medianRun.parsePerformance
-  output.stable = medianRun.stable
+  output.hiddenRestoreHeightStability = medianRun.hiddenRestoreHeightStability
+  output.heightStabilityWorst = summarizeHeightStabilityWorst(runs, 'heightStability')
+  output.hiddenRestoreHeightStabilityWorst = summarizeHeightStabilityWorst(runs, 'hiddenRestoreHeightStability')
+  output.observers = summarizeNumericObject(runs, run => run.observers, observerNumericKeys)
+  output.parsePerformance = summarizeParsePerformance(runs, medianRun)
+  output.stable = summarizeTimedResult(runs, medianRun, 'stable')
+  output.restoreReady = summarizeTimedResult(runs, medianRun, 'restoreReady')
+  output.prepare = medianRun.prepare
+  output.runTimedOut = runs.some(hasRunTimedOut)
   return output
 }
 
@@ -1055,16 +1692,23 @@ async function runBrowserCase(browser, port, mode, testCase) {
       await client.send('Emulation.setCPUThrottlingRate', { rate: browserCpuThrottleRate })
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'load' })
     await page.waitForFunction(() => window.__ready === true)
+    const runOptions = {
+      mode,
+      caseId: testCase.id,
+      chunks: browserStreamChunks,
+      intervalMs: browserStreamIntervalMs,
+      timeoutMs: 30000,
+    }
+    if (mode === 'chat-restore') {
+      await page.evaluate(
+        options => window.__prepareRealCorpusBenchmark(options),
+        runOptions,
+      )
+    }
     const before = await getMetrics(client)
     const result = await page.evaluate(
       options => window.__runRealCorpusBenchmark(options),
-      {
-        mode,
-        caseId: testCase.id,
-        chunks: browserStreamChunks,
-        intervalMs: browserStreamIntervalMs,
-        timeoutMs: 30000,
-      },
+      runOptions,
     )
     const after = await getMetrics(client)
     await page.close()
@@ -1102,6 +1746,7 @@ async function runBrowserCase(browser, port, mode, testCase) {
 async function runBrowserBenchmarks(corpus) {
   const restoreCases = selectCases(corpus, selectedBrowserRestoreCaseIds)
   const streamCases = selectCases(corpus, selectedBrowserStreamCaseIds)
+  const chatRestoreCases = selectChatTranscriptCases(createChatTranscriptCases(corpus), selectedBrowserChatRestoreCaseIds)
   const { server, port } = await createBenchmarkServer(corpus)
   let browser
 
@@ -1119,7 +1764,13 @@ async function runBrowserBenchmarks(corpus) {
       streaming.push(await runBrowserCase(browser, port, 'stream', testCase))
     }
 
-    return { restore, streaming }
+    const chatRestore = []
+    for (const testCase of chatRestoreCases) {
+      console.log(`browser chat restore case=${testCase.id}`)
+      chatRestore.push(await runBrowserCase(browser, port, 'chat-restore', testCase))
+    }
+
+    return { restore, streaming, chatRestore }
   }
   finally {
     await browser?.close()
@@ -1135,6 +1786,14 @@ function formatNumber(value) {
   return typeof value === 'number' && Number.isFinite(value) ? String(Math.round(value)) : '-'
 }
 
+function formatPercent(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? `${(value * 100).toFixed(1)}%` : '-'
+}
+
+function formatBoolean(value) {
+  return value === true ? 'yes' : 'no'
+}
+
 function renderParserTable(parserResults) {
   const lines = [
     '| Case | Bytes | Nodes | Final median | Process median | Stream total | Stream p95 commit | Final flush |',
@@ -1148,24 +1807,44 @@ function renderParserTable(parserResults) {
 
 function renderBrowserRestoreTable(rows) {
   const lines = [
-    '| Case | Bytes | Total | Task | Script | Layout | DOM nodes | Non-image/katex height changes | Max non-ignored delta | Parser total | Node reuse | Signature | CLS |',
-    '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
+    '| Case | Bytes | Total | Timed out | Task | Script | Layout | Run long task | Run long-task busy | Run frame p95 | Run frame max | Run dropped frames | DOM nodes | Worst non-image/katex height changes | Worst max non-ignored delta | Parser total | Node reuse | Signature | CLS |',
+    '| --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
   ]
   for (const row of rows) {
     const m = row.median
-    lines.push(`| ${row.id} | ${row.bytes} | ${formatMs(m.totalMs)} | ${formatMs(m.taskDurationMs)} | ${formatMs(m.scriptDurationMs)} | ${formatMs(m.layoutDurationMs)} | ${formatNumber(m.settledSnapshot?.domNodes)} | ${formatNumber(m.heightStability?.nonIgnoredChangedSlots)} | ${formatMs(m.heightStability?.nonIgnoredMaxAbsDeltaPx)} | ${formatMs(m.parsePerformance?.parseMarkdownToStructureTotalMs)} | ${formatMs(m.parsePerformance?.nodeReuseMs)} | ${formatMs(m.parsePerformance?.signatureMs)} | ${m.observers?.cls ?? '-'} |`)
+    lines.push(`| ${row.id} | ${row.bytes} | ${formatMs(m.totalMs)} | ${formatBoolean(m.runTimedOut)} | ${formatMs(m.taskDurationMs)} | ${formatMs(m.scriptDurationMs)} | ${formatMs(m.layoutDurationMs)} | ${formatMs(m.observers?.longTaskTotalMs)} | ${formatPercent(m.observers?.longTaskBusyRatio)} | ${formatMs(m.observers?.frameP95Ms)} | ${formatMs(m.observers?.frameMaxMs)} | ${formatNumber(m.observers?.droppedFrameEstimate)} | ${formatNumber(m.settledSnapshot?.domNodes)} | ${formatNumber(m.heightStabilityWorst?.nonIgnoredChangedSlots)} | ${formatMs(m.heightStabilityWorst?.nonIgnoredMaxAbsDeltaPx)} | ${formatMs(m.parsePerformance?.parseMarkdownToStructureTotalMs)} | ${formatMs(m.parsePerformance?.nodeReuseMs)} | ${formatMs(m.parsePerformance?.signatureMs)} | ${m.observers?.cls ?? '-'} |`)
   }
   return lines.join('\n')
 }
 
 function renderBrowserStreamTable(rows) {
   const lines = [
-    '| Case | Bytes | Chunks | Total | p95 update | Max update | Height jumps | Mutations | Task | Layout | Parser total | Node reuse | Signature | Non-image/katex final height changes |',
-    '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
+    '| Case | Bytes | Chunks | Total | Timed out | p95 update | Max update | Run frame p95 | Run frame max | Run dropped frames | Run long task | Run long-task busy | Height jumps | Mutations | Task | Layout | Parser total | Node reuse | Signature | Worst non-image/katex final height changes |',
+    '| --- | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
   ]
   for (const row of rows) {
     const m = row.median
-    lines.push(`| ${row.id} | ${row.bytes} | ${row.runs[0]?.chunks ?? '-'} | ${formatMs(m.totalMs)} | ${formatMs(m.p95UpdateMs)} | ${formatMs(m.maxUpdateMs)} | ${formatNumber(m.heightJumps)} | ${formatNumber(m.observers?.mutationCount)} | ${formatMs(m.taskDurationMs)} | ${formatMs(m.layoutDurationMs)} | ${formatMs(m.parsePerformance?.parseMarkdownToStructureTotalMs)} | ${formatMs(m.parsePerformance?.nodeReuseMs)} | ${formatMs(m.parsePerformance?.signatureMs)} | ${formatNumber(m.heightStability?.nonIgnoredChangedSlots)} |`)
+    lines.push(`| ${row.id} | ${row.bytes} | ${row.runs[0]?.chunks ?? '-'} | ${formatMs(m.totalMs)} | ${formatBoolean(m.runTimedOut)} | ${formatMs(m.p95UpdateMs)} | ${formatMs(m.maxUpdateMs)} | ${formatMs(m.observers?.frameP95Ms)} | ${formatMs(m.observers?.frameMaxMs)} | ${formatNumber(m.observers?.droppedFrameEstimate)} | ${formatMs(m.observers?.longTaskTotalMs)} | ${formatPercent(m.observers?.longTaskBusyRatio)} | ${formatNumber(m.heightJumps)} | ${formatNumber(m.observers?.mutationCount)} | ${formatMs(m.taskDurationMs)} | ${formatMs(m.layoutDurationMs)} | ${formatMs(m.parsePerformance?.parseMarkdownToStructureTotalMs)} | ${formatMs(m.parsePerformance?.nodeReuseMs)} | ${formatMs(m.parsePerformance?.signatureMs)} | ${formatNumber(m.heightStabilityWorst?.nonIgnoredChangedSlots)} |`)
+  }
+  return lines.join('\n')
+}
+
+function renderBrowserChatRestoreTable(rows) {
+  const lines = [
+    '| Case | Bytes | Items | Markdown items | Total | Timed out | Restore ready | Task | Script | Layout | Run long task | Run long-task busy | Run frame p95 | Run frame max | Run dropped frames | Timeline height | Visible timeline drift | Hidden timeline drift | DOM nodes | Worst viewport node height changes | Worst DOM node height changes | Worst hidden DOM node height changes | Worst max viewport node delta | Parser total | Node reuse | Signature | CLS |',
+    '| --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
+  ]
+  for (const row of rows) {
+    const m = row.median
+    const visibleTimelineDrift = Math.abs(
+      Number(m.firstVisibleTimelineSnapshot?.scrollHeight ?? 0)
+      - Number(m.settledTimelineSnapshot?.scrollHeight ?? 0),
+    )
+    const hiddenTimelineDrift = Math.abs(
+      Number(m.firstTimelineSnapshot?.scrollHeight ?? 0)
+      - Number(m.settledTimelineSnapshot?.scrollHeight ?? 0),
+    )
+    lines.push(`| ${row.id} | ${row.bytes} | ${formatNumber(row.runs[0]?.itemCount)} | ${formatNumber(row.runs[0]?.markdownItemCount)} | ${formatMs(m.totalMs)} | ${formatBoolean(m.runTimedOut)} | ${formatMs(m.restoreReady?.elapsedMs)} | ${formatMs(m.taskDurationMs)} | ${formatMs(m.scriptDurationMs)} | ${formatMs(m.layoutDurationMs)} | ${formatMs(m.observers?.longTaskTotalMs)} | ${formatPercent(m.observers?.longTaskBusyRatio)} | ${formatMs(m.observers?.frameP95Ms)} | ${formatMs(m.observers?.frameMaxMs)} | ${formatNumber(m.observers?.droppedFrameEstimate)} | ${formatNumber(m.settledTimelineSnapshot?.totalHeight)} | ${formatMs(visibleTimelineDrift)} | ${formatMs(hiddenTimelineDrift)} | ${formatNumber(m.settledSnapshot?.domNodes)} | ${formatNumber(m.heightStabilityWorst?.visibleNonIgnoredChangedSlots)} | ${formatNumber(m.heightStabilityWorst?.nonIgnoredChangedSlots)} | ${formatNumber(m.hiddenRestoreHeightStabilityWorst?.nonIgnoredChangedSlots)} | ${formatMs(m.heightStabilityWorst?.visibleNonIgnoredMaxAbsDeltaPx)} | ${formatMs(m.parsePerformance?.parseMarkdownToStructureTotalMs)} | ${formatMs(m.parsePerformance?.nodeReuseMs)} | ${formatMs(m.parsePerformance?.signatureMs)} | ${m.observers?.cls ?? '-'} |`)
   }
   return lines.join('\n')
 }
@@ -1187,6 +1866,16 @@ function renderHeightChangesByTypeTable(rows) {
   return lines.join('\n')
 }
 
+function renderOptionsTable(options) {
+  const lines = [
+    '| Option | Value |',
+    '| --- | --- |',
+  ]
+  for (const [key, value] of Object.entries(options))
+    lines.push(`| ${key} | ${String(value)} |`)
+  return lines.join('\n')
+}
+
 function renderMarkdownReport(payload) {
   const distRows = payload.distFreshness
     .map(item => `| ${item.name} | ${item.distPath} | ${item.stale ? 'yes' : 'no'} | ${item.missing ? 'yes' : 'no'} |`)
@@ -1204,6 +1893,18 @@ function renderMarkdownReport(payload) {
     `| Node | ${process.version} |`,
     `| OS | ${type()} ${release()} (${platform()} ${arch()}) |`,
     `| Memory | ${(totalmem() / 1024 / 1024).toFixed(0)} MB |`,
+    '',
+    '## Renderer Fixture',
+    '',
+    renderOptionsTable(payload.config.rendererOptions),
+    '',
+    '## Final Timeline Markdown Fixture',
+    '',
+    renderOptionsTable(payload.config.finalTimelineMarkdownOptions),
+    '',
+    '## Smooth Streaming Fixture',
+    '',
+    renderOptionsTable(payload.config.smoothStreamingOptions),
     '',
     '## Dist Freshness',
     '',
@@ -1223,6 +1924,14 @@ function renderMarkdownReport(payload) {
     '',
     renderHeightChangesByTypeTable(payload.browser.restore),
     '',
+    '## Browser Chat Restore',
+    '',
+    renderBrowserChatRestoreTable(payload.browser.chatRestore),
+    '',
+    '### Chat Restore Height Changes By Type',
+    '',
+    renderHeightChangesByTypeTable(payload.browser.chatRestore),
+    '',
     '## Browser Streaming',
     '',
     renderBrowserStreamTable(payload.browser.streaming),
@@ -1231,7 +1940,7 @@ function renderMarkdownReport(payload) {
     '',
     renderHeightChangesByTypeTable(payload.browser.streaming),
     '',
-    'Height stability reports compare node-slot heights after the first restored/final frame against the settled frame. The non-image/katex columns exclude image nodes, slots containing image DOM, math_block nodes, and slots containing KaTeX/math DOM. Browser task/layout timings still include diagnostic snapshots, but the streaming update loop does not force per-chunk layout reads.',
+    'Height stability reports compare rendered content element border-box heights after the first restored/final frame against the settled frame. Main table height columns use the worst run so intermittent non-image/katex height changes are not hidden; the by-type height tables remain median-run diagnostics. Chat restore uses the first visible timeline frame for viewport columns, keeps all mounted DOM node changes as diagnostics, and keeps hidden restore-frame changes as diagnostics. The non-image/katex columns exclude image nodes, slots containing image DOM, math_block nodes, and slots containing KaTeX/math DOM. Frame columns are sampled with requestAnimationFrame across each browser run; dropped frames are estimated from 16.67 ms frame slots. Run long-task busy is Long Task API duration divided by run duration, not full CPU occupancy. Browser task/layout timings still include diagnostic snapshots, but the streaming update loop does not force per-chunk layout reads.',
     '',
   ].join('\n')
 }
@@ -1240,9 +1949,11 @@ async function main() {
   validateCaseIds(selectedParserCaseIds, 'parser')
   validateCaseIds(selectedBrowserRestoreCaseIds, 'browser restore')
   validateCaseIds(selectedBrowserStreamCaseIds, 'browser stream')
+  validateChatCaseIds(selectedBrowserChatRestoreCaseIds, 'browser chat restore')
 
   const distFreshness = assertWorkspacePackageDistsFresh()
   const corpus = readCorpus()
+  const chatTranscripts = createChatTranscriptCases(corpus)
   mkdirSync(outputDir, { recursive: true })
 
   console.log('running parser real-corpus benchmark')
@@ -1263,9 +1974,13 @@ async function main() {
       browserViewportWidth,
       browserViewportHeight,
       browserCpuThrottleRate,
+      rendererOptions: browserRendererOptions,
+      finalTimelineMarkdownOptions: browserFinalTimelineMarkdownOptions,
+      smoothStreamingOptions: browserEffectiveSmoothStreamingOptions,
       parserCases: selectedParserCaseIds,
       browserRestoreCases: selectedBrowserRestoreCaseIds,
       browserStreamCases: selectedBrowserStreamCaseIds,
+      browserChatRestoreCases: selectedBrowserChatRestoreCaseIds,
     },
     distFreshness,
     corpus: corpus.map(item => ({
@@ -1274,6 +1989,15 @@ async function main() {
       path: item.path,
       bytes: item.bytes,
       chars: item.chars,
+    })),
+    chatTranscripts: chatTranscripts.map(item => ({
+      id: item.id,
+      label: item.label,
+      path: item.path,
+      bytes: item.bytes,
+      chars: item.chars,
+      itemCount: item.itemCount,
+      markdownItemCount: item.markdownItemCount,
     })),
     parser,
     browser,

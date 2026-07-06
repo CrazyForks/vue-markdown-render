@@ -15,23 +15,41 @@ import {
 
 const TIMELINE_MARKDOWN_EMIT_INTERVAL_MS = 96
 const TIMELINE_MARKDOWN_HEIGHT_DIFF_THRESHOLD_PX = 4
+const TIMELINE_MARKDOWN_MAX_LIVE_NODES = 60
+const TIMELINE_MARKDOWN_LIVE_NODE_BUFFER = 20
+
+function isMeasuredOrFinalConfidence(confidence: MarkstreamVirtualMetrics['confidence'] | undefined) {
+  return confidence === 'measured' || confidence === 'final'
+}
+
+function isStableFinalVirtualMetrics(metrics: MarkstreamVirtualMetrics) {
+  const nodeCount = Number(metrics.nodeCount)
+  const measuredCount = Number(metrics.measuredCount)
+  const liveStart = Math.max(0, Number(metrics.liveRange?.start ?? 0))
+  const liveEnd = Math.min(nodeCount, Math.max(liveStart, Number(metrics.liveRange?.end ?? 0)))
+  const liveRangeCount = Math.max(0, liveEnd - liveStart)
+
+  return metrics.final === true
+    && metrics.stable === true
+    && metrics.confidence === 'mixed'
+    && nodeCount > 0
+    && measuredCount > 0
+    && measuredCount < nodeCount
+    && (liveRangeCount <= 0 || measuredCount >= liveRangeCount)
+}
 
 function shouldAllowMarkdownShrink(metrics: MarkstreamVirtualMetrics) {
   if (metrics.phase === 'final')
     return true
 
-  if (
-    metrics.final === true
-    && (metrics.confidence === 'measured' || metrics.confidence === 'final')
-  ) {
+  if (metrics.final === true && isMeasuredOrFinalConfidence(metrics.confidence))
     return true
-  }
 
   if (!metrics.stable)
     return false
 
-  return metrics.confidence === 'measured'
-    || metrics.confidence === 'final'
+  return isMeasuredOrFinalConfidence(metrics.confidence)
+    || isStableFinalVirtualMetrics(metrics)
 }
 
 export type MarkstreamTimelineItemKey = string | number
@@ -155,7 +173,19 @@ export interface MarkstreamThreadVirtualState {
 
 type MarkstreamItemSizeSource = NonNullable<MarkstreamThreadVirtualState['itemSizeSources']>[string]
 
-export interface MarkstreamVirtualMarkdownProps extends Pick<NodeRendererProps, 'content' | 'final' | 'indexKey' | 'nodeVirtual' | 'virtualScroll' | 'fade' | 'mode' | 'codeRenderer'> {
+export interface MarkstreamVirtualMarkdownProps extends Pick<
+  NodeRendererProps,
+  | 'content'
+  | 'final'
+  | 'indexKey'
+  | 'nodeVirtual'
+  | 'maxLiveNodes'
+  | 'liveNodeBuffer'
+  | 'virtualScroll'
+  | 'fade'
+  | 'mode'
+  | 'codeRenderer'
+> {
   onHeightChange: (metrics: MarkstreamVirtualMetrics) => void
   onVirtualStateChange: (state: MarkstreamVirtualState) => void
 }
@@ -938,7 +968,9 @@ export function useMarkstreamVirtualAdapter<T = MarkstreamTimelineItem>(
       final,
       mode: markdownMode,
       codeRenderer: markdownCodeRenderer,
-      nodeVirtual: false,
+      nodeVirtual: final ? 'auto' : false,
+      maxLiveNodes: final ? TIMELINE_MARKDOWN_MAX_LIVE_NODES : undefined,
+      liveNodeBuffer: final ? TIMELINE_MARKDOWN_LIVE_NODE_BUFFER : undefined,
       fade: options.markdownFade === true,
       indexKey: sessionKey,
       virtualScroll,

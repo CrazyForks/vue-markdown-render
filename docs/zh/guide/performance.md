@@ -112,6 +112,24 @@ const md = '# Virtualized transcript'
 
 如果业务已经有自己的外层 virtualizer，使用 `useMarkstreamVirtualAdapter()`，并把 `markdownProps(item, index)` 绑定到 Markdown item。底层 `virtualScroll` prop 继续作为高级 adapter/debug 协议保留。
 
+`MarkstreamVirtualTimeline` 和 `useMarkstreamVirtualAdapter()` 产出的 final Markdown row 默认会使用 node virtualization（`nodeVirtual: 'auto'`、`maxLiveNodes: 60`、`liveNodeBuffer: 20`），这样恢复聊天记录时不会一次性挂载完整 Markdown DOM。如果某一行必须暴露完整 DOM 给选择复制、外部锚点、测试或自定义高亮逻辑，可以在自定义 slot 里覆盖绑定的 props：
+
+```vue
+<template v-slot:default="{ markdownProps, measureRef }">
+  <article :ref="measureRef" class="message-bubble">
+    <MarkdownRender
+      v-bind="{
+        ...markdownProps,
+        nodeVirtual: false,
+        maxLiveNodes: 0,
+      }"
+    />
+  </article>
+</template>
+```
+
+使用 `useMarkstreamVirtualAdapter()` 时，在绑定 `adapter.markdownProps(item, index)` 的位置应用同样的覆盖即可。
+
 #### Thread restore loading
 
 `MarkstreamVirtualTimeline` 会隐藏正在恢复的真实 rows，直到已恢复 viewport 准备就绪。你可以用 `restore-loading` slot 自定义不参与布局的 loading overlay。这个 overlay 以 absolute 方式定位在 scroll root 内，因此不会改变 `scrollHeight` 或 item 测量值。

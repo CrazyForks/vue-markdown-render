@@ -1177,6 +1177,61 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port, ensureServ
     let stableReadyKey = ''
     let stableReadyFrames = 0
     const total = Math.max(1, snapshot.totalHeight || snapshot.scrollHeight || 1)
+    const readMarkdownPersistenceReadiness = (sample) => {
+      const markdownMetrics = sample.state?.markdownStates?.['a-md-1']?.metrics
+      const itemHeight = Number(sample.state?.itemHeights?.['a-md-1'] ?? 0)
+      const metricsHeight = Number(markdownMetrics?.totalHeight ?? 0)
+      const estimatedCount = Number(markdownMetrics?.estimatedCount ?? 0)
+      const measuredCount = Number(markdownMetrics?.measuredCount ?? 0)
+      const nodeCount = Number(markdownMetrics?.nodeCount ?? 1)
+      const liveStart = Math.max(0, Number(markdownMetrics?.liveRange?.start ?? 0))
+      const liveEnd = Math.min(nodeCount, Math.max(liveStart, Number(markdownMetrics?.liveRange?.end ?? 0)))
+      const liveRangeCount = Math.max(0, liveEnd - liveStart)
+      const heightDelta = Math.abs(itemHeight - metricsHeight)
+      const heightDeltaTolerance = Math.min(
+        1600,
+        Math.max(320, Math.ceil(metricsHeight * 0.02) + measuredCount * 16),
+      )
+      const confidence = markdownMetrics?.confidence
+      const hasMeasuredOrFinalConfidence = confidence === 'measured'
+        || confidence === 'final'
+
+      const hasCompleteMeasuredMetrics = hasMeasuredOrFinalConfidence
+        && measuredCount >= nodeCount
+        && estimatedCount === 0
+
+      const hasStableMixedVirtualMetrics = confidence === 'mixed'
+        && markdownMetrics?.stable === true
+        && measuredCount > 0
+        && measuredCount < nodeCount
+        && (liveRangeCount <= 0 || measuredCount >= liveRangeCount)
+
+      return {
+        key: [
+          itemHeight,
+          metricsHeight,
+          heightDelta,
+          confidence ?? 'none',
+          Boolean(markdownMetrics?.stable),
+          estimatedCount,
+          measuredCount,
+          liveStart,
+          liveEnd,
+          nodeCount,
+        ].join(':'),
+        ready: Boolean(
+          markdownMetrics?.final === true
+          && (hasCompleteMeasuredMetrics || hasStableMixedVirtualMetrics)
+          && itemHeight > 0
+          && metricsHeight > 0
+          && heightDelta <= heightDeltaTolerance,
+        ),
+        itemHeight,
+        metrics: markdownMetrics,
+        metricsHeight,
+        heightDelta,
+      }
+    }
 
     // Locate the region around "PR analysis section 13", which is below the
     // section-6 area and keeps normal ts CodeBlockNode instances above it.
@@ -1192,7 +1247,6 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port, ensureServ
 
         snapshot = api.read()
 
-        const markdownMetrics = snapshot.state?.markdownStates?.['a-md-1']?.metrics
         const viewportText = String(snapshot.viewportText || snapshot.visibleText || '')
         if (
           viewportText.includes('PR analysis section 13')
@@ -1201,50 +1255,15 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port, ensureServ
           found = snapshot
         }
 
-        const itemHeight = Number(snapshot.state?.itemHeights?.['a-md-1'] ?? 0)
-        const metricsHeight = Number(markdownMetrics?.totalHeight ?? 0)
-        const visibleDomHeight = Number(markdownMetrics?.visibleDomHeight ?? 0)
-        const estimatedCount = Number(markdownMetrics?.estimatedCount ?? 0)
-        const measuredCount = Number(markdownMetrics?.measuredCount ?? 0)
-        const nodeCount = Number(markdownMetrics?.nodeCount ?? 1)
-
-        // Timeline item height includes assistant bubble chrome and the browser's
-        // outer block margin-collapsing effects for every measured markdown node.
-        // Scale the tolerance by measured node count, but cap it well below the
-        // old 1600px partial-measurement gap.
-        const heightDelta = Math.abs(itemHeight - metricsHeight)
-        const heightDeltaTolerance = Math.min(
-          1600,
-          Math.max(320, Math.ceil(metricsHeight * 0.02) + measuredCount * 16),
-        )
-
-        const readyKey = [
-          itemHeight,
-          metricsHeight,
-          visibleDomHeight,
-          estimatedCount,
-          measuredCount,
-          nodeCount,
-          Boolean(markdownMetrics?.stable),
-        ].join(':')
-
-        const markdownReady = Boolean(
-          found
-          && markdownMetrics?.final === true
-          && markdownMetrics?.confidence === 'measured'
-          && measuredCount >= nodeCount
-          && estimatedCount === 0
-          && itemHeight > 0
-          && metricsHeight > 0
-          && heightDelta <= heightDeltaTolerance,
-        )
+        const readiness = readMarkdownPersistenceReadiness(snapshot)
+        const markdownReady = found && readiness.ready
 
         if (markdownReady) {
-          if (readyKey === stableReadyKey) {
+          if (readiness.key === stableReadyKey) {
             stableReadyFrames += 1
           }
           else {
-            stableReadyKey = readyKey
+            stableReadyKey = readiness.key
             stableReadyFrames = 1
           }
 
@@ -1265,7 +1284,7 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port, ensureServ
 
     if (!finalReadySnapshot) {
       throw new Error([
-        'Could not observe final measured markdown metrics before storing virtual-timeline-zero reload state.',
+        'Could not observe final stable markdown metrics before storing virtual-timeline-zero reload state.',
         `Last itemHeight=${snapshot.state?.itemHeights?.['a-md-1'] ?? 'n/a'}`,
         `Last metrics=${JSON.stringify(snapshot.state?.markdownStates?.['a-md-1']?.metrics ?? null)}`,
       ].join('\n'))
@@ -1293,6 +1312,16 @@ async function runVirtualTimelineZeroCodeBlockJitterProbe(page, port, ensureServ
       await api.nextFrame()
 
     snapshot = api.read()
+    const finalReadiness = readMarkdownPersistenceReadiness(snapshot)
+
+    if (!finalReadiness.ready) {
+      throw new Error(`virtual-timeline-zero stored snapshot was not final-stable enough after anchor adjustment: ${JSON.stringify({
+        itemHeight: finalReadiness.itemHeight,
+        metricsHeight: finalReadiness.metricsHeight,
+        heightDelta: finalReadiness.heightDelta,
+        metrics: finalReadiness.metrics,
+      })}`)
+    }
 
     const storagePayload = JSON.stringify({
       [snapshot.state.threadKey]: snapshot.state,

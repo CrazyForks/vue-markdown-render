@@ -67,6 +67,173 @@ const final = ref(false)
 
 ## 4. 常见升级路径
 
+### 直播聊天自动滚到底，但不要每个 token 都写滚动
+
+如果聊天窗口要跟随最新 assistant 输出，滚动写入要用 `requestAnimationFrame` 合并，而且只在用户本来就接近底部时才跟随。不要在每个 chunk 上调用 `scrollIntoView({ behavior: 'smooth' })`；流式输出时这会制造一堆互相打断的滚动动画。
+
+```vue
+<script setup lang="ts">
+import MarkdownRender from 'markstream-vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+
+interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  final: boolean
+}
+
+const messages = ref<ChatMessage[]>([])
+const scrollRoot = ref<HTMLElement | null>(null)
+const contentRoot = ref<HTMLElement | null>(null)
+const bottomPinned = ref(true)
+
+const BOTTOM_THRESHOLD_PX = 64
+let scrollFrame = 0
+let resizeObserver: ResizeObserver | undefined
+
+const latestOutputSignal = computed(() => {
+  const latest = messages.value[messages.value.length - 1]
+  return latest
+    ? `${messages.value.length}:${latest.id}:${latest.content.length}:${latest.final}`
+    : '0'
+})
+
+function isNearBottom(element: HTMLElement) {
+  return element.scrollHeight - element.clientHeight - element.scrollTop <= BOTTOM_THRESHOLD_PX
+}
+
+function updateBottomPinned() {
+  const root = scrollRoot.value
+  bottomPinned.value = !root || isNearBottom(root)
+}
+
+function scrollToBottomNow() {
+  const root = scrollRoot.value
+  if (!root)
+    return
+
+  root.scrollTo({
+    top: root.scrollHeight,
+    behavior: 'auto',
+  })
+}
+
+function scheduleScrollToBottom() {
+  if (!bottomPinned.value || scrollFrame)
+    return
+
+  scrollFrame = requestAnimationFrame(() => {
+    scrollFrame = 0
+    if (!bottomPinned.value)
+      return
+
+    scrollToBottomNow()
+  })
+}
+
+watch(
+  latestOutputSignal,
+  async () => {
+    await nextTick()
+    scheduleScrollToBottom()
+  },
+  { flush: 'post' },
+)
+
+onMounted(() => {
+  updateBottomPinned()
+  resizeObserver = new ResizeObserver(scheduleScrollToBottom)
+
+  if (contentRoot.value)
+    resizeObserver.observe(contentRoot.value)
+})
+
+onBeforeUnmount(() => {
+  if (scrollFrame)
+    cancelAnimationFrame(scrollFrame)
+
+  resizeObserver?.disconnect()
+})
+</script>
+
+<template>
+  <div ref="scrollRoot" class="chat-scroll" @scroll.passive="updateBottomPinned">
+    <div ref="contentRoot" class="chat-list">
+      <article
+        v-for="message in messages"
+        :key="message.id"
+        class="chat-message"
+        :class="`chat-message--${message.role}`"
+      >
+        <MarkdownRender
+          v-if="message.role === 'assistant'"
+          custom-id="chat"
+          mode="chat"
+          :content="message.content"
+          :final="message.final"
+          :smooth-streaming="message.final ? false : 'auto'"
+          :fade="message.final"
+          :typewriter="!message.final"
+          v-bind="message.final ? {} : { maxLiveNodes: 0 }"
+        />
+        <p v-else class="user-text">
+          {{ message.content }}
+        </p>
+      </article>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.chat-scroll {
+  height: min(70vh, 720px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.chat-list {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.chat-message {
+  max-width: min(720px, 88%);
+}
+
+.chat-message--user {
+  align-self: flex-end;
+}
+
+.chat-message--assistant {
+  align-self: flex-start;
+}
+</style>
+```
+
+关键点是：
+
+- `latestOutputSignal` 只关注最后一条消息，避免长聊天记录在每个 token 上跑 deep watch。
+- `nextTick()` 等当前 Vue render pass 完成后再读取 `scrollHeight`；后续 smooth-streaming 帧的高度变化由 `ResizeObserver` 继续处理。
+- `requestAnimationFrame` 把多次 chunk 更新合并成每帧最多一次滚动写入。
+- `ResizeObserver` 处理图片、KaTeX、代码块、字体等异步高度变化；前提是用户仍然贴底。
+- `bottomPinned` 会在用户向上翻历史时关闭自动跟随，等用户回到底部附近再恢复。
+- 如果挂载时已经有完整历史消息，要单独决定首帧跳到最新消息，还是恢复已保存的滚动位置。
+
+长的混合 timeline 优先用内置虚拟列表。默认 `stick-to-bottom="auto"` 是同一类产品行为：贴底时跟随，用户手动翻历史时不抢滚动。
+
+```vue
+<MarkstreamVirtualTimeline
+  :items="timelineItems"
+  :thread-key="activeThreadId"
+  stick-to-bottom="auto"
+/>
+```
+
 ### 更好的代码块
 
 - 想要更轻的文档风格：用 `MarkdownCodeBlockNode`，配 `stream-markdown`
@@ -194,7 +361,7 @@ const isStreaming = computed(() => !final.value)
     :smooth-streaming="isStreaming ? 'auto' : false"
     :fade="!isStreaming"
     :typewriter="isStreaming"
-    :max-live-nodes="isStreaming ? 0 : undefined"
+    v-bind="isStreaming ? { maxLiveNodes: 0 } : {}"
   />
 </template>
 ```

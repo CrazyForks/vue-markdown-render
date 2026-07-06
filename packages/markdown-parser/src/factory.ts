@@ -1,5 +1,5 @@
 import type { MathOptions } from './config'
-import type { MarkdownIt as MarkdownItInstance } from './markdown-it-types'
+import type { MarkdownIt as MarkdownItInstance, Token } from './markdown-it-types'
 import MarkdownIt from 'markdown-it-ts'
 import { getDefaultMathOptions } from './config'
 import { isUnsafeHtmlUrl } from './htmlTags'
@@ -30,6 +30,91 @@ export interface FactoryOptions extends Record<string, unknown> {
   enableFixIndentedCodeBlock?: boolean
 }
 
+const HTML_LINK_OPEN_RE = /^<a[>\s]/i
+const HTML_LINK_CLOSE_RE = /^<\/a\s*>/i
+
+interface LinkifyLike {
+  pretest: (text: string) => boolean
+}
+
+interface CoreRuleRecord {
+  name: string
+  fn: (state: CoreStateLike) => unknown
+}
+
+interface CoreRulerWithNamedRules {
+  at: (ruleName: string, fn: (state: CoreStateLike) => unknown) => void
+  getNamedRules?: () => CoreRuleRecord[]
+}
+
+interface CoreStateLike {
+  md?: MarkdownItInstance & { linkify?: LinkifyLike }
+  tokens?: Token[]
+}
+
+function inlineTokenMayNeedLinkify(token: Token, linkify: LinkifyLike) {
+  if (token?.type !== 'inline')
+    return false
+
+  const children = token.children
+  if (!Array.isArray(children) || children.length === 0)
+    return linkify.pretest(String(token.content ?? ''))
+
+  let htmlLinkLevel = 0
+  for (let index = children.length - 1; index >= 0; index--) {
+    const currentToken = children[index]
+
+    if (currentToken?.type === 'link_close') {
+      index--
+      while (index >= 0 && children[index]?.level !== currentToken.level && children[index]?.type !== 'link_open')
+        index--
+      continue
+    }
+
+    if (currentToken?.type === 'html_inline') {
+      const content = String(currentToken.content ?? '')
+      if (HTML_LINK_OPEN_RE.test(content) && htmlLinkLevel > 0)
+        htmlLinkLevel--
+      if (HTML_LINK_CLOSE_RE.test(content))
+        htmlLinkLevel++
+    }
+
+    if (htmlLinkLevel > 0)
+      continue
+
+    if (currentToken?.type === 'text' && linkify.pretest(String(currentToken.content ?? '')))
+      return true
+  }
+
+  return false
+}
+
+function applyLinkifyCandidateFilter(md: MarkdownItInstance) {
+  const ruler = md.core?.ruler as CoreRulerWithNamedRules
+  const original = ruler.getNamedRules?.().find(rule => rule.name === 'linkify')?.fn
+  if (typeof original !== 'function')
+    return
+
+  ruler.at('linkify', (state: CoreStateLike) => {
+    if (!state.md?.options?.linkify)
+      return
+
+    const tokens = Array.isArray(state.tokens) ? state.tokens : []
+    const linkify = state.md.linkify
+    if (!linkify)
+      return
+
+    const candidates = tokens.filter((token: Token) => inlineTokenMayNeedLinkify(token, linkify))
+    if (!candidates.length)
+      return
+
+    const filteredState = Object.assign(Object.create(Object.getPrototypeOf(state)), state, {
+      tokens: candidates,
+    })
+    return original(filteredState)
+  })
+}
+
 export function factory(opts: FactoryOptions = {}): MarkdownItInstance {
   const markdownItOptions = opts.markdownItOptions ?? {}
   const experimental = typeof markdownItOptions.experimental === 'object' && markdownItOptions.experimental !== null
@@ -53,6 +138,8 @@ export function factory(opts: FactoryOptions = {}): MarkdownItInstance {
 
   if (!hasCustomValidateLink)
     md.set({ validateLink: (url: string) => !isUnsafeHtmlUrl(url, { tagName: 'a', attrName: 'href' }) })
+
+  applyLinkifyCandidateFilter(md)
 
   if (opts.enableMath ?? true) {
     const mergedMathOptions: MathOptions = { ...(getDefaultMathOptions() ?? {}), ...(opts.mathOptions ?? {}) }

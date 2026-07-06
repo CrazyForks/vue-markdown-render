@@ -181,6 +181,24 @@ If you customize timeline rows, bind `measureRef` to the element that contains t
 
 If your app already owns the outer virtualizer, use `useMarkstreamVirtualAdapter()` and bind its `markdownProps(item, index)` to each Markdown item. The raw `virtualScroll` prop remains available as the advanced protocol for custom adapters and debugging.
 
+Final Markdown rows from `MarkstreamVirtualTimeline` and `useMarkstreamVirtualAdapter()` use node virtualization by default (`nodeVirtual: 'auto'`, `maxLiveNodes: 60`, `liveNodeBuffer: 20`) so restored chat transcripts do not mount the full Markdown DOM at once. If a row must expose the complete DOM for selection, external anchors, tests, or custom highlighters, override the bound props in a custom slot:
+
+```vue
+<template v-slot:default="{ markdownProps, measureRef }">
+  <article :ref="measureRef" class="message-bubble">
+    <MarkdownRender
+      v-bind="{
+        ...markdownProps,
+        nodeVirtual: false,
+        maxLiveNodes: 0,
+      }"
+    />
+  </article>
+</template>
+```
+
+With `useMarkstreamVirtualAdapter()`, apply the same override where you bind `adapter.markdownProps(item, index)`.
+
 #### Thread restore loading
 
 `MarkstreamVirtualTimeline` hides the restoring rows until the restored viewport is ready. You can customize the non-layout loading overlay with the `restore-loading` slot. The overlay is absolutely positioned inside the scroll root, so it does not change `scrollHeight` or item measurements.
