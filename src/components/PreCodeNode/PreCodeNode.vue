@@ -765,6 +765,7 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
   );
   z-index: 0;
   pointer-events: none;
+  border-radius: 0;
   background: transparent;
 }
 
