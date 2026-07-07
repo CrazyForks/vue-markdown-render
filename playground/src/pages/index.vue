@@ -350,7 +350,8 @@ let __scheduled = false
 let __minHeightDisabled = false
 let __overflowConfirmations = 0
 let __clearConfirmations = 0
-let __autoScrollScheduled = false
+let __autoScrollRaf: number | null = null
+let __pendingAutoScroll = false
 // Observers and scheduler
 
 function getScrollRoot() {
@@ -367,15 +368,35 @@ function scrollToBottom() {
 }
 
 function scheduleScrollToBottom() {
-  if (!shouldStickToBottom.value || __autoScrollScheduled)
+  if (!shouldStickToBottom.value)
     return
 
-  __autoScrollScheduled = true
-  requestAnimationFrame(() => {
-    __autoScrollScheduled = false
-    if (shouldStickToBottom.value)
+  // Mark that we have a pending scroll request
+  __pendingAutoScroll = true
+
+  // If RAF already scheduled, the pending flag ensures the next frame will scroll
+  if (__autoScrollRaf != null)
+    return
+
+  const performScroll = () => {
+    __autoScrollRaf = null
+
+    // If still pending and stick-to-bottom is active, scroll now
+    if (__pendingAutoScroll && shouldStickToBottom.value) {
+      __pendingAutoScroll = false
       scrollToBottom()
-  })
+
+      // Schedule a second-pass correction to handle any late DOM updates
+      // This ensures we catch content that finishes rendering after the first scroll
+      requestAnimationFrame(() => {
+        if (shouldStickToBottom.value && isScrollRootAtBottom(getScrollRoot(), 48)) {
+          scrollToBottom()
+        }
+      })
+    }
+  }
+
+  __autoScrollRaf = requestAnimationFrame(performScroll)
 }
 
 function handleScrollRootScroll() {
