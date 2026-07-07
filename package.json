@@ -1,7 +1,7 @@
 {
   "name": "markstream-vue",
   "type": "module",
-  "version": "1.0.5",
+  "version": "1.0.6-beta.0",
   "packageManager": "pnpm@10.34.4",
   "description": "Vue/Nuxt streaming Markdown renderer for AI chat, LLM token streams, SSE/WebSocket output, incomplete Markdown, long documents, Mermaid, KaTeX, Shiki, and Monaco.",
   "author": "Simon He",
@@ -274,7 +274,7 @@
     "katex": ">=0.16.22",
     "mermaid": ">=11",
     "stream-markdown": ">=0.0.16",
-    "stream-monaco": ">=0.0.45",
+    "stream-monaco": ">=0.0.46",
     "vue": ">=3.0.0",
     "vue-i18n": ">=9"
   },

@@ -500,6 +500,33 @@ const resolvedMonacoOptions = computed(() => {
   }
 })
 
+/**
+ * Whether the editor surface (Monaco area) is dark.
+ * For fixed themes: detected from theme name or object luminance.
+ * For paired themes: follows page isDark.
+ */
+const editorSurfaceIsDark = computed(() => {
+  if (isFixedTheme())
+    return themeLooksDark(resolveRequestedTheme())
+  // Paired or default: follow page theme
+  return !!props.isDark
+})
+
+const effectiveDiffAppearance = computed<'light' | 'dark'>(() => {
+  if (!isDiff.value)
+    return editorSurfaceIsDark.value ? 'dark' : 'light'
+
+  const explicit = resolvedMonacoOptions.value?.diffAppearance
+  if (explicit === 'light' || explicit === 'dark')
+    return explicit
+
+  return editorSurfaceIsDark.value ? 'dark' : 'light'
+})
+
+const resolvedSurfaceIsDark = computed(() =>
+  isDiff.value ? effectiveDiffAppearance.value === 'dark' : editorSurfaceIsDark.value,
+)
+
 // In streaming scenarios, the opening fence info string can arrive in chunks
 // (e.g. "```d" then "iff json:..."), which means a block may flip between
 // single <-> diff after the component has mounted. Monaco editors can't switch
@@ -803,6 +830,22 @@ function countSideBySideDiffPreviewLines() {
   return Math.max(1, originalCount, modifiedCount)
 }
 
+function getDiffLayoutUnitPx() {
+  return Math.round(preFallbackFontSize.value * 0.6 * 100) / 100
+}
+
+function formatDiffPx(value: number) {
+  return `${Math.round(value * 100) / 100}px`
+}
+
+function getDiffLineNumberColumnWidth(unitPx: number) {
+  const lineCount = preFallbackDiffInline.value
+    ? countInlineDiffPreviewLines()
+    : countSideBySideDiffPreviewLines()
+  const digits = Math.max(2, String(Math.max(1, lineCount)).length)
+  return formatDiffPx((digits + 3) * unitPx)
+}
+
 // Max line count across both diff panes.
 const diffPreFallbackLineCount = computed(() => {
   if (preFallbackDiffInline.value)
@@ -956,6 +999,45 @@ const reservedEditorContentHeight = computed(() => {
 
   return null
 })
+
+function getDiffVisualVars(isDark: boolean) {
+  const addedFg = isDark ? 'hsl(152 42% 60%)' : 'var(--diff-added-fg)'
+  const removedFg = isDark ? 'hsl(0 58% 58%)' : 'var(--diff-removed-fg)'
+  const addedLine = isDark ? 'hsl(152 42% 60% / 0.18)' : 'var(--diff-added-bg)'
+  const removedLine = isDark ? 'hsl(0 58% 58% / 0.18)' : 'var(--diff-removed-bg)'
+  const addedInline = isDark ? 'hsl(152 42% 60% / 0.28)' : 'var(--diff-added-inline-bg)'
+  const removedInline = isDark ? 'hsl(0 58% 58% / 0.28)' : 'var(--diff-removed-inline-bg)'
+  const unitPx = getDiffLayoutUnitPx()
+
+  return {
+    '--markstream-diff-added-fg': addedFg,
+    '--markstream-diff-removed-fg': removedFg,
+    '--markstream-diff-added-line': addedLine,
+    '--markstream-diff-removed-line': removedLine,
+    '--markstream-diff-added-line-fill': addedLine,
+    '--markstream-diff-removed-line-fill': removedLine,
+    '--markstream-diff-added-inline': addedInline,
+    '--markstream-diff-removed-inline': removedInline,
+    '--stream-monaco-added-fg': addedFg,
+    '--stream-monaco-removed-fg': removedFg,
+    '--stream-monaco-added-line': addedLine,
+    '--stream-monaco-removed-line': removedLine,
+    '--stream-monaco-added-line-fill': addedLine,
+    '--stream-monaco-removed-line-fill': removedLine,
+    '--stream-monaco-added-inline': addedInline,
+    '--stream-monaco-removed-inline': removedInline,
+    '--stream-monaco-gutter-marker-width': '4px',
+    '--stream-monaco-gutter-gap': '16px',
+    '--stream-monaco-line-number-left': '4px',
+    '--stream-monaco-line-number-width': getDiffLineNumberColumnWidth(unitPx),
+    '--stream-monaco-line-number-padding-left': formatDiffPx(unitPx * 2),
+    '--stream-monaco-line-number-padding-right': formatDiffPx(unitPx),
+    '--stream-monaco-line-number-gap-to-code': '0px',
+    '--stream-monaco-diff-code-gap': '2px',
+    '--stream-monaco-diff-code-padding': formatDiffPx(unitPx),
+  }
+}
+
 const preFallbackStyle = computed(() => {
   const fontFamily = props.monacoOptions?.fontFamily
   const cappedEstimatedContentHeight = capEditorContentHeight(estimatedVisibleContentHeight.value)
@@ -997,6 +1079,7 @@ const preFallbackStyle = computed(() => {
     // Keep the pre diff fallback visually close to stream-monaco's diff line box.
     style['--markstream-pre-diff-line-height'] = `${preFallbackEffectiveLineHeight.value}px`
     style['--markstream-pre-diff-pane-bottom-padding'] = `${DIFF_PREVIEW_BOTTOM_PADDING}px`
+    Object.assign(style, getDiffVisualVars(resolvedSurfaceIsDark.value))
   }
 
   return style
@@ -1770,6 +1853,20 @@ function syncEditorCssVars() {
   const bg = bgVar || String(bgStyles?.backgroundColor ?? rootStyles?.backgroundColor ?? '').trim()
 
   if (isDiff.value) {
+    const setDiffVar = (name: string, value: string) => {
+      if (value) {
+        rootEl.style.setProperty(name, value)
+        targetEl.style.setProperty(name, value)
+      }
+      else {
+        rootEl.style.removeProperty(name)
+        targetEl.style.removeProperty(name)
+      }
+    }
+
+    for (const [name, value] of Object.entries(getDiffVisualVars(rootEl.classList.contains('is-dark'))))
+      setDiffVar(name, value)
+
     if (fg) {
       rootEl.style.setProperty('--markstream-diff-editor-fg', fg)
       targetEl.style.setProperty('--vscode-editor-foreground', fg)
@@ -3339,32 +3436,32 @@ function themeLooksDark(theme: CodeBlockMonacoTheme | null | undefined) {
     && !lightTokens.some(token => normalized.includes(token))
 }
 
-/**
- * Whether the editor surface (Monaco area) is dark.
- * For fixed themes: detected from theme name or object luminance.
- * For paired themes: follows page isDark.
- */
-const editorSurfaceIsDark = computed(() => {
-  if (isFixedTheme())
-    return themeLooksDark(resolveRequestedTheme())
-  // Paired or default: follow page theme
-  return !!props.isDark
+function addRuntimeLanguage(languages: string[], language: unknown) {
+  if (typeof language !== 'string')
+    return
+
+  const canonical = normalizeLanguageIdentifier(language)
+  const monacoId = resolveMonacoLanguageId(canonical)
+  for (const value of [canonical, monacoId]) {
+    if (value && !languages.includes(value))
+      languages.push(value)
+  }
+}
+
+const runtimeMonacoLanguages = computed(() => {
+  const languages: string[] = []
+  const configured = resolvedMonacoOptions.value?.languages
+  if (Array.isArray(configured)) {
+    for (const language of configured)
+      addRuntimeLanguage(languages, language)
+  }
+
+  addRuntimeLanguage(languages, props.node.language)
+  addRuntimeLanguage(languages, codeLanguage.value)
+  addRuntimeLanguage(languages, monacoLanguage.value)
+  addRuntimeLanguage(languages, 'plaintext')
+  return languages
 })
-
-const effectiveDiffAppearance = computed<'light' | 'dark'>(() => {
-  if (!isDiff.value)
-    return editorSurfaceIsDark.value ? 'dark' : 'light'
-
-  const explicit = resolvedMonacoOptions.value?.diffAppearance
-  if (explicit === 'light' || explicit === 'dark')
-    return explicit
-
-  return editorSurfaceIsDark.value ? 'dark' : 'light'
-})
-
-const resolvedSurfaceIsDark = computed(() =>
-  isDiff.value ? effectiveDiffAppearance.value === 'dark' : editorSurfaceIsDark.value,
-)
 
 function buildRuntimeMonacoOptions() {
   const nextOptions = {
@@ -3372,6 +3469,7 @@ function buildRuntimeMonacoOptions() {
     wrappingIndent: 'same',
     themes: props.themes,
     ...(resolvedMonacoOptions.value || {}),
+    languages: runtimeMonacoLanguages.value,
     theme: resolveRequestedTheme(),
     ...(isDiff.value ? { diffAppearance: effectiveDiffAppearance.value } : {}),
     onThemeChange() {
@@ -3909,15 +4007,14 @@ onUnmounted(() => {
   --markstream-diff-added-gutter: linear-gradient(
     90deg,
     var(--markstream-diff-added-fg) 0 var(--stream-monaco-gutter-marker-width, 4px),
-    hsl(var(--ms-diff-added) / 0.08) var(--stream-monaco-gutter-marker-width, 4px) 100%
+    transparent var(--stream-monaco-gutter-marker-width, 4px) 100%
   );
   --markstream-diff-removed-gutter: repeating-linear-gradient(
         180deg,
         var(--markstream-diff-removed-fg) 0 2px,
         transparent 2px 4px
       )
-      left / var(--stream-monaco-gutter-marker-width, 4px) 100% no-repeat,
-    linear-gradient(90deg, hsl(var(--ms-diff-removed) / 0.08) 0 100%);
+      left / var(--stream-monaco-gutter-marker-width, 4px) 100% no-repeat;
   --markstream-diff-added-line-fill: var(--diff-added-bg);
   --markstream-diff-removed-line-fill: var(--diff-removed-bg);
 }
@@ -3968,15 +4065,14 @@ onUnmounted(() => {
   --markstream-diff-added-gutter: linear-gradient(
     90deg,
     var(--markstream-diff-added-fg) 0 var(--stream-monaco-gutter-marker-width, 4px),
-    hsl(var(--ms-diff-added) / 0.2) var(--stream-monaco-gutter-marker-width, 4px) 100%
+    transparent var(--stream-monaco-gutter-marker-width, 4px) 100%
   );
   --markstream-diff-removed-gutter: repeating-linear-gradient(
         180deg,
         var(--markstream-diff-removed-fg) 0 2px,
         transparent 2px 4px
       )
-      left / var(--stream-monaco-gutter-marker-width, 4px) 100% no-repeat,
-    linear-gradient(90deg, hsl(var(--ms-diff-removed) / 0.18) 0 100%);
+      left / var(--stream-monaco-gutter-marker-width, 4px) 100% no-repeat;
   --markstream-diff-added-line-fill: hsl(152 42% 60% / 0.18);
   --markstream-diff-removed-line-fill: hsl(0 58% 58% / 0.18);
 }
@@ -4067,11 +4163,15 @@ onUnmounted(() => {
   --stream-monaco-gutter-guide: var(--markstream-diff-gutter-guide);
   --stream-monaco-gutter-marker-width: 4px;
   --stream-monaco-gutter-gap: 8px;
-  --stream-monaco-line-number-gap-to-code: var(--stream-monaco-gutter-gap);
+  --stream-monaco-line-number-gap-to-code: 0px;
   --stream-monaco-line-number: var(--markstream-diff-line-number);
   --stream-monaco-line-number-active: var(--markstream-diff-line-number-active);
-  --stream-monaco-line-number-left: 4px;
-  --stream-monaco-line-number-width: 36px;
+  --stream-monaco-line-number-left: var(--stream-monaco-gutter-marker-width);
+  --stream-monaco-line-number-width: 39px;
+  --stream-monaco-line-number-padding-left: 15.6px;
+  --stream-monaco-line-number-padding-right: 7.8px;
+  --stream-monaco-diff-code-gap: 2px;
+  --stream-monaco-diff-code-padding: 7.8px;
   --stream-monaco-line-number-align: var(
     --markstream-diff-line-number-align,
     var(--markstream-code-line-number-align, right)
@@ -4116,13 +4216,11 @@ onUnmounted(() => {
 }
 
 .code-block-container.is-diff :deep(.monaco-diff-editor .editor.original .margin-view-overlays .line-numbers) {
-  left: calc(
-    var(--stream-monaco-original-scrollable-left)
-    - var(--stream-monaco-line-number-gap-to-code)
-    - var(--stream-monaco-line-number-width)
-  ) !important;
+  left: var(--stream-monaco-line-number-left) !important;
   width: var(--stream-monaco-line-number-width) !important;
-  padding: 0 !important;
+  box-sizing: border-box !important;
+  padding-left: var(--stream-monaco-line-number-padding-left, 15.6px) !important;
+  padding-right: var(--stream-monaco-line-number-padding-right, 7.8px) !important;
   text-align: var(
     --markstream-diff-line-number-align,
     var(--markstream-code-line-number-align, right)
@@ -4131,13 +4229,11 @@ onUnmounted(() => {
 }
 
 .code-block-container.is-diff :deep(.monaco-diff-editor .editor.modified .margin-view-overlays .line-numbers) {
-  left: calc(
-    var(--stream-monaco-modified-scrollable-left)
-    - var(--stream-monaco-modified-line-number-gap-to-code, var(--stream-monaco-line-number-gap-to-code))
-    - var(--stream-monaco-line-number-width)
-  ) !important;
+  left: var(--stream-monaco-line-number-left) !important;
   width: var(--stream-monaco-line-number-width) !important;
-  padding: 0 !important;
+  box-sizing: border-box !important;
+  padding-left: var(--stream-monaco-line-number-padding-left, 15.6px) !important;
+  padding-right: var(--stream-monaco-line-number-padding-right, 7.8px) !important;
   text-align: var(
     --markstream-diff-line-number-align,
     var(--markstream-code-line-number-align, right)

@@ -221,7 +221,8 @@ describe('useBatchRenderingScheduler', () => {
     expect(h.renderedCount.value).toBe(8)
 
     vi.advanceTimersByTime(10)
-    currentTime = 8
+    // With new threshold (budget * 1.5 = 6 * 1.5 = 9), elapsed must be > 9ms to trigger shrink
+    currentTime = 10
     await nextTick()
 
     expect(h.renderedCount.value).toBe(16)
@@ -229,7 +230,8 @@ describe('useBatchRenderingScheduler', () => {
 
     vi.advanceTimersByTime(0)
 
-    expect(h.adaptiveBatchSize.value).toBe(5)
+    // With new shrink factor 0.8: floor(8 * 0.8) = 6
+    expect(h.adaptiveBatchSize.value).toBe(6)
   })
 
   it('uses timeout fallback when RAF boundary does not fire', async () => {
@@ -257,7 +259,7 @@ describe('useBatchRenderingScheduler', () => {
     expect(h.renderedCount.value).toBe(8)
 
     vi.advanceTimersByTime(10)
-    currentTime = 8
+    currentTime = 10
     await nextTick()
 
     expect(h.renderedCount.value).toBe(16)
@@ -268,7 +270,7 @@ describe('useBatchRenderingScheduler', () => {
 
     vi.advanceTimersByTime(1)
 
-    expect(h.adaptiveBatchSize.value).toBe(5)
+    expect(h.adaptiveBatchSize.value).toBe(6)
     expect(cancelFrame).toHaveBeenCalledWith(2)
   })
 
@@ -313,7 +315,7 @@ describe('useBatchRenderingScheduler', () => {
     expect(h.renderedCount.value).toBe(16)
     expect(idleCallbacks).toHaveLength(0)
 
-    currentTime = 8
+    currentTime = 10
     await nextTick()
 
     expect(h.adaptiveBatchSize.value).toBe(8)
@@ -321,7 +323,7 @@ describe('useBatchRenderingScheduler', () => {
 
     frames.shift()?.(currentTime)
 
-    expect(h.adaptiveBatchSize.value).toBe(5)
+    expect(h.adaptiveBatchSize.value).toBe(6)
     expect(idleCallbacks).toHaveLength(1)
 
     idleCallbacks.shift()?.({
@@ -329,7 +331,7 @@ describe('useBatchRenderingScheduler', () => {
       timeRemaining: () => 50,
     } as IdleDeadline)
 
-    expect(h.renderedCount.value).toBe(21)
+    expect(h.renderedCount.value).toBe(22)
   })
 
   it('delays desired-count follow-up until commit feedback updates adaptive size', async () => {
@@ -358,20 +360,20 @@ describe('useBatchRenderingScheduler', () => {
     expect(h.renderedCount.value).toBe(16)
 
     h.desiredCount.value = 24
-    currentTime = 8
+    currentTime = 10
     await nextTick()
 
     expect(h.adaptiveBatchSize.value).toBe(8)
 
     vi.advanceTimersByTime(0)
 
-    expect(h.adaptiveBatchSize.value).toBe(5)
+    expect(h.adaptiveBatchSize.value).toBe(6)
 
     vi.runOnlyPendingTimers()
     vi.advanceTimersByTime(10)
     await nextTick()
 
-    expect(h.renderedCount.value).toBe(21)
+    expect(h.renderedCount.value).toBe(22)
   })
 
   it('delays same-length parsed node identity follow-up until commit feedback updates adaptive size', async () => {
@@ -399,20 +401,20 @@ describe('useBatchRenderingScheduler', () => {
     expect(h.renderedCount.value).toBe(16)
 
     h.parsedNodes.value = makeNodes(24)
-    currentTime = 8
+    currentTime = 10
     await nextTick()
 
     expect(h.adaptiveBatchSize.value).toBe(8)
 
     vi.advanceTimersByTime(0)
 
-    expect(h.adaptiveBatchSize.value).toBe(5)
+    expect(h.adaptiveBatchSize.value).toBe(6)
 
     vi.runOnlyPendingTimers()
     vi.advanceTimersByTime(10)
     await nextTick()
 
-    expect(h.renderedCount.value).toBe(21)
+    expect(h.renderedCount.value).toBe(22)
   })
 
   it('does not schedule follow-up after cleanup cancels commit measurement', async () => {
@@ -439,7 +441,7 @@ describe('useBatchRenderingScheduler', () => {
     expect(h.renderedCount.value).toBe(16)
 
     h.desiredCount.value = 24
-    currentTime = 8
+    currentTime = 10
     await nextTick()
     h.cleanupBatchScheduler()
 

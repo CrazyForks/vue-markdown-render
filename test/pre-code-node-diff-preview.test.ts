@@ -78,6 +78,72 @@ describe('pre code node diff preview', () => {
     wrapper.unmount()
   })
 
+  it('keeps repeated braces and blank lines anchored before inserted inline source rows', () => {
+    const originalCode = [
+      '  };',
+      '}',
+      '',
+      'function splitUnifiedDiff(patch: string): { original: string; updated: string } {',
+      '  const original: string[] = [];',
+      '  const updated: string[] = [];',
+      '  }',
+      '',
+      '  for (const raw of lines) {',
+    ].join('\n')
+    const updatedCode = [
+      '  };',
+      '}',
+      '',
+      'function isNewFileDiff(file: FileChange): boolean {',
+      '  const { original, updated } = splitUnifiedDiff(file.content ?? "");',
+      '  return original.length === 0 && updated.length > 0;',
+      '}',
+      '',
+      'function splitUnifiedDiff(patch: string): { original: string; updated: string } {',
+      '  const original: string[] = [];',
+      '  const updated: string[] = [];',
+      '  }',
+      '',
+      '  for (const raw of lines) {',
+    ].join('\n')
+
+    const wrapper = mount(PreCodeNode, {
+      props: {
+        showLineNumbers: true,
+        diffInline: true,
+        node: {
+          type: 'code_block',
+          language: 'ts',
+          diff: true,
+          originalCode,
+          updatedCode,
+          code: '',
+          raw: '',
+        },
+      },
+    })
+
+    const rows = wrapper.findAll('.markstream-pre__diff-pane--inline .markstream-pre__diff-line')
+    const rowSummary = rows.map(row => ({
+      number: row.find('.markstream-pre__diff-number').text(),
+      text: row.find('.markstream-pre__diff-content-inner').text(),
+      classes: row.classes(),
+    }))
+
+    expect(rowSummary.slice(0, 9).map(row => row.number)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9'])
+    expect(rowSummary[1].classes).toContain('markstream-pre__diff-line--context')
+    expect(rowSummary[2].classes).toContain('markstream-pre__diff-line--context')
+    for (const row of rowSummary.slice(3, 8))
+      expect(row.classes).toContain('markstream-pre__diff-line--added')
+    expect(rowSummary[8]).toMatchObject({
+      number: '9',
+      text: 'function splitUnifiedDiff(patch: string): { original: string; updated: string } {',
+    })
+    expect(rowSummary[8].classes).toContain('markstream-pre__diff-line--context')
+
+    wrapper.unmount()
+  })
+
   it('allows empty added and removed rows to receive diff fill styles', () => {
     const source = readFileSync(
       'src/components/PreCodeNode/PreCodeNode.vue',
@@ -88,6 +154,15 @@ describe('pre code node diff preview', () => {
     expect(source).toContain('.markstream-pre__diff-line--removed::before')
     expect(source).toContain('.markstream-pre__diff-line--added > .markstream-pre__diff-rail')
     expect(source).toContain('.markstream-pre__diff-line--removed > .markstream-pre__diff-rail')
+    expect(source).toContain('.markstream-pre__diff-line--added > .markstream-pre__diff-number')
+    expect(source).toContain('.markstream-pre__diff-line--removed > .markstream-pre__diff-number')
+    expect(source).toContain('background: var(--stream-monaco-added-line-fill, var(--markstream-diff-added-line-fill, transparent));')
+    expect(source).toContain('background: var(--stream-monaco-removed-line-fill, var(--markstream-diff-removed-line-fill, transparent));')
+    expect(source).toContain('--markstream-pre-diff-content-height')
+    expect(source).toContain('color: var(--stream-monaco-added-fg, var(--markstream-diff-added-fg, var(--code-line-number)));')
+    expect(source).toContain('color: var(--stream-monaco-removed-fg, var(--markstream-diff-removed-fg, var(--code-line-number)));')
+    expect(source).not.toMatch(/\.markstream-pre__diff-line--added\s*\{\s*color:/)
+    expect(source).not.toMatch(/\.markstream-pre__diff-line--removed\s*\{\s*color:/)
     expect(source).not.toContain('.markstream-pre__diff-line--added:not(.markstream-pre__diff-line--empty)::before')
     expect(source).not.toContain('.markstream-pre__diff-line--removed:not(.markstream-pre__diff-line--empty)::before')
   })
@@ -99,8 +174,9 @@ describe('pre code node diff preview', () => {
     )
 
     expect(source).toContain('pre.markstream-pre--diff-preview.markstream-pre--diff-inline:not(.is-wrap) > .markstream-pre__diff-code')
-    expect(source).toContain('grid-template-columns: max-content;')
-    expect(source).toContain('width: max-content;')
+    expect(source).toContain('grid-template-columns: minmax(100%, max-content);')
+    expect(source).toContain('width: 100%;')
+    expect(source).toContain('min-width: max-content;')
     expect(source).toContain('white-space: inherit;')
     expect(source).toContain('overflow-wrap: normal;')
     expect(source).toContain('pre.markstream-pre--diff-preview.is-wrap')
@@ -108,7 +184,7 @@ describe('pre code node diff preview', () => {
     expect(source).toContain('overflow-wrap: anywhere;')
   })
 
-  it('uses modified gutter metrics and divider for inline diff fallback', () => {
+  it('uses modified gutter metrics and a 2px gap without a divider for inline diff fallback', () => {
     const source = readFileSync(
       'src/components/PreCodeNode/PreCodeNode.vue',
       'utf8',
@@ -116,10 +192,21 @@ describe('pre code node diff preview', () => {
 
     expect(source).toContain('pre.markstream-pre--diff-preview.markstream-pre--diff-inline {')
     expect(source).toContain('--markstream-pre-diff-gutter-marker-width: var(--stream-monaco-gutter-marker-width, 4px);')
-    expect(source).toContain('--stream-monaco-modified-scrollable-left')
-    expect(source).toContain('pre.markstream-pre--diff-preview.markstream-pre--diff-inline .markstream-pre__diff-line::after')
-    expect(source).toContain('left: var(--markstream-pre-diff-scrollable-left);')
-    expect(source).toContain('background: var(--stream-monaco-pane-divider')
+    expect(source).toContain('--markstream-pre-diff-code-gap: var(--stream-monaco-diff-code-gap, 2px);')
+    expect(source).toContain('--markstream-pre-diff-code-padding: var(--stream-monaco-diff-code-padding, 7.8px);')
+    expect(source).toContain('--markstream-pre-diff-line-number-padding-left: var(--stream-monaco-line-number-padding-left, 15.6px);')
+    expect(source).toContain('--markstream-pre-diff-line-number-padding-right: var(--stream-monaco-line-number-padding-right, 7.8px);')
+    expect(source).toContain('--markstream-pre-diff-code-fill-left: calc(')
+    expect(source).toContain('--markstream-pre-diff-code-left: calc(')
+    expect(source).toContain('var(--markstream-pre-diff-line-number-left)')
+    expect(source).toContain('+ var(--markstream-pre-diff-line-number-width)')
+    expect(source).not.toContain('--markstream-pre-diff-scrollable-left')
+    expect(source).not.toContain('pre.markstream-pre--diff-preview.markstream-pre--diff-inline .markstream-pre__diff-line::after')
+    expect(source).not.toContain('left: var(--markstream-pre-diff-scrollable-left);')
+    expect(source).toContain('padding-left: var(--markstream-pre-diff-code-left);')
+    expect(source).toContain('left: var(--markstream-pre-diff-code-fill-left);')
+    expect(source).toContain('padding-left: var(--markstream-pre-diff-line-number-padding-left, 15.6px);')
+    expect(source).toContain('padding-right: var(--markstream-pre-diff-line-number-padding-right, 7.8px);')
     expect(source).toContain('width: var(--markstream-pre-diff-gutter-marker-width, 4px);')
   })
 

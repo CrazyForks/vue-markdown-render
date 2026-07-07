@@ -53,9 +53,9 @@ const browserEffectiveSmoothStreamingOptions = {
   ...(browserSmoothStreamingOptions ?? {}),
 }
 const browserRendererOptions = {
-  initialRenderBatchSize: 16,
-  renderBatchSize: 24,
-  renderBatchDelay: 8,
+  initialRenderBatchSize: 32,
+  renderBatchSize: 48,
+  renderBatchDelay: 6,
   parseCoalesceMs: 32,
 }
 const browserFinalTimelineMarkdownOptions = {
@@ -564,6 +564,14 @@ import { createApp, defineComponent, h, nextTick, ref } from 'vue'
 import corpus from './corpus.json'
 import 'markstream-vue/index.css'
 import './style.css'
+
+function percentile(values, p) {
+  const sorted = values.filter(Number.isFinite).slice().sort((a, b) => a - b)
+  if (!sorted.length)
+    return 0
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * p) - 1))
+  return sorted[index]
+}
 
 const content = ref('')
 const final = ref(true)
