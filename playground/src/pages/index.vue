@@ -382,6 +382,7 @@ function scheduleScrollToBottom() {
     let lastHeight = 0
 
     const chase = () => {
+      // Check stick-to-bottom BEFORE scrolling - critical for user control
       if (!shouldStickToBottom.value) {
         __autoScrollRaf = null
         __continuousScrollMode = false
@@ -389,6 +390,18 @@ function scheduleScrollToBottom() {
       }
 
       const root = getScrollRoot()
+
+      // Double-check we're actually at/near bottom before forcing scroll
+      // This prevents fighting with user scroll gestures
+      const distanceFromBottom = root.scrollHeight - root.scrollTop - root.clientHeight
+      if (distanceFromBottom > 100) {
+        // User scrolled up significantly - respect that
+        __autoScrollRaf = null
+        __continuousScrollMode = false
+        shouldStickToBottom.value = false
+        return
+      }
+
       scrollToBottom()
 
       // Check if height stabilized
@@ -408,8 +421,14 @@ function scheduleScrollToBottom() {
         return
       }
 
-      // Continue chasing
-      __autoScrollRaf = requestAnimationFrame(chase)
+      // Continue chasing only if still at bottom
+      if (shouldStickToBottom.value) {
+        __autoScrollRaf = requestAnimationFrame(chase)
+      }
+      else {
+        __autoScrollRaf = null
+        __continuousScrollMode = false
+      }
     }
 
     __autoScrollRaf = requestAnimationFrame(chase)
