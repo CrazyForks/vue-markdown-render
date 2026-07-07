@@ -93,6 +93,7 @@ import { InfographicBlockNodeLoading } from './InfographicBlockNodeLoading'
 import { MermaidBlockNodeLoading } from './MermaidBlockNodeLoading'
 import { normalizeRendererMode, RENDERER_MODE_DEFAULTS, resolveNodeRendererCodeRenderer } from './rendererModeDefaults'
 import { buildVirtualMeasurementKey, buildVirtualRendererLayoutKey, stringifyVirtualToken } from './virtualLayoutKey'
+import { throttle } from '../../utils/throttle'
 
 type RuntimeCodeBlockNode = ParsedNode & {
   type: 'code_block'
@@ -4317,13 +4318,25 @@ watch(
   },
 )
 
+// Throttled version of scheduleVirtualMetricsEmit for high-frequency watchers
+// This prevents excessive metric emission during rapid state changes
+const throttledScheduleMetricsForContent = throttle(
+  () => scheduleVirtualMetricsEmit('content'),
+  16, // At most once per frame (16.67ms)
+)
+
+const throttledScheduleMetricsForBatch = throttle(
+  () => scheduleVirtualMetricsEmit('batch'),
+  16,
+)
+
 watch(
   [() => parsedNodes.value.length, () => renderedCount.value],
   () => {
     if (activeVirtualBottomAnchor.value)
       scheduleVirtualBottomRestoreReconcile()
 
-    scheduleVirtualMetricsEmit('content')
+    throttledScheduleMetricsForContent()
   },
   { flush: 'post', immediate: true },
 )
@@ -4331,7 +4344,7 @@ watch(
 watch(
   [() => liveRange.start, () => liveRange.end],
   () => {
-    scheduleVirtualMetricsEmit('batch')
+    throttledScheduleMetricsForBatch()
   },
   { flush: 'post' },
 )

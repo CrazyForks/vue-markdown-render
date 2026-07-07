@@ -277,10 +277,10 @@ export function useBatchRenderingScheduler(
     const budget = Math.max(2, props.renderBatchBudgetMs ?? 6)
     const maxSize = Math.max(1, resolvedBatchSize.value || 1)
     const minSize = Math.max(1, Math.floor(maxSize / 4))
-    if (elapsed > budget * 1.2) {
-      adaptiveBatchSize.value = Math.max(minSize, Math.floor(adaptiveBatchSize.value * 0.7))
+    if (elapsed > budget * 1.5) {
+      adaptiveBatchSize.value = Math.max(minSize, Math.floor(adaptiveBatchSize.value * 0.8))
     }
-    else if (elapsed < budget * 0.5 && adaptiveBatchSize.value < maxSize) {
+    else if (elapsed < budget * 0.6 && adaptiveBatchSize.value < maxSize) {
       adaptiveBatchSize.value = Math.min(maxSize, Math.ceil(adaptiveBatchSize.value * 1.2))
     }
   }

@@ -29,8 +29,8 @@ describe('rendererModeDefaults', () => {
     expect(RENDERER_MODE_DEFAULTS.chat).toMatchObject({
       showTooltips: false,
       fade: false,
-      initialRenderBatchSize: 16,
-      renderBatchSize: 24,
+      initialRenderBatchSize: 32,
+      renderBatchSize: 48,
       maxLiveNodes: 0,
       liveNodeBuffer: 0,
     })
