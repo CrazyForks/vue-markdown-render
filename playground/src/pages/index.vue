@@ -351,7 +351,8 @@ let __minHeightDisabled = false
 let __overflowConfirmations = 0
 let __clearConfirmations = 0
 let __autoScrollRaf: number | null = null
-let __pendingAutoScroll = false
+let __continuousScrollMode = false
+let __lastContentLength = 0
 // Observers and scheduler
 
 function getScrollRoot() {
@@ -371,32 +372,49 @@ function scheduleScrollToBottom() {
   if (!shouldStickToBottom.value)
     return
 
-  // Mark that we have a pending scroll request
-  __pendingAutoScroll = true
+  // Enter continuous chase mode - for high-frequency updates (8ms intervals, 24 char chunks)
+  // we need to keep scrolling every frame until content stabilizes
+  if (!__continuousScrollMode) {
+    __continuousScrollMode = true
+    __lastContentLength = content.value.length
 
-  // If RAF already scheduled, the pending flag ensures the next frame will scroll
-  if (__autoScrollRaf != null)
-    return
+    let stableFrames = 0
+    let lastHeight = 0
 
-  const performScroll = () => {
-    __autoScrollRaf = null
+    const chase = () => {
+      if (!shouldStickToBottom.value) {
+        __autoScrollRaf = null
+        __continuousScrollMode = false
+        return
+      }
 
-    // If still pending and stick-to-bottom is active, scroll now
-    if (__pendingAutoScroll && shouldStickToBottom.value) {
-      __pendingAutoScroll = false
+      const root = getScrollRoot()
       scrollToBottom()
 
-      // Schedule a second-pass correction to handle any late DOM updates
-      // This ensures we catch content that finishes rendering after the first scroll
-      requestAnimationFrame(() => {
-        if (shouldStickToBottom.value && isScrollRootAtBottom(getScrollRoot(), 48)) {
-          scrollToBottom()
-        }
-      })
-    }
-  }
+      // Check if height stabilized
+      const currentHeight = root.scrollHeight
+      if (currentHeight === lastHeight) {
+        stableFrames++
+      }
+      else {
+        stableFrames = 0
+        lastHeight = currentHeight
+      }
 
-  __autoScrollRaf = requestAnimationFrame(performScroll)
+      // Exit continuous mode after 3 consecutive stable frames
+      if (stableFrames >= 3) {
+        __autoScrollRaf = null
+        __continuousScrollMode = false
+        return
+      }
+
+      // Continue chasing
+      __autoScrollRaf = requestAnimationFrame(chase)
+    }
+
+    __autoScrollRaf = requestAnimationFrame(chase)
+  }
+  // If already chasing, the existing RAF loop will handle new content
 }
 
 function handleScrollRootScroll() {
