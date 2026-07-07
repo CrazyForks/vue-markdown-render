@@ -234,8 +234,8 @@ describe('virtual timeline API', () => {
 
     const markdownSlot = slotProps.find(props => props.kind === 'assistant-markdown')
     expect(markdownSlot.markdownProps.nodeVirtual).toBe('auto')
-    expect(markdownSlot.markdownProps.maxLiveNodes).toBe(60)
-    expect(markdownSlot.markdownProps.liveNodeBuffer).toBe(20)
+    expect(markdownSlot.markdownProps.maxLiveNodes).toBe(50)
+    expect(markdownSlot.markdownProps.liveNodeBuffer).toBe(16)
     expect(markdownSlot.markdownProps.mode).toBe('docs')
     expect(markdownSlot.markdownProps.codeRenderer).toBe('monaco')
     expect(markdownSlot.markdownProps.virtualScroll.enabled).toBe(true)
@@ -1006,8 +1006,8 @@ describe('virtual timeline API', () => {
 
     const finalProps = controller.markdownProps(items[0], 0)
     expect(finalProps.nodeVirtual).toBe('auto')
-    expect(finalProps.maxLiveNodes).toBe(60)
-    expect(finalProps.liveNodeBuffer).toBe(20)
+    expect(finalProps.maxLiveNodes).toBe(50)
+    expect(finalProps.liveNodeBuffer).toBe(16)
 
     const liveProps = controller.markdownProps(items[1], 1)
     expect(liveProps.nodeVirtual).toBe(false)
@@ -2168,12 +2168,12 @@ describe('virtual timeline API', () => {
       markdownProps.onHeightChange({
         ...createMetrics(1000, 'thread-a:a1:1'),
         nodeCount: 90,
-        liveRange: { start: 0, end: 60 },
-        renderedCount: 80,
-        measuredCount: 60,
-        estimatedCount: 22,
+        liveRange: { start: 0, end: 50 },
+        renderedCount: 50,
+        measuredCount: 50,
+        estimatedCount: 40,
         averageNodeHeight: 10,
-        visibleDomHeight: 640,
+        visibleDomHeight: 540,
         confidence: 'mixed',
       })
 

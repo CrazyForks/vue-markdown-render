@@ -15,8 +15,8 @@ import {
 
 const TIMELINE_MARKDOWN_EMIT_INTERVAL_MS = 96
 const TIMELINE_MARKDOWN_HEIGHT_DIFF_THRESHOLD_PX = 4
-const TIMELINE_MARKDOWN_MAX_LIVE_NODES = 60
-const TIMELINE_MARKDOWN_LIVE_NODE_BUFFER = 20
+const TIMELINE_MARKDOWN_MAX_LIVE_NODES = 50
+const TIMELINE_MARKDOWN_LIVE_NODE_BUFFER = 16
 
 function isMeasuredOrFinalConfidence(confidence: MarkstreamVirtualMetrics['confidence'] | undefined) {
   return confidence === 'measured' || confidence === 'final'

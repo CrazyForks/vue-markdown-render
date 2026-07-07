@@ -35,6 +35,68 @@ const UNICODE_PUNCTUATION_RE = /\p{P}/u
 // detection logic is easy to tweak and test.
 const AUTOLINK_PROTOCOL_RE = /^(?:https?:\/\/|mailto:|ftp:\/\/)/i
 const AUTOLINK_GENERIC_RE = /:\/\//
+const INLINE_TEXT_MARKER_BACKSLASH = 1
+const INLINE_TEXT_MARKER_ASTERISK = 2
+const INLINE_TEXT_MARKER_UNDERSCORE = 4
+const INLINE_TEXT_MARKER_TILDE = 8
+const INLINE_TEXT_MARKER_BACKTICK = 16
+const INLINE_TEXT_MARKER_OPEN_BRACKET = 32
+const INLINE_TEXT_MARKER_CLOSE_BRACKET = 64
+const INLINE_TEXT_MARKER_BANG = 128
+const INLINE_TEXT_MARKER_DOLLAR = 256
+const INLINE_TEXT_MARKER_PIPE = 512
+const INLINE_TEXT_MARKER_OPEN_PAREN = 1024
+const INLINE_CANDIDATE_MARKERS = INLINE_TEXT_MARKER_ASTERISK
+  | INLINE_TEXT_MARKER_UNDERSCORE
+  | INLINE_TEXT_MARKER_TILDE
+  | INLINE_TEXT_MARKER_BACKTICK
+  | INLINE_TEXT_MARKER_OPEN_BRACKET
+  | INLINE_TEXT_MARKER_BANG
+  | INLINE_TEXT_MARKER_DOLLAR
+  | INLINE_TEXT_MARKER_PIPE
+  | INLINE_TEXT_MARKER_OPEN_PAREN
+
+function getInlineTextMarkerFlags(content: string) {
+  let flags = 0
+  for (let index = 0; index < content.length; index++) {
+    switch (content.charCodeAt(index)) {
+      case 33:
+        flags |= INLINE_TEXT_MARKER_BANG
+        break
+      case 36:
+        flags |= INLINE_TEXT_MARKER_DOLLAR
+        break
+      case 40:
+        flags |= INLINE_TEXT_MARKER_OPEN_PAREN
+        break
+      case 42:
+        flags |= INLINE_TEXT_MARKER_ASTERISK
+        break
+      case 91:
+        flags |= INLINE_TEXT_MARKER_OPEN_BRACKET
+        break
+      case 92:
+        flags |= INLINE_TEXT_MARKER_BACKSLASH
+        break
+      case 93:
+        flags |= INLINE_TEXT_MARKER_CLOSE_BRACKET
+        break
+      case 95:
+        flags |= INLINE_TEXT_MARKER_UNDERSCORE
+        break
+      case 96:
+        flags |= INLINE_TEXT_MARKER_BACKTICK
+        break
+      case 124:
+        flags |= INLINE_TEXT_MARKER_PIPE
+        break
+      case 126:
+        flags |= INLINE_TEXT_MARKER_TILDE
+        break
+    }
+  }
+  return flags
+}
 
 function countUnescapedAsterisks(str: string): number {
   let count = 0
@@ -915,17 +977,17 @@ export function parseInlineTokens(
       && String(tokens[i + 4]?.content ?? '').startsWith(')')
   }
 
-  function stripTrailingMidStateMarker(content: string, token: MarkdownToken) {
+  function stripTrailingMidStateMarker(content: string, token: MarkdownToken, markerFlags = getInlineTextMarkerFlags(content)) {
     let nextContent = content
     const rawTokenContent = String(token.content ?? '')
 
-    if (nextContent.endsWith('\\') && !hasEscapedMarkup(token, '\\\\') && !rawTokenContent.endsWith('\\\\'))
+    if ((markerFlags & INLINE_TEXT_MARKER_BACKSLASH) !== 0 && nextContent.endsWith('\\') && !hasEscapedMarkup(token, '\\\\') && !rawTokenContent.endsWith('\\\\'))
       nextContent = nextContent.slice(0, -1)
 
-    if (nextContent.endsWith('(') && !hasEscapedMarkup(token, '\\(') && !rawTokenContent.endsWith('\\('))
+    if ((markerFlags & INLINE_TEXT_MARKER_OPEN_PAREN) !== 0 && nextContent.endsWith('(') && !hasEscapedMarkup(token, '\\(') && !rawTokenContent.endsWith('\\('))
       nextContent = nextContent.slice(0, -1)
 
-    if (/\*+$/.test(nextContent) && !hasEscapedMarkup(token, '\\*') && !rawTokenContent.endsWith('\\*'))
+    if ((markerFlags & INLINE_TEXT_MARKER_ASTERISK) !== 0 && /\*+$/.test(nextContent) && !hasEscapedMarkup(token, '\\*') && !rawTokenContent.endsWith('\\*'))
       nextContent = nextContent.replace(/\*+$/, '')
 
     return nextContent
@@ -1201,19 +1263,25 @@ export function parseInlineTokens(
     }
   }
 
-  function commitTextNode(content: string, token: MarkdownToken, preToken?: MarkdownToken, nextToken?: MarkdownToken) {
+  function commitTextNode(
+    content: string,
+    token: MarkdownToken,
+    preToken?: MarkdownToken,
+    nextToken?: MarkdownToken,
+    markerFlags = getInlineTextMarkerFlags(content),
+  ) {
     const textNode = parseTextToken({ ...token, content })
 
     if (currentTextNode) {
       // Merge with the previous text node
-      currentTextNode.content += stripTrailingMidStateMarker(textNode.content, token)
+      currentTextNode.content += stripTrailingMidStateMarker(textNode.content, token, markerFlags)
       currentTextNode.raw += textNode.raw
       return
     }
 
     const maybeMath = preToken?.tag === 'br' && tokens[i - 2]?.content === '['
     if (!nextToken)
-      textNode.content = stripTrailingMidStateMarker(textNode.content, token)
+      textNode.content = stripTrailingMidStateMarker(textNode.content, token, markerFlags)
 
     currentTextNode = textNode
     currentTextNode.center = maybeMath
@@ -1223,12 +1291,19 @@ export function parseInlineTokens(
   function handleTextToken(token: MarkdownToken) {
     // 合并连续的 text 节点
     const rawContent = String(token.content ?? '')
-    const rawSource = tokens.length === 1 && rawContent.includes('\\') && typeof raw === 'string'
+    const rawMarkerFlags = getInlineTextMarkerFlags(rawContent)
+    const rawHasBackslash = (rawMarkerFlags & INLINE_TEXT_MARKER_BACKSLASH) !== 0
+    const rawSource = tokens.length === 1 && rawHasBackslash && typeof raw === 'string'
       ? String(raw)
       : ''
     let content = rawSource
       ? decodeVisibleTextFromRaw(rawSource)
-      : rawContent.replace(ESCAPED_PUNCTUATION_RE, '$1')
+      : rawHasBackslash
+        ? rawContent.replace(ESCAPED_PUNCTUATION_RE, '$1')
+        : rawContent
+    const markerFlags = content === rawContent
+      ? rawMarkerFlags
+      : getInlineTextMarkerFlags(content)
 
     if (token.content === '<' || (content === '1' && tokens[i - 1]?.tag === 'br')) {
       i++
@@ -1236,10 +1311,11 @@ export function parseInlineTokens(
     }
 
     // math 公式 $ 只出现一个并且在末尾，优化掉
-    const dollarIndex = content.indexOf('$')
-    if (dollarIndex !== -1 && dollarIndex === content.lastIndexOf('$') && content.endsWith('$')) {
+    const dollarIndex = (markerFlags & INLINE_TEXT_MARKER_DOLLAR) !== 0
+      ? content.indexOf('$')
+      : -1
+    if (dollarIndex !== -1 && dollarIndex === content.lastIndexOf('$') && content.endsWith('$'))
       content = content.slice(0, -1)
-    }
 
     // 处理 undefined 结尾的问题
     if (content.endsWith('undefined') && !raw?.endsWith('undefined')) {
@@ -1277,60 +1353,66 @@ export function parseInlineTokens(
       i++
       return
     }
-    if (!nextToken && /[^\]]\s*\(\s*$/.test(content)) {
+    if (!nextToken && (markerFlags & INLINE_TEXT_MARKER_OPEN_PAREN) !== 0 && /[^\]]\s*\(\s*$/.test(content))
       content = content.replace(/\(\s*$/, '')
-    }
     if (!content) {
       i++
       return
     }
 
-    if (recoverOuterImageLinkFromRawText(content))
+    if (
+      (markerFlags & (INLINE_TEXT_MARKER_OPEN_BRACKET | INLINE_TEXT_MARKER_BANG)) === (INLINE_TEXT_MARKER_OPEN_BRACKET | INLINE_TEXT_MARKER_BANG)
+      && recoverOuterImageLinkFromRawText(content)
+    ) {
       return
+    }
 
-    if (recoverOuterImageLinkMidStateFromText(content))
+    if (
+      (markerFlags & (INLINE_TEXT_MARKER_CLOSE_BRACKET | INLINE_TEXT_MARKER_OPEN_PAREN)) === (INLINE_TEXT_MARKER_CLOSE_BRACKET | INLINE_TEXT_MARKER_OPEN_PAREN)
+      && recoverOuterImageLinkMidStateFromText(content)
+    ) {
       return
+    }
 
-    const hasInlineCandidates = (
-      content.includes('*')
-      || content.includes('_')
-      || content.includes('~')
-      || content.includes('`')
-      || content.includes('[')
-      || content.includes('!')
-      || content.includes('$')
-      || content.includes('|')
-      || content.includes('(')
-    )
+    const hasInlineCandidates = (markerFlags & INLINE_CANDIDATE_MARKERS) !== 0
     if (!hasInlineCandidates) {
-      commitTextNode(content, token, tokens[i - 1], nextToken)
+      commitTextNode(content, token, tokens[i - 1], nextToken, markerFlags)
       i++
       return
     }
 
-    if (handleCheckboxLike(content))
+    if ((markerFlags & INLINE_TEXT_MARKER_OPEN_BRACKET) !== 0 && handleCheckboxLike(content))
       return
     const preToken = tokens[i - 1]
     if (
-      (content === '[' && !nextToken?.markup?.includes('*') && !hasEscapedMarkup(token, '\\['))
-      || (content === ']' && !preToken?.markup?.includes('*') && !hasEscapedMarkup(token, '\\]'))
+      ((markerFlags & INLINE_TEXT_MARKER_OPEN_BRACKET) !== 0 && content === '[' && !nextToken?.markup?.includes('*') && !hasEscapedMarkup(token, '\\['))
+      || ((markerFlags & INLINE_TEXT_MARKER_CLOSE_BRACKET) !== 0 && content === ']' && !preToken?.markup?.includes('*') && !hasEscapedMarkup(token, '\\]'))
     ) {
       i++
       return
     }
     // Use raw token content for inline-code fallback parsing so backslashes
     // inside code spans are preserved (e.g. `\\(...\\)`).
-    if (handleInlineCodeContent(rawContent, token))
+    if ((markerFlags & INLINE_TEXT_MARKER_BACKTICK) !== 0 && handleInlineCodeContent(rawContent, token))
       return
 
-    if (handleInlineImageContent(content))
+    if (
+      (markerFlags & (INLINE_TEXT_MARKER_BANG | INLINE_TEXT_MARKER_OPEN_BRACKET)) === (INLINE_TEXT_MARKER_BANG | INLINE_TEXT_MARKER_OPEN_BRACKET)
+      && handleInlineImageContent(content)
+    ) {
       return
+    }
 
     // Avoid synthesizing links from raw text only when the next token is
     // already a structured link_open. This prevents duplicates while still
     // allowing fallback for later tricky links in the same inline run.
-    if ((tokens[i + 1]?.type !== 'link_open' || isMarkdownLinkBeforeLinkifiedUrl(content)) && handleInlineLinkContent(content, token))
+    if (
+      (markerFlags & INLINE_TEXT_MARKER_OPEN_BRACKET) !== 0
+      && (tokens[i + 1]?.type !== 'link_open' || isMarkdownLinkBeforeLinkifiedUrl(content))
+      && handleInlineLinkContent(content, token)
+    ) {
       return
+    }
 
     const reparsedNodes = tryReparseCollapsedInlineText(rawContent)
     if (reparsedNodes) {
@@ -1345,7 +1427,7 @@ export function parseInlineTokens(
       return
 
     // Emit remaining text token
-    commitTextNode(content, token, preToken, nextToken)
+    commitTextNode(content, token, preToken, nextToken, markerFlags)
     i++
   }
 

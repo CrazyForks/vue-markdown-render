@@ -60,8 +60,13 @@ const browserRendererOptions = {
 }
 const browserFinalTimelineMarkdownOptions = {
   nodeVirtual: 'auto',
-  maxLiveNodes: 60,
-  liveNodeBuffer: 20,
+  maxLiveNodes: 50,
+  liveNodeBuffer: 16,
+}
+const browserStandaloneFinalRestoreAutoExpectedOptions = {
+  nodeVirtual: 'auto',
+  maxLiveNodes: 50,
+  liveNodeBuffer: 16,
 }
 
 const corpusDefinitions = [
@@ -584,6 +589,14 @@ function waitFrame() {
 async function waitFrames(count) {
   for (let i = 0; i < count; i++)
     await waitFrame()
+}
+
+function percentile(values, p) {
+  const sorted = values.filter(Number.isFinite).slice().sort((a, b) => a - b)
+  if (!sorted.length)
+    return 0
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * p) - 1))
+  return sorted[index]
 }
 
 function createParsePerformance() {
@@ -1807,12 +1820,12 @@ function renderParserTable(parserResults) {
 
 function renderBrowserRestoreTable(rows) {
   const lines = [
-    '| Case | Bytes | Total | Timed out | Task | Script | Layout | Run long task | Run long-task busy | Run frame p95 | Run frame max | Run dropped frames | DOM nodes | Worst non-image/katex height changes | Worst max non-ignored delta | Parser total | Node reuse | Signature | CLS |',
-    '| --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
+    '| Case | Bytes | Total | Timed out | Task | Script | Layout | Run long task | Run long-task busy | Run frame p95 | Run frame max | Run dropped frames | DOM nodes | Rendered slots | Worst non-image/katex height changes | Worst max non-ignored delta | Parser total | Node reuse | Signature | CLS |',
+    '| --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
   ]
   for (const row of rows) {
     const m = row.median
-    lines.push(`| ${row.id} | ${row.bytes} | ${formatMs(m.totalMs)} | ${formatBoolean(m.runTimedOut)} | ${formatMs(m.taskDurationMs)} | ${formatMs(m.scriptDurationMs)} | ${formatMs(m.layoutDurationMs)} | ${formatMs(m.observers?.longTaskTotalMs)} | ${formatPercent(m.observers?.longTaskBusyRatio)} | ${formatMs(m.observers?.frameP95Ms)} | ${formatMs(m.observers?.frameMaxMs)} | ${formatNumber(m.observers?.droppedFrameEstimate)} | ${formatNumber(m.settledSnapshot?.domNodes)} | ${formatNumber(m.heightStabilityWorst?.nonIgnoredChangedSlots)} | ${formatMs(m.heightStabilityWorst?.nonIgnoredMaxAbsDeltaPx)} | ${formatMs(m.parsePerformance?.parseMarkdownToStructureTotalMs)} | ${formatMs(m.parsePerformance?.nodeReuseMs)} | ${formatMs(m.parsePerformance?.signatureMs)} | ${m.observers?.cls ?? '-'} |`)
+    lines.push(`| ${row.id} | ${row.bytes} | ${formatMs(m.totalMs)} | ${formatBoolean(m.runTimedOut)} | ${formatMs(m.taskDurationMs)} | ${formatMs(m.scriptDurationMs)} | ${formatMs(m.layoutDurationMs)} | ${formatMs(m.observers?.longTaskTotalMs)} | ${formatPercent(m.observers?.longTaskBusyRatio)} | ${formatMs(m.observers?.frameP95Ms)} | ${formatMs(m.observers?.frameMaxMs)} | ${formatNumber(m.observers?.droppedFrameEstimate)} | ${formatNumber(m.settledSnapshot?.domNodes)} | ${formatNumber(m.settledSnapshot?.slots)} | ${formatNumber(m.heightStabilityWorst?.nonIgnoredChangedSlots)} | ${formatMs(m.heightStabilityWorst?.nonIgnoredMaxAbsDeltaPx)} | ${formatMs(m.parsePerformance?.parseMarkdownToStructureTotalMs)} | ${formatMs(m.parsePerformance?.nodeReuseMs)} | ${formatMs(m.parsePerformance?.signatureMs)} | ${m.observers?.cls ?? '-'} |`)
   }
   return lines.join('\n')
 }
@@ -1902,6 +1915,12 @@ function renderMarkdownReport(payload) {
     '',
     renderOptionsTable(payload.config.finalTimelineMarkdownOptions),
     '',
+    '## Standalone Final Restore Auto Expected Defaults',
+    '',
+    'Standalone restore cases do not pass these props directly; they exercise the internal final-restore auto path. Use the Browser Restore `Rendered slots` column as runtime evidence for the active window.',
+    '',
+    renderOptionsTable(payload.config.standaloneFinalRestoreAutoExpectedOptions),
+    '',
     '## Smooth Streaming Fixture',
     '',
     renderOptionsTable(payload.config.smoothStreamingOptions),
@@ -1976,6 +1995,7 @@ async function main() {
       browserCpuThrottleRate,
       rendererOptions: browserRendererOptions,
       finalTimelineMarkdownOptions: browserFinalTimelineMarkdownOptions,
+      standaloneFinalRestoreAutoExpectedOptions: browserStandaloneFinalRestoreAutoExpectedOptions,
       smoothStreamingOptions: browserEffectiveSmoothStreamingOptions,
       parserCases: selectedParserCaseIds,
       browserRestoreCases: selectedBrowserRestoreCaseIds,

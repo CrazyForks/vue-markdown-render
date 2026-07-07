@@ -112,7 +112,7 @@ const md = '# Virtualized transcript'
 
 如果业务已经有自己的外层 virtualizer，使用 `useMarkstreamVirtualAdapter()`，并把 `markdownProps(item, index)` 绑定到 Markdown item。底层 `virtualScroll` prop 继续作为高级 adapter/debug 协议保留。
 
-`MarkstreamVirtualTimeline` 和 `useMarkstreamVirtualAdapter()` 产出的 final Markdown row 默认会使用 node virtualization（`nodeVirtual: 'auto'`、`maxLiveNodes: 60`、`liveNodeBuffer: 20`），这样恢复聊天记录时不会一次性挂载完整 Markdown DOM。如果某一行必须暴露完整 DOM 给选择复制、外部锚点、测试或自定义高亮逻辑，可以在自定义 slot 里覆盖绑定的 props：
+`MarkstreamVirtualTimeline` 和 `useMarkstreamVirtualAdapter()` 产出的 final Markdown row 默认会使用 node virtualization（`nodeVirtual: 'auto'`、`maxLiveNodes: 50`、`liveNodeBuffer: 16`），这样恢复聊天记录时不会一次性挂载完整 Markdown DOM。如果某一行必须暴露完整 DOM 给选择复制、外部锚点、测试或自定义高亮逻辑，可以在自定义 slot 里覆盖绑定的 props：
 
 ```vue
 <template v-slot:default="{ markdownProps, measureRef }">
