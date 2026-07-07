@@ -70,40 +70,45 @@ export function useBatchRenderingScheduler(
     onDatasetChanged,
   } = options
 
-  let batchRaf: number | null = null
-  let batchTimeout: number | null = null
-  let batchPending = false
+  // Consolidated scheduling state
+  let scheduleId: number | null = null
+  let scheduleType: 'raf' | 'idle' | 'timeout' = 'raf'
   let pendingIncrement: number | null = null
-  let batchIdle: number | null = null
   let commitMeasurementGeneration = 0
   let commitMeasurementPending = false
   let followupBatchRequested = false
-  const commitMeasurementRafs = new Set<number>()
-  const commitMeasurementTimeouts = new Set<number>()
+  const commitMeasurementCallbacks = new Set<number>()
 
   function cleanupBatchScheduler() {
     if (!isClient)
       return
-    if (batchRaf != null) {
-      cancelFrame?.(batchRaf)
-      batchRaf = null
+
+    // Cancel current schedule
+    if (scheduleId != null) {
+      if (scheduleType === 'raf' && cancelFrame) {
+        cancelFrame(scheduleId)
+      }
+      else if (scheduleType === 'idle' && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(scheduleId)
+      }
+      else if (scheduleType === 'timeout') {
+        window.clearTimeout(scheduleId)
+      }
+      scheduleId = null
     }
-    if (batchTimeout != null) {
-      window.clearTimeout(batchTimeout)
-      batchTimeout = null
-    }
-    if (batchIdle != null && typeof window.cancelIdleCallback === 'function') {
-      window.cancelIdleCallback(batchIdle)
-      batchIdle = null
-    }
+
+    // Cancel commit measurements
     commitMeasurementGeneration += 1
-    for (const raf of commitMeasurementRafs)
-      cancelFrame?.(raf)
-    commitMeasurementRafs.clear()
-    for (const timeout of commitMeasurementTimeouts)
-      window.clearTimeout(timeout)
-    commitMeasurementTimeouts.clear()
-    batchPending = false
+    for (const id of commitMeasurementCallbacks) {
+      if (cancelFrame) {
+        cancelFrame(id)
+      }
+      else {
+        window.clearTimeout(id)
+      }
+    }
+    commitMeasurementCallbacks.clear()
+
     pendingIncrement = null
     commitMeasurementPending = false
     followupBatchRequested = false
@@ -132,6 +137,7 @@ export function useBatchRenderingScheduler(
 
     commitMeasurementPending = true
     const generation = ++commitMeasurementGeneration
+
     void nextTick().then(() => {
       if (generation !== commitMeasurementGeneration)
         return
@@ -145,46 +151,32 @@ export function useBatchRenderingScheduler(
         finishCommitMeasurement(measuredCost)
       }
 
-      // Keep a frame boundary before the next batch without charging RAF wait time as commit cost.
+      // Single frame boundary without nested RAF
       if (requestFrame) {
-        let finished = false
-        let timeout: number | null = null
-
-        const finishOnce = () => {
-          if (finished)
-            return
-          finished = true
+        const id = requestFrame(() => {
+          commitMeasurementCallbacks.delete(id)
           finish()
-        }
-
-        const raf = requestFrame(() => {
-          commitMeasurementRafs.delete(raf)
-          if (timeout != null) {
-            window.clearTimeout(timeout)
-            commitMeasurementTimeouts.delete(timeout)
-            timeout = null
-          }
-          finishOnce()
         })
-        commitMeasurementRafs.add(raf)
+        commitMeasurementCallbacks.add(id)
 
-        timeout = window.setTimeout(() => {
-          if (timeout != null)
-            commitMeasurementTimeouts.delete(timeout)
-          timeout = null
-          cancelFrame?.(raf)
-          commitMeasurementRafs.delete(raf)
-          finishOnce()
-        }, Math.max(32, props.renderBatchIdleTimeoutMs ?? 120))
-        commitMeasurementTimeouts.add(timeout)
+        // Fallback timeout in case RAF is blocked
+        const timeoutId = window.setTimeout(() => {
+          if (commitMeasurementCallbacks.has(id)) {
+            commitMeasurementCallbacks.delete(id)
+            if (cancelFrame)
+              cancelFrame(id)
+            finish()
+          }
+        }, Math.max(32, props.renderBatchIdleTimeoutMs ?? 120)) as any
+        commitMeasurementCallbacks.add(timeoutId)
         return
       }
 
-      const timeout = window.setTimeout(() => {
-        commitMeasurementTimeouts.delete(timeout)
+      const timeoutId = window.setTimeout(() => {
+        commitMeasurementCallbacks.delete(timeoutId as any)
         finish()
-      }, 0)
-      commitMeasurementTimeouts.add(timeout)
+      }, 0) as any
+      commitMeasurementCallbacks.add(timeoutId)
     })
   }
 
@@ -198,18 +190,15 @@ export function useBatchRenderingScheduler(
     const amount = Math.max(1, increment)
     const run = () => {
       const runStart = now()
-      let syncElapsed = 0
-      batchRaf = null
-      batchTimeout = null
-      batchIdle = null
-      batchPending = false
+      scheduleId = null
+
       const applied = pendingIncrement != null ? pendingIncrement : amount
       pendingIncrement = null
 
       const start = now()
       renderedCount.value = Math.min(target, renderedCount.value + applied)
       cleanupNodeVisibility(renderedCount.value)
-      syncElapsed = now() - start
+      const syncElapsed = now() - start
 
       measureBatchPostFlushCost(runStart, syncElapsed)
     }
@@ -221,27 +210,37 @@ export function useBatchRenderingScheduler(
 
     const delay = Math.max(0, props.renderBatchDelay ?? 16)
     pendingIncrement = pendingIncrement != null ? Math.max(pendingIncrement, amount) : amount
-    if (batchPending)
-      return
-    batchPending = true
 
+    if (scheduleId != null)
+      return // Already scheduled
+
+    // Prioritize idle callback for smooth UX
     if (!isTestEnv && hasIdleCallback && window.requestIdleCallback) {
       const timeout = Math.max(0, props.renderBatchIdleTimeoutMs ?? 120)
-      batchIdle = window.requestIdleCallback(() => run(), { timeout })
+      scheduleType = 'idle'
+      scheduleId = window.requestIdleCallback(() => run(), { timeout })
       return
     }
 
-    if (!requestFrame || isTestEnv) {
-      batchTimeout = window.setTimeout(() => run(), delay)
+    // Use RAF with optional delay - preserve frame alignment like original
+    if (requestFrame && !isTestEnv) {
+      scheduleType = 'raf'
+      scheduleId = requestFrame(() => {
+        if (delay === 0) {
+          run()
+        }
+        else {
+          // RAF first for frame alignment, then timeout for delay
+          scheduleType = 'timeout'
+          scheduleId = window.setTimeout(() => run(), delay) as any
+        }
+      })
       return
     }
-    batchRaf = requestFrame(() => {
-      if (delay === 0) {
-        run()
-        return
-      }
-      batchTimeout = window.setTimeout(() => run(), delay)
-    })
+
+    // Fallback to setTimeout
+    scheduleType = 'timeout'
+    scheduleId = window.setTimeout(() => run(), delay) as any
   }
 
   function requestNextBatch(
@@ -249,7 +248,6 @@ export function useBatchRenderingScheduler(
     opts: { immediate?: boolean } = {},
   ) {
     if (commitMeasurementPending) {
-      // Use the post-feedback adaptive size instead of the stale requested increment.
       followupBatchRequested = true
       return
     }
@@ -277,6 +275,7 @@ export function useBatchRenderingScheduler(
     const budget = Math.max(2, props.renderBatchBudgetMs ?? 6)
     const maxSize = Math.max(1, resolvedBatchSize.value || 1)
     const minSize = Math.max(1, Math.floor(maxSize / 4))
+
     if (elapsed > budget * 1.5) {
       adaptiveBatchSize.value = Math.max(minSize, Math.floor(adaptiveBatchSize.value * 0.8))
     }
