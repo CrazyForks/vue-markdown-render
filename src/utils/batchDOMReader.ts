@@ -7,6 +7,7 @@
 interface DOMReadTask<T> {
   read: () => T
   resolve: (value: T) => void
+  reject: (error: unknown) => void
 }
 
 const isClient = typeof window !== 'undefined'
@@ -17,8 +18,8 @@ class BatchDOMReader {
   private isProcessing = false
 
   read<T>(task: () => T): Promise<T> {
-    return new Promise<T>((resolve) => {
-      this.pending.push({ read: task, resolve })
+    return new Promise<T>((resolve, reject) => {
+      this.pending.push({ read: task, resolve, reject })
       this.schedule()
     })
   }
@@ -35,6 +36,8 @@ class BatchDOMReader {
     // If batching is active, force immediate flush and execute
     // This ensures readSync truly returns synchronously
     let result: T | undefined
+    let thrown: unknown
+    let didThrow = false
 
     // Cancel pending RAF since we're flushing now
     if (this.rafId !== null) {
@@ -53,9 +56,16 @@ class BatchDOMReader {
       resolve: (value: T) => {
         result = value
       },
+      reject: (error: unknown) => {
+        thrown = error
+        didThrow = true
+      },
     })
 
     this.flushImmediate()
+
+    if (didThrow)
+      throw thrown
 
     return result!
   }
@@ -107,10 +117,23 @@ class BatchDOMReader {
       const tasks = this.pending.splice(0)
 
       // Execute all reads first (batched layout phase)
-      const results = tasks.map(task => task.read())
+      const outcomes = tasks.map((task) => {
+        try {
+          return { ok: true as const, value: task.read() }
+        }
+        catch (error) {
+          return { ok: false as const, error }
+        }
+      })
 
       // Then resolve all promises (no layout)
-      tasks.forEach((task, i) => task.resolve(results[i]))
+      tasks.forEach((task, i) => {
+        const outcome = outcomes[i]
+        if (outcome.ok)
+          task.resolve(outcome.value)
+        else
+          task.reject(outcome.error)
+      })
     }
     finally {
       this.isProcessing = false

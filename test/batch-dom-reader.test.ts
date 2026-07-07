@@ -85,4 +85,30 @@ describe('batchDOMReader', () => {
     expect(seen).toEqual(['first', 'sync', 'sync-result'])
     expect(frameCallbacks.size).toBe(0)
   })
+
+  it('settles every queued read when one read throws', async () => {
+    const reader = createBatchDOMReader()
+    const error = new Error('read failed')
+    const seen: string[] = []
+
+    const first = reader.read(() => {
+      seen.push('first')
+      return 'first-result'
+    })
+    const failed = reader.read(() => {
+      seen.push('failed')
+      throw error
+    })
+    const third = reader.read(() => {
+      seen.push('third')
+      return 'third-result'
+    })
+
+    flushNextFrame()
+
+    await expect(first).resolves.toBe('first-result')
+    await expect(failed).rejects.toBe(error)
+    await expect(third).resolves.toBe('third-result')
+    expect(seen).toEqual(['first', 'failed', 'third'])
+  })
 })

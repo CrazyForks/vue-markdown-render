@@ -1,41 +1,76 @@
-import { readFileSync } from 'node:fs'
+/**
+ * @vitest-environment jsdom
+ */
+
 import { describe, expect, it } from 'vitest'
+import { createAutoScrollChaseController } from '../playground/src/utils/autoScrollChase'
 
-describe('playground index auto-scroll source guards', () => {
-  it('keeps bottom chase leased and restores it when the user scrolls back to bottom', () => {
-    const source = readFileSync('playground/src/pages/index.vue', 'utf8')
+describe('playground auto-scroll chase', () => {
+  it('keeps chasing new content, stops when the user scrolls up, and resumes at bottom', () => {
+    const root = document.createElement('div')
+    let scrollHeight = 1000
+    const clientHeight = 100
+    let now = 0
+    let shouldStick = true
+    const frames: FrameRequestCallback[] = []
 
-    expect(source).toContain('let __autoScrollChaseUntil = 0')
-    expect(source).toContain('__autoScrollChaseUntil = performance.now() + 240')
-    expect(source).toContain('stableFrames >= 3 && performance.now() >= __autoScrollChaseUntil')
-    expect(source).toContain('let __lastObservedScrollTop = 0')
-    expect(source).toContain('const scrolledUp = currentScrollTop < __lastObservedScrollTop - 2')
-    expect(source).not.toContain('distanceFromBottom > 100')
+    Object.defineProperty(root, 'scrollHeight', {
+      configurable: true,
+      get: () => scrollHeight,
+    })
+    Object.defineProperty(root, 'clientHeight', {
+      configurable: true,
+      get: () => clientHeight,
+    })
 
-    const scrollHandlerStart = source.indexOf('function handleScrollRootScroll()')
-    expect(scrollHandlerStart).toBeGreaterThanOrEqual(0)
-    const scrollHandlerEnd = source.indexOf('function handleScrollRootWheel', scrollHandlerStart)
-    const scrollHandler = source.slice(scrollHandlerStart, scrollHandlerEnd)
+    root.scrollTop = 900
 
-    expect(scrollHandler).toContain('shouldStickToBottom.value = true')
-    expect(scrollHandler).toContain('scheduleScrollToBottom()')
-    expect(scrollHandler).toContain('shouldStickToBottom.value && !scrolledUp')
+    const controller = createAutoScrollChaseController({
+      getRoot: () => root,
+      getShouldStick: () => shouldStick,
+      setShouldStick: (value) => {
+        shouldStick = value
+      },
+      requestFrame: (callback) => {
+        frames.push(callback)
+        return frames.length
+      },
+      cancelFrame: () => {},
+      now: () => now,
+    })
 
-    const touchEndStart = source.indexOf('function handleScrollRootTouchEnd()')
-    expect(touchEndStart).toBeGreaterThanOrEqual(0)
-    const touchEndEnd = source.indexOf('// Streaming updates', touchEndStart)
-    const touchEndHandler = source.slice(touchEndStart, touchEndEnd)
+    function runNextFrame() {
+      const callback = frames.shift()
+      expect(callback).toBeTruthy()
+      callback?.(now)
+    }
 
-    expect(touchEndHandler).toContain('shouldStickToBottom.value = true')
-    expect(touchEndHandler).toContain('scheduleScrollToBottom()')
+    controller.handleScroll()
+    expect(shouldStick).toBe(true)
 
-    const overflowLatchStart = source.indexOf('const shouldRemove = __overflowConfirmations >= REQUIRED_OVERFLOW_CONFIRMATIONS')
-    expect(overflowLatchStart).toBeGreaterThanOrEqual(0)
-    const overflowLatchEnd = source.indexOf('else {', overflowLatchStart)
-    const overflowLatch = source.slice(overflowLatchStart, overflowLatchEnd)
+    runNextFrame()
+    expect(root.scrollTop).toBe(1000)
 
-    expect(overflowLatch).not.toContain('__roContainer?.disconnect()')
-    expect(overflowLatch).not.toContain('__roContent?.disconnect()')
-    expect(overflowLatch).toContain('__mo?.disconnect()')
+    scrollHeight = 1200
+    controller.schedule()
+    runNextFrame()
+    expect(root.scrollTop).toBe(1200)
+
+    root.scrollTop = 900
+    controller.handleScroll()
+    expect(shouldStick).toBe(false)
+
+    scrollHeight = 1400
+    controller.schedule()
+    runNextFrame()
+    expect(root.scrollTop).toBe(900)
+
+    root.scrollTop = 1300
+    controller.handleScroll()
+    expect(shouldStick).toBe(true)
+
+    now = 1
+    runNextFrame()
+    expect(root.scrollTop).toBe(1400)
   })
 })
