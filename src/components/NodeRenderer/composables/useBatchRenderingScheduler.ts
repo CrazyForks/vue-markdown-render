@@ -155,8 +155,13 @@ export function useBatchRenderingScheduler(
       if (requestFrame) {
         let frameId: number | null = null
         let timeoutId: number | null = null
+        let finished = false
 
         const finishOnce = () => {
+          if (finished)
+            return
+          finished = true
+
           if (frameId !== null) {
             commitMeasurementRafs.delete(frameId)
             frameId = null

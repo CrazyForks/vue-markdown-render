@@ -326,6 +326,63 @@ describe('useBatchRenderingScheduler', () => {
     expect(cancelFrame).not.toHaveBeenCalled()
   })
 
+  it('finishes commit measurement only once if RAF and fallback callbacks both run', async () => {
+    let currentTime = 0
+    let fallbackCallback: (() => void) | null = null
+    vi.spyOn(performance, 'now').mockImplementation(() => currentTime)
+
+    const originalSetTimeout = window.setTimeout.bind(window)
+    vi.spyOn(window, 'setTimeout').mockImplementation(((handler: TimerHandler, timeout?: number, ...args: any[]) => {
+      if (timeout === 120 && typeof handler === 'function')
+        fallbackCallback = () => handler(...args)
+      return originalSetTimeout(handler, timeout, ...args)
+    }) as typeof window.setTimeout)
+
+    let frameHandle = 0
+    const frames = new Map<number, FrameRequestCallback>()
+    const requestFrame = vi.fn((callback: FrameRequestCallback) => {
+      frameHandle += 1
+      frames.set(frameHandle, callback)
+      return frameHandle
+    }) as unknown as typeof window.requestAnimationFrame
+    const cancelFrame = vi.fn((id: number) => {
+      frames.delete(id)
+    }) as unknown as typeof window.cancelAnimationFrame
+
+    function runFrame(id: number) {
+      const callback = frames.get(id)
+      expect(callback).toBeTruthy()
+      frames.delete(id)
+      callback?.(currentTime)
+    }
+
+    const h = createHarness({
+      total: 16,
+      initialBatch: 8,
+      batchSize: 8,
+      delay: 10,
+      requestFrame,
+      cancelFrame,
+    })
+
+    expect(h.renderedCount.value).toBe(8)
+    runFrame(1)
+    vi.advanceTimersByTime(10)
+
+    expect(h.renderedCount.value).toBe(16)
+
+    currentTime = 10
+    await nextTick()
+
+    expect(fallbackCallback).not.toBeNull()
+
+    runFrame(2)
+    fallbackCallback?.()
+
+    expect(h.adaptiveBatchSize.value).toBe(6)
+    expect(cancelFrame).not.toHaveBeenCalled()
+  })
+
   it('does not apply multiple idle batches before commit feedback', async () => {
     let currentTime = 0
     vi.spyOn(performance, 'now').mockImplementation(() => currentTime)
