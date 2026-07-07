@@ -887,7 +887,7 @@ describe('codeBlockNode editor creation locking', () => {
     }
   })
 
-  it('keeps streaming diff fallback height, font size, and line height monotonic across frames', async () => {
+  it('keeps streaming diff fallback font metrics stable while allowing height to shrink', async () => {
     const helpers = getStreamMonacoHelpers()
     let resolveCreate: (() => void) | null = null
     helpers.createDiffEditor.mockImplementation(
@@ -954,7 +954,7 @@ describe('codeBlockNode editor creation locking', () => {
       await flushPendingMicrotasks()
 
       expect(readFallbackMetrics()).toEqual({
-        minHeight: '108px',
+        minHeight: '54px',
         fontSize: '12px',
         lineHeight: '18px',
         diffLineHeight: '18px',
@@ -994,7 +994,7 @@ describe('codeBlockNode editor creation locking', () => {
       await flushPendingMicrotasks()
 
       expect(readFallbackMetrics()).toEqual({
-        minHeight: '180px',
+        minHeight: '72px',
         fontSize: '12px',
         lineHeight: '18px',
         diffLineHeight: '18px',
@@ -2266,6 +2266,80 @@ describe('codeBlockNode language normalization', () => {
 
     wrapper.unmount()
   })
+
+  it('coalesces plain text stream updates while Monaco update is in flight', async () => {
+    const helpers = getStreamMonacoHelpers()
+    const firstUpdate = createDeferred()
+    helpers.updateCode
+      .mockImplementationOnce(() => firstUpdate.promise)
+      .mockImplementation(() => {})
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'vue',
+          code: '<template />',
+          raw: '```vue\n<template />',
+          loading: true,
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await waitForCreateEditorCalls(1, helpers)
+    await flushPendingMicrotasks()
+    helpers.updateCode.mockClear()
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'vue',
+        code: '<template />\n<style>',
+        raw: '```vue\n<template />\n<style>',
+        loading: true,
+      },
+    })
+    await flushPendingMicrotasks()
+
+    expect(helpers.updateCode).toHaveBeenCalledTimes(1)
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'vue',
+        code: '<template />\n<style>\n* { margin: 0; }',
+        raw: '```vue\n<template />\n<style>\n* { margin: 0; }',
+        loading: true,
+      },
+    })
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'vue',
+        code: '<template />\n<style>\n* { margin: 0; }\n</style>',
+        raw: '```vue\n<template />\n<style>\n* { margin: 0; }\n</style>',
+        loading: true,
+      },
+    })
+    await flushPendingMicrotasks()
+
+    expect(helpers.updateCode).toHaveBeenCalledTimes(1)
+
+    firstUpdate.resolve()
+    await firstUpdate.promise
+    await flushPendingMicrotasks()
+
+    expect(helpers.updateCode).toHaveBeenCalledTimes(2)
+    expect(helpers.updateCode).toHaveBeenLastCalledWith(
+      '<template />\n<style>\n* { margin: 0; }\n</style>',
+      'vue',
+    )
+
+    wrapper.unmount()
+  })
 })
 
 describe('codeBlockNode diff defaults', () => {
@@ -3426,7 +3500,7 @@ describe('codeBlockNode diff defaults', () => {
     wrapper.unmount()
   })
 
-  it('does not shrink the streaming diff host when Monaco reports a smaller partial frame', async () => {
+  it('shrinks the streaming diff host when Monaco reports a smaller partial frame', async () => {
     const helpers = getStreamMonacoHelpers()
     let lineCount = 20
     let contentSizeListener: (() => void) | null = null
@@ -3479,7 +3553,9 @@ describe('codeBlockNode diff defaults', () => {
     contentSizeListener?.()
     await flushPendingMicrotasks()
 
-    expect(Number.parseFloat(host.style.height)).toBe(initialHeight)
+    const nextHeight = Number.parseFloat(host.style.height)
+    expect(nextHeight).toBeGreaterThan(0)
+    expect(nextHeight).toBeLessThan(initialHeight)
 
     wrapper.unmount()
   })
@@ -4319,6 +4395,19 @@ describe('codeBlockNode plain text theme fallback', () => {
     expect(container.style.getPropertyValue('--vscode-editor-foreground')).toBe('')
 
     wrapper.unmount()
+  })
+})
+
+describe('codeBlockNode streaming height source guards', () => {
+  it('does not keep the largest historical streaming diff fallback height', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/components/CodeBlockNode/CodeBlockNode.vue'), 'utf8')
+    const rememberStart = source.indexOf('function rememberStreamingDiffHeightFloor')
+    expect(rememberStart).toBeGreaterThanOrEqual(0)
+    const rememberEnd = source.indexOf('const reservedEditorContentHeight', rememberStart)
+    const rememberSource = source.slice(rememberStart, rememberEnd)
+
+    expect(rememberSource).toContain('streamingDiffHeightFloor.value = nextHeight')
+    expect(rememberSource).not.toContain('Math.max(previous, nextHeight)')
   })
 })
 

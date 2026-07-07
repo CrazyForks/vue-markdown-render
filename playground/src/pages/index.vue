@@ -352,7 +352,8 @@ let __overflowConfirmations = 0
 let __clearConfirmations = 0
 let __autoScrollRaf: number | null = null
 let __continuousScrollMode = false
-let __autoScrollGuardUntil = 0
+let __autoScrollChaseUntil = 0
+let __lastObservedScrollTop = 0
 // Observers and scheduler
 
 function getScrollRoot() {
@@ -365,13 +366,15 @@ function isScrollRootAtBottom(root = getScrollRoot(), threshold = 24) {
 
 function scrollToBottom() {
   const root = getScrollRoot()
-  __autoScrollGuardUntil = performance.now() + 120
   root.scrollTop = root.scrollHeight
+  __lastObservedScrollTop = root.scrollTop
 }
 
 function scheduleScrollToBottom() {
   if (!shouldStickToBottom.value)
     return
+
+  __autoScrollChaseUntil = performance.now() + 240
 
   // Enter continuous chase mode - for high-frequency updates (8ms intervals, 24 char chunks)
   // we need to keep scrolling every frame until content stabilizes
@@ -391,17 +394,6 @@ function scheduleScrollToBottom() {
 
       const root = getScrollRoot()
 
-      // Double-check we're actually at/near bottom before forcing scroll
-      // This prevents fighting with user scroll gestures
-      const distanceFromBottom = root.scrollHeight - root.scrollTop - root.clientHeight
-      if (distanceFromBottom > 100) {
-        // User scrolled up significantly - respect that
-        __autoScrollRaf = null
-        __continuousScrollMode = false
-        shouldStickToBottom.value = false
-        return
-      }
-
       scrollToBottom()
 
       // Check if height stabilized
@@ -415,7 +407,7 @@ function scheduleScrollToBottom() {
       }
 
       // Exit continuous mode after 3 consecutive stable frames
-      if (stableFrames >= 3) {
+      if (stableFrames >= 3 && performance.now() >= __autoScrollChaseUntil) {
         __autoScrollRaf = null
         __continuousScrollMode = false
         return
@@ -437,12 +429,20 @@ function scheduleScrollToBottom() {
 }
 
 function handleScrollRootScroll() {
-  if (isScrollRootAtBottom()) {
+  const root = getScrollRoot()
+  const currentScrollTop = root.scrollTop
+
+  if (isScrollRootAtBottom(root)) {
+    __lastObservedScrollTop = currentScrollTop
     shouldStickToBottom.value = true
+    scheduleScrollToBottom()
     return
   }
 
-  if (shouldStickToBottom.value && performance.now() < __autoScrollGuardUntil) {
+  const scrolledUp = currentScrollTop < __lastObservedScrollTop - 2
+  __lastObservedScrollTop = currentScrollTop
+
+  if (shouldStickToBottom.value && !scrolledUp) {
     scheduleScrollToBottom()
     return
   }
@@ -460,8 +460,10 @@ function handleScrollRootTouchMove() {
 }
 
 function handleScrollRootTouchEnd() {
-  if (isScrollRootAtBottom())
+  if (isScrollRootAtBottom()) {
     shouldStickToBottom.value = true
+    scheduleScrollToBottom()
+  }
 }
 
 // Streaming updates can change the rendered height without reliably triggering
@@ -530,17 +532,8 @@ function scheduleCheckMinHeight() {
     if (shouldRemove) {
       __minHeightDisabled = true
       __clearConfirmations = 0
-      // 内容已超出：不再需要继续监听，断开所有 observer 以节省开销
-      try {
-        __roContainer?.disconnect()
-        __roContent?.disconnect()
-        __mo?.disconnect()
-      }
-      finally {
-        __roContainer = null
-        __roContent = null
-        __mo = null
-      }
+      __mo?.disconnect()
+      __mo = null
     }
     else {
       // Revert probe change before paint.

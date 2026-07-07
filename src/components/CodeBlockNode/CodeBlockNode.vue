@@ -980,10 +980,7 @@ function rememberStreamingDiffHeightFloor(height: number | null) {
   if (!Number.isFinite(nextHeight) || nextHeight <= 0)
     return
 
-  const previous = getStreamingDiffHeightFloor()
-  streamingDiffHeightFloor.value = previous == null
-    ? nextHeight
-    : Math.max(previous, nextHeight)
+  streamingDiffHeightFloor.value = nextHeight
 }
 
 const reservedEditorContentHeight = computed(() => {
@@ -1552,11 +1549,6 @@ function measureRenderedDiffHeight(container: HTMLElement): number | null {
 
     if (bottom > 0)
       return Math.ceil(bottom)
-
-    const diffRoot = container.querySelector('.monaco-diff-editor') as HTMLElement | null
-    const diffHeight = diffRoot?.getBoundingClientRect?.().height ?? 0
-    if (diffHeight > 0)
-      return Math.ceil(diffHeight + PIXEL_EPSILON)
 
     return null
   }
@@ -2337,11 +2329,13 @@ function updateCollapsedHeight() {
     else if (preFallbackDiffInline.value && measuredDiffHeight != null) {
       h0 = measuredDiffHeight
     }
-    else if (estimatedDiffHeight != null) {
-      h0 = Math.max(measuredDiffHeight ?? 0, estimatedDiffHeight)
+    else if (measuredDiffHeight != null) {
+      h0 = props.loading === false && estimatedDiffHeight != null
+        ? Math.max(measuredDiffHeight, estimatedDiffHeight)
+        : measuredDiffHeight
     }
     else {
-      h0 = measuredDiffHeight
+      h0 = estimatedDiffHeight
     }
     // 1) 有实时内容高度 -> 采用并记忆原始内容高度（未裁剪前），用于下一次恢复
     if (h0 != null && h0 > 0) {
@@ -2629,6 +2623,38 @@ function shouldDeferStreamingEditorCreation() {
   return !String(props.node.code ?? '')
 }
 
+let pendingPlainCodeUpdate: { code: string, language: string } | null = null
+let plainCodeUpdateRunning = false
+
+async function flushPlainCodeUpdateQueue() {
+  if (plainCodeUpdateRunning)
+    return
+
+  plainCodeUpdateRunning = true
+  try {
+    for (;;) {
+      if (!pendingPlainCodeUpdate || isUnmounted)
+        break
+      const next = pendingPlainCodeUpdate
+      pendingPlainCodeUpdate = null
+      try {
+        await Promise.resolve(updateCode(next.code, next.language))
+      }
+      catch (error) {
+        warnCodeBlockDev('Failed to update Monaco code editor', error)
+      }
+    }
+  }
+  finally {
+    plainCodeUpdateRunning = false
+  }
+}
+
+function queuePlainCodeUpdate(code: string, language: string) {
+  pendingPlainCodeUpdate = { code, language }
+  void flushPlainCodeUpdateQueue()
+}
+
 watch(
   () => [props.node.language, props.node.code, props.node.loading, props.loading] as const,
   ([newLanguage, code, nodeLoading, propLoading]) => {
@@ -2708,6 +2734,10 @@ watch(
         monacoLanguage.value,
       )
       layoutEditorToHost(true)
+      syncInlineFoldProxies()
+      syncEditorHostHeight(true)
+      layoutEditorToHost(true)
+      scheduleEditorHeightSync(true)
     }
     catch (error) {
       warnCodeBlockDev('Failed to update Monaco diff editor', error)
@@ -2758,7 +2788,7 @@ watch(
       catch {}
     }
 
-    updateCode(getDisplayCode(props.node.code, props.node.loading === true), monacoLanguage.value)
+    queuePlainCodeUpdate(getDisplayCode(props.node.code, props.node.loading === true), monacoLanguage.value)
 
     if (isExpanded.value) {
       safeRaf(() => updateExpandedHeight())

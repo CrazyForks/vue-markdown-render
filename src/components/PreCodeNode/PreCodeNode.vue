@@ -647,6 +647,33 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
   position: relative;
 }
 
+.markstream-vue pre.code-pre-fallback[data-markstream-code-loading='1'] {
+  --markstream-pre-line-number-top: var(--markstream-code-padding-y, 8px);
+  --markstream-pre-line-number-left: 4px;
+  --markstream-pre-line-number-width: 44px;
+  --markstream-pre-line-number-gap: 8px;
+  --markstream-code-padding-left: 48px;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: var(--markstream-code-padding-y, 8px) var(--markstream-code-padding-x, 12px);
+  padding-left: var(--markstream-code-padding-left);
+  overflow: auto;
+  border: 1px solid var(--code-border);
+  border-radius: var(--ms-radius);
+  background: var(--code-bg);
+  color: var(--code-fg);
+  font-family: var(
+    --markstream-code-font-family,
+    Menlo,
+    Monaco,
+    Courier New,
+    monospace
+  );
+  font-size: var(--vscode-editor-font-size, 12px);
+  line-height: var(--vscode-editor-line-height, 18px);
+}
+
 .markstream-vue pre.markstream-pre--line-numbers > .markstream-pre__line-numbers {
   position: absolute;
   top: var(--markstream-pre-line-number-top, 0);
@@ -787,6 +814,8 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
   position: relative;
   display: block;
   box-sizing: border-box;
+  width: 100%;
+  min-width: 100%;
   min-height: var(
     --markstream-pre-diff-synced-row-height,
     var(--markstream-pre-diff-line-height, 18px)
@@ -858,7 +887,8 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
   position: relative;
   z-index: 1;
   display: block;
-  min-width: max-content;
+  width: max-content;
+  min-width: 100%;
   line-height: var(--markstream-pre-diff-line-height, 18px);
   white-space: inherit;
   overflow-wrap: normal;
@@ -867,6 +897,7 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
 }
 
 .markstream-vue pre.markstream-pre--diff-preview.is-wrap .markstream-pre__diff-content {
+  width: auto;
   min-width: 0;
   overflow-wrap: inherit;
 }
