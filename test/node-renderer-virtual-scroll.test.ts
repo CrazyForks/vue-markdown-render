@@ -1177,7 +1177,7 @@ describe('node renderer virtual-scroll coordination', () => {
     await flushAll()
 
     expect(wrapper.classes()).toContain('virtualized')
-    expect(getRootNodeContentElements(wrapper.element).length).toBe(60)
+    expect(getRootNodeContentElements(wrapper.element).length).toBe(50)
 
     wrapper.unmount()
   })
@@ -1216,7 +1216,7 @@ describe('node renderer virtual-scroll coordination', () => {
     await flushAll()
 
     expect(wrapper.classes()).toContain('virtualized')
-    expect(getRootNodeContentElements(wrapper.element).length).toBe(60)
+    expect(getRootNodeContentElements(wrapper.element).length).toBe(50)
 
     wrapper.unmount()
   })
@@ -1239,7 +1239,7 @@ describe('node renderer virtual-scroll coordination', () => {
     await flushAll()
 
     expect(wrapper.classes()).not.toContain('virtualized')
-    expect(getRootNodeContentElements(wrapper.element).length).toBeGreaterThan(60)
+    expect(getRootNodeContentElements(wrapper.element).length).toBeGreaterThan(50)
 
     wrapper.unmount()
   })
@@ -1263,7 +1263,7 @@ describe('node renderer virtual-scroll coordination', () => {
     await flushAll()
 
     expect(wrapper.classes()).not.toContain('virtualized')
-    expect(getRootNodeContentElements(wrapper.element).length).toBeGreaterThan(60)
+    expect(getRootNodeContentElements(wrapper.element).length).toBeGreaterThan(50)
 
     wrapper.unmount()
   })
@@ -1288,7 +1288,7 @@ describe('node renderer virtual-scroll coordination', () => {
     await flushAll()
 
     expect(wrapper.classes()).not.toContain('virtualized')
-    expect(getRootNodeContentElements(wrapper.element).length).toBeGreaterThan(60)
+    expect(getRootNodeContentElements(wrapper.element).length).toBeGreaterThan(50)
 
     await wrapper.setProps({
       content: makeSameShapeContent('restore'),
@@ -1297,7 +1297,7 @@ describe('node renderer virtual-scroll coordination', () => {
     await flushAll()
 
     expect(wrapper.classes()).toContain('virtualized')
-    expect(getRootNodeContentElements(wrapper.element).length).toBe(60)
+    expect(getRootNodeContentElements(wrapper.element).length).toBe(50)
 
     wrapper.unmount()
   })
@@ -1324,7 +1324,7 @@ describe('node renderer virtual-scroll coordination', () => {
     await flushAll()
 
     expect(wrapper.classes()).not.toContain('virtualized')
-    expect(getRootNodeContentElements(wrapper.element).length).toBeGreaterThan(60)
+    expect(getRootNodeContentElements(wrapper.element).length).toBeGreaterThan(50)
 
     wrapper.unmount()
   })
@@ -1366,7 +1366,7 @@ describe('node renderer virtual-scroll coordination', () => {
     await flushAll()
 
     expect(wrapper.classes()).not.toContain('virtualized')
-    expect(getRootNodeContentElements(wrapper.element).length).toBeGreaterThan(60)
+    expect(getRootNodeContentElements(wrapper.element).length).toBeGreaterThan(50)
 
     wrapper.unmount()
   })

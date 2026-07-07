@@ -181,7 +181,7 @@ If you customize timeline rows, bind `measureRef` to the element that contains t
 
 If your app already owns the outer virtualizer, use `useMarkstreamVirtualAdapter()` and bind its `markdownProps(item, index)` to each Markdown item. The raw `virtualScroll` prop remains available as the advanced protocol for custom adapters and debugging.
 
-Final Markdown rows from `MarkstreamVirtualTimeline` and `useMarkstreamVirtualAdapter()` use node virtualization by default (`nodeVirtual: 'auto'`, `maxLiveNodes: 60`, `liveNodeBuffer: 20`) so restored chat transcripts do not mount the full Markdown DOM at once. If a row must expose the complete DOM for selection, external anchors, tests, or custom highlighters, override the bound props in a custom slot:
+Final Markdown rows from `MarkstreamVirtualTimeline` and `useMarkstreamVirtualAdapter()` use node virtualization by default (`nodeVirtual: 'auto'`, `maxLiveNodes: 50`, `liveNodeBuffer: 16`) so restored chat transcripts do not mount the full Markdown DOM at once. If a row must expose the complete DOM for selection, external anchors, tests, or custom highlighters, override the bound props in a custom slot:
 
 ```vue
 <template v-slot:default="{ markdownProps, measureRef }">
