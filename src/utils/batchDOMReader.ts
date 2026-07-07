@@ -29,6 +29,9 @@ class BatchDOMReader {
       return task()
     }
 
+    if (this.isProcessing)
+      return task()
+
     // If batching is active, force immediate flush and execute
     // This ensures readSync truly returns synchronously
     let result: T | undefined
@@ -99,15 +102,21 @@ class BatchDOMReader {
 
     this.rafId = null
     this.isProcessing = true
-    const tasks = this.pending.splice(0)
 
-    // Execute all reads first (batched layout phase)
-    const results = tasks.map(task => task.read())
+    try {
+      const tasks = this.pending.splice(0)
 
-    // Then resolve all promises (no layout)
-    tasks.forEach((task, i) => task.resolve(results[i]))
+      // Execute all reads first (batched layout phase)
+      const results = tasks.map(task => task.read())
 
-    this.isProcessing = false
+      // Then resolve all promises (no layout)
+      tasks.forEach((task, i) => task.resolve(results[i]))
+    }
+    finally {
+      this.isProcessing = false
+      if (this.pending.length > 0)
+        this.schedule()
+    }
   }
 
   cancel() {

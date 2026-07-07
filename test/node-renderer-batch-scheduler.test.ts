@@ -274,6 +274,58 @@ describe('useBatchRenderingScheduler', () => {
     expect(cancelFrame).toHaveBeenCalledWith(2)
   })
 
+  it('clears commit measurement fallback timeout when RAF boundary fires', async () => {
+    let currentTime = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => currentTime)
+
+    let frameHandle = 0
+    const frames = new Map<number, FrameRequestCallback>()
+    const requestFrame = vi.fn((callback: FrameRequestCallback) => {
+      frameHandle += 1
+      frames.set(frameHandle, callback)
+      return frameHandle
+    }) as unknown as typeof window.requestAnimationFrame
+    const cancelFrame = vi.fn((id: number) => {
+      frames.delete(id)
+    }) as unknown as typeof window.cancelAnimationFrame
+
+    function runFrame(id: number) {
+      const callback = frames.get(id)
+      expect(callback).toBeTruthy()
+      frames.delete(id)
+      callback?.(currentTime)
+    }
+
+    const h = createHarness({
+      total: 16,
+      initialBatch: 8,
+      batchSize: 8,
+      delay: 10,
+      requestFrame,
+      cancelFrame,
+    })
+
+    expect(h.renderedCount.value).toBe(8)
+    runFrame(1)
+    vi.advanceTimersByTime(10)
+
+    expect(h.renderedCount.value).toBe(16)
+
+    currentTime = 10
+    await nextTick()
+
+    expect(frames.has(2)).toBe(true)
+    const timersBeforeFrame = vi.getTimerCount()
+
+    runFrame(2)
+
+    expect(vi.getTimerCount()).toBeLessThan(timersBeforeFrame)
+
+    h.cleanupBatchScheduler()
+
+    expect(cancelFrame).not.toHaveBeenCalled()
+  })
+
   it('does not apply multiple idle batches before commit feedback', async () => {
     let currentTime = 0
     vi.spyOn(performance, 'now').mockImplementation(() => currentTime)

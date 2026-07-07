@@ -77,7 +77,8 @@ export function useBatchRenderingScheduler(
   let commitMeasurementGeneration = 0
   let commitMeasurementPending = false
   let followupBatchRequested = false
-  const commitMeasurementCallbacks = new Set<number>()
+  const commitMeasurementRafs = new Set<number>()
+  const commitMeasurementTimeouts = new Set<number>()
 
   function cleanupBatchScheduler() {
     if (!isClient)
@@ -99,15 +100,14 @@ export function useBatchRenderingScheduler(
 
     // Cancel commit measurements
     commitMeasurementGeneration += 1
-    for (const id of commitMeasurementCallbacks) {
-      if (cancelFrame) {
+    for (const id of commitMeasurementRafs) {
+      if (cancelFrame)
         cancelFrame(id)
-      }
-      else {
-        window.clearTimeout(id)
-      }
     }
-    commitMeasurementCallbacks.clear()
+    for (const id of commitMeasurementTimeouts)
+      window.clearTimeout(id)
+    commitMeasurementRafs.clear()
+    commitMeasurementTimeouts.clear()
 
     pendingIncrement = null
     commitMeasurementPending = false
@@ -153,30 +153,42 @@ export function useBatchRenderingScheduler(
 
       // Single frame boundary without nested RAF
       if (requestFrame) {
-        const id = requestFrame(() => {
-          commitMeasurementCallbacks.delete(id)
+        let frameId: number | null = null
+        let timeoutId: number | null = null
+
+        const finishOnce = () => {
+          if (frameId !== null) {
+            commitMeasurementRafs.delete(frameId)
+            frameId = null
+          }
+          if (timeoutId !== null) {
+            commitMeasurementTimeouts.delete(timeoutId)
+            window.clearTimeout(timeoutId)
+            timeoutId = null
+          }
           finish()
+        }
+
+        frameId = requestFrame(() => {
+          finishOnce()
         })
-        commitMeasurementCallbacks.add(id)
+        commitMeasurementRafs.add(frameId)
 
         // Fallback timeout in case RAF is blocked
-        const timeoutId = window.setTimeout(() => {
-          if (commitMeasurementCallbacks.has(id)) {
-            commitMeasurementCallbacks.delete(id)
-            if (cancelFrame)
-              cancelFrame(id)
-            finish()
-          }
+        timeoutId = window.setTimeout(() => {
+          if (frameId !== null && cancelFrame)
+            cancelFrame(frameId)
+          finishOnce()
         }, Math.max(32, props.renderBatchIdleTimeoutMs ?? 120)) as any
-        commitMeasurementCallbacks.add(timeoutId)
+        commitMeasurementTimeouts.add(timeoutId)
         return
       }
 
       const timeoutId = window.setTimeout(() => {
-        commitMeasurementCallbacks.delete(timeoutId as any)
+        commitMeasurementTimeouts.delete(timeoutId as any)
         finish()
       }, 0) as any
-      commitMeasurementCallbacks.add(timeoutId)
+      commitMeasurementTimeouts.add(timeoutId)
     })
   }
 
