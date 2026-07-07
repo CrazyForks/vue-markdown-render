@@ -843,7 +843,7 @@ function getDiffLineNumberColumnWidth(unitPx: number) {
     ? countInlineDiffPreviewLines()
     : countSideBySideDiffPreviewLines()
   const digits = Math.max(2, String(Math.max(1, lineCount)).length)
-  return formatDiffPx((digits + 3) * unitPx)
+  return formatDiffPx(Math.max(48, (digits + 3) * unitPx))
 }
 
 // Max line count across both diff panes.
@@ -911,7 +911,7 @@ const preFallbackLocalMinHeight = computed(() => {
     return null
 
   return Math.ceil(
-    countLines(displayCode.value) * (preFallbackLineHeight.value + LINE_EXTRA_PER_LINE)
+    countLines(displayCode.value) * preFallbackEffectiveLineHeight.value
     + PIXEL_EPSILON,
   )
 })
@@ -1071,9 +1071,10 @@ const preFallbackStyle = computed(() => {
   } as Record<string, string | number>
 
   style['--markstream-pre-line-number-top'] = `${preFallbackVerticalPadding.value.top}px`
-  style['--markstream-code-padding-left'] = '62px'
-  style['--markstream-pre-line-number-width'] = '36px'
-  style['--markstream-pre-line-number-gap'] = '0px'
+  style['--markstream-code-padding-left'] = '48px'
+  style['--markstream-pre-line-number-left'] = '4px'
+  style['--markstream-pre-line-number-width'] = '44px'
+  style['--markstream-pre-line-number-gap'] = '8px'
 
   if (isDiff.value) {
     // Keep the pre diff fallback visually close to stream-monaco's diff line box.
@@ -4167,7 +4168,7 @@ onUnmounted(() => {
   --stream-monaco-line-number: var(--markstream-diff-line-number);
   --stream-monaco-line-number-active: var(--markstream-diff-line-number-active);
   --stream-monaco-line-number-left: var(--stream-monaco-gutter-marker-width);
-  --stream-monaco-line-number-width: 39px;
+  --stream-monaco-line-number-width: 48px;
   --stream-monaco-line-number-padding-left: 15.6px;
   --stream-monaco-line-number-padding-right: 7.8px;
   --stream-monaco-diff-code-gap: 2px;
@@ -4493,6 +4494,11 @@ onUnmounted(() => {
 :deep(.stream-monaco-diff-root .monaco-diff-editor:not(.side-by-side) .editor.modified .monaco-scrollable-element.editor-scrollable) {
   left: var(--stream-monaco-modified-scrollable-left, var(--stream-monaco-modified-margin-width)) !important;
   width: calc(100% - var(--stream-monaco-modified-scrollable-left, var(--stream-monaco-modified-margin-width))) !important;
+}
+
+.code-block-container.is-diff :deep(.stream-monaco-fallback-inline-delete-line) {
+  box-sizing: border-box;
+  padding-left: var(--stream-monaco-line-number-gap-to-code, 8px);
 }
 
 :deep(.stream-monaco-diff-root.stream-monaco-diff-inline .monaco-diff-editor .scrollbar.horizontal),

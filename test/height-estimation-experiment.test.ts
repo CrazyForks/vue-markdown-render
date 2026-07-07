@@ -145,6 +145,29 @@ describe('height estimation experiment internals', () => {
     expect(loadingWithTerminalNewline?.contentHeight).toBe(withBlankLine?.contentHeight)
   })
 
+  it('estimates ordinary monaco code blocks from visible line height only', () => {
+    const code = Array.from({ length: 24 }, (_, index) => `line ${index + 1}`).join('\n')
+    const estimated = estimateCodeBlockHeight(
+      {
+        type: 'code_block',
+        language: 'js',
+        code,
+        raw: `\`\`\`js\n${code}`,
+        loading: true,
+      } as any,
+      {
+        rendererKind: 'monaco',
+        monacoOptions: {
+          lineHeight: 18,
+        },
+        showHeader: false,
+      },
+    )
+
+    expect(estimated?.contentHeight).toBe(432)
+    expect(estimated?.height).toBe(432)
+  })
+
   it('caps monaco estimate by max height', () => {
     const estimated = estimateCodeBlockHeight(
       {

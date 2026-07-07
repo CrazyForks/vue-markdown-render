@@ -92,6 +92,27 @@ describe('parseFenceToken - streaming unified diff stability', () => {
     ].join('\n'))
   })
 
+  it('does not add extra indentation when patch rows already include source indentation', () => {
+    const node = parseStreamingDiff([
+      '{',
+      '  "name": "markstream-vue",',
+      '-  "version": "0.0.49",',
+      '+  "version": "0.0.54-beta.1",',
+      '',
+    ].join('\n'))
+
+    expect(node.originalCode).toBe([
+      '{',
+      '  "name": "markstream-vue",',
+      '  "version": "0.0.49",',
+    ].join('\n'))
+    expect(node.updatedCode).toBe([
+      '{',
+      '  "name": "markstream-vue",',
+      '  "version": "0.0.54-beta.1",',
+    ].join('\n'))
+  })
+
   it('streams a trailing incomplete added line before newline', () => {
     const node = parseStreamingDiff([
       '{',

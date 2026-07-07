@@ -48,6 +48,7 @@ const reservedHeightStyle = computed(() => {
 })
 
 type DiffPreviewLineKind = 'context' | 'removed' | 'added' | 'hunk'
+const DIFF_HEADER_PREFIXES = ['diff ', 'index ', '--- ', '+++ ', '@@ ']
 
 interface DiffPreviewLine {
   code: string
@@ -99,6 +100,16 @@ function isRemovedDiffLine(line: string) {
 
 function isAddedDiffLine(line: string) {
   return line.startsWith('+') && !line.startsWith('+++')
+}
+
+function hasUnifiedDiffHeaders(lines: string[]) {
+  return lines.some(line => DIFF_HEADER_PREFIXES.some(prefix => line.startsWith(prefix)))
+}
+
+function normalizeLooseDiffBody(body: string, hasHeaders: boolean) {
+  return !hasHeaders && body.startsWith(' ') && !body.startsWith('  ')
+    ? ` ${body}`
+    : body
 }
 
 function isExplicitDiffLanguage() {
@@ -190,6 +201,7 @@ function computeSourceLineMatches(original: string[], modified: string[]): Sourc
 function buildInlinePatchPreviewLines(lines: string[]): DiffPreviewLine[] {
   const result: DiffPreviewLine[] = []
   let modifiedLine = 1
+  const hasHeaders = hasUnifiedDiffHeaders(lines)
 
   for (const [index, raw] of lines.entries()) {
     if (raw.startsWith('@@')) {
@@ -201,20 +213,20 @@ function buildInlinePatchPreviewLines(lines: string[]): DiffPreviewLine[] {
     }
     else if (isRemovedDiffLine(raw)) {
       result.push({
-        ...toDiffPreviewLine(raw.slice(1), 'removed', { preserveBlankKind: true }),
+        ...toDiffPreviewLine(normalizeLooseDiffBody(raw.slice(1), hasHeaders), 'removed', { preserveBlankKind: true }),
         key: `inline-removed-${index}`,
         number: '',
       })
     }
     else if (isAddedDiffLine(raw)) {
       result.push({
-        ...toDiffPreviewLine(raw.slice(1), 'added', { preserveBlankKind: true }),
+        ...toDiffPreviewLine(normalizeLooseDiffBody(raw.slice(1), hasHeaders), 'added', { preserveBlankKind: true }),
         key: `inline-added-${index}`,
         number: modifiedLine++,
       })
     }
     else {
-      const code = raw.startsWith(' ') ? raw.slice(1) : raw
+      const code = hasHeaders && raw.startsWith(' ') ? raw.slice(1) : raw
       result.push({
         ...toDiffPreviewLine(code),
         key: `inline-context-${index}`,
@@ -350,9 +362,9 @@ const diffPreviewPanes = computed(() => {
   const hasPatchDiffLines = hasPatchLines(codeLines.value)
   const hasSourcePair = hasDiffSourcePair()
   if (isInlineDiffPreview.value) {
-    const lines = hasPatchDiffLines
-      ? buildInlinePatchPreviewLines(codeLines.value)
-      : buildInlineSourcePreviewLines(props.node?.originalCode, props.node?.updatedCode)
+    const lines = hasSourcePair
+      ? buildInlineSourcePreviewLines(props.node?.originalCode, props.node?.updatedCode)
+      : buildInlinePatchPreviewLines(codeLines.value)
 
     return [
       {
@@ -400,6 +412,7 @@ const diffPreviewPanes = computed(() => {
 
   const original = [] as Array<{ code: string, kind: DiffPreviewLineKind, empty: boolean }>
   const modified = [] as Array<{ code: string, kind: DiffPreviewLineKind, empty: boolean }>
+  const hasHeaders = hasUnifiedDiffHeaders(codeLines.value)
 
   for (const raw of codeLines.value) {
     if (raw.startsWith('@@')) {
@@ -407,13 +420,13 @@ const diffPreviewPanes = computed(() => {
       modified.push(toDiffPreviewLine(raw, 'hunk'))
     }
     else if (raw.startsWith('-') && !raw.startsWith('---')) {
-      original.push(toDiffPreviewLine(raw.slice(1), 'removed', { preserveBlankKind: true }))
+      original.push(toDiffPreviewLine(normalizeLooseDiffBody(raw.slice(1), hasHeaders), 'removed', { preserveBlankKind: true }))
     }
     else if (raw.startsWith('+') && !raw.startsWith('+++')) {
-      modified.push(toDiffPreviewLine(raw.slice(1), 'added', { preserveBlankKind: true }))
+      modified.push(toDiffPreviewLine(normalizeLooseDiffBody(raw.slice(1), hasHeaders), 'added', { preserveBlankKind: true }))
     }
     else {
-      const code = raw.startsWith(' ') ? raw.slice(1) : raw
+      const code = hasHeaders && raw.startsWith(' ') ? raw.slice(1) : raw
       original.push(toDiffPreviewLine(code))
       modified.push(toDiffPreviewLine(code))
     }
@@ -637,7 +650,7 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
 .markstream-vue pre.markstream-pre--line-numbers > .markstream-pre__line-numbers {
   position: absolute;
   top: var(--markstream-pre-line-number-top, 0);
-  left: 0;
+  left: var(--markstream-pre-line-number-left, 0);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -653,6 +666,13 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
   line-height: inherit;
   pointer-events: none;
   user-select: none;
+}
+
+.markstream-vue pre.markstream-pre--line-numbers:not(.markstream-pre--diff-preview):not(.code-pre-fallback) > .markstream-pre__code {
+  box-sizing: border-box;
+  min-width: 100%;
+  padding-left: var(--markstream-code-padding-left, 52px);
+  padding-right: var(--markstream-code-padding-x, 12px);
 }
 
 .markstream-vue pre.markstream-pre--line-numbers > .markstream-pre__line-numbers > .markstream-pre__line-number {
@@ -672,7 +692,7 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
   --markstream-pre-diff-code-padding: var(--stream-monaco-diff-code-padding, 7.8px);
   --markstream-pre-diff-line-number-width: var(
     --stream-monaco-line-number-width,
-    39px
+    48px
   );
   --markstream-pre-diff-line-number-padding-left: var(--stream-monaco-line-number-padding-left, 15.6px);
   --markstream-pre-diff-line-number-padding-right: var(--stream-monaco-line-number-padding-right, 7.8px);
@@ -743,6 +763,7 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
 
 .markstream-vue pre.markstream-pre--diff-preview.markstream-pre--diff-inline:not(.is-wrap) .markstream-pre__diff-pane {
   min-width: max-content;
+  width: 100%;
   overflow: visible;
 }
 

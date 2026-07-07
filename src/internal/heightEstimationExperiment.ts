@@ -91,7 +91,6 @@ const CODE_BLOCK_DEFAULT_CAP = 500
 const MARKDOWN_CODE_LINE_HEIGHT = 21
 const MARKDOWN_CODE_VERTICAL_PADDING = 32
 const PRE_CODE_LINE_HEIGHT = 28
-const MONACO_LINE_EXTRA = 1.5
 
 interface PreparedCacheEntry {
   prepared: PreparedText
@@ -403,7 +402,7 @@ export function estimateCodeBlockHeight(
       : CODE_BLOCK_DEFAULT_CAP
     contentHeight = isDiff
       ? Math.round(lineCount * lineHeight + verticalPadding)
-      : Math.round(lineCount * (lineHeight + MONACO_LINE_EXTRA))
+      : Math.round(lineCount * lineHeight)
   }
   else if (rendererKind === 'markdown') {
     contentHeight = Math.round(lineCount * MARKDOWN_CODE_LINE_HEIGHT + MARKDOWN_CODE_VERTICAL_PADDING)

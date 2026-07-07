@@ -167,7 +167,7 @@ describe('pre code node diff preview', () => {
     expect(source).not.toContain('.markstream-pre__diff-line--removed:not(.markstream-pre__diff-line--empty)::before')
   })
 
-  it('uses content width for inline diff fallback when wrap is disabled', () => {
+  it('keeps inline diff fallback full width when wrap is disabled', () => {
     const source = readFileSync(
       'src/components/PreCodeNode/PreCodeNode.vue',
       'utf8',
@@ -389,7 +389,7 @@ describe('pre code node diff preview', () => {
 
     expect(wrapper.findAll('.markstream-pre__diff-pane')).toHaveLength(1)
     expect(wrapper.find('.markstream-pre__diff-pane--inline').exists()).toBe(true)
-    expect(wrapper.findAll('.markstream-pre__diff-content').map(node => node.text())).toEqual([
+    expect(wrapper.findAll('.markstream-pre__diff-content').map(node => node.element.textContent)).toEqual([
       'same before',
       'old value',
       'new value',
@@ -397,6 +397,66 @@ describe('pre code node diff preview', () => {
     ])
     expect(wrapper.findAll('.markstream-pre__diff-line--removed')).toHaveLength(1)
     expect(wrapper.findAll('.markstream-pre__diff-line--added')).toHaveLength(1)
+
+    wrapper.unmount()
+  })
+
+  it('normalizes inline patch indentation to match source diff rows', () => {
+    const wrapper = mount(PreCodeNode, {
+      props: {
+        showLineNumbers: true,
+        diffInline: true,
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          diff: true,
+          code: [
+            '{',
+            '  "type": "module",',
+            '- "version": "0.0.49",',
+            '+ "version": "0.0.54-beta.1",',
+          ].join('\n'),
+          raw: '```diff json:package.json',
+        },
+      },
+    })
+
+    expect(wrapper.findAll('.markstream-pre__diff-content').map(node => node.element.textContent)).toEqual([
+      '{',
+      '  "type": "module",',
+      '  "version": "0.0.49",',
+      '  "version": "0.0.54-beta.1",',
+    ])
+
+    wrapper.unmount()
+  })
+
+  it('does not add an extra space to already-indented inline patch rows', () => {
+    const wrapper = mount(PreCodeNode, {
+      props: {
+        showLineNumbers: true,
+        diffInline: true,
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          diff: true,
+          code: [
+            '{',
+            '  "type": "module",',
+            '-  "version": "0.0.49",',
+            '+  "version": "0.0.54-beta.1",',
+          ].join('\n'),
+          raw: '```diff json:package.json',
+        },
+      },
+    })
+
+    expect(wrapper.findAll('.markstream-pre__diff-content').map(node => node.element.textContent)).toEqual([
+      '{',
+      '  "type": "module",',
+      '  "version": "0.0.49",',
+      '  "version": "0.0.54-beta.1",',
+    ])
 
     wrapper.unmount()
   })

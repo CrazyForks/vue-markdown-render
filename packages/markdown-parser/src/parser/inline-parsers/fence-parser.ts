@@ -32,6 +32,12 @@ function flushPendingDiffHunk(
   pendingUpdated.length = 0
 }
 
+function normalizeLooseDiffBody(body: string, hasUnifiedDiffHeaders: boolean) {
+  return !hasUnifiedDiffHeaders && body.startsWith(' ') && !body.startsWith('  ')
+    ? ` ${body}`
+    : body
+}
+
 function splitUnifiedDiff(content: string, closed: boolean) {
   const orig: string[] = []
   const updated: string[] = []
@@ -54,11 +60,11 @@ function splitUnifiedDiff(content: string, closed: boolean) {
 
     if (line.startsWith('-')) {
       const body = line.slice(1)
-      pendingOrig.push(!hasUnifiedDiffHeaders && body.startsWith(' ') ? ` ${body}` : body)
+      pendingOrig.push(normalizeLooseDiffBody(body, hasUnifiedDiffHeaders))
     }
     else if (line.startsWith('+')) {
       const body = line.slice(1)
-      pendingUpdated.push(!hasUnifiedDiffHeaders && body.startsWith(' ') ? ` ${body}` : body)
+      pendingUpdated.push(normalizeLooseDiffBody(body, hasUnifiedDiffHeaders))
     }
     else {
       flushPendingDiffHunk(orig, updated, pendingOrig, pendingUpdated)

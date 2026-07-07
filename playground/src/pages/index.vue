@@ -352,7 +352,7 @@ let __overflowConfirmations = 0
 let __clearConfirmations = 0
 let __autoScrollRaf: number | null = null
 let __continuousScrollMode = false
-let __lastContentLength = 0
+let __autoScrollGuardUntil = 0
 // Observers and scheduler
 
 function getScrollRoot() {
@@ -365,6 +365,7 @@ function isScrollRootAtBottom(root = getScrollRoot(), threshold = 24) {
 
 function scrollToBottom() {
   const root = getScrollRoot()
+  __autoScrollGuardUntil = performance.now() + 120
   root.scrollTop = root.scrollHeight
 }
 
@@ -376,7 +377,6 @@ function scheduleScrollToBottom() {
   // we need to keep scrolling every frame until content stabilizes
   if (!__continuousScrollMode) {
     __continuousScrollMode = true
-    __lastContentLength = content.value.length
 
     let stableFrames = 0
     let lastHeight = 0
@@ -437,7 +437,17 @@ function scheduleScrollToBottom() {
 }
 
 function handleScrollRootScroll() {
-  shouldStickToBottom.value = isScrollRootAtBottom()
+  if (isScrollRootAtBottom()) {
+    shouldStickToBottom.value = true
+    return
+  }
+
+  if (shouldStickToBottom.value && performance.now() < __autoScrollGuardUntil) {
+    scheduleScrollToBottom()
+    return
+  }
+
+  shouldStickToBottom.value = false
 }
 
 function handleScrollRootWheel(event: WheelEvent) {
