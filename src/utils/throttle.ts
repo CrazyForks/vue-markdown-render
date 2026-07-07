@@ -6,7 +6,7 @@
 /**
  * Creates a throttled version of the provided function.
  * The throttled function will invoke the original function at most once per `wait` milliseconds.
- * 
+ *
  * @param fn - The function to throttle
  * @param wait - The minimum time in milliseconds between invocations
  * @returns A throttled version of the function

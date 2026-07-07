@@ -14,11 +14,11 @@ const regexCache = new Map<string, RegExp>()
 export function getCachedRegex(pattern: string, flags?: string): RegExp {
   const key = flags ? `${pattern}:::${flags}` : pattern
   let regex = regexCache.get(key)
-  
+
   if (!regex) {
     regex = new RegExp(pattern, flags)
     regexCache.set(key, regex)
-    
+
     // Limit cache size to prevent memory leaks
     if (regexCache.size > 200) {
       // Remove oldest 50 entries
@@ -28,10 +28,10 @@ export function getCachedRegex(pattern: string, flags?: string): RegExp {
       }
     }
   }
-  
+
   // Reset lastIndex for global/sticky regexes to ensure consistent behavior
   regex.lastIndex = 0
-  
+
   return regex
 }
 

@@ -2300,6 +2300,31 @@ describe('codeBlockNode diff defaults', () => {
     wrapper.unmount()
   })
 
+  it('passes active syntax languages to stream-monaco', async () => {
+    const helpers = getStreamMonacoHelpers()
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'tsx',
+          code: 'const value: number = 1',
+          raw: '```tsx\nconst value: number = 1\n```',
+        },
+        loading: false,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await waitForCreateEditorCalls(1, helpers)
+
+    const options = helpers.useMonaco.mock.calls[0]?.[0]
+    expect(options.languages).toEqual(expect.arrayContaining(['tsx', 'typescript', 'plaintext']))
+
+    wrapper.unmount()
+  })
+
   it('keeps inline diff modified editor internals aligned without showing a horizontal scrollbar', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/components/CodeBlockNode/CodeBlockNode.vue'),
@@ -2379,6 +2404,32 @@ describe('codeBlockNode diff defaults', () => {
     expect(source).toContain('--markstream-diff-editor-fg: #e5e5e5')
     expect(source).toContain('--markstream-diff-added-fg: hsl(152 42% 60%)')
     expect(source).toContain('--markstream-diff-removed-fg: hsl(0 58% 58%)')
+  })
+
+  it('keeps diff line number and code fill separated by the 2px code gap only', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/components/CodeBlockNode/CodeBlockNode.vue'),
+      'utf8',
+    )
+    const preSource = readFileSync(
+      resolve(process.cwd(), 'src/components/PreCodeNode/PreCodeNode.vue'),
+      'utf8',
+    )
+
+    expect(preSource).toContain('--markstream-pre-diff-code-gap: var(--stream-monaco-diff-code-gap, 2px);')
+    expect(source).toContain('--stream-monaco-line-number-gap-to-code: 0px;')
+    expect(source).toContain('--stream-monaco-line-number-left: var(--stream-monaco-gutter-marker-width);')
+    expect(source).toContain('--stream-monaco-line-number-width: 39px;')
+    expect(source).toContain('\'--stream-monaco-line-number-width\': getDiffLineNumberColumnWidth(unitPx)')
+    expect(source).toContain('\'--stream-monaco-line-number-padding-left\': formatDiffPx(unitPx * 2)')
+    expect(source).toContain('\'--stream-monaco-line-number-padding-right\': formatDiffPx(unitPx)')
+    expect(source).toContain('\'--stream-monaco-diff-code-padding\': formatDiffPx(unitPx)')
+    expect(preSource).toContain('39px')
+    expect(preSource).toContain('padding-left: var(--markstream-pre-diff-line-number-padding-left, 15.6px);')
+    expect(preSource).toContain('padding-right: var(--markstream-pre-diff-line-number-padding-right, 7.8px);')
+    expect(preSource).toContain('var(--markstream-pre-diff-line-number-left)')
+    expect(preSource).toContain('+ var(--markstream-pre-diff-line-number-width)')
+    expect(source).toContain('transparent var(--stream-monaco-gutter-marker-width, 4px) 100%')
   })
 
   it('defaults diff blocks to the line-info collapsed preset', async () => {
