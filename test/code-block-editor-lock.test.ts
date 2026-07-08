@@ -325,7 +325,7 @@ describe('codeBlockNode editor creation locking', () => {
     }
   })
 
-  it('keeps a terminal newline while an ordinary Monaco code block is still loading', async () => {
+  it('trims a terminal newline while an ordinary Monaco code block is still loading', async () => {
     const helpers = getStreamMonacoHelpers()
     helpers.createEditor.mockImplementation(async () => {})
 
@@ -347,7 +347,7 @@ describe('codeBlockNode editor creation locking', () => {
     await flushPendingMicrotasks()
     await waitForCreateEditorCalls(1, helpers)
 
-    expect(helpers.createEditor.mock.calls[0]?.[1]).toBe('console.log(1)\n')
+    expect(helpers.createEditor.mock.calls[0]?.[1]).toBe('console.log(1)')
 
     wrapper.unmount()
   })
@@ -2431,7 +2431,7 @@ describe('codeBlockNode language normalization', () => {
 
     expect(helpers.updateCode).toHaveBeenCalledTimes(1)
     expect(helpers.updateCode).toHaveBeenLastCalledWith(
-      '<template />\n<style>\n',
+      '<template />\n<style>',
       'vue',
     )
 

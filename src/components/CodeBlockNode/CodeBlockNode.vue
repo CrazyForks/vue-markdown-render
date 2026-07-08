@@ -388,14 +388,14 @@ function resolveInlineDiffScrollbar(raw: Record<string, unknown>) {
 
 function resolveDiffRenderPair(original: string, updated: string) {
   return {
-    original: getDisplayCode(original, false),
-    updated: getDisplayCode(updated, false),
+    original: getDisplayCode(original),
+    updated: getDisplayCode(updated),
   }
 }
 
-function getDisplayCode(code: unknown, loading?: boolean) {
+function getDisplayCode(code: unknown) {
   const value = String(code ?? '')
-  return loading ? value : value.replace(/\r\n$|\n$|\r$/, '')
+  return value.replace(/\r\n$|\n$|\r$/, '')
 }
 
 function isPendingDiffResultError(error: unknown) {
@@ -622,7 +622,7 @@ const codeBlockEnhancementState = computed(() => {
   return editorCreationFailed.value ? 'fallback' : 'pending'
 })
 const showInlinePreview = ref(false)
-const displayCode = computed(() => getDisplayCode(props.node.code, props.node.loading === true))
+const displayCode = computed(() => getDisplayCode(props.node.code))
 const preCodeNode = computed(() => {
   if (!isDiff.value) {
     if (displayCode.value === props.node.code)
@@ -3068,7 +3068,7 @@ watch(
       catch {}
     }
 
-    queuePlainCodeUpdate(getDisplayCode(props.node.code, props.node.loading === true), monacoLanguage.value)
+    queuePlainCodeUpdate(getDisplayCode(props.node.code), monacoLanguage.value)
 
     if (isExpanded.value) {
       safeRaf(() => updateExpandedHeight())
