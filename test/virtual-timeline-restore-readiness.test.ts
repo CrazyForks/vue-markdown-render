@@ -1611,8 +1611,8 @@ describe('virtual timeline restore visual readiness', () => {
 
     const pre = wrapper.get('pre.code-pre-fallback')
     expect(pre.attributes('data-markstream-code-loading')).toBe('1')
-    expect(pre.attributes('style')).toContain('height: 240px')
-    expect(pre.attributes('style')).toContain('min-height: 240px')
+    expect(pre.attributes('style')).not.toMatch(/(?:^|;\s*)height: 240px/)
+    expect(pre.attributes('style')).not.toMatch(/(?:^|;\s*)min-height: 240px/)
     expect(pre.attributes('style')).toContain('max-height: 240px')
     expect(pre.attributes('style')).toContain('overflow: auto')
 

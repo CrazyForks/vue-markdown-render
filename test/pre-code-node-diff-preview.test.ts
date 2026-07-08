@@ -64,6 +64,57 @@ describe('pre code node diff preview', () => {
     wrapper.unmount()
   })
 
+  it('does not pin streaming pre height to the reserved estimate', () => {
+    const wrapper = mount(PreCodeNode, {
+      props: {
+        loading: true,
+        showLineNumbers: true,
+        reservedHeightPx: 240,
+        node: {
+          type: 'code_block',
+          language: 'json',
+          code: '{\n  "name": "marks"',
+          raw: '```json\n{\n  "name": "marks"',
+        },
+      },
+    })
+
+    const pre = wrapper.get('pre').element
+
+    expect(pre.style.height).toBe('')
+    expect(pre.style.minHeight).toBe('')
+    expect(pre.style.maxHeight).toBe('240px')
+    expect(wrapper.findAll('.markstream-pre__line-number').map(node => node.text())).toEqual(['1', '2'])
+    expect(wrapper.get('pre').attributes('aria-busy')).toBe('true')
+
+    wrapper.unmount()
+  })
+
+  it('keeps reserved pre height fixed after loading', () => {
+    const wrapper = mount(PreCodeNode, {
+      props: {
+        loading: false,
+        showLineNumbers: true,
+        reservedHeightPx: 120,
+        node: {
+          type: 'code_block',
+          language: 'ts',
+          code: 'const value = 1',
+          raw: '```ts\nconst value = 1\n```',
+        },
+      },
+    })
+
+    const pre = wrapper.get('pre').element
+
+    expect(pre.style.height).toBe('120px')
+    expect(pre.style.minHeight).toBe('120px')
+    expect(pre.style.maxHeight).toBe('120px')
+    expect(wrapper.get('pre').attributes('aria-busy')).toBe('false')
+
+    wrapper.unmount()
+  })
+
   it('does not paint terminal blank diff preview rows as added or removed', () => {
     const wrapper = mount(PreCodeNode, {
       props: {
@@ -166,12 +217,17 @@ describe('pre code node diff preview', () => {
 
     expect(source).toContain('.markstream-pre__diff-line--added::before')
     expect(source).toContain('.markstream-pre__diff-line--removed::before')
+    expect(source).toContain('.markstream-pre__diff-line::after')
+    expect(source).toContain('.markstream-pre__diff-line--added::after')
+    expect(source).toContain('.markstream-pre__diff-line--removed::after')
     expect(source).toContain('.markstream-pre__diff-line--added > .markstream-pre__diff-rail')
     expect(source).toContain('.markstream-pre__diff-line--removed > .markstream-pre__diff-rail')
     expect(source).toContain('.markstream-pre__diff-line--added > .markstream-pre__diff-number')
     expect(source).toContain('.markstream-pre__diff-line--removed > .markstream-pre__diff-number')
     expect(source).toContain('background: var(--stream-monaco-added-line-fill, var(--markstream-diff-added-line-fill, transparent));')
     expect(source).toContain('background: var(--stream-monaco-removed-line-fill, var(--markstream-diff-removed-line-fill, transparent));')
+    expect(source).toContain('--markstream-pre-diff-line-number-bg: var(')
+    expect(source).toContain('background: var(--markstream-pre-diff-line-number-bg);')
     expect(source).toContain('--markstream-pre-diff-content-height')
     expect(source).toContain('color: var(--stream-monaco-added-fg, var(--markstream-diff-added-fg, var(--code-line-number)));')
     expect(source).toContain('color: var(--stream-monaco-removed-fg, var(--markstream-diff-removed-fg, var(--code-line-number)));')
@@ -221,12 +277,13 @@ describe('pre code node diff preview', () => {
     expect(source).toContain('--markstream-pre-diff-code-padding: var(--stream-monaco-diff-code-padding, 7.8px);')
     expect(source).toContain('--markstream-pre-diff-line-number-padding-left: var(--stream-monaco-line-number-padding-left, 15.6px);')
     expect(source).toContain('--markstream-pre-diff-line-number-padding-right: var(--stream-monaco-line-number-padding-right, 7.8px);')
+    expect(source).toContain('--markstream-pre-diff-line-number-bg: var(')
+    expect(source).toContain('--markstream-pre-diff-line-number-box-width: calc(')
     expect(source).toContain('--markstream-pre-diff-code-fill-left: calc(')
     expect(source).toContain('--markstream-pre-diff-code-left: calc(')
     expect(source).toContain('var(--markstream-pre-diff-line-number-left)')
-    expect(source).toContain('+ var(--markstream-pre-diff-line-number-width)')
+    expect(source).toContain('+ var(--markstream-pre-diff-line-number-box-width)')
     expect(source).not.toContain('--markstream-pre-diff-scrollable-left')
-    expect(source).not.toContain('pre.markstream-pre--diff-preview.markstream-pre--diff-inline .markstream-pre__diff-line::after')
     expect(source).not.toContain('left: var(--markstream-pre-diff-scrollable-left);')
     expect(source).toContain('padding-left: var(--markstream-pre-diff-code-left);')
     expect(source).toContain('left: var(--markstream-pre-diff-code-fill-left);')

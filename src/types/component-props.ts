@@ -164,6 +164,7 @@ export interface LinkNodeProps {
 
 export interface PreCodeNodeProps {
   node: CodeBlockNode
+  loading?: boolean
   showLineNumbers?: boolean
   diffInline?: boolean
   /**

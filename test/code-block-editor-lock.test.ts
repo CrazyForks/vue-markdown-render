@@ -490,12 +490,54 @@ describe('codeBlockNode editor creation locking', () => {
       const fallback = wrapper.get('pre.code-pre-fallback').element as HTMLElement
       const host = wrapper.get('.code-editor-container').element as HTMLElement
       const block = wrapper.get('.code-block-container').element as HTMLElement
-      expect(fallback.style.height).toBe('320px')
+      expect(fallback.style.height).toBe('')
       expect(fallback.style.minHeight).toBe('320px')
       expect(fallback.style.maxHeight).toBe('320px')
       expect(fallback.style.overflow).toBe('auto')
       expect(host.style.minHeight).toBe('320px')
       expect(block.style.minHeight).toBe('320px')
+    }
+    finally {
+      resolveCreate?.()
+      wrapper.unmount()
+    }
+  })
+
+  it('keeps ordinary streaming pre fallback tight to rendered lines despite estimates', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let resolveCreate: (() => void) | null = null
+    helpers.createEditor.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreate = () => resolve()
+        }),
+    )
+
+    const code = '{\n  "name": "marks'
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'json',
+          code,
+          raw: `\`\`\`json\n${code}`,
+        },
+        estimatedHeightPx: 280,
+        estimatedContentHeightPx: 240,
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    try {
+      await flushPendingMicrotasks()
+      await waitForCreateEditorCalls(1, helpers)
+
+      const fallback = wrapper.get('pre.code-pre-fallback').element as HTMLElement
+      expect(fallback.style.height).toBe('')
+      expect(fallback.style.minHeight).toBe('37px')
+      expect(fallback.style.paddingBottom).toBe('0px')
     }
     finally {
       resolveCreate?.()
@@ -816,10 +858,10 @@ describe('codeBlockNode editor creation locking', () => {
       const fallback = wrapper.get('pre.code-pre-fallback')
       expect(fallback.classes()).toContain('markstream-pre--diff-preview')
       expect(fallback.classes()).toContain('markstream-pre--diff-inline')
-      expect(fallback.element.style.getPropertyValue('--stream-monaco-line-number-width')).toBe('48px')
-      expect(fallback.element.style.getPropertyValue('--stream-monaco-line-number-gap-to-code')).toBe('0px')
+      expect(fallback.element.style.getPropertyValue('--stream-monaco-line-number-width')).toBe('15.6px')
+      expect(fallback.element.style.getPropertyValue('--stream-monaco-line-number-gap-to-code')).toBe('2px')
       expect(fallback.element.style.getPropertyValue('--stream-monaco-diff-code-gap')).toBe('2px')
-      expect(fallback.element.style.getPropertyValue('--stream-monaco-diff-code-padding')).toBe('7.2px')
+      expect(fallback.element.style.getPropertyValue('--stream-monaco-diff-code-padding')).toBe('7.8px')
       expect(wrapper.findAll('.markstream-pre__diff-pane')).toHaveLength(1)
       expect(wrapper.findAll('.markstream-pre__diff-content').map(node => node.text())).toEqual([
         'const oldValue = 1',
@@ -2764,12 +2806,16 @@ describe('codeBlockNode diff defaults', () => {
     expect(source).toContain('stream-monaco-diff-root .monaco-diff-editor:not(.side-by-side) .editor.modified .monaco-scrollable-element.editor-scrollable')
     expect(source).toContain('width: calc(100% - var(--stream-monaco-modified-scrollable-left')
     expect(source).toContain('stream-monaco-fallback-inline-delete-line')
-    expect(source).toContain('padding-left: var(--stream-monaco-line-number-gap-to-code, 8px);')
+    expect(source).toContain('padding-left: var(--stream-monaco-diff-code-padding, 7.8px);')
     expect(source).toContain('stream-monaco-diff-inline .monaco-diff-editor .scrollbar.horizontal')
     expect(source).toContain('stream-monaco-diff-root .monaco-diff-editor:not(.side-by-side) .scrollbar.horizontal')
     expect(source).toContain('height: 0 !important;')
     expect(source).toContain('stream-monaco-diff-inline.stream-monaco-diff-inline-native-ready.stream-monaco-diff-native-stale')
     expect(source).toContain('background: var(--stream-monaco-removed-line-fill) !important;')
+    expect(source).toContain('margin-left: 0 !important;')
+    expect(source).toContain('background: var(--stream-monaco-removed-gutter), var(--stream-monaco-removed-line-fill) !important;')
+    expect(source).toContain('.editor.modified .inline-deleted-margin-view-zone')
+    expect(source).toContain('.editor.modified .stream-monaco-fallback-inline-delete-margin')
     const root = document.createElement('div')
     root.className = 'stream-monaco-diff-root stream-monaco-diff-inline stream-monaco-diff-inline-native-ready stream-monaco-diff-native-stale'
     root.innerHTML = `
@@ -2865,20 +2911,56 @@ describe('codeBlockNode diff defaults', () => {
     )
 
     expect(preSource).toContain('--markstream-pre-diff-code-gap: var(--stream-monaco-diff-code-gap, 2px);')
-    expect(source).toContain('--stream-monaco-line-number-gap-to-code: 0px;')
+    expect(source).toContain('--stream-monaco-line-number-gap-to-code: var(--stream-monaco-diff-code-gap);')
     expect(source).toContain('--stream-monaco-line-number-left: var(--stream-monaco-gutter-marker-width);')
-    expect(source).toContain('--stream-monaco-line-number-width: 48px;')
+    expect(source).toContain('--stream-monaco-line-number-width: 15.6px;')
+    expect(source).toContain('--stream-monaco-line-number-box-width: calc(')
     expect(source).toContain('\'--stream-monaco-line-number-width\': getDiffLineNumberColumnWidth(unitPx)')
-    expect(source).toContain('Math.max(48, (digits + 3) * unitPx)')
+    expect(source).toContain('return formatDiffPx(digits * unitPx)')
     expect(source).toContain('\'--stream-monaco-line-number-padding-left\': formatDiffPx(unitPx * 2)')
     expect(source).toContain('\'--stream-monaco-line-number-padding-right\': formatDiffPx(unitPx)')
+    expect(source).toContain('\'--stream-monaco-line-number-gap-to-code\': \'2px\'')
+    expect(source).toContain('\'--stream-monaco-line-number-bg\': lineNumberBg')
     expect(source).toContain('\'--stream-monaco-diff-code-padding\': formatDiffPx(unitPx)')
-    expect(preSource).toContain('48px')
+    expect(preSource).toContain('15.6px')
+    expect(preSource).toContain('--markstream-pre-diff-line-number-box-width: calc(')
+    expect(preSource).toContain('--markstream-pre-diff-line-number-bg: var(')
+    expect(preSource).toContain('background: var(--markstream-pre-diff-line-number-bg);')
     expect(preSource).toContain('padding-left: var(--markstream-pre-diff-line-number-padding-left, 15.6px);')
     expect(preSource).toContain('padding-right: var(--markstream-pre-diff-line-number-padding-right, 7.8px);')
     expect(preSource).toContain('var(--markstream-pre-diff-line-number-left)')
-    expect(preSource).toContain('+ var(--markstream-pre-diff-line-number-width)')
+    expect(preSource).toContain('+ var(--markstream-pre-diff-line-number-box-width)')
+    expect(source).toContain('background: var(--stream-monaco-line-number-bg, var(--markstream-diff-line-number-bg)) !important;')
+    expect(source).toContain('box-sizing: content-box !important;')
+    expect(source).toContain('.editor.original .margin-view-overlays .line-delete.line-numbers')
+    expect(source).toContain('.editor.modified .margin-view-overlays .line-insert.line-numbers')
+    expect(source).toContain('background: var(--stream-monaco-removed-line-fill) !important;')
+    expect(source).toContain('color: var(--stream-monaco-removed-fg) !important;')
+    expect(source).toContain('background: var(--stream-monaco-added-line-fill) !important;')
+    expect(source).toContain('color: var(--stream-monaco-added-fg) !important;')
+    expect(source).toContain('pre.code-pre-fallback.markstream-pre--diff-preview .markstream-pre__diff-line--removed::after')
+    expect(source).toContain('pre.code-pre-fallback.markstream-pre--diff-preview .markstream-pre__diff-line--removed > .markstream-pre__diff-number')
+    expect(source).toContain('pre.code-pre-fallback.markstream-pre--diff-preview .markstream-pre__diff-line--removed > .markstream-pre__diff-rail')
+    expect(source).toContain('background: var(--stream-monaco-removed-gutter, var(--markstream-diff-removed-gutter, currentColor)) !important;')
+    expect(source).toContain('pre.code-pre-fallback.markstream-pre--diff-preview .markstream-pre__diff-line--added::after')
+    expect(source).toContain('pre.code-pre-fallback.markstream-pre--diff-preview .markstream-pre__diff-line--added > .markstream-pre__diff-number')
+    expect(source).toContain('pre.code-pre-fallback.markstream-pre--diff-preview .markstream-pre__diff-line--added > .markstream-pre__diff-rail')
+    expect(source).toContain('background: var(--stream-monaco-added-gutter, var(--markstream-diff-added-gutter, currentColor)) !important;')
     expect(source).toContain('transparent var(--stream-monaco-gutter-marker-width, 4px) 100%')
+  })
+
+  it('waits for inline deleted margin before revealing the Monaco diff editor', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/components/CodeBlockNode/CodeBlockNode.vue'),
+      'utf8',
+    )
+
+    expect(source).toContain('function hasInlineRemovedDiffRows()')
+    expect(source).toContain('function hasInlineDeletedMarginReady(root: HTMLElement | null | undefined)')
+    expect(source).toContain('stream-monaco-diff-inline-native-ready')
+    expect(source).toContain('root?.querySelector(\'.inline-deleted-margin-view-zone, .stream-monaco-fallback-inline-delete-margin\')')
+    expect(source).toContain('const maxPasses = hasInlineRemovedDiffRows() ? 120 : 8')
+    expect(source).toContain('hasDiffRoot && hasRenderedLines && lineChangesReady && hasInlineDeletedMarginReady(root)')
   })
 
   it('defaults diff blocks to the line-info collapsed preset', async () => {
@@ -4037,7 +4119,7 @@ describe('codeBlockNode diff defaults', () => {
     }
   })
 
-  it('does not grow a streaming diff host before the new diff lines render', async () => {
+  it('uses model height to grow a streaming diff host before new diff lines render', async () => {
     const helpers = getStreamMonacoHelpers()
     let lineCount = 14
     let didUpdateDiff: (() => void) | null = null
@@ -4144,7 +4226,7 @@ describe('codeBlockNode diff defaults', () => {
       await flushMicrotasksOnly()
       await flushMicrotasksOnly()
 
-      expect(Number.parseFloat(host.style.height)).toBeLessThanOrEqual(initialHeight + 1)
+      expect(Number.parseFloat(host.style.height)).toBeGreaterThan(initialHeight)
 
       renderDiffLines(host, 19)
       didUpdateDiff?.()
@@ -4157,7 +4239,7 @@ describe('codeBlockNode diff defaults', () => {
     }
   })
 
-  it('uses rendered diff height during streaming when rendered DOM is still partial', async () => {
+  it('uses model diff height during streaming when rendered DOM is still partial', async () => {
     const helpers = getStreamMonacoHelpers()
     const rect = (height: number, top = 0) => ({
       x: 0,
@@ -4233,7 +4315,7 @@ describe('codeBlockNode diff defaults', () => {
     await waitForCreateDiffEditorCalls(1, helpers)
     await vi.waitFor(() => {
       const host = wrapper.get('.code-editor-container').element as HTMLElement
-      expect(Number.parseFloat(host.style.height)).toBeLessThan(80)
+      expect(Number.parseFloat(host.style.height)).toBeGreaterThan(300)
     })
 
     wrapper.unmount()
@@ -5020,6 +5102,17 @@ describe('codeBlockNode streaming height source guards', () => {
 
     expect(rememberSource).toContain('streamingDiffHeightFloor.value = nextHeight')
     expect(rememberSource).not.toContain('Math.max(previous, nextHeight)')
+  })
+
+  it('keeps chasing diff height briefly after streaming settles', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/components/CodeBlockNode/CodeBlockNode.vue'), 'utf8')
+
+    expect(source).toContain('streamingDiffHeightChaseAllowSettled')
+    expect(source).toContain('scheduleStreamingDiffHeightChase(true)')
+    expect(source).toContain('allowSettled ? 18 : 6')
+    expect(source).toContain('holdCurrentDiffHeight: streamingDiffHeightChaseAllowSettled')
+    expect(source).toContain('stream-monaco-diff-native-stale')
+    expect(source).toContain('h0 = Math.min(h0, estimatedDiffHeight)')
   })
 })
 
