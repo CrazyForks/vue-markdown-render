@@ -77,8 +77,10 @@ async function renderMath() {
     return
 
   if (!props.node.content) {
-    applyRawFallback()
-    hasRenderedOnce = true
+    renderedHtml.value = ''
+    fallbackText.value = props.node.loading ? '' : props.node.raw
+    renderingLoading.value = !!props.node.loading
+    hasRenderedOnce = !props.node.loading
     return
   }
 

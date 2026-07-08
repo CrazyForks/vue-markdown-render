@@ -17,8 +17,8 @@ function resolveInitialState() {
   if (!props.node.content) {
     return {
       html: '',
-      text: props.node.raw,
-      loading: false,
+      text: props.node.loading ? '' : props.node.raw,
+      loading: props.node.loading,
     }
   }
 
@@ -26,8 +26,8 @@ function resolveInitialState() {
   if (!katex) {
     return {
       html: '',
-      text: props.node.raw,
-      loading: false,
+      text: props.node.loading ? '' : props.node.raw,
+      loading: props.node.loading,
     }
   }
 
@@ -44,8 +44,8 @@ function resolveInitialState() {
   catch {
     return {
       html: '',
-      text: props.node.raw,
-      loading: false,
+      text: props.node.loading ? '' : props.node.raw,
+      loading: props.node.loading,
     }
   }
 }
@@ -89,10 +89,10 @@ async function renderMath() {
 
   if (!props.node.content) {
     clearRenderPending()
-    renderingLoading.value = false
     renderedHtml.value = ''
-    renderedText.value = props.node.raw
-    hasRenderedOnce = true
+    renderedText.value = props.node.loading ? '' : props.node.raw
+    renderingLoading.value = props.node.loading
+    hasRenderedOnce = !props.node.loading
     return
   }
 
@@ -189,7 +189,7 @@ async function renderMath() {
 }
 
 watch(
-  () => props.node.content,
+  () => [props.node.content, props.node.loading, props.node.raw, props.node.markup],
   () => {
     renderMath()
   },
