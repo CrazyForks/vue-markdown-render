@@ -1851,6 +1851,8 @@ function syncDiffEditorHostToFallbackHeight() {
   editorHost.style.minHeight = `${height}px`
   editorHost.style.maxHeight = `${Math.ceil(getMaxHeightValue())}px`
   editorHost.style.overflow = 'hidden'
+  if (props.loading !== false && height < getMaxHeightValue() - PIXEL_EPSILON)
+    lastStreamingDiffTightHeight = height
   if (props.loading !== false && height >= getMaxHeightValue() - PIXEL_EPSILON)
     scheduleStreamingDiffHeightMicrotaskSync()
   return height
@@ -2068,7 +2070,7 @@ function updateExpandedHeight() {
   catch {}
 }
 
-function clearEditorHeightSyncBindings() {
+function clearEditorHeightSyncBindings(options: { resetStreamingDiffTightHeight?: boolean } = {}) {
   while (editorHeightSyncDisposables.length > 0) {
     try {
       editorHeightSyncDisposables.pop()?.dispose?.()
@@ -2085,7 +2087,8 @@ function clearEditorHeightSyncBindings() {
   }
   streamingDiffHeightChaseFrames = 0
   streamingDiffHeightMicrotaskPending = false
-  lastStreamingDiffTightHeight = null
+  if (options.resetStreamingDiffTightHeight === true)
+    lastStreamingDiffTightHeight = null
 }
 
 function clearInlineFoldProxies() {
@@ -2316,7 +2319,7 @@ function applyCollapsedContainerHeight(
     const currentHeight = Math.ceil(container.getBoundingClientRect().height || 0)
     const tightHeight = renderedStreamingDiffHeight != null && renderedStreamingDiffHeight > 0
       ? renderedStreamingDiffHeight
-      : currentHeight > 0 && currentHeight < maxHeight - PIXEL_EPSILON ? currentHeight : lastStreamingDiffTightHeight
+      : lastStreamingDiffTightHeight ?? (currentHeight > 0 && currentHeight < maxHeight - PIXEL_EPSILON ? currentHeight : null)
     if (tightHeight != null && tightHeight < nextHeight - PIXEL_EPSILON) {
       nextHeight = tightHeight
       allowBelowEstimatedFloor = true
@@ -2324,8 +2327,15 @@ function applyCollapsedContainerHeight(
         clearEstimatedEditorHeightFloor()
     }
   }
-  if (isDiff.value && props.loading !== false && nextHeight > 0 && nextHeight < maxHeight - PIXEL_EPSILON)
+  if (
+    isDiff.value
+    && props.loading !== false
+    && renderedStreamingDiffHeight != null
+    && nextHeight > 0
+    && nextHeight < maxHeight - PIXEL_EPSILON
+  ) {
     lastStreamingDiffTightHeight = nextHeight
+  }
 
   const floor = getPendingEstimatedEditorHeightFloor()
 
@@ -2408,7 +2418,9 @@ function bindEditorHeightSync() {
         return Boolean(el?.closest?.(syncMutationSelector) || el?.querySelector?.(syncMutationSelector))
       }
       const observer = new MutationObserver((mutations) => {
-        if (!isDiff.value || props.loading === false)
+        if (!isDiff.value)
+          return
+        if (!shouldAllowDiffDomHeightShrink(host))
           return
         const shouldShrinkHostHeight = mutations.some(mutation =>
           mutation.target === host
@@ -2444,7 +2456,9 @@ function bindEditorHeightSync() {
     }
     if (host && typeof ResizeObserver !== 'undefined') {
       const resizeObserver = new ResizeObserver(() => {
-        if (!isDiff.value || props.loading === false)
+        if (!isDiff.value)
+          return
+        if (!shouldAllowDiffDomHeightShrink(host))
           return
         const renderedHeight = measureRenderedDiffHeight(host)
         if (renderedHeight == null)
@@ -2699,6 +2713,14 @@ function hasRenderedDiffEditorDom(root = codeEditor.value) {
   return Boolean(
     root?.querySelector('.monaco-diff-editor .view-lines .view-line'),
   )
+}
+
+function shouldAllowDiffDomHeightShrink(host: HTMLElement) {
+  return props.loading !== false
+    || diffFallbackExitActive.value
+    || diffFallbackFadingOut.value
+    || host.classList.contains('stream-monaco-diff-native-stale')
+    || hasVisibleDiffHiddenLines(host)
 }
 
 function hasRuntimeDiffEditorView() {
@@ -3574,7 +3596,7 @@ watch(
       editorDisplayReady.value = false
       editorCreated.value = false
       editorRuntimeCreated.value = false
-      clearEditorHeightSyncBindings()
+      clearEditorHeightSyncBindings({ resetStreamingDiffTightHeight: true })
       clearInlineFoldProxies()
       safeClean()
       await nextTick()
@@ -4134,7 +4156,7 @@ onUnmounted(() => {
   // Ensure any RAF loops are stopped and editor resources are released
   stopExpandAutoResize()
   clearDiffFallbackExitTimer()
-  clearEditorHeightSyncBindings()
+  clearEditorHeightSyncBindings({ resetStreamingDiffTightHeight: true })
   clearInlineFoldProxies()
   cleanupEditor()
 
