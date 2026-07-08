@@ -2341,6 +2341,89 @@ describe('codeBlockNode language normalization', () => {
     wrapper.unmount()
   })
 
+  it('applies the settled plain text update after pending streaming updates', async () => {
+    const helpers = getStreamMonacoHelpers()
+    const firstUpdate = createDeferred()
+    helpers.updateCode
+      .mockImplementationOnce(() => firstUpdate.promise)
+      .mockImplementation(() => {})
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'vue',
+          code: '<template />\n',
+          raw: '```vue\n<template />\n',
+          loading: true,
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await waitForCreateEditorCalls(1, helpers)
+    await flushPendingMicrotasks()
+    helpers.updateCode.mockClear()
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'vue',
+        code: '<template />\n<style>\n',
+        raw: '```vue\n<template />\n<style>\n',
+        loading: true,
+      },
+    })
+    await flushPendingMicrotasks()
+
+    expect(helpers.updateCode).toHaveBeenCalledTimes(1)
+    expect(helpers.updateCode).toHaveBeenLastCalledWith(
+      '<template />\n<style>\n',
+      'vue',
+    )
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'vue',
+        code: '<template />\n<style>\n* { margin: 0; }\n',
+        raw: '```vue\n<template />\n<style>\n* { margin: 0; }\n',
+        loading: true,
+      },
+    })
+    await flushPendingMicrotasks()
+
+    expect(helpers.updateCode).toHaveBeenCalledTimes(1)
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'vue',
+        code: '<template />\n<style>\n* { margin: 0; }\n',
+        raw: '```vue\n<template />\n<style>\n* { margin: 0; }\n',
+        loading: false,
+      },
+      loading: false,
+    })
+    await flushPendingMicrotasks()
+
+    expect(helpers.updateCode).toHaveBeenCalledTimes(1)
+
+    firstUpdate.resolve()
+    await firstUpdate.promise
+    await flushPendingMicrotasks()
+
+    expect(helpers.updateCode).toHaveBeenCalledTimes(2)
+    expect(helpers.updateCode).toHaveBeenLastCalledWith(
+      '<template />\n<style>\n* { margin: 0; }',
+      'vue',
+    )
+
+    wrapper.unmount()
+  })
+
   it('continues flushing the latest plain text stream update after one update fails', async () => {
     const helpers = getStreamMonacoHelpers()
     const firstUpdate = createDeferred()
@@ -2580,6 +2663,24 @@ describe('codeBlockNode diff defaults', () => {
     expect(source).toContain('height: 0 !important;')
     expect(source).toContain('stream-monaco-diff-inline.stream-monaco-diff-inline-native-ready.stream-monaco-diff-native-stale')
     expect(source).toContain('background: var(--stream-monaco-removed-line-fill) !important;')
+    const root = document.createElement('div')
+    root.className = 'stream-monaco-diff-root stream-monaco-diff-inline stream-monaco-diff-inline-native-ready stream-monaco-diff-native-stale'
+    root.innerHTML = `
+      <div class="monaco-diff-editor">
+        <div class="editor modified">
+          <div class="view-zones">
+            <div class="view-lines line-delete"><div class="view-line">"version": "0.0.49",</div></div>
+          </div>
+        </div>
+      </div>
+    `
+    document.body.appendChild(root)
+    try {
+      expect(document.querySelectorAll('.stream-monaco-diff-root.stream-monaco-diff-inline.stream-monaco-diff-inline-native-ready.stream-monaco-diff-native-stale .monaco-diff-editor .editor.modified .view-lines.line-delete')).toHaveLength(1)
+    }
+    finally {
+      root.remove()
+    }
     expect(source).toContain('--stream-monaco-gutter-marker-width: 4px;')
     expect(source).toContain('--stream-monaco-modified-scrollable-left: var(--stream-monaco-modified-margin-width);')
     expect(source).not.toContain('--stream-monaco-modified-scrollable-left: calc(var(--stream-monaco-modified-margin-width) + 1px);')

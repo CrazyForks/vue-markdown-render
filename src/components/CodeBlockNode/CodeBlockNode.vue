@@ -3863,7 +3863,8 @@ watch(
               scheduleEditorHeightSync()
             }
             else {
-              updateCode(displayCode.value, monacoLanguage.value)
+              clearPlainCodeUpdateQueue()
+              queuePlainCodeUpdate(displayCode.value, monacoLanguage.value)
             }
           }
           syncEditorHostHeight(false)
