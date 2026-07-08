@@ -72,6 +72,61 @@ describe('mathInlineNode pending state', () => {
     wrapper.unmount()
   })
 
+  it('keeps empty loading paren math in loading mode', async () => {
+    const wrapper = mount(MathInlineNode as any, {
+      props: {
+        node: {
+          type: 'math_inline',
+          content: '',
+          raw: '\\(\\)',
+          markup: '\\(\\)',
+          loading: true,
+        },
+      },
+    })
+
+    await flushAll()
+
+    expect(mocks.renderKaTeXWithBackpressure).not.toHaveBeenCalled()
+    expect(wrapper.attributes('data-markstream-mode')).toBe('loading')
+    expect(wrapper.find('.math-inline--fallback').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('\\(\\)')
+
+    wrapper.unmount()
+  })
+
+  it('shows raw fallback when empty loading paren math settles without content', async () => {
+    const wrapper = mount(MathInlineNode as any, {
+      props: {
+        node: {
+          type: 'math_inline',
+          content: '',
+          raw: '\\(\\)',
+          markup: '\\(\\)',
+          loading: true,
+        },
+      },
+    })
+
+    await flushAll()
+
+    await wrapper.setProps({
+      node: {
+        type: 'math_inline',
+        content: '',
+        raw: '\\(\\)',
+        markup: '\\(\\)',
+        loading: false,
+      },
+    })
+    await flushAll()
+
+    expect(wrapper.attributes('data-markstream-mode')).toBe('fallback')
+    expect(wrapper.text()).toContain('\\(\\)')
+
+    wrapper.unmount()
+  })
+
   it('re-renders when loading changes without a content change', async () => {
     const disabledError: any = new Error('KaTeX disabled')
     disabledError.code = 'KATEX_DISABLED'

@@ -34,4 +34,21 @@ describe('inline math streaming prefix', () => {
       markup: '\\(\\)',
     })
   })
+
+  it('keeps an adjacent escaped literal paren before loading paren math', () => {
+    const md = getMarkdown('inline-math-streaming-adjacent-literal')
+    const input = String.raw`literal \(\(x`
+    const nodes = parseMarkdownToStructure(input, md, { final: false }) as any[]
+    const text = collectByType(nodes, 'text').map((node: any) => node.content).join('')
+    const math = collectByType(nodes, 'math_inline')
+
+    expect(text).toBe('literal (')
+    expect(math).toHaveLength(1)
+    expect(math[0]).toMatchObject({
+      type: 'math_inline',
+      content: 'x',
+      loading: true,
+      markup: '\\(\\)',
+    })
+  })
 })
