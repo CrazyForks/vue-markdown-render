@@ -21,13 +21,14 @@ export function throttle<T extends (...args: any[]) => any>(
   let pendingArgs: Parameters<T> | null = null
 
   const execute = () => {
-    if (pendingArgs) {
+    const args = pendingArgs
+    pendingArgs = null
+    timeout = null
+
+    if (args) {
       lastCall = Date.now()
-      const args = pendingArgs
-      pendingArgs = null
       fn(...args)
     }
-    timeout = null
   }
 
   return function throttled(...args: Parameters<T>) {

@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createAutoScrollChaseController } from '../playground/src/utils/autoScrollChase'
 
 describe('playground auto-scroll chase', () => {
@@ -72,5 +72,33 @@ describe('playground auto-scroll chase', () => {
     now = 1
     runNextFrame()
     expect(root.scrollTop).toBe(1400)
+  })
+
+  it('cancels a pending chase frame during cleanup', () => {
+    const root = document.createElement('div')
+    Object.defineProperty(root, 'scrollHeight', {
+      configurable: true,
+      get: () => 1000,
+    })
+    Object.defineProperty(root, 'clientHeight', {
+      configurable: true,
+      get: () => 100,
+    })
+    root.scrollTop = 900
+
+    const cancelFrame = vi.fn()
+    const controller = createAutoScrollChaseController({
+      getRoot: () => root,
+      getShouldStick: () => true,
+      setShouldStick: () => {},
+      requestFrame: () => 42,
+      cancelFrame,
+      now: () => 0,
+    })
+
+    controller.schedule()
+    controller.cancel()
+
+    expect(cancelFrame).toHaveBeenCalledWith(42)
   })
 })

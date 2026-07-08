@@ -467,6 +467,7 @@ onMounted(() => {
   if (isBenchmarkMode) {
     benchmarkWindow.__markstreamBenchmarkUnmount = () => {
       stopStreamSimulation()
+      autoScrollChase.cancel()
       __roContainer?.disconnect()
       __roContent?.disconnect()
       __mo?.disconnect()
@@ -516,6 +517,7 @@ onBeforeUnmount(() => {
   const benchmarkWindow = window as Window & { __markstreamBenchmarkUnmount?: () => void }
   delete benchmarkWindow.__markstreamBenchmarkUnmount
   stopStreamSimulation()
+  autoScrollChase.cancel()
   __roContainer?.disconnect()
   __roContent?.disconnect()
   __mo?.disconnect()

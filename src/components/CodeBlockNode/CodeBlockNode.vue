@@ -2625,15 +2625,21 @@ function shouldDeferStreamingEditorCreation() {
 
 let pendingPlainCodeUpdate: { code: string, language: string } | null = null
 let plainCodeUpdateRunning = false
+let plainCodeUpdateGeneration = 0
 
-async function flushPlainCodeUpdateQueue() {
+function clearPlainCodeUpdateQueue() {
+  pendingPlainCodeUpdate = null
+  plainCodeUpdateGeneration++
+}
+
+async function flushPlainCodeUpdateQueue(generation = plainCodeUpdateGeneration) {
   if (plainCodeUpdateRunning)
     return
 
   plainCodeUpdateRunning = true
   try {
     for (;;) {
-      if (!pendingPlainCodeUpdate || isUnmounted)
+      if (!pendingPlainCodeUpdate || isUnmounted || isDiff.value || generation !== plainCodeUpdateGeneration)
         break
       const next = pendingPlainCodeUpdate
       pendingPlainCodeUpdate = null
@@ -2647,12 +2653,14 @@ async function flushPlainCodeUpdateQueue() {
   }
   finally {
     plainCodeUpdateRunning = false
+    if (pendingPlainCodeUpdate && !isUnmounted && !isDiff.value)
+      void flushPlainCodeUpdateQueue()
   }
 }
 
 function queuePlainCodeUpdate(code: string, language: string) {
   pendingPlainCodeUpdate = { code, language }
-  void flushPlainCodeUpdateQueue()
+  void flushPlainCodeUpdateQueue(plainCodeUpdateGeneration)
 }
 
 watch(
@@ -3286,6 +3294,7 @@ watch(
   async (nextKind, prevKind) => {
     if (nextKind === prevKind)
       return
+    clearPlainCodeUpdateQueue()
     currentEditorKind.value = nextKind
 
     // If Monaco isn't mounted yet (or not available), just let the normal

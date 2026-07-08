@@ -2340,6 +2340,87 @@ describe('codeBlockNode language normalization', () => {
 
     wrapper.unmount()
   })
+
+  it('drops queued plain text stream updates after switching to diff mode', async () => {
+    const helpers = getStreamMonacoHelpers()
+    const firstUpdate = createDeferred()
+    helpers.updateCode
+      .mockImplementationOnce(() => firstUpdate.promise)
+      .mockImplementation(() => {})
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'vue',
+          code: '<template />',
+          raw: '```vue\n<template />',
+          loading: true,
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await waitForCreateEditorCalls(1, helpers)
+    await flushPendingMicrotasks()
+    helpers.updateCode.mockClear()
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'vue',
+        code: '<template />\n<style>',
+        raw: '```vue\n<template />\n<style>',
+        loading: true,
+      },
+    })
+    await flushPendingMicrotasks()
+
+    expect(helpers.updateCode).toHaveBeenCalledTimes(1)
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'vue',
+        code: '<template />\n<style>\n* { margin: 0; }',
+        raw: '```vue\n<template />\n<style>\n* { margin: 0; }',
+        loading: true,
+      },
+    })
+    await flushPendingMicrotasks()
+
+    expect(helpers.updateCode).toHaveBeenCalledTimes(1)
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'diff',
+        code: '-old\n+new',
+        diff: true,
+        originalCode: 'old',
+        updatedCode: 'new',
+        raw: '```diff\n-old\n+new',
+        loading: true,
+      },
+    })
+    await waitForCreateDiffEditorCalls(1, helpers)
+
+    firstUpdate.resolve()
+    await firstUpdate.promise
+    await flushPendingMicrotasks()
+
+    expect(helpers.updateCode).toHaveBeenCalledTimes(1)
+    expect(helpers.createDiffEditor).toHaveBeenLastCalledWith(
+      expect.any(HTMLElement),
+      'old',
+      'new',
+      'diff',
+    )
+
+    wrapper.unmount()
+  })
 })
 
 describe('codeBlockNode diff defaults', () => {

@@ -60,4 +60,31 @@ describe('throttle', () => {
       ['outside'],
     ])
   })
+
+  it('does not wedge when a trailing call throws', () => {
+    const error = new Error('trailing failed')
+    const fn = vi.fn((value: string) => {
+      if (value === 'throw')
+        throw error
+    })
+    const throttled = throttle(fn, 100)
+
+    throttled('first')
+
+    vi.setSystemTime(1010)
+    throttled('throw')
+
+    expect(() => vi.advanceTimersByTime(90)).toThrow(error)
+
+    vi.setSystemTime(1110)
+    throttled('next')
+
+    vi.advanceTimersByTime(90)
+
+    expect(fn.mock.calls).toEqual([
+      ['first'],
+      ['throw'],
+      ['next'],
+    ])
+  })
 })
