@@ -541,6 +541,7 @@ const editorCreationContentRevision = ref(0)
 const editorCreationSettledContentGeneration = ref(0)
 const diffFallbackExitActive = ref(false)
 const diffFallbackFadingOut = ref(false)
+const plainEditorContentMeasured = ref(false)
 let diffFallbackExitTimer: number | null = null
 let staleContentRetryFailureKey: string | null = null
 let editorCreationFailureRetryInProgress = false
@@ -988,6 +989,9 @@ const reservedEditorContentHeight = computed(() => {
   if (floor != null)
     return floor
 
+  if (!isDiff.value && plainEditorContentMeasured.value)
+    return null
+
   // While the fallback pre is visible, keep the hidden editor host at the same
   // content height. When Monaco becomes visible, the grid row will not collapse
   // by a browser rounding pixel.
@@ -1137,6 +1141,7 @@ const codeEditorContainerStyle = computed(() => {
 })
 
 function armEstimatedEditorHeightFloor() {
+  plainEditorContentMeasured.value = false
   const estimate = preFallbackReservedContentHeight.value
   pendingEstimatedEditorHeightFloor.value = !editorMounted.value && estimate != null
     ? estimate
@@ -1497,8 +1502,11 @@ function computeContentHeight(): number | null {
     else if (editor?.getContentHeight) {
       editor?.layout?.()
       const h = editor.getContentHeight()
-      if (h > 0)
+      if (h > 0) {
+        if (!isDiff.value)
+          plainEditorContentMeasured.value = true
         return Math.ceil(h + PIXEL_EPSILON)
+      }
     }
     // generic fallback
     const model = editor?.getModel?.()
@@ -1519,7 +1527,10 @@ function hasMeasuredPlainEditorContentHeight() {
     return false
   try {
     const height = getEditorView()?.getContentHeight?.()
-    return typeof height === 'number' && Number.isFinite(height) && height > 0
+    const hasHeight = typeof height === 'number' && Number.isFinite(height) && height > 0
+    if (hasHeight)
+      plainEditorContentMeasured.value = true
+    return hasHeight
   }
   catch {
     return false
