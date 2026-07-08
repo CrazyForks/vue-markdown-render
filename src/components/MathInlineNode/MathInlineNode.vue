@@ -189,7 +189,7 @@ async function renderMath() {
 }
 
 watch(
-  () => props.node.content,
+  () => [props.node.content, props.node.loading, props.node.raw, props.node.markup],
   () => {
     renderMath()
   },

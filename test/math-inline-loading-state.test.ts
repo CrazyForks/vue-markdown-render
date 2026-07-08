@@ -71,4 +71,45 @@ describe('mathInlineNode pending state', () => {
 
     wrapper.unmount()
   })
+
+  it('re-renders when loading changes without a content change', async () => {
+    const disabledError: any = new Error('KaTeX disabled')
+    disabledError.code = 'KATEX_DISABLED'
+    mocks.renderKaTeXWithBackpressure
+      .mockImplementationOnce(() => new Promise<string>(() => {}))
+      .mockRejectedValueOnce(disabledError)
+
+    const wrapper = mount(MathInlineNode as any, {
+      props: {
+        node: {
+          type: 'math_inline',
+          content: 'x',
+          raw: '\\(x\\)',
+          markup: '\\(\\)',
+          loading: true,
+        },
+      },
+    })
+
+    await flushAll()
+
+    expect(wrapper.attributes('data-markstream-mode')).toBe('loading')
+
+    await wrapper.setProps({
+      node: {
+        type: 'math_inline',
+        content: 'x',
+        raw: '\\(x\\)',
+        markup: '\\(\\)',
+        loading: false,
+      },
+    })
+    await flushAll()
+
+    expect(mocks.renderKaTeXWithBackpressure).toHaveBeenCalledTimes(2)
+    expect(wrapper.attributes('data-markstream-mode')).toBe('fallback')
+    expect(wrapper.text()).toContain('\\(x\\)')
+
+    wrapper.unmount()
+  })
 })
