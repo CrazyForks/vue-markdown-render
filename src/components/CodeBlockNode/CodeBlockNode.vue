@@ -2319,6 +2319,10 @@ function updateCollapsedHeight() {
       && renderedDiffHeight != null
       ? Math.ceil(renderedDiffHeight + DIFF_PREVIEW_BOTTOM_PADDING)
       : renderedDiffHeight
+    const shouldKeepDiffEstimatedFloor = estimatedDiffHeight != null
+      && !foldedDiffReadyForShrink
+    const shouldKeepInlineDiffEstimatedFloor = shouldKeepDiffEstimatedFloor
+      && props.loading !== false
     let h0: number | null
     if (!isDiff.value) {
       h0 = computeContentHeight()
@@ -2327,10 +2331,12 @@ function updateCollapsedHeight() {
       h0 = renderedDiffHeight
     }
     else if (preFallbackDiffInline.value && measuredDiffHeight != null) {
-      h0 = measuredDiffHeight
+      h0 = shouldKeepInlineDiffEstimatedFloor
+        ? Math.max(measuredDiffHeight, estimatedDiffHeight)
+        : measuredDiffHeight
     }
     else if (measuredDiffHeight != null) {
-      h0 = props.loading === false && estimatedDiffHeight != null
+      h0 = shouldKeepDiffEstimatedFloor
         ? Math.max(measuredDiffHeight, estimatedDiffHeight)
         : measuredDiffHeight
     }
@@ -4544,6 +4550,15 @@ onUnmounted(() => {
 :deep(.stream-monaco-diff-root .monaco-diff-editor:not(.side-by-side) .scrollbar.horizontal) {
   display: none !important;
   height: 0 !important;
+}
+
+:deep(.stream-monaco-diff-root.stream-monaco-diff-inline.stream-monaco-diff-inline-native-ready.stream-monaco-diff-native-stale .monaco-diff-editor .editor.modified .view-lines.line-delete) {
+  background: var(--stream-monaco-removed-line-fill) !important;
+  box-shadow: var(--stream-monaco-removed-line-shadow) !important;
+  display: block !important;
+  height: max-content !important;
+  min-height: 18px !important;
+  overflow: visible !important;
 }
 
 :deep(.stream-monaco-diff-root .monaco-editor .diff-hidden-lines .center:not(.stream-monaco-unchanged-bridge-source)),

@@ -142,7 +142,7 @@ class BatchDOMReader {
     }
   }
 
-  cancel() {
+  cancel(reason: unknown = new Error('BatchDOMReader cancelled')) {
     if (this.rafId !== null) {
       if (isClient && typeof cancelAnimationFrame === 'function') {
         cancelAnimationFrame(this.rafId)
@@ -152,7 +152,8 @@ class BatchDOMReader {
       }
       this.rafId = null
     }
-    this.pending = []
+    const tasks = this.pending.splice(0)
+    tasks.forEach(task => task.reject(reason))
     this.isProcessing = false
   }
 }

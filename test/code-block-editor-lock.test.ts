@@ -2341,6 +2341,82 @@ describe('codeBlockNode language normalization', () => {
     wrapper.unmount()
   })
 
+  it('continues flushing the latest plain text stream update after one update fails', async () => {
+    const helpers = getStreamMonacoHelpers()
+    const firstUpdate = createDeferred()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    helpers.updateCode
+      .mockImplementationOnce(() => firstUpdate.promise)
+      .mockImplementation(() => {})
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'vue',
+          code: '<template />',
+          raw: '```vue\n<template />',
+          loading: true,
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await waitForCreateEditorCalls(1, helpers)
+    await flushPendingMicrotasks()
+    helpers.updateCode.mockClear()
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'vue',
+        code: '<template />\n<style>',
+        raw: '```vue\n<template />\n<style>',
+        loading: true,
+      },
+    })
+    await flushPendingMicrotasks()
+
+    expect(helpers.updateCode).toHaveBeenCalledTimes(1)
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'vue',
+        code: '<template />\n<style>\n* { margin: 0; }',
+        raw: '```vue\n<template />\n<style>\n* { margin: 0; }',
+        loading: true,
+      },
+    })
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'vue',
+        code: '<template />\n<style>\n* { margin: 0; }\n</style>',
+        raw: '```vue\n<template />\n<style>\n* { margin: 0; }\n</style>',
+        loading: true,
+      },
+    })
+    await flushPendingMicrotasks()
+
+    expect(helpers.updateCode).toHaveBeenCalledTimes(1)
+
+    firstUpdate.reject(new Error('update failed'))
+    await firstUpdate.promise.catch(() => {})
+    await flushPendingMicrotasks()
+
+    expect(helpers.updateCode).toHaveBeenCalledTimes(2)
+    expect(helpers.updateCode).toHaveBeenLastCalledWith(
+      '<template />\n<style>\n* { margin: 0; }\n</style>',
+      'vue',
+    )
+
+    warn.mockRestore()
+    wrapper.unmount()
+  })
+
   it('drops queued plain text stream updates after switching to diff mode', async () => {
     const helpers = getStreamMonacoHelpers()
     const firstUpdate = createDeferred()
@@ -2502,6 +2578,8 @@ describe('codeBlockNode diff defaults', () => {
     expect(source).toContain('stream-monaco-diff-inline .monaco-diff-editor .scrollbar.horizontal')
     expect(source).toContain('stream-monaco-diff-root .monaco-diff-editor:not(.side-by-side) .scrollbar.horizontal')
     expect(source).toContain('height: 0 !important;')
+    expect(source).toContain('stream-monaco-diff-inline.stream-monaco-diff-inline-native-ready.stream-monaco-diff-native-stale')
+    expect(source).toContain('background: var(--stream-monaco-removed-line-fill) !important;')
     expect(source).toContain('--stream-monaco-gutter-marker-width: 4px;')
     expect(source).toContain('--stream-monaco-modified-scrollable-left: var(--stream-monaco-modified-margin-width);')
     expect(source).not.toContain('--stream-monaco-modified-scrollable-left: calc(var(--stream-monaco-modified-margin-width) + 1px);')
@@ -3643,15 +3721,15 @@ describe('codeBlockNode diff defaults', () => {
 
   it('keeps diff host height at least the model-estimated height when rendered DOM is still partial', async () => {
     const helpers = getStreamMonacoHelpers()
-    const rect = (height: number) => ({
+    const rect = (height: number, top = 0) => ({
       x: 0,
-      y: 0,
+      y: top,
       width: 0,
       height,
-      top: 0,
+      top,
       left: 0,
       right: 0,
-      bottom: height,
+      bottom: top + height,
       toJSON: () => ({}),
     }) as DOMRect
     const makeSideEditor = () => ({
@@ -3679,6 +3757,20 @@ describe('codeBlockNode diff defaults', () => {
       Object.defineProperty(diffRoot, 'getBoundingClientRect', {
         configurable: true,
         value: () => rect(120),
+      })
+      diffRoot.innerHTML = `
+        <div class="editor original">
+          <div class="view-lines"><div class="view-line"></div></div>
+        </div>
+        <div class="editor modified">
+          <div class="view-lines"><div class="view-line"></div></div>
+        </div>
+      `
+      Array.from(diffRoot.querySelectorAll('.view-line')).forEach((line) => {
+        Object.defineProperty(line, 'getBoundingClientRect', {
+          configurable: true,
+          value: () => rect(18),
+        })
       })
       el.appendChild(diffRoot)
     })

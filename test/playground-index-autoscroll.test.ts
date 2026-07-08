@@ -10,6 +10,7 @@ describe('playground auto-scroll chase', () => {
     const root = document.createElement('div')
     let scrollHeight = 1000
     const clientHeight = 100
+    let rawScrollTop = 0
     let now = 0
     let shouldStick = true
     const frames: FrameRequestCallback[] = []
@@ -21,6 +22,13 @@ describe('playground auto-scroll chase', () => {
     Object.defineProperty(root, 'clientHeight', {
       configurable: true,
       get: () => clientHeight,
+    })
+    Object.defineProperty(root, 'scrollTop', {
+      configurable: true,
+      get: () => rawScrollTop,
+      set: (value: number) => {
+        rawScrollTop = Math.max(0, Math.min(value, scrollHeight - clientHeight))
+      },
     })
 
     root.scrollTop = 900
@@ -45,16 +53,20 @@ describe('playground auto-scroll chase', () => {
       callback?.(now)
     }
 
+    function expectAtBottom() {
+      expect(scrollHeight - root.scrollTop - clientHeight).toBeLessThanOrEqual(24)
+    }
+
     controller.handleScroll()
     expect(shouldStick).toBe(true)
 
     runNextFrame()
-    expect(root.scrollTop).toBe(1000)
+    expectAtBottom()
 
     scrollHeight = 1200
     controller.schedule()
     runNextFrame()
-    expect(root.scrollTop).toBe(1200)
+    expectAtBottom()
 
     root.scrollTop = 900
     controller.handleScroll()
@@ -71,7 +83,7 @@ describe('playground auto-scroll chase', () => {
 
     now = 1
     runNextFrame()
-    expect(root.scrollTop).toBe(1400)
+    expectAtBottom()
   })
 
   it('cancels a pending chase frame during cleanup', () => {

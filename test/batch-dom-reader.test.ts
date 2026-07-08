@@ -111,4 +111,14 @@ describe('batchDOMReader', () => {
     await expect(third).resolves.toBe('third-result')
     expect(seen).toEqual(['first', 'failed', 'third'])
   })
+
+  it('rejects pending reads when canceled', async () => {
+    const reader = createBatchDOMReader()
+
+    const pending = reader.read(() => 'never')
+    reader.cancel()
+
+    await expect(pending).rejects.toThrow('BatchDOMReader cancelled')
+    expect(frameCallbacks.size).toBe(0)
+  })
 })
