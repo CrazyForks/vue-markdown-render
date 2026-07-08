@@ -965,6 +965,27 @@ export function parseInlineTokens(
     return String(token.markup ?? '').startsWith(escapedPrefix)
   }
 
+  function stripTrailingLoadingParenMathOpener(token: MarkdownToken) {
+    if (!currentTextNode || token.loading !== true || token.markup !== '\\(\\)')
+      return
+
+    const previousToken = tokens[i - 1]
+    if (!previousToken || previousToken.type !== 'text' || !hasEscapedMarkup(previousToken, '\\('))
+      return
+
+    if (!currentTextNode.content.endsWith('('))
+      return
+
+    currentTextNode.content = currentTextNode.content.slice(0, -1)
+    if (currentTextNode.raw.endsWith('('))
+      currentTextNode.raw = currentTextNode.raw.slice(0, -1)
+
+    if (!currentTextNode.content && result[result.length - 1] === currentTextNode) {
+      result.pop()
+      currentTextNode = null
+    }
+  }
+
   function isMarkdownLinkBeforeLinkifiedUrl(content: string) {
     if (!content.endsWith(']('))
       return false
@@ -1204,6 +1225,7 @@ export function parseInlineTokens(
       }
 
       case 'math_inline': {
+        stripTrailingLoadingParenMathOpener(token)
         resetCurrentTextNode()
         // 可能遇到 math_inline text math_inline 的特殊情况，需要合并成一个
         if (!token.content && token.markup === '$' && tokens[i + 1]?.type === 'text' && tokens[i + 2]?.type === 'math_inline') {

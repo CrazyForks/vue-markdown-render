@@ -47,4 +47,28 @@ describe('mathInlineNode pending state', () => {
 
     wrapper.unmount()
   })
+
+  it('keeps loading inline math in loading mode instead of flashing raw fallback', async () => {
+    const wrapper = mount(MathInlineNode as any, {
+      props: {
+        node: {
+          type: 'math_inline',
+          content: 'W = \\operatorname{span}\\{\\boldsy',
+          raw: '\\(W = \\operatorname{span}\\{\\boldsy\\)',
+          markup: '\\(\\)',
+          loading: true,
+        },
+      },
+    })
+
+    await flushAll()
+
+    expect(mocks.renderKaTeXWithBackpressure).toHaveBeenCalled()
+    expect(wrapper.attributes('data-markstream-mode')).toBe('loading')
+    expect(wrapper.attributes('data-markstream-pending')).toBe('true')
+    expect(wrapper.find('.math-inline--fallback').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('\\operatorname')
+
+    wrapper.unmount()
+  })
 })
