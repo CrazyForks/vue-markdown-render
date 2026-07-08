@@ -2317,9 +2317,7 @@ function updateCollapsedHeight(options: EditorHostHeightSyncOptions = {}) {
       }
     }
     const preferModelDiffHeight = isDiff.value && options.preferModelDiffHeight === true
-    const renderedDiffHeight = isDiff.value && !preferModelDiffHeight
-      ? measureRenderedDiffHeight(container)
-      : null
+    const renderedDiffHeight = isDiff.value ? measureRenderedDiffHeight(container) : null
     const measuredDiffHeight = isDiff.value
       && preFallbackDiffInline.value
       && !hasVisibleCollapsedDiffSummary
@@ -2327,21 +2325,26 @@ function updateCollapsedHeight(options: EditorHostHeightSyncOptions = {}) {
       ? Math.ceil(renderedDiffHeight + DIFF_PREVIEW_BOTTOM_PADDING)
       : renderedDiffHeight
     const shouldKeepDiffEstimatedFloor = estimatedDiffHeight != null
+      && props.loading === false
+      && !preFallbackDiffInline.value
       && !foldedDiffReadyForShrink
-    const shouldKeepInlineDiffEstimatedFloor = shouldKeepDiffEstimatedFloor
-      && props.loading !== false
     let h0: number | null
     if (!isDiff.value) {
       h0 = computeContentHeight()
     }
     else if (preferModelDiffHeight) {
-      h0 = estimatedDiffHeight ?? computeContentHeight()
+      const shouldShrinkToModel = estimatedDiffHeight != null
+        && rectH > 0
+        && estimatedDiffHeight < rectH - PIXEL_EPSILON
+      h0 = shouldShrinkToModel
+        ? estimatedDiffHeight
+        : measuredDiffHeight ?? (rectH > 0 ? rectH : estimatedDiffHeight)
     }
     else if (hasVisibleCollapsedDiffSummary) {
       h0 = renderedDiffHeight
     }
     else if (preFallbackDiffInline.value && measuredDiffHeight != null) {
-      h0 = shouldKeepInlineDiffEstimatedFloor
+      h0 = shouldKeepDiffEstimatedFloor
         ? Math.max(measuredDiffHeight, estimatedDiffHeight)
         : measuredDiffHeight
     }

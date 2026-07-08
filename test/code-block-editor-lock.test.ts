@@ -2773,7 +2773,7 @@ describe('codeBlockNode diff defaults', () => {
 
     const revealStart = source.indexOf('async function revealEditorDisplay()')
     const updateStart = source.indexOf('function updateCollapsedHeight(')
-    const renderMeasure = source.indexOf('const renderedDiffHeight = isDiff.value && !preferModelDiffHeight', updateStart)
+    const renderMeasure = source.indexOf('const renderedDiffHeight = isDiff.value ? measureRenderedDiffHeight(container) : null', updateStart)
 
     expect(revealStart).toBeGreaterThanOrEqual(0)
     const diffRevealStart = source.indexOf('diffFallbackExitActive.value = true', revealStart)
@@ -3985,6 +3985,126 @@ describe('codeBlockNode diff defaults', () => {
 
       expect(helpers.updateDiff).toHaveBeenCalled()
       expect(Number.parseFloat(host.style.height)).toBeLessThan(450)
+    }
+    finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('does not grow a streaming diff host before the new diff lines render', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let lineCount = 14
+    let didUpdateDiff: (() => void) | null = null
+    const rect = (height: number, top = 0, width = 480) => ({
+      x: 0,
+      y: top,
+      width,
+      height,
+      top,
+      left: 0,
+      right: width,
+      bottom: top + height,
+      toJSON: () => ({}),
+    }) as DOMRect
+    const renderDiffLines = (el: HTMLElement, count: number) => {
+      for (const viewLines of Array.from(el.querySelectorAll('.view-lines'))) {
+        viewLines.innerHTML = Array.from({ length: count }, (_, index) => `<div class="view-line" data-line="${index}"></div>`).join('')
+      }
+      for (const [index, line] of Array.from(el.querySelectorAll('.view-line')).entries()) {
+        Object.defineProperty(line, 'getBoundingClientRect', {
+          configurable: true,
+          value: () => rect(20, (index % count) * 20),
+        })
+      }
+    }
+    const makeSideEditor = () => ({
+      onDidContentSizeChange: vi.fn(() => ({ dispose: vi.fn() })),
+      onDidLayoutChange: vi.fn(() => ({ dispose: vi.fn() })),
+      getModel: vi.fn(() => ({ getLineCount: () => lineCount })),
+      getOption: vi.fn(() => 14),
+      layout: vi.fn(),
+    })
+    const diffEditor = {
+      getOriginalEditor: vi.fn(() => makeSideEditor()),
+      getModifiedEditor: vi.fn(() => makeSideEditor()),
+      onDidUpdateDiff: vi.fn((listener: () => void) => {
+        didUpdateDiff = listener
+        return { dispose: vi.fn() }
+      }),
+      getLineChanges: vi.fn(() => []),
+      updateOptions: vi.fn(),
+      layout: vi.fn(),
+    }
+    helpers.getDiffEditorView.mockReturnValue(diffEditor as any)
+    helpers.createDiffEditor.mockImplementation(async (el: HTMLElement) => {
+      Object.defineProperty(el, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => rect(Number.parseFloat(el.style.height || '') || 280),
+      })
+      el.innerHTML = `
+        <div class="monaco-diff-editor">
+          <div class="editor original"><div class="view-lines"></div></div>
+          <div class="editor modified"><div class="view-lines"></div></div>
+        </div>
+      `
+      const diffRoot = el.querySelector('.monaco-diff-editor') as HTMLElement
+      Object.defineProperty(diffRoot, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => rect(Number.parseFloat(el.style.height || '') || 280),
+      })
+      renderDiffLines(el, 14)
+    })
+    helpers.updateDiff.mockImplementation(() => {})
+
+    const wrapper = mount(CodeBlockNode, {
+      attachTo: document.body,
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '@@ -1 +1 @@',
+          diff: true,
+          originalCode: Array.from({ length: 14 }, (_, index) => `old ${index}`).join('\n'),
+          updatedCode: Array.from({ length: 14 }, (_, index) => `new ${index}`).join('\n'),
+          raw: '```diff\n-old\n+new',
+          loading: true,
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    try {
+      await waitForCreateDiffEditorCalls(1, helpers)
+      await flushPendingMicrotasks()
+      const host = wrapper.get('.code-editor-container').element as HTMLElement
+      const initialHeight = Number.parseFloat(host.style.height)
+      expect(initialHeight).toBeGreaterThan(0)
+
+      lineCount = 19
+      await wrapper.setProps({
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '@@ -1 +1 @@',
+          diff: true,
+          originalCode: Array.from({ length: 19 }, (_, index) => `old ${index}`).join('\n'),
+          updatedCode: Array.from({ length: 19 }, (_, index) => `new ${index}`).join('\n'),
+          raw: '```diff\n-old\n+new',
+          loading: true,
+        },
+      })
+      await flushMicrotasksOnly()
+      await flushMicrotasksOnly()
+
+      expect(Number.parseFloat(host.style.height)).toBeLessThanOrEqual(initialHeight + 1)
+
+      renderDiffLines(host, 19)
+      didUpdateDiff?.()
+      await flushPendingMicrotasks()
+
+      expect(Number.parseFloat(host.style.height)).toBeGreaterThan(initialHeight)
     }
     finally {
       wrapper.unmount()
