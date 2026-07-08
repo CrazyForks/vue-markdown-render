@@ -2810,7 +2810,7 @@ describe('codeBlockNode diff defaults', () => {
     expect(source.indexOf('if (!viewportReady.value)', postRuntimeGuard)).toBeGreaterThan(postRuntimeGuard)
   })
 
-  it('keeps the inline diff fallback height pinned during Monaco handoff', () => {
+  it('keeps inline diff reveal height synced during Monaco handoff', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/components/CodeBlockNode/CodeBlockNode.vue'),
       'utf8',
@@ -2825,7 +2825,7 @@ describe('codeBlockNode diff defaults', () => {
     const readyWrite = source.indexOf('editorDisplayReady.value = true', diffRevealStart)
     expect(diffRevealStart).toBeGreaterThan(revealStart)
     expect(readyWrite).toBeGreaterThan(revealStart)
-    expect(source.slice(revealStart, diffRevealStart)).toContain('syncDiffEditorHostToFallbackHeight()')
+    expect(source.slice(revealStart, diffRevealStart)).toContain('syncDiffRevealHostHeight()')
     expect(updateStart).toBeGreaterThanOrEqual(0)
     expect(renderMeasure).toBeGreaterThan(updateStart)
     expect(source.slice(updateStart, renderMeasure)).toContain('diffFallbackExitActive.value || diffFallbackFadingOut.value')
@@ -3867,7 +3867,7 @@ describe('codeBlockNode diff defaults', () => {
     wrapper.unmount()
   })
 
-  it('shrinks the streaming diff host when Monaco reports a smaller partial frame', async () => {
+  it('does not resize a streaming diff host from model-only partial frames', async () => {
     const helpers = getStreamMonacoHelpers()
     let lineCount = 20
     let contentSizeListener: (() => void) | null = null
@@ -3922,12 +3922,12 @@ describe('codeBlockNode diff defaults', () => {
 
     const nextHeight = Number.parseFloat(host.style.height)
     expect(nextHeight).toBeGreaterThan(0)
-    expect(nextHeight).toBeLessThan(initialHeight)
+    expect(nextHeight).toBe(initialHeight)
 
     wrapper.unmount()
   })
 
-  it('does not keep stale rendered diff DOM height after a streaming update', async () => {
+  it('keeps rendered streaming diff DOM height ahead of model-only shrink', async () => {
     const helpers = getStreamMonacoHelpers()
     let lineCount = 24
     const rect = (height: number, top = 0, width = 480) => ({
@@ -4009,7 +4009,8 @@ describe('codeBlockNode diff defaults', () => {
       await waitForCreateDiffEditorCalls(1, helpers)
       await flushPendingMicrotasks()
       const host = wrapper.get('.code-editor-container').element as HTMLElement
-      expect(Number.parseFloat(host.style.height)).toBeGreaterThan(450)
+      const initialHeight = Number.parseFloat(host.style.height)
+      expect(initialHeight).toBeGreaterThan(350)
 
       lineCount = 22
       helpers.updateDiff.mockClear()
@@ -4029,7 +4030,7 @@ describe('codeBlockNode diff defaults', () => {
       await flushMicrotasksOnly()
 
       expect(helpers.updateDiff).toHaveBeenCalled()
-      expect(Number.parseFloat(host.style.height)).toBeLessThan(450)
+      expect(Number.parseFloat(host.style.height)).toBeGreaterThanOrEqual(initialHeight)
     }
     finally {
       wrapper.unmount()
@@ -4156,7 +4157,7 @@ describe('codeBlockNode diff defaults', () => {
     }
   })
 
-  it('keeps diff host height at least the model-estimated height when rendered DOM is still partial', async () => {
+  it('uses rendered diff height during streaming when rendered DOM is still partial', async () => {
     const helpers = getStreamMonacoHelpers()
     const rect = (height: number, top = 0) => ({
       x: 0,
@@ -4232,13 +4233,13 @@ describe('codeBlockNode diff defaults', () => {
     await waitForCreateDiffEditorCalls(1, helpers)
     await vi.waitFor(() => {
       const host = wrapper.get('.code-editor-container').element as HTMLElement
-      expect(Number.parseFloat(host.style.height)).toBeGreaterThan(300)
+      expect(Number.parseFloat(host.style.height)).toBeLessThan(80)
     })
 
     wrapper.unmount()
   })
 
-  it('keeps inline diff height aligned with the pre fallback bottom padding after Monaco renders', async () => {
+  it('uses rendered inline diff height without carrying fallback bottom padding after Monaco renders', async () => {
     const helpers = getStreamMonacoHelpers()
     const rect = (top: number, height: number, width = 240) => ({
       x: 0,
@@ -4321,8 +4322,9 @@ describe('codeBlockNode diff defaults', () => {
     await waitForCreateDiffEditorCalls(1, helpers)
     const host = wrapper.get('.code-editor-container').element as HTMLElement
     await vi.waitFor(() => {
-      expect(host.style.height).toBe('154px')
+      expect(host.style.height).toBe('144px')
     })
+    expect(host.style.height).not.toBe('154px')
     expect(host.style.height).not.toBe('162px')
 
     wrapper.unmount()

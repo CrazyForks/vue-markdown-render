@@ -184,6 +184,10 @@ const monacoReady = ref(false)
 let isUnmounted = false
 let expandRafId: number | null = null
 let deferredHeightSyncRafId: number | null = null
+let streamingDiffHeightChaseRafId: number | null = null
+let streamingDiffHeightChaseFrames = 0
+let streamingDiffHeightMicrotaskPending = false
+let lastStreamingDiffTightHeight: number | null = null
 let lifecyclePendingIndexKey = ''
 const heightBeforeCollapse = ref<number | null>(null)
 const lastStableCollapsedDiffHeight = ref<number | null>(null)
@@ -956,8 +960,7 @@ function shouldHoldStreamingDiffHeightFloor() {
   return isDiff.value
     && props.stream !== false
     && (
-      props.loading !== false
-      || showPreWhileMonacoLoads.value
+      showPreWhileMonacoLoads.value
       || diffFallbackExitActive.value
       || diffFallbackFadingOut.value
     )
@@ -1167,14 +1170,14 @@ async function revealEditorDisplay() {
     return
   }
 
-  syncDiffEditorHostToFallbackHeight()
+  syncDiffRevealHostHeight()
   diffFallbackExitActive.value = true
   diffFallbackFadingOut.value = false
   editorDisplayReady.value = true
   await nextTick()
-  syncDiffEditorHostToFallbackHeight()
+  syncDiffRevealHostHeight()
   await waitForAnimationFrame()
-  syncDiffEditorHostToFallbackHeight()
+  syncDiffRevealHostHeight()
 
   if (isUnmounted)
     return
@@ -1204,6 +1207,17 @@ async function revealEditorDisplay() {
   }, 120)
 }
 
+function syncDiffRevealHostHeight() {
+  const editorHost = codeEditor.value
+  if (editorHost && hasRenderedDiffEditorDom(editorHost)) {
+    syncInlineFoldProxies()
+    syncEditorHostHeight({ preferModelDiffHeight: true })
+    scheduleStreamingDiffHeightChase()
+    return Number.parseFloat(editorHost.style.height || '') || null
+  }
+  return syncDiffEditorHostToFallbackHeight()
+}
+
 function canReleaseEstimatedFloorForFoldedDiff() {
   if (!isDiff.value)
     return false
@@ -1211,9 +1225,7 @@ function canReleaseEstimatedFloorForFoldedDiff() {
   if (!editorMounted.value || !editorDisplayReady.value)
     return false
 
-  // During fallback fade-out, keep the fallback/editor height locked to avoid
-  // exposing an intermediate jump. Release only after the fallback layer is gone.
-  if (diffFallbackExitActive.value || diffFallbackFadingOut.value)
+  if (showPreWhileMonacoLoads.value)
     return false
 
   const editorHost = codeEditor.value
@@ -1562,6 +1574,17 @@ function measureRenderedDiffHeight(container: HTMLElement): number | null {
     for (const node of Array.from(container.querySelectorAll(selectors.join(',')))) {
       if (!(node instanceof HTMLElement))
         continue
+      const isViewZone = Boolean(
+        node.parentElement?.classList.contains('view-zones')
+        || node.parentElement?.classList.contains('margin-view-zones'),
+      )
+      if (isViewZone) {
+        const hasVisibleZoneContent = node.textContent?.trim()
+          || node.matches('.line-delete, .line-insert, .cdr')
+          || node.querySelector('.diff-hidden-lines, .stream-monaco-diff-unchanged-bridge, .line-delete, .line-insert, .cdr')
+        if (!hasVisibleZoneContent)
+          continue
+      }
       const style = window.getComputedStyle(node)
       if (style.display === 'none' || style.visibility === 'hidden')
         continue
@@ -1590,7 +1613,7 @@ function hasVisibleDiffHiddenLines(container: HTMLElement): boolean {
   if (hostRect.width <= 0 || hostRect.height <= 0)
     return false
   const nodes = container.querySelectorAll(
-    '.editor.modified .diff-hidden-lines .center, .stream-monaco-diff-unchanged-bridge',
+    '.editor.modified .diff-hidden-lines, .editor.original .diff-hidden-lines, .stream-monaco-diff-unchanged-bridge',
   )
   for (const node of Array.from(nodes)) {
     if (!(node instanceof HTMLElement))
@@ -1828,6 +1851,8 @@ function syncDiffEditorHostToFallbackHeight() {
   editorHost.style.minHeight = `${height}px`
   editorHost.style.maxHeight = `${Math.ceil(getMaxHeightValue())}px`
   editorHost.style.overflow = 'hidden'
+  if (props.loading !== false && height >= getMaxHeightValue() - PIXEL_EPSILON)
+    scheduleStreamingDiffHeightMicrotaskSync()
   return height
 }
 
@@ -2054,6 +2079,13 @@ function clearEditorHeightSyncBindings() {
     safeCancelRaf(deferredHeightSyncRafId)
     deferredHeightSyncRafId = null
   }
+  if (streamingDiffHeightChaseRafId != null) {
+    safeCancelRaf(streamingDiffHeightChaseRafId)
+    streamingDiffHeightChaseRafId = null
+  }
+  streamingDiffHeightChaseFrames = 0
+  streamingDiffHeightMicrotaskPending = false
+  lastStreamingDiffTightHeight = null
 }
 
 function clearInlineFoldProxies() {
@@ -2191,13 +2223,62 @@ function syncInlineFoldProxies() {
 function scheduleEditorHeightSync(allowDuringStreamingDiff = false) {
   if (deferredHeightSyncRafId != null)
     return
+  const sync = () => {
+    syncInlineFoldProxies()
+    syncEditorHostHeight(allowDuringStreamingDiff)
+    layoutEditorToHost()
+  }
   deferredHeightSyncRafId = safeRaf(() => {
     deferredHeightSyncRafId = null
+    sync()
     safeRaf(() => {
-      syncInlineFoldProxies()
-      syncEditorHostHeight(allowDuringStreamingDiff)
-      layoutEditorToHost()
+      sync()
     })
+  })
+  scheduleStreamingDiffHeightChase()
+}
+
+function scheduleStreamingDiffHeightChase() {
+  if (!isDiff.value || props.loading === false || isUnmounted)
+    return
+
+  streamingDiffHeightChaseFrames = Math.max(streamingDiffHeightChaseFrames, 6)
+  if (streamingDiffHeightChaseRafId != null)
+    return
+
+  const tick = () => {
+    streamingDiffHeightChaseRafId = null
+    if (!isDiff.value || props.loading === false || isUnmounted || streamingDiffHeightChaseFrames <= 0) {
+      streamingDiffHeightChaseFrames = 0
+      return
+    }
+
+    streamingDiffHeightChaseFrames--
+    syncInlineFoldProxies()
+    syncEditorHostHeight({ preferModelDiffHeight: true })
+    layoutEditorToHost()
+    streamingDiffHeightChaseRafId = safeRaf(tick)
+  }
+
+  streamingDiffHeightChaseRafId = safeRaf(tick)
+}
+
+function scheduleStreamingDiffHeightMicrotaskSync() {
+  if (streamingDiffHeightMicrotaskPending || typeof window === 'undefined')
+    return
+
+  streamingDiffHeightMicrotaskPending = true
+  queueMicrotask(() => {
+    try {
+      if (!isDiff.value || props.loading === false || isUnmounted)
+        return
+      syncInlineFoldProxies()
+      syncEditorHostHeight({ preferModelDiffHeight: true })
+      layoutEditorToHost()
+    }
+    finally {
+      streamingDiffHeightMicrotaskPending = false
+    }
   })
 }
 
@@ -2215,15 +2296,36 @@ function applyCollapsedContainerHeight(
   const floorAdjustedContentHeight = streamingFloor != null
     ? Math.max(contentHeight, streamingFloor)
     : contentHeight
-  const cappedHeight = Math.min(floorAdjustedContentHeight, maxHeight)
-  const allowBelowEstimatedFloor = options.allowBelowEstimatedFloor === true
+  const renderedStreamingDiffHeight = isDiff.value && props.loading !== false
+    ? measureRenderedDiffHeight(container)
+    : null
+  const resolvedContentHeight = renderedStreamingDiffHeight != null
+    && renderedStreamingDiffHeight < floorAdjustedContentHeight - PIXEL_EPSILON
+    ? renderedStreamingDiffHeight
+    : floorAdjustedContentHeight
+  const cappedHeight = Math.min(resolvedContentHeight, maxHeight)
+  let allowBelowEstimatedFloor = options.allowBelowEstimatedFloor === true
     || canReleaseEstimatedFloorForFoldedDiff()
 
-  const nextHeight = resolveHeightWithEstimatedEditorFloor(
+  let nextHeight = resolveHeightWithEstimatedEditorFloor(
     cappedHeight,
     options.clearEstimatedFloor === true,
     { allowBelowEstimatedFloor },
   )
+  if (isDiff.value && props.loading !== false && nextHeight >= maxHeight - PIXEL_EPSILON) {
+    const currentHeight = Math.ceil(container.getBoundingClientRect().height || 0)
+    const tightHeight = renderedStreamingDiffHeight != null && renderedStreamingDiffHeight > 0
+      ? renderedStreamingDiffHeight
+      : currentHeight > 0 && currentHeight < maxHeight - PIXEL_EPSILON ? currentHeight : lastStreamingDiffTightHeight
+    if (tightHeight != null && tightHeight < nextHeight - PIXEL_EPSILON) {
+      nextHeight = tightHeight
+      allowBelowEstimatedFloor = true
+      if (editorMounted.value)
+        clearEstimatedEditorHeightFloor()
+    }
+  }
+  if (isDiff.value && props.loading !== false && nextHeight > 0 && nextHeight < maxHeight - PIXEL_EPSILON)
+    lastStreamingDiffTightHeight = nextHeight
 
   const floor = getPendingEstimatedEditorHeightFloor()
 
@@ -2235,6 +2337,8 @@ function applyCollapsedContainerHeight(
 
   container.style.height = `${nextHeight}px`
   container.style.maxHeight = `${Math.ceil(maxHeight)}px`
+  if (isDiff.value && props.loading !== false && nextHeight >= maxHeight - PIXEL_EPSILON)
+    scheduleStreamingDiffHeightMicrotaskSync()
 
   if (isDiff.value) {
     container.style.overflow = 'hidden'
@@ -2283,6 +2387,78 @@ function bindEditorHeightSync() {
     bind(modifiedEditor, 'onDidContentSizeChange')
     bind(originalEditor, 'onDidLayoutChange')
     bind(modifiedEditor, 'onDidLayoutChange')
+    const host = codeEditor.value
+    if (host && typeof MutationObserver !== 'undefined') {
+      const syncMutationSelector = [
+        '.view-line',
+        '.view-lines',
+        '.view-zones',
+        '.margin-view-zones',
+        '.diff-hidden-lines',
+        '.stream-monaco-diff-unchanged-bridge',
+        '.stream-monaco-fallback-inline-delete-zone',
+        '.stream-monaco-fallback-inline-delete-margin',
+      ].join(',')
+      const isRelevantMutationTarget = (node: Node) => {
+        const el = node instanceof HTMLElement ? node : node.parentElement
+        return Boolean(el?.closest?.(syncMutationSelector))
+      }
+      const hasRelevantMutationSubtree = (node: Node) => {
+        const el = node instanceof HTMLElement ? node : node.parentElement
+        return Boolean(el?.closest?.(syncMutationSelector) || el?.querySelector?.(syncMutationSelector))
+      }
+      const observer = new MutationObserver((mutations) => {
+        if (!isDiff.value || props.loading === false)
+          return
+        const shouldShrinkHostHeight = mutations.some(mutation =>
+          mutation.target === host
+          && mutation.type === 'attributes'
+          && mutation.attributeName === 'style',
+        ) && (() => {
+          const renderedHeight = measureRenderedDiffHeight(host)
+          if (renderedHeight == null)
+            return false
+          const hostHeight = Math.ceil(host.getBoundingClientRect().height || 0)
+          return hostHeight > renderedHeight + PIXEL_EPSILON
+        })()
+        const shouldSync = mutations.some(mutation =>
+          isRelevantMutationTarget(mutation.target)
+          || Array.from(mutation.addedNodes).some(hasRelevantMutationSubtree)
+          || Array.from(mutation.removedNodes).some(isRelevantMutationTarget),
+        ) || shouldShrinkHostHeight
+        if (!shouldSync)
+          return
+        syncInlineFoldProxies()
+        syncEditorHostHeight({ preferModelDiffHeight: true })
+        layoutEditorToHost()
+        scheduleStreamingDiffHeightChase()
+      })
+      observer.observe(host, {
+        attributeFilter: ['class', 'style'],
+        attributes: true,
+        childList: true,
+        characterData: true,
+        subtree: true,
+      })
+      editorHeightSyncDisposables.push({ dispose: () => observer.disconnect() })
+    }
+    if (host && typeof ResizeObserver !== 'undefined') {
+      const resizeObserver = new ResizeObserver(() => {
+        if (!isDiff.value || props.loading === false)
+          return
+        const renderedHeight = measureRenderedDiffHeight(host)
+        if (renderedHeight == null)
+          return
+        const hostHeight = Math.ceil(host.getBoundingClientRect().height || 0)
+        if (hostHeight <= renderedHeight + PIXEL_EPSILON)
+          return
+        syncInlineFoldProxies()
+        syncEditorHostHeight({ preferModelDiffHeight: true })
+        layoutEditorToHost()
+      })
+      resizeObserver.observe(host)
+      editorHeightSyncDisposables.push({ dispose: () => resizeObserver.disconnect() })
+    }
     return
   }
 
@@ -2317,11 +2493,11 @@ function updateCollapsedHeight(options: EditorHostHeightSyncOptions = {}) {
     const rectH = Math.ceil((container.getBoundingClientRect?.().height) || 0)
     const estimatedDiffHeight = isDiff.value ? estimateDiffEditorContentHeight() : null
     const hasVisibleCollapsedDiffSummary = isDiff.value && hasVisibleDiffHiddenLines(container)
+    const hasRenderedDiffDom = isDiff.value && hasRenderedDiffEditorDom(container)
     const foldedDiffReadyForShrink = hasVisibleCollapsedDiffSummary
       && editorMounted.value
       && editorDisplayReady.value
-      && !diffFallbackExitActive.value
-      && !diffFallbackFadingOut.value
+      && !showPreWhileMonacoLoads.value
     if (!hasVisibleCollapsedDiffSummary)
       lastStableCollapsedDiffHeight.value = null
     if (resumeGuardFrames > 0) {
@@ -2334,7 +2510,7 @@ function updateCollapsedHeight(options: EditorHostHeightSyncOptions = {}) {
         return
       }
     }
-    if (isDiff.value && (showPreWhileMonacoLoads.value || diffFallbackExitActive.value || diffFallbackFadingOut.value)) {
+    if (isDiff.value && !hasRenderedDiffDom && !hasVisibleCollapsedDiffSummary && (showPreWhileMonacoLoads.value || diffFallbackExitActive.value || diffFallbackFadingOut.value)) {
       const fallbackHeight = syncDiffEditorHostToFallbackHeight()
       if (fallbackHeight != null) {
         const h = applyCollapsedContainerHeight(container, fallbackHeight, max, {
@@ -2347,15 +2523,20 @@ function updateCollapsedHeight(options: EditorHostHeightSyncOptions = {}) {
     }
     const preferModelDiffHeight = isDiff.value && options.preferModelDiffHeight === true
     const renderedDiffHeight = isDiff.value ? measureRenderedDiffHeight(container) : null
-    const measuredDiffHeight = isDiff.value
-      && preFallbackDiffInline.value
-      && !hasVisibleCollapsedDiffSummary
-      && renderedDiffHeight != null
-      ? Math.ceil(renderedDiffHeight + DIFF_PREVIEW_BOTTOM_PADDING)
-      : renderedDiffHeight
+    const measuredDiffHeight = renderedDiffHeight
     const allowBelowPlainEstimatedFloor = !isDiff.value
       && editorMounted.value
       && hasMeasuredPlainEditorContentHeight()
+    const allowBelowStreamingDiffEstimatedFloor = isDiff.value
+      && props.loading !== false
+      && (
+        measuredDiffHeight != null
+        || (
+          estimatedDiffHeight != null
+          && rectH > 0
+          && estimatedDiffHeight < rectH - PIXEL_EPSILON
+        )
+      )
     const shouldKeepDiffEstimatedFloor = estimatedDiffHeight != null
       && props.loading === false
       && !preFallbackDiffInline.value
@@ -2365,12 +2546,13 @@ function updateCollapsedHeight(options: EditorHostHeightSyncOptions = {}) {
       h0 = computeContentHeight()
     }
     else if (preferModelDiffHeight) {
+      const shouldUseMeasuredStreamingDiffHeight = props.loading !== false
       const shouldShrinkToModel = estimatedDiffHeight != null
         && rectH > 0
         && estimatedDiffHeight < rectH - PIXEL_EPSILON
       h0 = shouldShrinkToModel
         ? estimatedDiffHeight
-        : measuredDiffHeight ?? (rectH > 0 ? rectH : estimatedDiffHeight)
+        : measuredDiffHeight ?? (rectH > 0 ? rectH : shouldUseMeasuredStreamingDiffHeight ? null : estimatedDiffHeight)
     }
     else if (hasVisibleCollapsedDiffSummary) {
       h0 = renderedDiffHeight
@@ -2386,7 +2568,16 @@ function updateCollapsedHeight(options: EditorHostHeightSyncOptions = {}) {
         : measuredDiffHeight
     }
     else {
-      h0 = estimatedDiffHeight
+      if (isDiff.value && props.loading !== false) {
+        h0 = estimatedDiffHeight != null
+          && rectH > 0
+          && estimatedDiffHeight < rectH - PIXEL_EPSILON
+          ? estimatedDiffHeight
+          : rectH > 0 ? rectH : null
+      }
+      else {
+        h0 = estimatedDiffHeight
+      }
     }
     // 1) 有实时内容高度 -> 采用并记忆原始内容高度（未裁剪前），用于下一次恢复
     if (h0 != null && h0 > 0) {
@@ -2402,7 +2593,7 @@ function updateCollapsedHeight(options: EditorHostHeightSyncOptions = {}) {
         : shouldKeepCurrentCollapsedDiffHeight ? rectH : h0
       const h = applyCollapsedContainerHeight(container, measuredHeight, max, {
         clearEstimatedFloor: true,
-        allowBelowEstimatedFloor: foldedDiffReadyForShrink || allowBelowPlainEstimatedFloor,
+        allowBelowEstimatedFloor: foldedDiffReadyForShrink || allowBelowPlainEstimatedFloor || allowBelowStreamingDiffEstimatedFloor,
       })
       if (hasVisibleCollapsedDiffSummary && h < max - PIXEL_EPSILON) {
         lastStableCollapsedDiffHeight.value = h
@@ -2421,12 +2612,14 @@ function updateCollapsedHeight(options: EditorHostHeightSyncOptions = {}) {
       return
     }
 
-    const stableFallbackHeight = hasVisibleCollapsedDiffSummary
+    const stableFallbackHeight = isDiff.value && props.loading !== false
       ? rectH
-      : Math.max(
-          rectH,
-          estimatedDiffHeight != null && estimatedDiffHeight > 0 ? estimatedDiffHeight : 0,
-        )
+      : hasVisibleCollapsedDiffSummary
+        ? rectH
+        : Math.max(
+            rectH,
+            estimatedDiffHeight != null && estimatedDiffHeight > 0 ? estimatedDiffHeight : 0,
+          )
     // 3) 使用当前 DOM 高度或保守估算高度（不更新记忆值）
     if (stableFallbackHeight > 0) {
       const shouldKeepLastStableCollapsedDiffHeight = lastStableCollapsedDiffHeight.value != null
@@ -2451,7 +2644,7 @@ function updateCollapsedHeight(options: EditorHostHeightSyncOptions = {}) {
     }
 
     const floor = getPendingEstimatedEditorHeightFloor()
-    if (floor != null) {
+    if (floor != null && !(isDiff.value && props.loading !== false && hasRenderedDiffDom)) {
       const h = applyCollapsedContainerHeight(container, floor, max, {
         allowBelowEstimatedFloor: foldedDiffReadyForShrink,
       })
@@ -3201,7 +3394,7 @@ async function runEditorCreation(el: HTMLElement) {
   syncFallbackFontMetricsFromEditor()
   syncDiffFallbackLayoutVarsFromEditor()
   await nextTick()
-  syncDiffEditorHostToFallbackHeight()
+  syncDiffRevealHostHeight()
   await waitForAnimationFrame()
   await revealEditorDisplay()
 }
