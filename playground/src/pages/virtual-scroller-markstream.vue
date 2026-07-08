@@ -524,12 +524,15 @@ function updateScrollMetrics() {
   totalHeight.value = root?.scrollHeight ?? 0
   updateWidthBucket()
 
-  const start = scrollerRef.value?.findItemIndex?.(scrollTop.value) ?? 0
-  const end = scrollerRef.value?.findItemIndex?.(scrollTop.value + viewportHeight.value) ?? start
-  const nextRange = {
-    start: Math.min(Math.max(0, start), Math.max(0, items.value.length - 1)),
-    end: Math.min(items.value.length, Math.max(end + 1, start + 1)),
-  }
+  const domRange = getVisibleDomRowRange(root)
+  const nextRange = domRange ?? (() => {
+    const start = scrollerRef.value?.findItemIndex?.(scrollTop.value) ?? 0
+    const end = scrollerRef.value?.findItemIndex?.(scrollTop.value + viewportHeight.value) ?? start
+    return {
+      start: Math.min(Math.max(0, start), Math.max(0, items.value.length - 1)),
+      end: Math.min(items.value.length, Math.max(end + 1, start + 1)),
+    }
+  })()
 
   if (visibleRange.value.start !== nextRange.start || visibleRange.value.end !== nextRange.end)
     visibleRange.value = nextRange
@@ -628,6 +631,32 @@ function getColdThreadAnchor(): RestoreAnchor | undefined {
 function isVisibleInRoot(el: HTMLElement, rootRect: DOMRect) {
   const rect = el.getBoundingClientRect()
   return rect.bottom > rootRect.top + 1 && rect.top < rootRect.bottom - 1
+}
+
+function getVisibleDomRowRange(root: HTMLElement | null | undefined) {
+  if (!root)
+    return null
+
+  const rootRect = root.getBoundingClientRect()
+  let start = Number.POSITIVE_INFINITY
+  let end = Number.NEGATIVE_INFINITY
+
+  for (const row of Array.from(root.querySelectorAll<HTMLElement>('.timeline-row'))) {
+    if (!isVisibleInRoot(row, rootRect))
+      continue
+
+    const index = Number(row.dataset.rowIndex)
+    if (!Number.isFinite(index))
+      return null
+
+    start = Math.min(start, index)
+    end = Math.max(end, index + 1)
+  }
+
+  if (!Number.isFinite(start) || !Number.isFinite(end))
+    return null
+
+  return { start, end }
 }
 
 function isElementVisiblyPainted(el: HTMLElement | null) {
@@ -787,13 +816,12 @@ function isExternalRestoreViewportReady() {
   if (!visibleRows.length)
     return false
 
-  const visibleStart = visibleRange.value.start
-  const visibleEnd = visibleRange.value.end
-  for (const row of visibleRows) {
-    const rowIndex = Number(row.dataset.rowIndex)
-    if (!Number.isFinite(rowIndex) || rowIndex < visibleStart || rowIndex >= visibleEnd)
-      return false
-  }
+  const domRange = getVisibleDomRowRange(root)
+  if (!domRange)
+    return false
+
+  if (visibleRange.value.start !== domRange.start || visibleRange.value.end !== domRange.end)
+    visibleRange.value = domRange
 
   const visibleSlots = Array.from(root.querySelectorAll<HTMLElement>('[data-node-index]'))
     .filter(slot => isVisibleInRoot(slot, rootRect))
