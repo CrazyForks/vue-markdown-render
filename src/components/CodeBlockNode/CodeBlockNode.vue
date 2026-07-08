@@ -2036,13 +2036,13 @@ function clearInlineFoldProxies() {
   }
 }
 
-function syncEditorHostHeight(_allowDuringStreamingDiff = false) {
+function syncEditorHostHeight(options: boolean | EditorHostHeightSyncOptions = false) {
   if (isCollapsed.value)
     return
   if (isExpanded.value)
     updateExpandedHeight()
   else
-    updateCollapsedHeight()
+    updateCollapsedHeight(typeof options === 'object' ? options : {})
 }
 
 function resetEditorLayoutCache() {
@@ -2272,7 +2272,11 @@ function bindEditorHeightSync() {
   catch {}
 }
 
-function updateCollapsedHeight() {
+interface EditorHostHeightSyncOptions {
+  preferModelDiffHeight?: boolean
+}
+
+function updateCollapsedHeight(options: EditorHostHeightSyncOptions = {}) {
   try {
     const container = codeEditor.value
     if (!container)
@@ -2312,7 +2316,10 @@ function updateCollapsedHeight() {
         return
       }
     }
-    const renderedDiffHeight = isDiff.value ? measureRenderedDiffHeight(container) : null
+    const preferModelDiffHeight = isDiff.value && options.preferModelDiffHeight === true
+    const renderedDiffHeight = isDiff.value && !preferModelDiffHeight
+      ? measureRenderedDiffHeight(container)
+      : null
     const measuredDiffHeight = isDiff.value
       && preFallbackDiffInline.value
       && !hasVisibleCollapsedDiffSummary
@@ -2326,6 +2333,9 @@ function updateCollapsedHeight() {
     let h0: number | null
     if (!isDiff.value) {
       h0 = computeContentHeight()
+    }
+    else if (preferModelDiffHeight) {
+      h0 = estimatedDiffHeight ?? computeContentHeight()
     }
     else if (hasVisibleCollapsedDiffSummary) {
       h0 = renderedDiffHeight
@@ -2651,6 +2661,11 @@ async function flushPlainCodeUpdateQueue(generation = plainCodeUpdateGeneration)
       pendingPlainCodeUpdate = null
       try {
         await Promise.resolve(updateCode(next.code, next.language))
+        await nextTick()
+        if (!isUnmounted && !isDiff.value) {
+          syncEditorHostHeight(false)
+          layoutEditorToHost()
+        }
       }
       catch (error) {
         warnCodeBlockDev('Failed to update Monaco code editor', error)
@@ -2747,9 +2762,10 @@ watch(
         pair.updated,
         monacoLanguage.value,
       )
+      await nextTick()
       layoutEditorToHost(true)
       syncInlineFoldProxies()
-      syncEditorHostHeight(true)
+      syncEditorHostHeight(props.loading !== false ? { preferModelDiffHeight: true } : true)
       layoutEditorToHost(true)
       scheduleEditorHeightSync(true)
     }

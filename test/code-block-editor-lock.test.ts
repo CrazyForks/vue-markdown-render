@@ -69,6 +69,12 @@ async function flushPendingMicrotasks() {
   })
 }
 
+async function flushMicrotasksOnly() {
+  await nextTick()
+  await Promise.resolve()
+  await Promise.resolve()
+}
+
 async function waitForCreateEditorCalls(expected: number, helpers: StreamMonacoHelpers, timeout = 1000) {
   const start = Date.now()
   while (helpers.createEditor.mock.calls.length < expected) {
@@ -2424,6 +2430,62 @@ describe('codeBlockNode language normalization', () => {
     wrapper.unmount()
   })
 
+  it('syncs the plain editor host height when a queued content update finishes', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let contentHeight = 180
+    const editorView = {
+      getModel: () => ({ getLineCount: () => 7 }),
+      getOption: () => 18,
+      updateOptions: vi.fn(),
+      layout: vi.fn(),
+      getContentHeight: () => contentHeight,
+      onDidContentSizeChange: vi.fn(() => ({ dispose: vi.fn() })),
+      onDidLayoutChange: vi.fn(() => ({ dispose: vi.fn() })),
+    }
+    helpers.getEditorView.mockReturnValue(editorView)
+    helpers.updateCode.mockImplementation(() => {
+      contentHeight = 126
+    })
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'shell',
+          code: '# Create Vue project\nnpm create vue@latest electron-vue-chat\n\n# Navigate to project\ncd electron-vue-chat\n\n# Install d',
+          raw: '```shell\n# Create Vue project\nnpm create vue@latest electron-vue-chat\n\n# Navigate to project\ncd electron-vue-chat\n\n# Install d',
+          loading: true,
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await waitForCreateEditorCalls(1, helpers)
+    await flushPendingMicrotasks()
+    const host = wrapper.get('.code-editor-container').element as HTMLElement
+    expect(host.style.height).toBe('181px')
+    helpers.updateCode.mockClear()
+
+    await wrapper.setProps({
+      node: {
+        type: 'code_block',
+        language: 'shell',
+        code: '# Create Vue project\nnpm create vue@latest electron-vue-chat\n\n# Navigate to project\ncd electron-vue-chat\n\n# Install de',
+        raw: '```shell\n# Create Vue project\nnpm create vue@latest electron-vue-chat\n\n# Navigate to project\ncd electron-vue-chat\n\n# Install de',
+        loading: true,
+      },
+      loading: true,
+    })
+    await flushMicrotasksOnly()
+
+    expect(helpers.updateCode).toHaveBeenCalledTimes(1)
+    expect(host.style.height).toBe('127px')
+
+    wrapper.unmount()
+  })
+
   it('continues flushing the latest plain text stream update after one update fails', async () => {
     const helpers = getStreamMonacoHelpers()
     const firstUpdate = createDeferred()
@@ -2710,8 +2772,8 @@ describe('codeBlockNode diff defaults', () => {
     )
 
     const revealStart = source.indexOf('async function revealEditorDisplay()')
-    const updateStart = source.indexOf('function updateCollapsedHeight()')
-    const renderMeasure = source.indexOf('const renderedDiffHeight = isDiff.value ? measureRenderedDiffHeight(container) : null', updateStart)
+    const updateStart = source.indexOf('function updateCollapsedHeight(')
+    const renderMeasure = source.indexOf('const renderedDiffHeight = isDiff.value && !preferModelDiffHeight', updateStart)
 
     expect(revealStart).toBeGreaterThanOrEqual(0)
     const diffRevealStart = source.indexOf('diffFallbackExitActive.value = true', revealStart)
@@ -3818,6 +3880,115 @@ describe('codeBlockNode diff defaults', () => {
     expect(nextHeight).toBeLessThan(initialHeight)
 
     wrapper.unmount()
+  })
+
+  it('does not keep stale rendered diff DOM height after a streaming update', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let lineCount = 24
+    const rect = (height: number, top = 0, width = 480) => ({
+      x: 0,
+      y: top,
+      width,
+      height,
+      top,
+      left: 0,
+      right: width,
+      bottom: top + height,
+      toJSON: () => ({}),
+    }) as DOMRect
+    const makeSideEditor = () => ({
+      onDidContentSizeChange: vi.fn(() => ({ dispose: vi.fn() })),
+      onDidLayoutChange: vi.fn(() => ({ dispose: vi.fn() })),
+      getModel: vi.fn(() => ({ getLineCount: () => lineCount })),
+      getOption: vi.fn(() => 14),
+      layout: vi.fn(),
+    })
+    const diffEditor = {
+      getOriginalEditor: vi.fn(() => makeSideEditor()),
+      getModifiedEditor: vi.fn(() => makeSideEditor()),
+      onDidUpdateDiff: vi.fn(() => ({ dispose: vi.fn() })),
+      getLineChanges: vi.fn(() => []),
+      updateOptions: vi.fn(),
+      layout: vi.fn(),
+    }
+    helpers.getEditor.mockReturnValue({ EditorOption: { lineHeight: 1 } })
+    helpers.getDiffEditorView.mockReturnValue(diffEditor as any)
+    helpers.createDiffEditor.mockImplementation(async (el: HTMLElement) => {
+      Object.defineProperty(el, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => rect(Number.parseFloat(el.style.height || '') || 480),
+      })
+      el.innerHTML = `
+        <div class="monaco-diff-editor">
+          <div class="editor original"><div class="view-lines"></div></div>
+          <div class="editor modified"><div class="view-lines"></div></div>
+        </div>
+      `
+      const diffRoot = el.querySelector('.monaco-diff-editor') as HTMLElement
+      Object.defineProperty(diffRoot, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => rect(480),
+      })
+      for (const viewLines of Array.from(el.querySelectorAll('.view-lines'))) {
+        viewLines.innerHTML = Array.from({ length: 24 }, (_, index) => `<div class="view-line" data-line="${index}"></div>`).join('')
+      }
+      for (const [index, line] of Array.from(el.querySelectorAll('.view-line')).entries()) {
+        Object.defineProperty(line, 'getBoundingClientRect', {
+          configurable: true,
+          value: () => rect(20, (index % 24) * 20),
+        })
+      }
+    })
+    helpers.updateDiff.mockImplementation(() => {})
+
+    const wrapper = mount(CodeBlockNode, {
+      attachTo: document.body,
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '@@ -1 +1 @@',
+          diff: true,
+          originalCode: Array.from({ length: 24 }, (_, index) => `old ${index}`).join('\n'),
+          updatedCode: Array.from({ length: 24 }, (_, index) => `new ${index}`).join('\n'),
+          raw: '```diff\n-old\n+new',
+          loading: true,
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    try {
+      await waitForCreateDiffEditorCalls(1, helpers)
+      await flushPendingMicrotasks()
+      const host = wrapper.get('.code-editor-container').element as HTMLElement
+      expect(Number.parseFloat(host.style.height)).toBeGreaterThan(450)
+
+      lineCount = 22
+      helpers.updateDiff.mockClear()
+      await wrapper.setProps({
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '@@ -1 +1 @@',
+          diff: true,
+          originalCode: Array.from({ length: 22 }, (_, index) => `old ${index}`).join('\n'),
+          updatedCode: Array.from({ length: 22 }, (_, index) => `new ${index}`).join('\n'),
+          raw: '```diff\n-old\n+new',
+          loading: true,
+        },
+      })
+      await flushMicrotasksOnly()
+      await flushMicrotasksOnly()
+
+      expect(helpers.updateDiff).toHaveBeenCalled()
+      expect(Number.parseFloat(host.style.height)).toBeLessThan(450)
+    }
+    finally {
+      wrapper.unmount()
+    }
   })
 
   it('keeps diff host height at least the model-estimated height when rendered DOM is still partial', async () => {
