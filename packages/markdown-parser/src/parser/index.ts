@@ -1,7 +1,7 @@
 import type { MarkdownIt, Token } from '../markdown-it-types'
 import type { HtmlBlockNode, InternalParseOptions, MarkdownToken, ParsedNode, ParseOptions } from '../types'
 import { normalizeCustomHtmlTags } from '../customHtmlTags'
-import { NON_STRUCTURING_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
+import { NON_STRUCTURING_HTML_TAGS, STANDARD_BLOCK_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
 import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes, parseTagAttrs } from '../htmlTagUtils'
 import {
   getTolerantMathBlockBoundaryStreamKey,
@@ -53,6 +53,7 @@ const tolerantMathBoundaryStreamCache = new WeakMap<object, {
 }>()
 
 const TOLERANT_BOUNDARY_SPLIT_OPENERS = ['$$', '\\[']
+const STREAMING_ADMONITION_OPEN_RE = /(^|\r?\n)[\t ]*:::[\t ]*(?:warning|info|note|tip|danger|caution|error)(?=[\t ]|\r?\n|$)[^\r\n]*(?:\r?\n[\t ]*)*$/
 
 interface ParseTimingMetrics {
   tokenCloneMs?: number
@@ -537,6 +538,373 @@ function matchMarkdownFenceMarker(line: string) {
   return listedMarker == null
     ? null
     : { ...listedMarker, inBlockquote: false, inList: true, listIndent: listed.contentIndent }
+}
+
+function isInsideOpenMarkdownFenceBeforeOffset(markdown: string, offset: number) {
+  let inFence = false
+  let fenceChar: '`' | '~' | '' = ''
+  let fenceLen = 0
+  let fenceInBlockquote = false
+  let fenceInList = false
+  let fenceListIndent = 0
+  let listContentIndent: number | null = null
+  let index = 0
+
+  while (index < offset) {
+    const newlineIndex = markdown.indexOf('\n', index)
+    const lineEnd = newlineIndex === -1 || newlineIndex >= offset ? offset : newlineIndex
+    const rawLine = markdown.slice(index, lineEnd)
+    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine
+    const lineIndent = getMarkdownIndent(line)
+    const listPrefix = stripMarkdownListPrefix(line)
+
+    if (inFence && fenceInBlockquote && line.trim() && stripMarkdownBlockquotePrefix(line) == null) {
+      inFence = false
+      fenceChar = ''
+      fenceLen = 0
+      fenceInBlockquote = false
+      fenceInList = false
+      fenceListIndent = 0
+    }
+
+    if (
+      inFence
+      && fenceInList
+      && line.trim()
+      && lineIndent.column < fenceListIndent
+      && !listPrefix
+    ) {
+      inFence = false
+      fenceChar = ''
+      fenceLen = 0
+      fenceInBlockquote = false
+      fenceInList = false
+      fenceListIndent = 0
+    }
+
+    if (listPrefix) {
+      listContentIndent = listPrefix.contentIndent
+    }
+    else if (line.trim() && listContentIndent != null && lineIndent.column < listContentIndent && !inFence) {
+      listContentIndent = null
+    }
+
+    const fenceMatch = matchMarkdownFenceMarker(line)
+    if (fenceMatch) {
+      if (inFence) {
+        if (
+          fenceMatch.markerChar === fenceChar
+          && fenceMatch.markerLen >= fenceLen
+          && /^\s*$/.test(fenceMatch.rest)
+        ) {
+          inFence = false
+          fenceChar = ''
+          fenceLen = 0
+          fenceInBlockquote = false
+          fenceInList = false
+          fenceListIndent = 0
+        }
+      }
+      else {
+        inFence = true
+        fenceChar = fenceMatch.markerChar
+        fenceLen = fenceMatch.markerLen
+        fenceInBlockquote = fenceMatch.inBlockquote
+        fenceInList = fenceMatch.inList
+          || (
+            listContentIndent != null
+            && !fenceMatch.inBlockquote
+            && lineIndent.column >= listContentIndent
+          )
+        fenceListIndent = fenceMatch.listIndent || listContentIndent || 0
+      }
+    }
+
+    if (newlineIndex === -1 || newlineIndex >= offset)
+      break
+    index = newlineIndex + 1
+  }
+
+  return inFence
+}
+
+function isInsideOpenStandardHtmlBlockBeforeOffset(markdown: string, offset: number) {
+  const isWs = (ch: string) => ch === ' ' || ch === '\t'
+  const isNameChar = (ch: string) => {
+    const c = ch.charCodeAt(0)
+    return (
+      (c >= 65 && c <= 90)
+      || (c >= 97 && c <= 122)
+      || (c >= 48 && c <= 57)
+      || ch === '_'
+      || ch === '-'
+      || ch === ':'
+    )
+  }
+  const parseLineStartTag = (line: string) => {
+    if (line[0] !== '<')
+      return null
+
+    let index = 1
+    while (index < line.length && isWs(line[index]))
+      index++
+
+    const closing = line[index] === '/'
+    if (closing) {
+      index++
+      while (index < line.length && isWs(line[index]))
+        index++
+    }
+
+    const nameStart = index
+    while (index < line.length && isNameChar(line[index]))
+      index++
+    if (index === nameStart)
+      return null
+
+    const tag = line.slice(nameStart, index).toLowerCase()
+    if (!STANDARD_BLOCK_HTML_TAGS.has(tag))
+      return null
+
+    const boundary = line[index]
+    if (boundary && boundary !== ' ' && boundary !== '\t' && boundary !== '>' && boundary !== '/')
+      return null
+
+    const tagEnd = findTagCloseIndexOutsideQuotes(line)
+    if (tagEnd === -1)
+      return null
+
+    let beforeEnd = tagEnd - 1
+    while (beforeEnd >= 0 && isWs(line[beforeEnd]))
+      beforeEnd--
+
+    return {
+      closing,
+      tag,
+      selfClosing: !closing && line[beforeEnd] === '/',
+      after: line.slice(tagEnd + 1),
+    }
+  }
+  const hasSameLineClose = (line: string, tag: string) => {
+    const lower = line.toLowerCase()
+    let index = 0
+    while (index < lower.length) {
+      const closeStart = lower.indexOf('</', index)
+      if (closeStart === -1)
+        return false
+      index = closeStart + 2
+      while (index < lower.length && isWs(lower[index]))
+        index++
+      if (lower.startsWith(tag, index)) {
+        const boundary = lower[index + tag.length]
+        if (!boundary || boundary === ' ' || boundary === '\t' || boundary === '>')
+          return true
+      }
+    }
+    return false
+  }
+
+  const stack: string[] = []
+  let inComment = false
+  let inDeclaration = false
+  let inProcessingInstruction = false
+  let index = 0
+
+  while (index < offset) {
+    const newlineIndex = markdown.indexOf('\n', index)
+    const lineEnd = newlineIndex === -1 || newlineIndex >= offset ? offset : newlineIndex
+    const rawLine = markdown.slice(index, lineEnd)
+    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine
+    const indent = consumeMarkdownIndent(line)
+    if (indent) {
+      const rest = line.slice(indent.index)
+      if (inComment) {
+        inComment = !rest.includes('-->')
+      }
+      else if (inDeclaration) {
+        inDeclaration = !rest.includes('>')
+      }
+      else if (inProcessingInstruction) {
+        inProcessingInstruction = !rest.includes('?>')
+      }
+      else if (rest.startsWith('<!--')) {
+        inComment = !rest.includes('-->')
+      }
+      else if (rest.startsWith('<?')) {
+        inProcessingInstruction = !rest.includes('?>')
+      }
+      else if (rest.startsWith('<!')) {
+        inDeclaration = !rest.includes('>')
+      }
+      else {
+        const tagInfo = parseLineStartTag(rest)
+        if (tagInfo) {
+          if (tagInfo.closing) {
+            for (let i = stack.length - 1; i >= 0; i--) {
+              if (stack[i] === tagInfo.tag) {
+                stack.length = i
+                break
+              }
+            }
+          }
+          else if (!tagInfo.selfClosing) {
+            if (!hasSameLineClose(tagInfo.after, tagInfo.tag))
+              stack.push(tagInfo.tag)
+          }
+        }
+      }
+    }
+
+    if (newlineIndex === -1 || newlineIndex >= offset)
+      break
+    index = newlineIndex + 1
+  }
+
+  return inComment || inDeclaration || inProcessingInstruction || stack.length > 0
+}
+
+function isInsideOpenCustomHtmlBlockBeforeOffset(markdown: string, offset: number, customHtmlTags?: readonly string[]) {
+  if (!customHtmlTags?.length)
+    return false
+
+  const tagSet = new Set(normalizeCustomHtmlTags(customHtmlTags))
+  if (!tagSet.size)
+    return false
+
+  const isNameChar = (ch: string) => {
+    const c = ch.charCodeAt(0)
+    return (
+      (c >= 65 && c <= 90)
+      || (c >= 97 && c <= 122)
+      || (c >= 48 && c <= 57)
+      || ch === '_'
+      || ch === '-'
+      || ch === ':'
+    )
+  }
+  const isWs = (ch: string) => ch === ' ' || ch === '\t'
+  const parseLineStartTag = (line: string) => {
+    if (line[0] !== '<')
+      return null
+
+    let index = 1
+    while (index < line.length && isWs(line[index]))
+      index++
+
+    const closing = line[index] === '/'
+    if (closing) {
+      index++
+      while (index < line.length && isWs(line[index]))
+        index++
+    }
+
+    const nameStart = index
+    while (index < line.length && isNameChar(line[index]))
+      index++
+    if (index === nameStart)
+      return null
+
+    const tag = line.slice(nameStart, index).toLowerCase()
+    if (!tagSet.has(tag))
+      return null
+
+    const boundary = line[index]
+    if (boundary && boundary !== ' ' && boundary !== '\t' && boundary !== '>' && boundary !== '/')
+      return null
+
+    const tagEnd = line.indexOf('>', index)
+    if (tagEnd === -1)
+      return null
+
+    let beforeEnd = tagEnd - 1
+    while (beforeEnd >= 0 && isWs(line[beforeEnd]))
+      beforeEnd--
+
+    return {
+      closing,
+      tag,
+      selfClosing: !closing && line[beforeEnd] === '/',
+      after: line.slice(tagEnd + 1),
+    }
+  }
+  const hasSameLineClose = (line: string, tag: string) => {
+    const lower = line.toLowerCase()
+    let index = 0
+    while (index < lower.length) {
+      const closeStart = lower.indexOf('</', index)
+      if (closeStart === -1)
+        return false
+      index = closeStart + 2
+      while (index < lower.length && isWs(lower[index]))
+        index++
+      if (lower.startsWith(tag, index)) {
+        const boundary = lower[index + tag.length]
+        if (!boundary || boundary === ' ' || boundary === '\t' || boundary === '>')
+          return true
+      }
+    }
+    return false
+  }
+
+  const stack: string[] = []
+  let index = 0
+
+  while (index < offset) {
+    const newlineIndex = markdown.indexOf('\n', index)
+    const lineEnd = newlineIndex === -1 || newlineIndex >= offset ? offset : newlineIndex
+    const rawLine = markdown.slice(index, lineEnd)
+    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine
+    const indent = consumeMarkdownIndent(line)
+    if (indent) {
+      const rest = line.slice(indent.index)
+      const tagInfo = parseLineStartTag(rest)
+      if (tagInfo) {
+        if (tagInfo.closing) {
+          for (let i = stack.length - 1; i >= 0; i--) {
+            if (stack[i] === tagInfo.tag) {
+              stack.length = i
+              break
+            }
+          }
+        }
+        else if (!tagInfo.selfClosing) {
+          if (!hasSameLineClose(tagInfo.after, tagInfo.tag))
+            stack.push(tagInfo.tag)
+        }
+      }
+    }
+
+    if (newlineIndex === -1 || newlineIndex >= offset)
+      break
+    index = newlineIndex + 1
+  }
+
+  return stack.length > 0
+}
+
+function getStreamingAdmonitionOpenTailReplacement(markdown: string, customHtmlTags?: readonly string[]) {
+  const match = STREAMING_ADMONITION_OPEN_RE.exec(markdown)
+  if (!match)
+    return null
+
+  const separator = match[1] ?? ''
+  const lineStart = match.index + separator.length
+  const lineEnd = markdown.indexOf('\n', lineStart)
+  const rawLine = markdown.slice(lineStart, lineEnd === -1 ? markdown.length : lineEnd)
+  const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine
+  if (!consumeMarkdownIndent(line))
+    return null
+
+  if (isInsideOpenMarkdownFenceBeforeOffset(markdown, lineStart))
+    return null
+
+  if (isInsideOpenStandardHtmlBlockBeforeOffset(markdown, lineStart))
+    return null
+
+  if (isInsideOpenCustomHtmlBlockBeforeOffset(markdown, lineStart, customHtmlTags))
+    return null
+
+  return `${markdown.slice(0, match.index)}${separator}`
 }
 
 function countRepeatedChar(source: string, index: number, ch: string) {
@@ -1656,6 +2024,9 @@ function stripDanglingHtmlLikeTail(markdown: string) {
     let i = 1
     // "< " is likely comparison ("x < y"), not a tag
     if (i < tail.length && isWs(tail[i]))
+      return false
+
+    if (tail.startsWith('<!--') || tail.startsWith('<?') || tail.startsWith('<!'))
       return false
 
     if (tail[i] === '/') {
@@ -2957,6 +3328,8 @@ export function parseMarkdownToStructure(
       // 此时 markdown 解析会出错要跳过
       safeMarkdown = safeMarkdown.replace(/(\n\[|\n\()+\n*$/g, '\n')
     }
+
+    safeMarkdown = getStreamingAdmonitionOpenTailReplacement(safeMarkdown, options.customHtmlTags) ?? safeMarkdown
   }
 
   // For custom HTML-like blocks (e.g. <thinking>...</thinking>), markdown-it may

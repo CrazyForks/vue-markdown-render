@@ -641,11 +641,9 @@ describe('parseMarkdownToStructure - incremental/mid-typing states', () => {
     })
 
     describe('custom container/admonition mid-states', () => {
-      it('"::: tip" mid-state: accept container/admonition node or paragraph fallback', () => {
+      it('"::: tip" mid-state: waits instead of rendering an empty container', () => {
         const nodes = parseMarkdownToStructure('::: tip', md)
-        const container = collect(nodes, 'container')[0] || collect(nodes, 'admonition')[0]
-        const para = hasParagraph(nodes)
-        expect(!!container || para).toBe(true)
+        expect(nodes).toEqual([])
       })
 
       it('"::: tip\ncontent\n:::" closed: container/admonition with paragraph child or paragraph fallback', () => {
