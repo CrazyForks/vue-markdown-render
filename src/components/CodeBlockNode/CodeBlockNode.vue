@@ -1156,6 +1156,9 @@ function clearDiffFallbackExitTimer() {
 async function revealEditorDisplay() {
   if (!isDiff.value) {
     editorDisplayReady.value = true
+    await nextTick()
+    syncEditorHostHeight(false)
+    layoutEditorToHost()
     return
   }
 
@@ -1508,6 +1511,18 @@ function computeContentHeight(): number | null {
   }
   catch {
     return null
+  }
+}
+
+function hasMeasuredPlainEditorContentHeight() {
+  if (isDiff.value)
+    return false
+  try {
+    const height = getEditorView()?.getContentHeight?.()
+    return typeof height === 'number' && Number.isFinite(height) && height > 0
+  }
+  catch {
+    return false
   }
 }
 
@@ -1993,7 +2008,10 @@ function updateExpandedHeight() {
     const oldHeight = container.getBoundingClientRect().height
     const h = computeContentHeight()
     if (h != null && h > 0) {
-      const nextHeight = resolveHeightWithEstimatedEditorFloor(h, true)
+      const allowBelowEstimatedFloor = !isDiff.value
+        && editorMounted.value
+        && hasMeasuredPlainEditorContentHeight()
+      const nextHeight = resolveHeightWithEstimatedEditorFloor(h, true, { allowBelowEstimatedFloor })
       const floor = getPendingEstimatedEditorHeightFloor()
       container.style.minHeight = floor != null ? `${floor}px` : '0px'
       container.style.height = `${nextHeight}px`
@@ -2324,6 +2342,9 @@ function updateCollapsedHeight(options: EditorHostHeightSyncOptions = {}) {
       && renderedDiffHeight != null
       ? Math.ceil(renderedDiffHeight + DIFF_PREVIEW_BOTTOM_PADDING)
       : renderedDiffHeight
+    const allowBelowPlainEstimatedFloor = !isDiff.value
+      && editorMounted.value
+      && hasMeasuredPlainEditorContentHeight()
     const shouldKeepDiffEstimatedFloor = estimatedDiffHeight != null
       && props.loading === false
       && !preFallbackDiffInline.value
@@ -2370,7 +2391,7 @@ function updateCollapsedHeight(options: EditorHostHeightSyncOptions = {}) {
         : shouldKeepCurrentCollapsedDiffHeight ? rectH : h0
       const h = applyCollapsedContainerHeight(container, measuredHeight, max, {
         clearEstimatedFloor: true,
-        allowBelowEstimatedFloor: foldedDiffReadyForShrink,
+        allowBelowEstimatedFloor: foldedDiffReadyForShrink || allowBelowPlainEstimatedFloor,
       })
       if (hasVisibleCollapsedDiffSummary && h < max - PIXEL_EPSILON) {
         lastStableCollapsedDiffHeight.value = h

@@ -550,6 +550,50 @@ describe('codeBlockNode editor creation locking', () => {
     wrapper.unmount()
   })
 
+  it('releases the ordinary block outer reserve after Monaco measures real content', async () => {
+    const helpers = getStreamMonacoHelpers()
+    helpers.getEditorView.mockReturnValue({
+      getModel: () => ({ getLineCount: () => 6 }),
+      getOption: () => 18,
+      updateOptions: vi.fn(),
+      layout: vi.fn(),
+      getContentHeight: () => 126,
+      onDidContentSizeChange: vi.fn(() => ({ dispose: vi.fn() })),
+      onDidLayoutChange: vi.fn(() => ({ dispose: vi.fn() })),
+    })
+
+    const code = 'from fastapi import FastAPI\nfrom pydantic import BaseModel\n\napp = FastAPI()\n\nclass Messag'
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'python',
+          code,
+          raw: `\`\`\`python\n${code}`,
+          loading: true,
+        },
+        estimatedHeightPx: 360,
+        estimatedContentHeightPx: 320,
+        loading: true,
+        stream: true,
+        showHeader: true,
+      },
+    })
+
+    await waitForCreateEditorCalls(1, helpers)
+    await flushPendingMicrotasks()
+
+    const host = wrapper.get('.code-editor-container').element as HTMLElement
+    const block = wrapper.get('.code-block-container').element as HTMLElement
+    await vi.waitFor(() => {
+      expect(host.style.height).toBe('127px')
+      expect(host.style.minHeight).toBe('0px')
+      expect(block.style.minHeight).toBe('')
+    })
+
+    wrapper.unmount()
+  })
+
   it('renders a side-by-side diff fallback while Monaco is mounting', async () => {
     const helpers = getStreamMonacoHelpers()
     let resolveCreate: (() => void) | null = null
@@ -1886,7 +1930,7 @@ describe('codeBlockNode editor creation locking', () => {
     wrapper.unmount()
   })
 
-  it('keeps the estimated height floor after Monaco reports a shorter first layout', async () => {
+  it('releases the estimated height floor after Monaco reports measured content', async () => {
     const helpers = getStreamMonacoHelpers()
     helpers.getEditorView.mockReturnValue({
       getModel: () => ({ getLineCount: () => 5 }),
@@ -1920,8 +1964,9 @@ describe('codeBlockNode editor creation locking', () => {
 
     const host = wrapper.get('.code-editor-container').element as HTMLElement
     const block = wrapper.get('.code-block-container').element as HTMLElement
-    expect(host.style.minHeight).toBe('240px')
-    expect(block.style.minHeight).toBe('280px')
+    expect(host.style.height).toBe('239px')
+    expect(host.style.minHeight).toBe('0px')
+    expect(block.style.minHeight).toBe('')
 
     wrapper.unmount()
   })
