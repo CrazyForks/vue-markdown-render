@@ -2832,14 +2832,14 @@ describe('codeBlockNode diff defaults', () => {
     expect(source.slice(updateStart, renderMeasure)).toContain('syncDiffEditorHostToFallbackHeight()')
   })
 
-  it('keeps side-by-side diff fallback height aligned during Monaco handoff', () => {
+  it('keeps diff fallback bottom aligned during Monaco handoff', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/components/CodeBlockNode/CodeBlockNode.vue'),
       'utf8',
     )
 
     expect(source).toContain('pre.code-pre-fallback.markstream-pre--diff-preview:not(.markstream-pre--diff-inline) .markstream-pre__diff-pane')
-    expect(source).toContain('padding-bottom: calc(var(--markstream-pre-diff-pane-bottom-padding, 10px) - 1px);')
+    expect(source).toContain('padding-bottom: var(--markstream-pre-diff-pane-bottom-padding, 0px);')
   })
 
   it('uses a dark diff fallback surface before Monaco theme variables are available', () => {

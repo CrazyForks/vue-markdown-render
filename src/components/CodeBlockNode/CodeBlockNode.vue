@@ -877,7 +877,7 @@ const preFallbackVerticalPadding = computed(() => {
 })
 // Keep computed height tight to content. Extra padding caused visible bottom gap.
 const CONTENT_PADDING = 0
-const DIFF_PREVIEW_BOTTOM_PADDING = 10
+const DIFF_PREVIEW_BOTTOM_PADDING = 0
 // Fine-tuned to avoid bottom gap at default font size
 const LINE_EXTRA_PER_LINE = 1.5
 const PIXEL_EPSILON = 1
@@ -4634,11 +4634,11 @@ onUnmounted(() => {
 
 .code-block-container.is-diff :deep(pre.code-pre-fallback.markstream-pre--diff-preview .markstream-pre__diff-pane) {
   box-sizing: border-box;
-  padding-bottom: var(--markstream-pre-diff-pane-bottom-padding, 10px);
+  padding-bottom: var(--markstream-pre-diff-pane-bottom-padding, 0px);
 }
 
 .code-block-container.is-diff :deep(pre.code-pre-fallback.markstream-pre--diff-preview:not(.markstream-pre--diff-inline) .markstream-pre__diff-pane) {
-  padding-bottom: calc(var(--markstream-pre-diff-pane-bottom-padding, 10px) - 1px);
+  padding-bottom: var(--markstream-pre-diff-pane-bottom-padding, 0px);
 }
 
 :deep(pre.code-pre-fallback.is-fading-out) {
