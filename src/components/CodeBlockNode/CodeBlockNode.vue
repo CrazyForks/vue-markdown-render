@@ -2719,6 +2719,7 @@ function shouldAllowDiffDomHeightShrink(host: HTMLElement) {
   return props.loading !== false
     || diffFallbackExitActive.value
     || diffFallbackFadingOut.value
+    || editorDisplayReady.value
     || host.classList.contains('stream-monaco-diff-native-stale')
     || hasVisibleDiffHiddenLines(host)
 }
@@ -4641,7 +4642,10 @@ onUnmounted(() => {
 }
 
 :deep(pre.code-pre-fallback.is-fading-out) {
+  position: absolute;
+  inset: 0;
   opacity: 0;
+  overflow: hidden;
   pointer-events: none;
 }
 
