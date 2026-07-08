@@ -28,11 +28,28 @@ describe('playground stream content', () => {
   it('keeps mermaid blocks closed while later math content streams', () => {
     const mathStart = streamContent.indexOf('# 复杂数学公式')
     const mathEnd = streamContent.indexOf('总之，', mathStart)
+    const boldsymbolStart = streamContent.indexOf('boldsymbol', mathStart)
+    const orthogonalStart = streamContent.indexOf('正交补空间', mathStart)
     expect(mathStart).toBeGreaterThan(0)
     expect(mathEnd).toBeGreaterThan(mathStart)
+    expect(boldsymbolStart).toBeGreaterThan(mathStart)
+    expect(orthogonalStart).toBeGreaterThan(mathStart)
+
+    const rangeStart = Math.max(1, mathStart - 1200)
+    const rangeEnd = mathEnd + 180
+    const prefixEnds = new Set<number>()
+    for (let end = rangeStart; end <= rangeEnd; end += 16)
+      prefixEnds.add(end)
+    for (const anchor of [mathStart, boldsymbolStart, orthogonalStart, mathEnd]) {
+      for (let end = anchor - 8; end <= anchor + 24; end++) {
+        if (end >= rangeStart && end <= rangeEnd)
+          prefixEnds.add(end)
+      }
+    }
+    prefixEnds.add(rangeEnd)
 
     const md = getMarkdown('playground-mermaid-stream-regression')
-    for (let end = Math.max(1, mathStart - 1200); end <= mathEnd + 180; end++) {
+    for (const end of [...prefixEnds].sort((a, b) => a - b)) {
       const chunk = streamContent.slice(0, end)
       const nodes = parseMarkdownToStructure(chunk, md, {
         final: false,

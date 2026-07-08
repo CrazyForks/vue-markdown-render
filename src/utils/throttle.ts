@@ -1,6 +1,7 @@
 /**
  * Throttle utility for performance optimization.
  * Ensures a function is called at most once per specified time period.
+ * Optimized to reduce setTimeout calls.
  */
 
 /**
@@ -17,25 +18,40 @@ export function throttle<T extends (...args: any[]) => any>(
 ): (...args: Parameters<T>) => void {
   let lastCall = 0
   let timeout: ReturnType<typeof setTimeout> | null = null
+  let pendingArgs: Parameters<T> | null = null
+
+  const execute = () => {
+    const args = pendingArgs
+    pendingArgs = null
+    timeout = null
+
+    if (args) {
+      lastCall = Date.now()
+      fn(...args)
+    }
+  }
 
   return function throttled(...args: Parameters<T>) {
     const now = Date.now()
     const remaining = wait - (now - lastCall)
 
+    // Store the latest args
+    pendingArgs = args
+
     if (remaining <= 0) {
+      // Execute immediately
       if (timeout) {
         clearTimeout(timeout)
         timeout = null
       }
       lastCall = now
+      pendingArgs = null
       fn(...args)
     }
     else if (!timeout) {
-      timeout = setTimeout(() => {
-        lastCall = Date.now()
-        timeout = null
-        fn(...args)
-      }, remaining)
+      // Schedule single timeout
+      timeout = setTimeout(execute, remaining)
     }
+    // else: timeout already scheduled, will use latest pendingArgs
   }
 }

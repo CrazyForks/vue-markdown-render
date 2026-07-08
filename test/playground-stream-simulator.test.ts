@@ -88,6 +88,39 @@ describe('playground stream simulator', () => {
     wrapper.unmount()
   })
 
+  it('uses exact delay and chunk sizes in readable-stream mode', async () => {
+    vi.useFakeTimers()
+    const wrapper = mountSimulator({
+      source: 'abcdefghijkl',
+      chunkDelayMin: 10,
+      chunkDelayMax: 10,
+      chunkSizeMin: 2,
+      chunkSizeMax: 2,
+      burstiness: 0,
+      random: () => 0.5,
+      sliceMode: 'pure-random',
+      transportMode: 'readable-stream',
+    })
+
+    await vi.advanceTimersByTimeAsync(10)
+    await nextTick()
+
+    expect((wrapper.vm as any).content).toHaveLength(2)
+    expect((wrapper.vm as any).lastDelayMs).toBe(10)
+    expect((wrapper.vm as any).lastChunkSize).toBe(2)
+
+    await vi.advanceTimersByTimeAsync(10)
+    await nextTick()
+
+    expect((wrapper.vm as any).content).toHaveLength(4)
+    expect((wrapper.vm as any).history).toEqual([
+      { delay: 10, chunk: 2 },
+      { delay: 10, chunk: 2 },
+    ])
+
+    wrapper.unmount()
+  })
+
   it('keeps sampled delays and chunk sizes inside explicit min-max windows', async () => {
     vi.useFakeTimers()
     const values = [0.92, 0.14, 0.81, 0.32, 0.67, 0.25, 0.58, 0.44, 0.73, 0.19]

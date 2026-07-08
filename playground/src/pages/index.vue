@@ -16,6 +16,7 @@ import ThinkingNode from '../components/ThinkingNode.vue'
 import { CUSTOM_STREAM_PRESET_ID, findMatchingStreamPreset, getStreamPreset, STREAM_PRESETS } from '../composables/streamPresets'
 import { clampStreamControl, normalizeStreamRange, useStreamSimulator } from '../composables/useStreamSimulator'
 import { streamContent } from '../const/markdown'
+import { createAutoScrollChaseController } from '../utils/autoScrollChase'
 import 'katex/dist/katex.min.css'
 import '../../../src/index.css'
 // import MarkdownCodeBlockNode from '../../../src/components/MarkdownCodeBlockNode'
@@ -350,118 +351,38 @@ let __scheduled = false
 let __minHeightDisabled = false
 let __overflowConfirmations = 0
 let __clearConfirmations = 0
-let __autoScrollRaf: number | null = null
-let __continuousScrollMode = false
-let __autoScrollGuardUntil = 0
 // Observers and scheduler
 
 function getScrollRoot() {
-  return scrollRoot.value || document.scrollingElement || document.documentElement
+  return (scrollRoot.value || document.scrollingElement || document.documentElement) as HTMLElement
 }
 
-function isScrollRootAtBottom(root = getScrollRoot(), threshold = 24) {
-  return root.scrollHeight - root.scrollTop - root.clientHeight <= threshold
-}
-
-function scrollToBottom() {
-  const root = getScrollRoot()
-  __autoScrollGuardUntil = performance.now() + 120
-  root.scrollTop = root.scrollHeight
-}
+const autoScrollChase = createAutoScrollChaseController({
+  getRoot: getScrollRoot,
+  getShouldStick: () => shouldStickToBottom.value,
+  setShouldStick: (value: boolean) => {
+    shouldStickToBottom.value = value
+  },
+})
 
 function scheduleScrollToBottom() {
-  if (!shouldStickToBottom.value)
-    return
-
-  // Enter continuous chase mode - for high-frequency updates (8ms intervals, 24 char chunks)
-  // we need to keep scrolling every frame until content stabilizes
-  if (!__continuousScrollMode) {
-    __continuousScrollMode = true
-
-    let stableFrames = 0
-    let lastHeight = 0
-
-    const chase = () => {
-      // Check stick-to-bottom BEFORE scrolling - critical for user control
-      if (!shouldStickToBottom.value) {
-        __autoScrollRaf = null
-        __continuousScrollMode = false
-        return
-      }
-
-      const root = getScrollRoot()
-
-      // Double-check we're actually at/near bottom before forcing scroll
-      // This prevents fighting with user scroll gestures
-      const distanceFromBottom = root.scrollHeight - root.scrollTop - root.clientHeight
-      if (distanceFromBottom > 100) {
-        // User scrolled up significantly - respect that
-        __autoScrollRaf = null
-        __continuousScrollMode = false
-        shouldStickToBottom.value = false
-        return
-      }
-
-      scrollToBottom()
-
-      // Check if height stabilized
-      const currentHeight = root.scrollHeight
-      if (currentHeight === lastHeight) {
-        stableFrames++
-      }
-      else {
-        stableFrames = 0
-        lastHeight = currentHeight
-      }
-
-      // Exit continuous mode after 3 consecutive stable frames
-      if (stableFrames >= 3) {
-        __autoScrollRaf = null
-        __continuousScrollMode = false
-        return
-      }
-
-      // Continue chasing only if still at bottom
-      if (shouldStickToBottom.value) {
-        __autoScrollRaf = requestAnimationFrame(chase)
-      }
-      else {
-        __autoScrollRaf = null
-        __continuousScrollMode = false
-      }
-    }
-
-    __autoScrollRaf = requestAnimationFrame(chase)
-  }
-  // If already chasing, the existing RAF loop will handle new content
+  autoScrollChase.schedule()
 }
 
 function handleScrollRootScroll() {
-  if (isScrollRootAtBottom()) {
-    shouldStickToBottom.value = true
-    return
-  }
-
-  if (shouldStickToBottom.value && performance.now() < __autoScrollGuardUntil) {
-    scheduleScrollToBottom()
-    return
-  }
-
-  shouldStickToBottom.value = false
+  autoScrollChase.handleScroll()
 }
 
 function handleScrollRootWheel(event: WheelEvent) {
-  if (event.deltaY < 0)
-    shouldStickToBottom.value = false
+  autoScrollChase.handleWheel(event.deltaY)
 }
 
 function handleScrollRootTouchMove() {
-  shouldStickToBottom.value = false
+  autoScrollChase.handleTouchMove()
 }
 
 function handleScrollRootTouchEnd() {
-  if (isScrollRootAtBottom())
-    shouldStickToBottom.value = true
+  autoScrollChase.handleTouchEnd()
 }
 
 // Streaming updates can change the rendered height without reliably triggering
@@ -530,17 +451,8 @@ function scheduleCheckMinHeight() {
     if (shouldRemove) {
       __minHeightDisabled = true
       __clearConfirmations = 0
-      // 内容已超出：不再需要继续监听，断开所有 observer 以节省开销
-      try {
-        __roContainer?.disconnect()
-        __roContent?.disconnect()
-        __mo?.disconnect()
-      }
-      finally {
-        __roContainer = null
-        __roContent = null
-        __mo = null
-      }
+      __mo?.disconnect()
+      __mo = null
     }
     else {
       // Revert probe change before paint.
@@ -555,6 +467,7 @@ onMounted(() => {
   if (isBenchmarkMode) {
     benchmarkWindow.__markstreamBenchmarkUnmount = () => {
       stopStreamSimulation()
+      autoScrollChase.cancel()
       __roContainer?.disconnect()
       __roContent?.disconnect()
       __mo?.disconnect()
@@ -604,6 +517,7 @@ onBeforeUnmount(() => {
   const benchmarkWindow = window as Window & { __markstreamBenchmarkUnmount?: () => void }
   delete benchmarkWindow.__markstreamBenchmarkUnmount
   stopStreamSimulation()
+  autoScrollChase.cancel()
   __roContainer?.disconnect()
   __roContent?.disconnect()
   __mo?.disconnect()

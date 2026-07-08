@@ -6,6 +6,20 @@ import { nextTick } from 'vue'
 import PreCodeNode from '../src/components/PreCodeNode'
 
 describe('pre code node diff preview', () => {
+  it('styles async code block loading fallback as a code surface', () => {
+    const source = readFileSync('src/components/PreCodeNode/PreCodeNode.vue', 'utf8')
+    const selector = '.markstream-vue pre.code-pre-fallback[data-markstream-code-loading=\'1\']'
+    const start = source.indexOf(selector)
+    expect(start).toBeGreaterThanOrEqual(0)
+    const end = source.indexOf('}', start)
+    const rule = source.slice(start, end)
+
+    expect(rule).toContain('background: var(--code-bg)')
+    expect(rule).toContain('color: var(--code-fg)')
+    expect(rule).toContain('border: 1px solid var(--code-border)')
+    expect(rule).toContain('font-family: var(')
+  })
+
   it('does not render a terminal newline as an extra ordinary line', async () => {
     const wrapper = mount(PreCodeNode, {
       props: {
@@ -182,6 +196,17 @@ describe('pre code node diff preview', () => {
     expect(source).toContain('pre.markstream-pre--diff-preview.is-wrap')
     expect(source).toContain('white-space: pre-wrap;')
     expect(source).toContain('overflow-wrap: anywhere;')
+  })
+
+  it('keeps diff fallback rows and content at least pane width', () => {
+    const source = readFileSync(
+      'src/components/PreCodeNode/PreCodeNode.vue',
+      'utf8',
+    )
+
+    expect(source).toContain('.markstream-pre__diff-line {\n  position: relative;\n  display: block;\n  box-sizing: border-box;\n  width: 100%;\n  min-width: 100%;')
+    expect(source).toContain('.markstream-pre__diff-content {\n  position: relative;\n  z-index: 1;\n  display: block;\n  width: max-content;\n  min-width: 100%;')
+    expect(source).toContain('.markstream-pre--diff-preview.is-wrap .markstream-pre__diff-content {\n  width: auto;\n  min-width: 0;')
   })
 
   it('uses modified gutter metrics and a 2px gap without a divider for inline diff fallback', () => {
