@@ -227,7 +227,10 @@ describe('pre code node diff preview', () => {
     expect(source).toContain('background: var(--stream-monaco-added-line-fill, var(--markstream-diff-added-line-fill, transparent));')
     expect(source).toContain('background: var(--stream-monaco-removed-line-fill, var(--markstream-diff-removed-line-fill, transparent));')
     expect(source).toContain('--markstream-pre-diff-line-number-bg: var(')
+    expect(source).toContain('--markstream-pre-diff-line-number-border: var(')
+    expect(source).toContain('var(--markstream-diff-gutter-guide, hsl(var(--ms-border, 214 32% 91%) / 0.72))')
     expect(source).toContain('background: var(--markstream-pre-diff-line-number-bg);')
+    expect(source).toContain('box-shadow: inset -1px 0 var(--markstream-pre-diff-line-number-border);')
     expect(source).toContain('--markstream-pre-diff-content-height')
     expect(source).toContain('color: var(--stream-monaco-added-fg, var(--markstream-diff-added-fg, var(--code-line-number)));')
     expect(source).toContain('color: var(--stream-monaco-removed-fg, var(--markstream-diff-removed-fg, var(--code-line-number)));')
@@ -265,7 +268,7 @@ describe('pre code node diff preview', () => {
     expect(source).toContain('.markstream-pre--diff-preview.is-wrap .markstream-pre__diff-content {\n  width: auto;\n  min-width: 0;')
   })
 
-  it('uses modified gutter metrics and a 2px gap without a divider for inline diff fallback', () => {
+  it('uses modified gutter metrics without an extra gap for inline diff fallback', () => {
     const source = readFileSync(
       'src/components/PreCodeNode/PreCodeNode.vue',
       'utf8',
@@ -273,22 +276,28 @@ describe('pre code node diff preview', () => {
 
     expect(source).toContain('pre.markstream-pre--diff-preview.markstream-pre--diff-inline {')
     expect(source).toContain('--markstream-pre-diff-gutter-marker-width: var(--stream-monaco-gutter-marker-width, 4px);')
-    expect(source).toContain('--markstream-pre-diff-code-gap: var(--stream-monaco-diff-code-gap, 2px);')
-    expect(source).toContain('--markstream-pre-diff-code-padding: var(--stream-monaco-diff-code-padding, 7.8px);')
+    expect(source).toContain('--markstream-pre-diff-code-gap: var(--stream-monaco-diff-code-gap, 7.8px);')
+    expect(source).toContain('--markstream-pre-diff-code-padding: var(--stream-monaco-diff-code-padding, 0px);')
+    expect(source).toContain('--markstream-diff-added-gutter: linear-gradient(')
+    expect(source).toContain('--markstream-diff-removed-gutter: linear-gradient(')
     expect(source).toContain('--markstream-pre-diff-line-number-padding-left: var(--stream-monaco-line-number-padding-left, 15.6px);')
     expect(source).toContain('--markstream-pre-diff-line-number-padding-right: var(--stream-monaco-line-number-padding-right, 7.8px);')
     expect(source).toContain('--markstream-pre-diff-line-number-bg: var(')
+    expect(source).toContain('--markstream-pre-diff-line-number-border: var(')
+    expect(source).toContain('var(--markstream-diff-gutter-guide, hsl(var(--ms-border, 214 32% 91%) / 0.72))')
     expect(source).toContain('--markstream-pre-diff-line-number-box-width: calc(')
     expect(source).toContain('--markstream-pre-diff-code-fill-left: calc(')
     expect(source).toContain('--markstream-pre-diff-code-left: calc(')
     expect(source).toContain('var(--markstream-pre-diff-line-number-left)')
     expect(source).toContain('+ var(--markstream-pre-diff-line-number-box-width)')
+    expect(source).toContain('+ var(--markstream-pre-diff-line-number-gap-to-code)')
     expect(source).not.toContain('--markstream-pre-diff-scrollable-left')
     expect(source).not.toContain('left: var(--markstream-pre-diff-scrollable-left);')
     expect(source).toContain('padding-left: var(--markstream-pre-diff-code-left);')
     expect(source).toContain('left: var(--markstream-pre-diff-code-fill-left);')
     expect(source).toContain('padding-left: var(--markstream-pre-diff-line-number-padding-left, 15.6px);')
     expect(source).toContain('padding-right: var(--markstream-pre-diff-line-number-padding-right, 7.8px);')
+    expect(source).toContain('box-shadow: inset -1px 0 var(--markstream-pre-diff-line-number-border);')
     expect(source).toContain('width: var(--markstream-pre-diff-gutter-marker-width, 4px);')
   })
 
