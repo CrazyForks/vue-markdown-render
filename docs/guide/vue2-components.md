@@ -125,7 +125,7 @@ Trusted compatibility example:
 
 #### Events
 
-- `@copy`, `@handleArtifactClick`, `@click`, `@mouseover`, `@mouseout`
+- `@copy-code` for code copy text, `@copy` (deprecated compatibility alias), `@handleArtifactClick`, `@click`, `@mouseover`, `@mouseout`
 
 ### Usage
 

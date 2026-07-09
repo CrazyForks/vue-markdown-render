@@ -4011,6 +4011,11 @@ describe('codeBlockNode diff defaults', () => {
       const host = wrapper.get('.code-editor-container').element as HTMLElement
       const initialHeight = Number.parseFloat(host.style.height)
       expect(initialHeight).toBeGreaterThan(350)
+      const fallback = wrapper.get('pre.code-pre-fallback').element as HTMLElement
+      Object.defineProperty(fallback, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => rect(initialHeight),
+      })
 
       lineCount = 22
       helpers.updateDiff.mockClear()

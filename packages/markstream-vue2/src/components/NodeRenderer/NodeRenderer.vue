@@ -187,11 +187,31 @@ const props = withDefaults(defineProps<NodeRendererProps>(), {
 
 const emit = defineEmits<{
   (e: 'copy', code: string): void
+  (e: 'copy-code', code: string): void
   (e: 'handleArtifactClick', payload: CodeBlockPreviewPayload): void
   (e: 'click', event: MouseEvent): void
   (e: 'mouseover', event: MouseEvent): void
   (e: 'mouseout', event: MouseEvent): void
 }>()
+
+function isNativeDomEvent(value: unknown): value is Event {
+  return typeof Event !== 'undefined' && value instanceof Event
+}
+
+function emitCodeCopy(payload: unknown) {
+  if (isNativeDomEvent(payload))
+    return
+
+  if (typeof payload === 'string') {
+    // eslint-disable-next-line vue/custom-event-name-casing -- Public copy-code event is kebab-case.
+    emit('copy-code', payload)
+    emit('copy', payload)
+    return
+  }
+
+  emit('copy', payload as string)
+}
+
 const MAX_DEFERRED_NODE_COUNT = 900
 const MAX_VIEWPORT_OBSERVER_TARGETS = 640
 const VIEWPORT_PRIORITY_RECOVERY_COUNT = 200
@@ -2460,7 +2480,7 @@ watch(
               v-bind="item.bindings"
               :custom-id="props.customId"
               :is-dark="props.isDark"
-              @copy="emit('copy', $event)"
+              @copy="emitCodeCopy($event)"
               @handle-artifact-click="emit('handleArtifactClick', $event)"
             />
           </transition>
@@ -2474,7 +2494,7 @@ watch(
             v-bind="item.bindings"
             :custom-id="props.customId"
             :is-dark="props.isDark"
-            @copy="emit('copy', $event)"
+            @copy="emitCodeCopy($event)"
             @handle-artifact-click="emit('handleArtifactClick', $event)"
           />
         </div>
@@ -2501,7 +2521,7 @@ watch(
       :is-dark="props.isDark"
       :custom-html-tags="mergedParseOptions.customHtmlTags"
       :html-policy="resolvedHtmlPolicy"
-      @copy="emit('copy', $event)"
+      @copy="emitCodeCopy($event)"
       @handle-artifact-click="emit('handleArtifactClick', $event)"
     />
     <template v-else>
@@ -2538,7 +2558,7 @@ watch(
               v-bind="item.bindings"
               :custom-id="props.customId"
               :is-dark="props.isDark"
-              @copy="emit('copy', $event)"
+              @copy="emitCodeCopy($event)"
               @handle-artifact-click="emit('handleArtifactClick', $event)"
             />
           </transition>
@@ -2552,7 +2572,7 @@ watch(
             v-bind="item.bindings"
             :custom-id="props.customId"
             :is-dark="props.isDark"
-            @copy="emit('copy', $event)"
+            @copy="emitCodeCopy($event)"
             @handle-artifact-click="emit('handleArtifactClick', $event)"
           />
         </div>

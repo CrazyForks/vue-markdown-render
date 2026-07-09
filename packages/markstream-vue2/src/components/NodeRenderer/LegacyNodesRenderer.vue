@@ -94,6 +94,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   (e: 'copy', code: string): void
+  (e: 'copy-code', code: string): void
   (e: 'handleArtifactClick', payload: CodeBlockPreviewPayload): void
   (e: 'click', event: MouseEvent): void
 }>()
@@ -101,8 +102,22 @@ const emit = defineEmits<{
 provide('markstreamTypewriter', computed(() => props.typewriter === true))
 provide('markstreamFade', computed(() => props.fade !== false))
 
-function handleCopy(code: string) {
-  emit('copy', code)
+function isNativeDomEvent(value: unknown): value is Event {
+  return typeof Event !== 'undefined' && value instanceof Event
+}
+
+function handleCopy(payload: unknown) {
+  if (isNativeDomEvent(payload))
+    return
+
+  if (typeof payload === 'string') {
+    // eslint-disable-next-line vue/custom-event-name-casing -- Public copy-code event is kebab-case.
+    emit('copy-code', payload)
+    emit('copy', payload)
+    return
+  }
+
+  emit('copy', payload as string)
 }
 
 function handleArtifactClick(payload: CodeBlockPreviewPayload) {
