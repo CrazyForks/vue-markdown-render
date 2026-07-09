@@ -113,7 +113,7 @@ import type { CodeBlockNode } from 'stream-markdown-parser'
 
 #### 事件
 
-- `@copy`, `@handleArtifactClick`, `@click`, `@mouseover`, `@mouseout`
+- `@copy-code` 用于代码复制文本，`@copy`（已弃用的兼容别名）、`@handleArtifactClick`、`@click`、`@mouseover`、`@mouseout`
 
 ### 使用
 

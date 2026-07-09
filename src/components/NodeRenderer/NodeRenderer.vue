@@ -128,6 +128,7 @@ const props = withDefaults(defineProps<NodeRendererProps>(), {
 
 const emit = defineEmits<{
   (e: 'copy', code: string): void
+  (e: 'copy-code', code: string): void
   (e: 'handleArtifactClick', payload: CodeBlockPreviewPayload): void
   (e: 'click', event: MouseEvent): void
   (e: 'mouseover', event: MouseEvent): void
@@ -138,6 +139,24 @@ const emit = defineEmits<{
   (e: 'render-final', payload: MarkstreamVirtualMetrics): void
   (e: 'anchor-change', payload: MarkstreamVirtualAnchor): void
 }>()
+
+function isNativeDomEvent(value: unknown): value is Event {
+  return typeof Event !== 'undefined' && value instanceof Event
+}
+
+function emitCodeCopy(payload: unknown) {
+  if (isNativeDomEvent(payload))
+    return
+
+  if (typeof payload === 'string') {
+    // eslint-disable-next-line vue/custom-event-name-casing -- Public copy-code event is kebab-case.
+    emit('copy-code', payload)
+    emit('copy', payload)
+    return
+  }
+
+  emit('copy', payload as string)
+}
 
 const instance = getCurrentInstance()
 const inheritedNestedRendererProps = inject<{ value?: Partial<NodeRendererProps> } | undefined>('markstreamNestedRendererProps', undefined)
@@ -6096,7 +6115,7 @@ onBeforeUnmount(() => {
         @click="handleContainerClick"
         @mouseover="handleFragmentMouseover"
         @mouseout="handleFragmentMouseout"
-        @copy="emit('copy', $event)"
+        @copy="emitCodeCopy($event)"
         @handle-artifact-click="emit('handleArtifactClick', $event)"
       >
         <NodeRenderer
@@ -6132,7 +6151,7 @@ onBeforeUnmount(() => {
         @click="handleContainerClick"
         @mouseover="handleFragmentMouseover"
         @mouseout="handleFragmentMouseout"
-        @copy="emit('copy', $event)"
+        @copy="emitCodeCopy($event)"
         @handle-artifact-click="emit('handleArtifactClick', $event)"
       />
     </template>
@@ -6187,7 +6206,7 @@ onBeforeUnmount(() => {
           :is-dark="rendererProps.isDark"
           @mouseover="emit('mouseover', $event)"
           @mouseout="emit('mouseout', $event)"
-          @copy="emit('copy', $event)"
+          @copy="emitCodeCopy($event)"
           @handle-artifact-click="emit('handleArtifactClick', $event)"
         />
       </template>
@@ -6221,7 +6240,7 @@ onBeforeUnmount(() => {
                 :index-key="item.indexKey"
                 :custom-id="rendererProps.customId"
                 :is-dark="rendererProps.isDark"
-                @copy="emit('copy', $event)"
+                @copy="emitCodeCopy($event)"
                 @handle-artifact-click="emit('handleArtifactClick', $event)"
               >
                 <NodeRenderer
@@ -6254,7 +6273,7 @@ onBeforeUnmount(() => {
                 v-bind="item.bindings"
                 :custom-id="rendererProps.customId"
                 :is-dark="rendererProps.isDark"
-                @copy="emit('copy', $event)"
+                @copy="emitCodeCopy($event)"
                 @handle-artifact-click="emit('handleArtifactClick', $event)"
               />
             </transition>
@@ -6268,7 +6287,7 @@ onBeforeUnmount(() => {
               :index-key="item.indexKey"
               :custom-id="rendererProps.customId"
               :is-dark="rendererProps.isDark"
-              @copy="emit('copy', $event)"
+              @copy="emitCodeCopy($event)"
               @handle-artifact-click="emit('handleArtifactClick', $event)"
             >
               <NodeRenderer
@@ -6301,7 +6320,7 @@ onBeforeUnmount(() => {
               v-bind="item.bindings"
               :custom-id="rendererProps.customId"
               :is-dark="rendererProps.isDark"
-              @copy="emit('copy', $event)"
+              @copy="emitCodeCopy($event)"
               @handle-artifact-click="emit('handleArtifactClick', $event)"
             />
           </div>

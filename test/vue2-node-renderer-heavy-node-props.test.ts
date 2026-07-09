@@ -105,6 +105,16 @@ const CopyEmitterProbe = defineComponent({
   },
 })
 
+const NativeCopyProbe = defineComponent({
+  name: 'NativeCopyProbe',
+  props: {
+    node: { type: Object, required: true },
+  },
+  render() {
+    return h('span', { class: 'native-copy-probe' }, 'math')
+  },
+})
+
 const ReservedCodeBlockPropsProbe = defineComponent({
   name: 'ReservedCodeBlockPropsProbe',
   props: {
@@ -452,7 +462,32 @@ describe('markstream-vue2 heavy-node prop forwarding', () => {
 
     await wrapper.get('.copy-emitter-probe').trigger('click')
 
+    expect(wrapper.emitted('copy-code')?.[0]).toEqual(['export const value = 1'])
     expect(wrapper.emitted('copy')?.[0]).toEqual(['export const value = 1'])
+  })
+
+  it('does not re-emit native copy events from NodeRenderer children', async () => {
+    setCustomComponents(customId, {
+      math_inline: NativeCopyProbe as any,
+    })
+
+    const wrapper = mount(NodeRenderer as any, {
+      props: {
+        customId,
+        nodes: [
+          {
+            type: 'math_inline',
+            content: 'x + y',
+            raw: '$x + y$',
+          },
+        ],
+      },
+    })
+
+    wrapper.get('.native-copy-probe').element.dispatchEvent(new Event('copy', { bubbles: true }))
+
+    expect(wrapper.emitted('copy-code')).toBeUndefined()
+    expect(wrapper.emitted('copy')).toBeUndefined()
   })
 
   it('lets d2lang exact overrides beat d2 fallback while keeping d2 props', async () => {

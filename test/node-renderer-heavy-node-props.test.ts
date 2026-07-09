@@ -198,6 +198,30 @@ const InlinePropsProbe = defineComponent({
   },
 })
 
+const CopyEmitterProbe = defineComponent({
+  name: 'CopyEmitterProbe',
+  props: {
+    node: { type: Object, required: true },
+  },
+  emits: ['copy'],
+  setup(props, { emit }) {
+    return () => h('button', {
+      class: 'copy-emitter-probe',
+      onClick: () => emit('copy', (props.node as any).code),
+    }, 'copy')
+  },
+})
+
+const NativeCopyProbe = defineComponent({
+  name: 'NativeCopyProbe',
+  props: {
+    node: { type: Object, required: true },
+  },
+  setup() {
+    return () => h('span', { class: 'native-copy-probe' }, 'math')
+  },
+})
+
 afterEach(() => {
   removeCustomComponents(customId)
 })
@@ -243,6 +267,55 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
     await flushAll()
 
     expect(wrapper.get('.fade-probe').attributes('data-fade')).toBe('true')
+  })
+
+  it('emits copy-code and legacy copy for code copy payloads', async () => {
+    setCustomComponents(customId, {
+      code_block: CopyEmitterProbe,
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId,
+        nodes: [
+          {
+            type: 'code_block',
+            language: 'ts',
+            code: 'export const value = 1',
+            raw: '```ts\nexport const value = 1\n```',
+          },
+        ],
+      },
+    })
+
+    await wrapper.get('.copy-emitter-probe').trigger('click')
+
+    expect(wrapper.emitted('copy-code')?.[0]).toEqual(['export const value = 1'])
+    expect(wrapper.emitted('copy')?.[0]).toEqual(['export const value = 1'])
+  })
+
+  it('does not re-emit native copy events from math nodes', async () => {
+    setCustomComponents(customId, {
+      math_inline: NativeCopyProbe,
+    })
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId,
+        nodes: [
+          {
+            type: 'math_inline',
+            content: 'x + y',
+            raw: '$x + y$',
+          },
+        ],
+      },
+    })
+
+    wrapper.get('.native-copy-probe').element.dispatchEvent(new Event('copy', { bubbles: true }))
+
+    expect(wrapper.emitted('copy-code')).toBeUndefined()
+    expect(wrapper.emitted('copy')).toBeUndefined()
   })
 
   it('honors explicit pre code renderer in the default mode', async () => {
