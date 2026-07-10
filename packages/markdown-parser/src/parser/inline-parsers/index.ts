@@ -30,6 +30,8 @@ const ESCAPABLE_PUNCTUATION = new Set(['\\', '(', ')', '[', ']', '`', '$', '|', 
 const WHITESPACE_RE = /\s/u
 const ASCII_PUNCTUATION_RE = /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/
 const UNICODE_PUNCTUATION_RE = /\p{P}/u
+const CJK_OPENING_PUNCTUATION_RE = /^[《「『【〔〖〘〚〈（［｛“‘﹁﹃﹙﹛﹝]$/u
+const CJK_CLOSING_PUNCTUATION_RE = /^[》」』】〕〗〙〛〉）］｝”’﹂﹄﹚﹜﹞]$/u
 
 // Helper: detect likely URLs/hrefs (autolinks). Extracted so the
 // detection logic is easy to tweak and test.
@@ -152,6 +154,20 @@ function isPunctuationChar(ch?: string) {
   return !!ch && (ASCII_PUNCTUATION_RE.test(ch) || UNICODE_PUNCTUATION_RE.test(ch))
 }
 
+function isCjkOpeningPunctuation(ch?: string, previous?: string) {
+  return !!ch
+    && !!previous
+    && /^\p{Script=Han}$/u.test(previous)
+    && CJK_OPENING_PUNCTUATION_RE.test(ch)
+}
+
+function isCjkClosingPunctuation(ch?: string, next?: string) {
+  return !!ch
+    && !!next
+    && /^\p{Script=Han}$/u.test(next)
+    && CJK_CLOSING_PUNCTUATION_RE.test(ch)
+}
+
 function isEmphasisOpenDelimiter(content: string, index: number) {
   const prev = index > 0 ? content[index - 1] : undefined
   const next = content[index + 1]
@@ -159,7 +175,7 @@ function isEmphasisOpenDelimiter(content: string, index: number) {
   if (!next || isWhitespaceChar(next))
     return false
 
-  return !(isPunctuationChar(next) && !!prev && !isWhitespaceChar(prev) && !isPunctuationChar(prev))
+  return !(isPunctuationChar(next) && !isCjkOpeningPunctuation(next, prev) && !!prev && !isWhitespaceChar(prev) && !isPunctuationChar(prev))
 }
 
 function isEmphasisCloseDelimiter(content: string, index: number) {
@@ -169,7 +185,7 @@ function isEmphasisCloseDelimiter(content: string, index: number) {
   if (!prev || isWhitespaceChar(prev))
     return false
 
-  return !(isPunctuationChar(prev) && !!next && !isWhitespaceChar(next) && !isPunctuationChar(next))
+  return !(isPunctuationChar(prev) && !isCjkClosingPunctuation(prev, next) && !!next && !isWhitespaceChar(next) && !isPunctuationChar(next))
 }
 
 function findNextUnescapedEmphasisClose(
@@ -205,7 +221,7 @@ function isStrongOpenDelimiter(content: string, index: number) {
   if (!next || isWhitespaceChar(next))
     return false
 
-  return !(isPunctuationChar(next) && !!prev && !isWhitespaceChar(prev) && !isPunctuationChar(prev))
+  return !(isPunctuationChar(next) && !isCjkOpeningPunctuation(next, prev) && !!prev && !isWhitespaceChar(prev) && !isPunctuationChar(prev))
 }
 
 function isStrongCloseDelimiter(content: string, index: number) {
@@ -215,7 +231,7 @@ function isStrongCloseDelimiter(content: string, index: number) {
   if (!prev || isWhitespaceChar(prev))
     return false
 
-  return !(isPunctuationChar(prev) && !!next && !isWhitespaceChar(next) && !isPunctuationChar(next))
+  return !(isPunctuationChar(prev) && !isCjkClosingPunctuation(prev, next) && !!next && !isWhitespaceChar(next) && !isPunctuationChar(next))
 }
 
 function findNextStrongClose(content: string, startContentIndex = 0) {
