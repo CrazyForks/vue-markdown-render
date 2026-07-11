@@ -689,6 +689,18 @@ function hasVisibleMonacoDom(root: HTMLElement) {
     .some(isElementVisiblyPainted)
 }
 
+function hasUsableCodeFallback(el: HTMLElement | null) {
+  if (!el)
+    return false
+
+  const style = window.getComputedStyle(el)
+  if (style.display === 'none' || Number.parseFloat(style.opacity || '1') <= 0.01)
+    return false
+
+  const rect = el.getBoundingClientRect()
+  return rect.width > 0 && rect.height > 0
+}
+
 function hasElementContent(content: HTMLElement) {
   if ((content.textContent ?? '').trim().length > 0)
     return true
@@ -770,7 +782,7 @@ function isCodeBlockReady(content: HTMLElement) {
     return true
 
   const fallback = codeBlock.querySelector<HTMLElement>('pre.code-pre-fallback')
-  if (isElementVisiblyPainted(fallback))
+  if (hasUsableCodeFallback(fallback))
     return true
 
   return hasVisibleMonacoDom(codeBlock)
@@ -788,7 +800,7 @@ function isVisibleNodeSlotReady(slot: HTMLElement) {
     .from(content.querySelectorAll<HTMLElement>('[data-markstream-pending="true"]'))
     .some((node) => {
       if (node.matches('[data-markstream-code-block="1"]'))
-        return !isElementVisiblyPainted(node.querySelector<HTMLElement>('pre.code-pre-fallback'))
+        return !hasUsableCodeFallback(node.querySelector<HTMLElement>('pre.code-pre-fallback'))
       return true
     })
   if (hasBlockingPendingNode)
