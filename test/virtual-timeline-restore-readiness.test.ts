@@ -1592,6 +1592,54 @@ describe('virtual timeline restore visual readiness', () => {
     }
   })
 
+  it('reveals restored viewport when a pending code block has a stable visible pre fallback', async () => {
+    stubTimelineDom()
+    installRestoreGeometryStub()
+
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items: [{ kind: 'assistant-markdown', id: 'm1', content: 'code', final: true, revision: 1 }],
+        threadKey: 'thread-a',
+        stickToBottom: false,
+        initialThreadState: {
+          threadKey: 'thread-a',
+          measurementKey: ':800',
+          widthBucket: 800,
+          outerAnchor: { type: 'item', itemKey: 'm1', offsetWithinItemPx: 0 },
+          itemHeights: { m1: 360 },
+          itemSizeSources: { m1: timelineMarkdownItemSource('thread-a', 'm1', 1) },
+          markdownStates: {},
+        },
+      },
+      slots: {
+        default(props: any) {
+          return h('div', { ref: props.measureRef }, [
+            h('div', { 'class': 'node-slot', 'data-node-index': '0', 'data-node-type': 'code_block' }, [
+              h('div', { class: 'node-content' }, [
+                h('div', {
+                  'class': 'code-block-container',
+                  'data-markstream-code-block': '1',
+                  'data-markstream-enhanced': 'false',
+                  'data-markstream-pending': 'true',
+                }, [
+                  h('pre', { class: 'code-pre-fallback' }, 'const readyFallback = true'),
+                ]),
+              ]),
+            ]),
+          ])
+        },
+      },
+    })
+
+    const root = wrapper.find('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+    expect(root.classList.contains('is-restoring-thread')).toBe(true)
+
+    await waitForTimelineRestoreSettled(root)
+
+    wrapper.unmount()
+  })
+
   it('reserves async code block loading fallback height from block estimates', async () => {
     const { CodeBlockNodeLoading } = await import('../src/components/NodeRenderer/asyncComponent')
 

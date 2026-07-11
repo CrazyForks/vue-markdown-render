@@ -1808,12 +1808,16 @@ function hasUsableRestoreFallback(el: HTMLElement | null) {
 }
 
 function hasPendingVisualNode(content: HTMLElement) {
-  return Boolean(content.querySelector([
+  return Array.from(content.querySelectorAll<HTMLElement>([
     '[data-markstream-pending="true"]',
     '[data-markstream-mermaid][data-markstream-mode="pending"]',
     '.mermaid-block-container[data-markstream-mode="pending"]',
     '[data-markstream-code-loading="1"]',
-  ].join(',')))
+  ].join(','))).some((node) => {
+    if (node.matches('[data-markstream-code-block="1"]'))
+      return !hasUsableRestoreFallback(node.querySelector<HTMLElement>('pre.code-pre-fallback'))
+    return true
+  })
 }
 
 function hasReadyMathContent(content: HTMLElement) {
@@ -2131,7 +2135,13 @@ function isRestoreViewportReady() {
       '.mermaid-block-container[data-markstream-mode="pending"]',
       '[data-markstream-code-loading="1"]',
     ].join(',')))
-    .some(el => isVisibleInRootRect(el, rootRect))
+    .some((el) => {
+      if (!isVisibleInRootRect(el, rootRect))
+        return false
+      if (el.matches('[data-markstream-code-block="1"]'))
+        return !hasUsableRestoreFallback(el.querySelector<HTMLElement>('pre.code-pre-fallback'))
+      return true
+    })
 
   if (visiblePendingVisualNode)
     return false
