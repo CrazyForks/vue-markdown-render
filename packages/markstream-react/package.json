@@ -102,7 +102,7 @@
     "react": ">=18",
     "react-dom": ">=18",
     "stream-markdown": ">=0.0.16",
-    "stream-monaco": ">=0.0.46"
+    "stream-monaco": ">=0.0.47"
   },
   "peerDependenciesMeta": {
     "@antv/infographic": {
@@ -125,7 +125,7 @@
     }
   },
   "dependencies": {
-    "@floating-ui/dom": "^1.7.6",
+    "@floating-ui/dom": "^1.8.0",
     "clsx": "^2.1.1",
     "markstream-core": "workspace:*",
     "stream-markdown-parser": "workspace:*"
@@ -134,13 +134,13 @@
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react-swc": "^3.11.0",
-    "autoprefixer": "^10.5.1",
+    "autoprefixer": "^10.5.2",
     "rollup": "^3.30.0",
     "rollup-plugin-dts": "^5.3.1",
     "rollup-plugin-visualizer": "^6.0.11",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.9.3",
-    "vite": "^7.3.5",
+    "vite": "^7.3.6",
     "vite-plugin-dts": "^4.5.4"
   }
 }
