@@ -6,7 +6,7 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 
 ### markstream-vue
 - Package name: markstream-vue
-- Version: 1.0.6-beta.0
+- Version: 1.0.6-beta.1
 - Maturity label: stable
 - Framework/runtime: Vue 3, Nuxt 3, VitePress
 - Description: Vue/Nuxt streaming Markdown renderer for AI chat, LLM token streams, SSE/WebSocket output, incomplete Markdown, long documents, Mermaid, KaTeX, Shiki, and Monaco.
@@ -76,7 +76,7 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 
 ### stream-markdown-parser
 - Package name: stream-markdown-parser
-- Version: 1.0.9
+- Version: 1.1.0
 - Maturity label: stable
 - Framework/runtime: Any JavaScript or TypeScript app
 - Description: Framework-agnostic streaming Markdown parser that outputs structured nodes for Markstream renderers and custom render pipelines.
