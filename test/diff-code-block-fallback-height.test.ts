@@ -128,6 +128,115 @@ describe('diff CodeBlockNode fallback height stability', () => {
     wrapper.unmount()
   })
 
+  it('does not reserve an extra side-by-side diff fallback row for terminal newline', async () => {
+    const helpers = getStreamMonacoHelpers()
+    helpers.createDiffEditor.mockImplementation(() => new Promise<void>(() => {}))
+
+    const patch = [
+      '{',
+      '  "dependencies": {',
+      '-   "stream-monaco": "^0.0.45",',
+      '+   "stream-monaco": "link:~/Github/stream-monaco",',
+      '    "tailwind-merge": "^3.6.0"',
+      '  }',
+      '}',
+      '',
+    ].join('\n')
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff ts:package.json',
+          code: patch,
+          raw: '',
+          diff: true,
+        },
+        monacoOptions: {
+          renderSideBySide: true,
+          useInlineViewWhenSpaceIsLimited: false,
+        },
+        loading: false,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flushPendingMicrotasks()
+
+    const pre = wrapper.find('pre.code-pre-fallback')
+    expect(pre.exists()).toBe(true)
+    expect(wrapper.findAll('.markstream-pre__diff-pane--original .markstream-pre__diff-line')).toHaveLength(6)
+    expect(wrapper.findAll('.markstream-pre__diff-pane--modified .markstream-pre__diff-line')).toHaveLength(6)
+    expect(Number.parseFloat((pre.element as HTMLElement).style.minHeight)).toBe(108)
+
+    wrapper.unmount()
+  })
+
+  it('does not stretch a near-max side-by-side diff fallback with empty space', async () => {
+    const helpers = getStreamMonacoHelpers()
+    helpers.createDiffEditor.mockImplementation(() => new Promise<void>(() => {}))
+
+    const patch = [
+      'const diffCodeBlockMonacoOptions = computed<CodeBlockMonacoOptions>(() => ({',
+      '  ...codeBlockMonacoOptions.value,',
+      '  padding: { top: 0, bottom: 0 },',
+      '-lineDecorationsWidth: 0,',
+      '+lineDecorationsWidth: 4,',
+      '  glyphMargin: false,',
+      '  wordWrap: "off",',
+      '  renderSideBySide: false,',
+      '  margin: 0,',
+      '  padding: 0,',
+      '  overflow-x: auto,',
+      '+ --context-panel-diff-gutter-marker-width: 4px;',
+      '+ --context-panel-diff-line-number-width: 15.6px;',
+      '+ --context-panel-diff-line-number-padding-left: 15.6px;',
+      '+ --context-panel-diff-line-number-padding-right: 7.8px;',
+      '+ --context-panel-diff-line-number-gap-to-code: 7.8px;',
+      '+ --context-panel-diff-code-padding-left: 0px;',
+      '+ --context-panel-diff-line-number-box-width: calc(var(--context-panel-diff-line-number-padding-left) + var(--context-panel-diff-line-number-width) + var(--context-panel-diff-line-number-padding-right));',
+      '+ --context-panel-diff-content-left: calc(var(--context-panel-diff-gutter-marker-width) + var(--context-panel-diff-line-number-box-width) + var(--context-panel-diff-line-number-gap-to-code));',
+      '+ --context-panel-diff-right-reserve-width: 7.8px;',
+      '+ --stream-monaco-gutter-marker-width: var(--context-panel-diff-gutter-marker-width);',
+      '+ --stream-monaco-line-number-left: var(--context-panel-diff-gutter-marker-width);',
+      '+ --stream-monaco-line-number-width: var(--context-panel-diff-line-number-width);',
+      '+ --stream-monaco-line-number-padding-left: var(--context-panel-diff-line-number-padding-left);',
+      '+ --stream-monaco-line-number-padding-right: var(--context-panel-diff-line-number-padding-right);',
+      '+ --stream-monaco-line-number-gap-to-code: var(--context-panel-diff-line-number-gap-to-code);',
+      '}))',
+    ].join('\n')
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff ts:DiffView.vue',
+          code: patch,
+          raw: '',
+          diff: true,
+        },
+        monacoOptions: {
+          renderSideBySide: true,
+          useInlineViewWhenSpaceIsLimited: false,
+          MAX_HEIGHT: 500,
+        },
+        loading: false,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flushPendingMicrotasks()
+
+    const pre = wrapper.find('pre.code-pre-fallback')
+    expect(pre.exists()).toBe(true)
+    expect((pre.element as HTMLElement).style.height).toBe('')
+    expect(Number.parseFloat((pre.element as HTMLElement).style.minHeight)).toBe(468)
+
+    wrapper.unmount()
+  })
+
   it('diff fallback is visible before Monaco diff editor becomes ready', async () => {
     const helpers = getStreamMonacoHelpers()
     helpers.createDiffEditor.mockImplementation(() => new Promise<void>(() => {}))

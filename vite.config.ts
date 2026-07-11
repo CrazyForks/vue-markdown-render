@@ -195,6 +195,6 @@ export default defineConfig(({ mode }) => {
     css: {
       postcss: './postcss.config.cjs',
     },
-    resolve: { alias, dedupe: ['react', 'react-dom'] },
+    resolve: { alias, dedupe: ['react', 'react-dom', 'stream-monaco'] },
   }
 })

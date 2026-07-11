@@ -164,8 +164,10 @@ export interface LinkNodeProps {
 
 export interface PreCodeNodeProps {
   node: CodeBlockNode
+  loading?: boolean
   showLineNumbers?: boolean
   diffInline?: boolean
+  diffHideUnchangedRegions?: CodeBlockDiffHideUnchangedRegions
   /**
    * Optional reserved visual height for async/loading fallbacks.
    * Used by virtual-scroll restore paths to avoid a zero/short pending frame.

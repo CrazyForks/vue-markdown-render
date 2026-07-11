@@ -93,6 +93,10 @@ export function resolveMonacoLanguageId(lang?: string | null): string {
       return 'javascript'
     case 'tsx':
       return 'typescript'
+    case 'objectivec':
+      return 'objective-c'
+    case 'objectivecpp':
+      return 'objective-cpp'
     default:
       return canonical
   }

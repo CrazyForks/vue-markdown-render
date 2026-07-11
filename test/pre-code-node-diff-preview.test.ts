@@ -64,6 +64,57 @@ describe('pre code node diff preview', () => {
     wrapper.unmount()
   })
 
+  it('does not pin streaming pre height to the reserved estimate', () => {
+    const wrapper = mount(PreCodeNode, {
+      props: {
+        loading: true,
+        showLineNumbers: true,
+        reservedHeightPx: 240,
+        node: {
+          type: 'code_block',
+          language: 'json',
+          code: '{\n  "name": "marks"',
+          raw: '```json\n{\n  "name": "marks"',
+        },
+      },
+    })
+
+    const pre = wrapper.get('pre').element
+
+    expect(pre.style.height).toBe('')
+    expect(pre.style.minHeight).toBe('')
+    expect(pre.style.maxHeight).toBe('240px')
+    expect(wrapper.findAll('.markstream-pre__line-number').map(node => node.text())).toEqual(['1', '2'])
+    expect(wrapper.get('pre').attributes('aria-busy')).toBe('true')
+
+    wrapper.unmount()
+  })
+
+  it('keeps reserved pre height fixed after loading', () => {
+    const wrapper = mount(PreCodeNode, {
+      props: {
+        loading: false,
+        showLineNumbers: true,
+        reservedHeightPx: 120,
+        node: {
+          type: 'code_block',
+          language: 'ts',
+          code: 'const value = 1',
+          raw: '```ts\nconst value = 1\n```',
+        },
+      },
+    })
+
+    const pre = wrapper.get('pre').element
+
+    expect(pre.style.height).toBe('120px')
+    expect(pre.style.minHeight).toBe('120px')
+    expect(pre.style.maxHeight).toBe('120px')
+    expect(wrapper.get('pre').attributes('aria-busy')).toBe('false')
+
+    wrapper.unmount()
+  })
+
   it('does not paint terminal blank diff preview rows as added or removed', () => {
     const wrapper = mount(PreCodeNode, {
       props: {
@@ -82,12 +133,157 @@ describe('pre code node diff preview', () => {
 
     const emptyRows = wrapper.findAll('.markstream-pre__diff-line--empty')
 
-    expect(emptyRows.length).toBeGreaterThan(0)
-    for (const row of emptyRows) {
-      expect(row.classes()).toContain('markstream-pre__diff-line--context')
-      expect(row.classes()).not.toContain('markstream-pre__diff-line--added')
-      expect(row.classes()).not.toContain('markstream-pre__diff-line--removed')
-    }
+    expect(emptyRows).toHaveLength(0)
+
+    wrapper.unmount()
+  })
+
+  it('matches side-by-side Monaco unchanged-region folding before handoff', () => {
+    const originalLines = [
+      'import { computed, ref } from \'vue\'',
+      '',
+      'const count = ref(1)',
+      'const label = computed(() => `old:' + '$' + '{count.value}`)',
+      ...Array.from({ length: 20 }, (_, index) => `const stable${index} = ${index}`),
+      'console.log(label.value)',
+    ]
+    const modifiedLines = [...originalLines]
+    modifiedLines[2] = 'const count = ref(2)'
+    modifiedLines[3] = 'const label = computed(() => `new:' + '$' + '{count.value}`)'
+    modifiedLines[24] = 'console.info(label.value)'
+
+    const wrapper = mount(PreCodeNode, {
+      props: {
+        showLineNumbers: true,
+        diffHideUnchangedRegions: {
+          enabled: true,
+          contextLineCount: 2,
+          minimumLineCount: 4,
+          revealLineCount: 5,
+        },
+        node: {
+          type: 'code_block',
+          language: 'diff typescript',
+          diff: true,
+          originalCode: originalLines.join('\n'),
+          updatedCode: modifiedLines.join('\n'),
+          code: '',
+          raw: '',
+        },
+      },
+    })
+
+    const originalRows = wrapper.findAll('.markstream-pre__diff-pane--original .markstream-pre__diff-line')
+    const modifiedRows = wrapper.findAll('.markstream-pre__diff-pane--modified .markstream-pre__diff-line')
+    const numbers = originalRows.map(row => row.find('.markstream-pre__diff-number').text())
+
+    expect(wrapper.get('pre').classes()).toContain('markstream-pre--diff-collapsed')
+    expect(originalRows).toHaveLength(10)
+    expect(modifiedRows).toHaveLength(10)
+    expect(numbers).toEqual(['1', '2', '3', '4', '5', '6', '', '23', '24', '25'])
+    expect(wrapper.findAll('.markstream-pre__diff-line--collapsed')).toHaveLength(2)
+    expect(wrapper.get('.markstream-pre__diff-pane--original .markstream-pre__diff-line--collapsed').text()).toContain('Unmodified lines')
+
+    wrapper.unmount()
+  })
+
+  it('applies unchanged-region folding to inline diff fallback rows', () => {
+    const originalLines = [
+      'const before = 1',
+      ...Array.from({ length: 12 }, (_, index) => `const stable${index} = ${index}`),
+      'const after = 1',
+    ]
+    const modifiedLines = [...originalLines]
+    modifiedLines[0] = 'const before = 2'
+    modifiedLines[13] = 'const after = 2'
+
+    const wrapper = mount(PreCodeNode, {
+      props: {
+        showLineNumbers: true,
+        diffInline: true,
+        diffHideUnchangedRegions: {
+          enabled: true,
+          contextLineCount: 2,
+          minimumLineCount: 4,
+        },
+        node: {
+          type: 'code_block',
+          language: 'diff typescript',
+          diff: true,
+          originalCode: originalLines.join('\n'),
+          updatedCode: modifiedLines.join('\n'),
+          code: '',
+          raw: '',
+        },
+      },
+    })
+
+    expect(wrapper.get('pre').classes()).toContain('markstream-pre--diff-collapsed')
+    expect(wrapper.findAll('.markstream-pre__diff-pane--inline .markstream-pre__diff-line--collapsed')).toHaveLength(1)
+
+    wrapper.unmount()
+  })
+
+  it('preserves exact common prefix and suffix rows when a diff exceeds the LCS limit', () => {
+    const middleLength = 1230
+    const originalLines = [
+      'const sharedPrefix = true',
+      ...Array.from({ length: middleLength }, (_, index) => `const old${index} = ${index}`),
+      'const sharedSuffix = true',
+    ]
+    const modifiedLines = [
+      'const sharedPrefix = true',
+      ...Array.from({ length: middleLength }, (_, index) => `const next${index} = ${index}`),
+      'const sharedSuffix = true',
+    ]
+
+    const wrapper = mount(PreCodeNode, {
+      props: {
+        showLineNumbers: true,
+        node: {
+          type: 'code_block',
+          language: 'diff typescript',
+          diff: true,
+          originalCode: originalLines.join('\n'),
+          updatedCode: modifiedLines.join('\n'),
+          code: '',
+          raw: '',
+        },
+      },
+    })
+
+    const originalRows = wrapper.findAll('.markstream-pre__diff-pane--original .markstream-pre__diff-line')
+    expect(originalRows[0].classes()).toContain('markstream-pre__diff-line--context')
+    expect(originalRows.at(-1)?.classes()).toContain('markstream-pre__diff-line--context')
+
+    wrapper.unmount()
+  })
+
+  it('shows original line numbers on removed inline diff fallback rows', () => {
+    const wrapper = mount(PreCodeNode, {
+      props: {
+        showLineNumbers: true,
+        diffInline: true,
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          diff: true,
+          code: [
+            '@@ -26,1 +25,1 @@',
+            '- lineDecorationsWidth: 0,',
+            '+ lineDecorationsWidth: 4,',
+          ].join('\n'),
+          raw: '',
+        },
+      },
+    })
+
+    const rows = wrapper.findAll('.markstream-pre__diff-pane--inline .markstream-pre__diff-line')
+    const removed = rows.find(row => row.classes().includes('markstream-pre__diff-line--removed'))
+    const added = rows.find(row => row.classes().includes('markstream-pre__diff-line--added'))
+
+    expect(removed?.find('.markstream-pre__diff-number').text()).toBe('26')
+    expect(added?.find('.markstream-pre__diff-number').text()).toBe('25')
 
     wrapper.unmount()
   })
@@ -166,12 +362,20 @@ describe('pre code node diff preview', () => {
 
     expect(source).toContain('.markstream-pre__diff-line--added::before')
     expect(source).toContain('.markstream-pre__diff-line--removed::before')
+    expect(source).toContain('.markstream-pre__diff-line::after')
+    expect(source).toContain('.markstream-pre__diff-line--added::after')
+    expect(source).toContain('.markstream-pre__diff-line--removed::after')
     expect(source).toContain('.markstream-pre__diff-line--added > .markstream-pre__diff-rail')
     expect(source).toContain('.markstream-pre__diff-line--removed > .markstream-pre__diff-rail')
     expect(source).toContain('.markstream-pre__diff-line--added > .markstream-pre__diff-number')
     expect(source).toContain('.markstream-pre__diff-line--removed > .markstream-pre__diff-number')
     expect(source).toContain('background: var(--stream-monaco-added-line-fill, var(--markstream-diff-added-line-fill, transparent));')
     expect(source).toContain('background: var(--stream-monaco-removed-line-fill, var(--markstream-diff-removed-line-fill, transparent));')
+    expect(source).toContain('--markstream-pre-diff-line-number-bg: var(')
+    expect(source).toContain('--markstream-pre-diff-line-number-border: var(')
+    expect(source).toContain('var(--markstream-diff-gutter-guide, hsl(var(--ms-border, 214 32% 91%) / 0.72))')
+    expect(source).toContain('background: var(--markstream-pre-diff-line-number-bg);')
+    expect(source).toContain('box-shadow: inset -1px 0 var(--markstream-pre-diff-line-number-border);')
     expect(source).toContain('--markstream-pre-diff-content-height')
     expect(source).toContain('color: var(--stream-monaco-added-fg, var(--markstream-diff-added-fg, var(--code-line-number)));')
     expect(source).toContain('color: var(--stream-monaco-removed-fg, var(--markstream-diff-removed-fg, var(--code-line-number)));')
@@ -209,7 +413,7 @@ describe('pre code node diff preview', () => {
     expect(source).toContain('.markstream-pre--diff-preview.is-wrap .markstream-pre__diff-content {\n  width: auto;\n  min-width: 0;')
   })
 
-  it('uses modified gutter metrics and a 2px gap without a divider for inline diff fallback', () => {
+  it('uses modified gutter metrics without an extra gap for inline diff fallback', () => {
     const source = readFileSync(
       'src/components/PreCodeNode/PreCodeNode.vue',
       'utf8',
@@ -217,21 +421,28 @@ describe('pre code node diff preview', () => {
 
     expect(source).toContain('pre.markstream-pre--diff-preview.markstream-pre--diff-inline {')
     expect(source).toContain('--markstream-pre-diff-gutter-marker-width: var(--stream-monaco-gutter-marker-width, 4px);')
-    expect(source).toContain('--markstream-pre-diff-code-gap: var(--stream-monaco-diff-code-gap, 2px);')
-    expect(source).toContain('--markstream-pre-diff-code-padding: var(--stream-monaco-diff-code-padding, 7.8px);')
+    expect(source).toContain('--markstream-pre-diff-code-gap: var(--stream-monaco-diff-code-gap, 7.8px);')
+    expect(source).toContain('--markstream-pre-diff-code-padding: var(--stream-monaco-diff-code-padding, 0px);')
+    expect(source).toContain('--markstream-diff-added-gutter: linear-gradient(')
+    expect(source).toContain('--markstream-diff-removed-gutter: linear-gradient(')
     expect(source).toContain('--markstream-pre-diff-line-number-padding-left: var(--stream-monaco-line-number-padding-left, 15.6px);')
     expect(source).toContain('--markstream-pre-diff-line-number-padding-right: var(--stream-monaco-line-number-padding-right, 7.8px);')
+    expect(source).toContain('--markstream-pre-diff-line-number-bg: var(')
+    expect(source).toContain('--markstream-pre-diff-line-number-border: var(')
+    expect(source).toContain('var(--markstream-diff-gutter-guide, hsl(var(--ms-border, 214 32% 91%) / 0.72))')
+    expect(source).toContain('--markstream-pre-diff-line-number-box-width: calc(')
     expect(source).toContain('--markstream-pre-diff-code-fill-left: calc(')
     expect(source).toContain('--markstream-pre-diff-code-left: calc(')
     expect(source).toContain('var(--markstream-pre-diff-line-number-left)')
-    expect(source).toContain('+ var(--markstream-pre-diff-line-number-width)')
+    expect(source).toContain('+ var(--markstream-pre-diff-line-number-box-width)')
+    expect(source).toContain('+ var(--markstream-pre-diff-line-number-gap-to-code)')
     expect(source).not.toContain('--markstream-pre-diff-scrollable-left')
-    expect(source).not.toContain('pre.markstream-pre--diff-preview.markstream-pre--diff-inline .markstream-pre__diff-line::after')
     expect(source).not.toContain('left: var(--markstream-pre-diff-scrollable-left);')
     expect(source).toContain('padding-left: var(--markstream-pre-diff-code-left);')
     expect(source).toContain('left: var(--markstream-pre-diff-code-fill-left);')
     expect(source).toContain('padding-left: var(--markstream-pre-diff-line-number-padding-left, 15.6px);')
     expect(source).toContain('padding-right: var(--markstream-pre-diff-line-number-padding-right, 7.8px);')
+    expect(source).toContain('box-shadow: inset -1px 0 var(--markstream-pre-diff-line-number-border);')
     expect(source).toContain('width: var(--markstream-pre-diff-gutter-marker-width, 4px);')
   })
 
@@ -286,6 +497,42 @@ describe('pre code node diff preview', () => {
       expect(line.find('.markstream-pre__diff-number').exists()).toBe(true)
       expect(line.find('.markstream-pre__diff-content').exists()).toBe(true)
     }
+
+    wrapper.unmount()
+  })
+
+  it('aligns side-by-side source changes with Monaco spacer rows before handoff', () => {
+    const wrapper = mount(PreCodeNode, {
+      props: {
+        showLineNumbers: true,
+        node: {
+          type: 'code_block',
+          language: 'ts',
+          diff: true,
+          originalCode: ['same', 'old one', 'old two', 'old three', 'tail'].join('\n'),
+          updatedCode: ['same', 'new one', 'tail'].join('\n'),
+          code: '',
+          raw: '',
+        },
+      },
+    })
+
+    const summarize = (selector: string) => wrapper.findAll(selector).map(row => ({
+      number: row.find('.markstream-pre__diff-number').text(),
+      text: row.find('.markstream-pre__diff-content-inner').text(),
+      classes: row.classes(),
+    }))
+    const originalRows = summarize('.markstream-pre__diff-pane--original .markstream-pre__diff-line')
+    const modifiedRows = summarize('.markstream-pre__diff-pane--modified .markstream-pre__diff-line')
+
+    expect(originalRows.map(row => row.number)).toEqual(['1', '2', '3', '4', '5'])
+    expect(modifiedRows.map(row => row.number)).toEqual(['1', '2', '', '', '3'])
+    expect(originalRows[1].classes).toContain('markstream-pre__diff-line--removed')
+    expect(modifiedRows[1].classes).toContain('markstream-pre__diff-line--added')
+    expect(modifiedRows[2].classes).toContain('markstream-pre__diff-line--spacer')
+    expect(modifiedRows[3].classes).toContain('markstream-pre__diff-line--spacer')
+    expect(originalRows[4].text).toBe('tail')
+    expect(modifiedRows[4].text).toBe('tail')
 
     wrapper.unmount()
   })
@@ -520,7 +767,7 @@ describe('pre code node diff preview', () => {
     const removedNumber = wrapper.get('.markstream-pre__diff-line--removed .markstream-pre__diff-number')
     const addedNumber = wrapper.get('.markstream-pre__diff-line--added .markstream-pre__diff-number')
 
-    expect(removedNumber.text()).toBe('')
+    expect(removedNumber.text()).toBe('4')
     expect(addedNumber.text()).toBe('4')
 
     wrapper.unmount()
