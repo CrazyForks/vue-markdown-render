@@ -43,25 +43,6 @@ export const CodeBlockNodeLoading = defineComponent({
   },
 })
 
-export const CodeBlockNodeAsync = defineAsyncComponent({
-  loader: async () => {
-    try {
-      const mod = await import('../../components/CodeBlockNode/CodeBlockNode.vue')
-      return mod.default
-    }
-    catch (e) {
-      console.warn(
-        '[markstream-vue] Optional peer dependencies for CodeBlockNode are missing. Falling back to preformatted code rendering (no Monaco). To enable full code block features, please install "stream-monaco".',
-        e,
-      )
-      return PreCodeNode
-    }
-  },
-  loadingComponent: CodeBlockNodeLoading,
-  delay: 0,
-  suspensible: false,
-})
-
 export const MathInlineNodeAsync = defineAsyncComponent(async () => {
   // In test environment prefer the simple text fallback to avoid
   // race conditions with workers/KaTeX rendering.

@@ -622,6 +622,7 @@ const showPreWhileMonacoLoads = computed(() => {
   return !editorDisplayReady.value
 })
 const renderPreFallback = computed(() => showPreWhileMonacoLoads.value)
+const useStandalonePreHandoff = computed(() => renderPreFallback.value && !isDiff.value)
 const hideCodeEditorContainer = computed(() => showPreWhileMonacoLoads.value)
 const restoreVisualPending = computed(() =>
   !usePreCodeRender.value
@@ -4634,17 +4635,25 @@ onUnmounted(() => {
     v-else
     ref="container"
     :style="containerStyle"
-    class="code-block-container rounded-lg border"
+    class="code-block-container"
     data-markstream-code-block="1"
     :data-markstream-enhanced="editorDisplayReady && !usePreCodeRender ? 'true' : 'false'"
     :data-markstream-enhancement-state="codeBlockEnhancementState"
     :data-markstream-pending="restoreVisualPending ? 'true' : undefined"
     :class="[
-      { 'dark': props.isDark, 'is-rendering': props.loading, 'is-dark': resolvedSurfaceIsDark, 'is-diff': isDiff, 'is-plain-text': isPlainTextLanguage },
+      { 'rounded-lg border': !useStandalonePreHandoff, 'dark': props.isDark, 'is-rendering': props.loading, 'is-dark': resolvedSurfaceIsDark, 'is-diff': isDiff, 'is-plain-text': isPlainTextLanguage, 'is-standalone-pre-handoff': useStandalonePreHandoff },
     ]"
   >
+    <PreCodeNode
+      v-if="useStandalonePreHandoff"
+      class="code-pre-fallback code-pre-handoff"
+      :class="{ 'is-wrap': preFallbackWrap }"
+      :style="preFallbackStyle"
+      :node="preCodeNode"
+      :show-line-numbers="true"
+    />
     <CodeBlockShell
-      :show-header="props.showHeader"
+      :show-header="props.showHeader && !useStandalonePreHandoff"
       :show-collapse-button="props.showCollapseButton"
       :show-font-size-buttons="props.showFontSizeButtons"
       :enable-font-size-control="props.enableFontSizeControl"
@@ -4703,7 +4712,7 @@ onUnmounted(() => {
           :style="codeEditorContainerStyle"
         />
         <PreCodeNode
-          v-if="renderPreFallback"
+          v-if="renderPreFallback && !useStandalonePreHandoff"
           class="code-pre-fallback"
           :class="{ 'is-wrap': preFallbackWrap }"
           :style="preFallbackStyle"
@@ -4792,6 +4801,28 @@ onUnmounted(() => {
   --markstream-diff-removed-line-fill: var(--diff-removed-bg);
 }
 
+.code-block-container.is-standalone-pre-handoff {
+  position: relative;
+}
+
+.code-block-container.is-standalone-pre-handoff :deep(pre.code-pre-handoff) {
+  --markstream-pre-line-number-top: var(--markstream-code-padding-y, 8px);
+  --markstream-pre-line-number-left: 4px;
+  --markstream-pre-line-number-width: 44px;
+  --markstream-pre-line-number-gap: 8px;
+  --markstream-code-padding-left: 48px;
+  padding-bottom: 1px !important;
+  border: 1px solid var(--code-border);
+  border-radius: var(--ms-radius);
+  background: var(--code-bg);
+  color: var(--code-fg);
+}
+
+.code-block-container.is-dark.is-standalone-pre-handoff :deep(pre.code-pre-handoff) {
+  background: var(--markstream-diff-editor-bg);
+  color: var(--markstream-diff-editor-fg);
+}
+
 .code-block-container.is-dark {
   --markstream-code-fallback-bg: var(--code-bg);
   --markstream-code-fallback-fg: var(--code-fg);
@@ -4871,6 +4902,7 @@ onUnmounted(() => {
   grid-area: 1 / 1;
   z-index: 1;
 }
+
 :deep(.code-editor-layer > pre.code-pre-fallback) {
   grid-area: 1 / 1;
   position: relative;

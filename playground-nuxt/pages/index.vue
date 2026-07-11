@@ -156,6 +156,7 @@ const themes = [
   'vitesse-light',
 ]
 const selectedTheme = useLocalStorage<string>('vmr-settings-selected-theme', 'vitesse-dark')
+const codeBlockProps = { showHeader: false } as const
 
 function formatThemeName(themeName: string) {
   return themeName
@@ -447,6 +448,7 @@ onBeforeUnmount(() => {
             :code-block-dark-theme="selectedTheme || undefined"
             :code-block-light-theme="selectedTheme || undefined"
             :themes="themes"
+            :code-block-props="codeBlockProps"
             :is-dark="isDark"
             :parse-options="parseOptions"
             custom-id="playground-demo"

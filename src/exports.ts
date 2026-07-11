@@ -4,7 +4,6 @@ import type { InfographicLoader } from './components/InfographicBlockNode/infogr
 import type { MarkstreamVirtualTimelineProps } from './composables/useMarkstreamVirtualAdapter'
 import type { CustomComponents as MarkstreamCustomComponents } from './types'
 import type {
-  CodeBlockNodeProps,
   D2BlockNodeProps,
   InfographicBlockNodeProps,
   MathBlockNodeProps,
@@ -18,6 +17,7 @@ import AdmonitionNode from './components/AdmonitionNode'
 
 import BlockquoteNode from './components/BlockquoteNode'
 import CheckboxNode from './components/CheckboxNode'
+import CodeBlockNode from './components/CodeBlockNode'
 import { disableD2, enableD2, isD2Enabled, setD2Loader } from './components/D2BlockNode/d2'
 import DefinitionListNode from './components/DefinitionListNode'
 import EmojiNode from './components/EmojiNode'
@@ -65,7 +65,6 @@ function definePublicAsyncComponent<TProps extends object>(
   return defineAsyncComponent(loader) as DefineComponent<TProps>
 }
 
-const CodeBlockNode = definePublicAsyncComponent<CodeBlockNodeProps>(() => import('./components/CodeBlockNode'))
 const MathBlockNode = definePublicAsyncComponent<MathBlockNodeProps>(() => import('./components/MathBlockNode'))
 const MathInlineNode = definePublicAsyncComponent<MathInlineNodeProps>(() => import('./components/MathInlineNode'))
 const MermaidBlockNode = definePublicAsyncComponent<MermaidBlockNodeProps>(() => import('./components/MermaidBlockNode'))

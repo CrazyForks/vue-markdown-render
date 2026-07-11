@@ -70,10 +70,11 @@ import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import { setNormalizedElementScrollTop } from '../../utils/normalizedScroll'
 import { throttle } from '../../utils/throttle'
 import { normalizeTypewriterCursorMode } from '../../utils/typewriter'
+import CodeBlockNode from '../CodeBlockNode/CodeBlockNode.vue'
 import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode/HtmlInlineNode.vue'
 import { createMathBlockMinHeightCache, provideMathBlockMinHeightCache } from '../MathBlockNode/minHeightCache'
-import { CodeBlockNodeAsync, CodeBlockNodeLoading, MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
+import { CodeBlockNodeLoading, MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
 import { useBatchRenderingScheduler } from './composables/useBatchRenderingScheduler'
 import { useBatchRenderingState } from './composables/useBatchRenderingState'
 import { useFocusSyncScheduler } from './composables/useFocusSyncScheduler'
@@ -1615,7 +1616,7 @@ const codeBlockComponent = computed(() => {
     return PreCodeNode
   if (resolvedCodeRenderer.value === 'shiki')
     return MarkdownCodeBlockNodeAsync
-  return CodeBlockNodeAsync
+  return CodeBlockNode
 })
 
 function resolveCodeBlockRendererKind(node: ParsedNode) {
@@ -1626,7 +1627,7 @@ function resolveCodeBlockRendererKind(node: ParsedNode) {
     return 'markdown'
   if (component === PreCodeNode)
     return 'pre'
-  if (component === codeBlockComponent.value || component === CodeBlockNodeAsync)
+  if (component === codeBlockComponent.value || component === CodeBlockNode)
     return 'monaco'
   return null
 }
@@ -5183,7 +5184,7 @@ const nodeComponents: Partial<CustomComponents> = {
   text: TextNode,
   paragraph: ParagraphNode,
   heading: HeadingNode,
-  code_block: CodeBlockNodeAsync,
+  code_block: CodeBlockNode,
   list: ListNode,
   list_item: ListItemNode,
   blockquote: BlockquoteNode,
