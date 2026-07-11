@@ -1667,24 +1667,6 @@ describe('virtual timeline restore visual readiness', () => {
     wrapper.unmount()
   })
 
-  it('reserves async Monaco layout without rendering duplicate code DOM', async () => {
-    const { CodeBlockNodePlaceholder } = await import('../src/components/NodeRenderer/asyncComponent')
-
-    const wrapper = mount(CodeBlockNodePlaceholder as any, {
-      attrs: {
-        estimatedHeightPx: 240,
-        estimatedContentHeightPx: 123.2,
-      },
-    })
-
-    expect(wrapper.attributes('data-markstream-code-placeholder')).toBe('1')
-    expect(wrapper.attributes('style')).toContain('min-height: 240px')
-    expect(wrapper.find('pre').exists()).toBe(false)
-    expect(wrapper.text()).toBe('')
-
-    wrapper.unmount()
-  })
-
   it('keeps configured item overscan mounted during restore', async () => {
     const itemHeight = 88
 

@@ -43,26 +43,6 @@ export const CodeBlockNodeLoading = defineComponent({
   },
 })
 
-export const CodeBlockNodePlaceholder = defineComponent({
-  name: 'CodeBlockNodePlaceholder',
-  inheritAttrs: false,
-  setup(_props, { attrs }) {
-    const props = attrs as CodeBlockFallbackProps & {
-      estimatedHeightPx?: number
-      estimatedContentHeightPx?: number
-    }
-
-    return () => {
-      const height = props.estimatedHeightPx ?? props.estimatedContentHeightPx
-      return h('div', {
-        'aria-hidden': 'true',
-        'data-markstream-code-placeholder': '1',
-        'style': height == null ? undefined : { minHeight: `${Math.ceil(height)}px` },
-      })
-    }
-  },
-})
-
 export const CodeBlockNodeAsync = defineAsyncComponent({
   loader: async () => {
     try {
@@ -77,7 +57,7 @@ export const CodeBlockNodeAsync = defineAsyncComponent({
       return PreCodeNode
     }
   },
-  loadingComponent: CodeBlockNodePlaceholder,
+  loadingComponent: CodeBlockNodeLoading,
   delay: 0,
   suspensible: false,
 })
