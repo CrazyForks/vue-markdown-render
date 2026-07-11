@@ -43,6 +43,45 @@ export const CodeBlockNodeLoading = defineComponent({
   },
 })
 
+export const CodeBlockNodePlaceholder = defineComponent({
+  name: 'CodeBlockNodePlaceholder',
+  inheritAttrs: false,
+  setup(_props, { attrs }) {
+    const props = attrs as CodeBlockFallbackProps & {
+      estimatedHeightPx?: number
+      estimatedContentHeightPx?: number
+    }
+
+    return () => {
+      const height = props.estimatedHeightPx ?? props.estimatedContentHeightPx
+      return h('div', {
+        'aria-hidden': 'true',
+        'data-markstream-code-placeholder': '1',
+        'style': height == null ? undefined : { minHeight: `${Math.ceil(height)}px` },
+      })
+    }
+  },
+})
+
+export const CodeBlockNodeAsync = defineAsyncComponent({
+  loader: async () => {
+    try {
+      const mod = await import('../../components/CodeBlockNode/CodeBlockNode.vue')
+      return mod.default
+    }
+    catch (e) {
+      console.warn(
+        '[markstream-vue] Optional peer dependencies for CodeBlockNode are missing. Falling back to preformatted code rendering (no Monaco). To enable full code block features, please install "stream-monaco".',
+        e,
+      )
+      return PreCodeNode
+    }
+  },
+  loadingComponent: CodeBlockNodePlaceholder,
+  delay: 0,
+  suspensible: false,
+})
+
 export const MathInlineNodeAsync = defineAsyncComponent(async () => {
   // In test environment prefer the simple text fallback to avoid
   // race conditions with workers/KaTeX rendering.

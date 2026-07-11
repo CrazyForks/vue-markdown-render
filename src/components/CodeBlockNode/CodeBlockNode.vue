@@ -622,7 +622,7 @@ const showPreWhileMonacoLoads = computed(() => {
   return !editorDisplayReady.value
 })
 const renderPreFallback = computed(() => showPreWhileMonacoLoads.value)
-const useStandalonePreHandoff = computed(() => renderPreFallback.value && !isDiff.value)
+const useStandalonePreHandoff = computed(() => renderPreFallback.value && !isDiff.value && !props.showHeader)
 const hideCodeEditorContainer = computed(() => showPreWhileMonacoLoads.value)
 const restoreVisualPending = computed(() =>
   !usePreCodeRender.value
@@ -4653,7 +4653,7 @@ onUnmounted(() => {
       :show-line-numbers="true"
     />
     <CodeBlockShell
-      :show-header="props.showHeader && !useStandalonePreHandoff"
+      :show-header="props.showHeader"
       :show-collapse-button="props.showCollapseButton"
       :show-font-size-buttons="props.showFontSizeButtons"
       :enable-font-size-control="props.enableFontSizeControl"
