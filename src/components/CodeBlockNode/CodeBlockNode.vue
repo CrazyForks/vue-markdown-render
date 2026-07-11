@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CodeBlockMonacoTheme, CodeBlockNodeProps, CodeBlockPreviewPayload } from '../../types/component-props'
+import type { CodeBlockDiffHideUnchangedRegions, CodeBlockDiffHideUnchangedRegionsOptions, CodeBlockMonacoTheme, CodeBlockNodeProps, CodeBlockPreviewPayload } from '../../types/component-props'
 import type { MonacoDiffEditorViewLike, MonacoDisposableLike, MonacoEditorViewLike, MonacoNamespaceLike, MonacoRuntimeOptions } from './monaco'
 // Avoid static import of `stream-monaco` for types so the runtime bundle
 // doesn't get a reference. Define minimal local types we need here.
@@ -19,7 +19,6 @@ import CodeBlockShell from './CodeBlockShell.vue'
 import HtmlPreviewFrame from './HtmlPreviewFrame.vue'
 import {
   getUseMonaco,
-  isCodeBlockRuntimeReady,
 } from './monaco'
 import { scheduleGlobalMonacoTheme } from './monacoThemeScheduler'
 
@@ -70,6 +69,7 @@ interface MonacoTouchPatchState {
   depth: number
   original: AddEventListenerFn | null
 }
+const activeMonacoTouchPatchReleases = new Set<() => void>()
 
 function getMonacoTouchPatchState() {
   const globalObj = window as Window
@@ -95,6 +95,7 @@ async function withMonacoPassiveTouchListeners<T>(task: () => Promise<T> | T) {
     return await task()
 
   const state = getMonacoTouchPatchState()
+  let release: (() => void) | null = null
   try {
     if (state.depth === 0) {
       state.original = nativeAdd
@@ -112,6 +113,19 @@ async function withMonacoPassiveTouchListeners<T>(task: () => Promise<T> | T) {
     }
 
     state.depth++
+    let released = false
+    release = () => {
+      if (released)
+        return
+      released = true
+      activeMonacoTouchPatchReleases.delete(release!)
+      state.depth = Math.max(0, state.depth - 1)
+      if (state.depth === 0 && state.original && proto.addEventListener !== state.original) {
+        proto.addEventListener = state.original
+        state.original = null
+      }
+    }
+    activeMonacoTouchPatchReleases.add(release)
   }
   catch {
     return await task()
@@ -121,11 +135,7 @@ async function withMonacoPassiveTouchListeners<T>(task: () => Promise<T> | T) {
     return await task()
   }
   finally {
-    state.depth = Math.max(0, state.depth - 1)
-    if (state.depth === 0 && state.original && proto.addEventListener !== state.original) {
-      proto.addEventListener = state.original
-      state.original = null
-    }
+    release?.()
   }
 }
 
@@ -184,10 +194,10 @@ const monacoReady = ref(false)
 let isUnmounted = false
 let expandRafId: number | null = null
 let deferredHeightSyncRafId: number | null = null
+let deferredHeightSyncFollowUpRafId: number | null = null
 let streamingDiffHeightChaseRafId: number | null = null
 let streamingDiffHeightChaseFrames = 0
 let streamingDiffHeightChaseAllowSettled = false
-let streamingDiffHeightMicrotaskPending = false
 let lifecyclePendingIndexKey = ''
 const heightBeforeCollapse = ref<number | null>(null)
 const lastStableCollapsedDiffHeight = ref<number | null>(null)
@@ -283,6 +293,8 @@ function clearLifecyclePending() {
 
 onBeforeUnmount(() => {
   isUnmounted = true
+  for (const release of Array.from(activeMonacoTouchPatchReleases))
+    release()
   clearLifecyclePending()
   viewportHandle.value?.destroy()
   viewportHandle.value = null
@@ -307,6 +319,7 @@ let monacoRuntimePromise: Promise<void> | null = null
 let detectLanguage: (code: string) => string = () => String(props.node.language ?? 'plaintext')
 let setTheme: (theme: CodeBlockMonacoTheme | undefined) => Promise<void> | void = async () => {}
 let pendingDiffResultErrorFilterInstalled = false
+let pendingDiffResultErrorFilterCleanup: (() => void) | null = null
 const editorHeightSyncDisposables: MonacoDisposableLike[] = []
 const inlineFoldProxyCleanups: Array<() => void> = []
 let runtimeMonacoOptions: MonacoRuntimeOptions | null = null
@@ -333,7 +346,7 @@ const disabledDiffHideUnchangedRegions = Object.freeze({
   enabled: false,
   revealLineCount: 0,
 })
-function resolveDiffHideUnchangedRegionsOption(value: unknown) {
+function resolveDiffHideUnchangedRegionsOption(value: unknown): CodeBlockDiffHideUnchangedRegions {
   if (typeof value === 'boolean')
     return value
   if (value && typeof value === 'object') {
@@ -342,7 +355,7 @@ function resolveDiffHideUnchangedRegionsOption(value: unknown) {
       ...defaultDiffHideUnchangedRegions,
       ...raw,
       enabled: raw.enabled ?? true,
-    }
+    } as CodeBlockDiffHideUnchangedRegionsOptions
   }
   return { ...defaultDiffHideUnchangedRegions }
 }
@@ -423,6 +436,12 @@ function installPendingDiffResultErrorFilter() {
 
   window.addEventListener('error', handleError, true)
   window.addEventListener('unhandledrejection', handleError, true)
+  pendingDiffResultErrorFilterCleanup = () => {
+    window.removeEventListener('error', handleError, true)
+    window.removeEventListener('unhandledrejection', handleError, true)
+    pendingDiffResultErrorFilterInstalled = false
+    pendingDiffResultErrorFilterCleanup = null
+  }
 }
 
 function refreshDiffPresentationSafely() {
@@ -543,10 +562,7 @@ const editorCreationFailed = ref(false)
 const failedEditorCreationKey = ref<string | null>(null)
 const editorCreationContentRevision = ref(0)
 const editorCreationSettledContentGeneration = ref(0)
-const diffFallbackExitActive = ref(false)
-const diffFallbackFadingOut = ref(false)
 const plainEditorContentMeasured = ref(false)
-let diffFallbackExitTimer: number | null = null
 let staleContentRetryFailureKey: string | null = null
 let editorCreationFailureRetryInProgress = false
 let editorCreationFailureKeyRetriedKey: string | null = null
@@ -573,6 +589,12 @@ const preFallbackDiffInline = computed(() => {
 
   return shouldUseInlineDiffLayout((resolvedMonacoOptions.value ?? {}) as Record<string, unknown>)
 })
+const preFallbackDiffHideUnchangedRegions = computed(() => {
+  const configured = resolvedMonacoOptions.value?.diffHideUnchangedRegions
+  return configured === undefined
+    ? { ...defaultDiffHideUnchangedRegions }
+    : resolveDiffHideUnchangedRegionsOption(configured)
+})
 function isHostScrollManagedCodeBlockElement(el?: HTMLElement | null) {
   if (hostScrollManaged?.value === true)
     return true
@@ -594,27 +616,17 @@ const showPreWhileMonacoLoads = computed(() => {
     return false
   if (editorCreationFailed.value)
     return true
-  // Diff editor has a visible intermediate phase: Monaco root is mounted, but
-  // line changes / diff decorations / theme presentation are not ready yet.
-  // Keep the pre fallback over it until the diff surface is visually ready,
-  // otherwise users see a third "plain editor" state between fallback and final.
-  if (isDiff.value)
-    return !editorDisplayReady.value
-
-  // When an outer virtualizer owns scroll/item height, keep the fallback even
-  // for warm/preloaded runtime mounts so restore never waits on an empty editor host.
-  if (codeBlockHostScrollManaged.value)
-    return !editorDisplayReady.value
-
-  // Cold starts keep the fallback until Monaco settles; warm/preloaded mounts skip it.
-  return !isCodeBlockRuntimeReady() && !editorDisplayReady.value
+  // A warm runtime still needs at least one paint before its editor is visible.
+  // Keeping one fallback rule for single and diff blocks also prevents parser
+  // kind changes from producing a blank third state during the handoff.
+  return !editorDisplayReady.value
 })
 const renderPreFallback = computed(() => showPreWhileMonacoLoads.value)
-const hideCodeEditorContainer = computed(() => showPreWhileMonacoLoads.value && !diffFallbackExitActive.value)
+const hideCodeEditorContainer = computed(() => showPreWhileMonacoLoads.value)
 const restoreVisualPending = computed(() =>
   !usePreCodeRender.value
   && !editorCreationFailed.value
-  && (showPreWhileMonacoLoads.value || diffFallbackExitActive.value || diffFallbackFadingOut.value),
+  && showPreWhileMonacoLoads.value,
 )
 const codeBlockEnhancementState = computed(() => {
   if (editorDisplayReady.value && !usePreCodeRender.value)
@@ -745,10 +757,15 @@ const preFallbackLineHeight = computed(() => {
 // Unified line height for both diff and non-diff fallback; uses measured values first.
 const preFallbackEffectiveLineHeight = computed(() => preFallbackLineHeight.value)
 function countCodeLines(source: unknown) {
-  const value = String(source ?? '')
+  const value = getDisplayCode(source)
   if (!value)
     return 1
   return Math.max(1, value.split(/\r\n|\n|\r/).length)
+}
+
+function splitDisplayCodeLines(source: unknown) {
+  const value = getDisplayCode(source)
+  return value ? value.split(/\r\n|\n|\r/) : ['']
 }
 
 function isRemovedDiffLine(line: string) {
@@ -772,12 +789,12 @@ function hasPatchDiffLines(lines: string[]) {
 }
 
 function countInlineDiffPreviewLines() {
-  const patchLines = String(props.node.code ?? '').split(/\r\n|\n|\r/)
+  const patchLines = splitDisplayCodeLines(props.node.code)
   if (hasPatchDiffLines(patchLines))
     return Math.max(1, patchLines.length)
 
-  const original = String(props.node.originalCode ?? '').split(/\r\n|\n|\r/)
-  const modified = String(props.node.updatedCode ?? '').split(/\r\n|\n|\r/)
+  const original = splitDisplayCodeLines(props.node.originalCode)
+  const modified = splitDisplayCodeLines(props.node.updatedCode)
   let start = 0
   let originalEnd = original.length - 1
   let modifiedEnd = modified.length - 1
@@ -807,7 +824,7 @@ function countInlineDiffPreviewLines() {
 }
 
 function countSideBySideDiffPreviewLines() {
-  const patchLines = String(props.node.code ?? '').split(/\r\n|\n|\r/)
+  const patchLines = splitDisplayCodeLines(props.node.code)
   const hasPatchLines = hasPatchDiffLines(patchLines)
 
   if (!hasPatchLines && hasDiffSourcePair()) {
@@ -968,11 +985,7 @@ function getPendingEstimatedEditorHeightFloor() {
 function shouldHoldStreamingDiffHeightFloor() {
   return isDiff.value
     && props.stream !== false
-    && (
-      showPreWhileMonacoLoads.value
-      || diffFallbackExitActive.value
-      || diffFallbackFadingOut.value
-    )
+    && showPreWhileMonacoLoads.value
 }
 
 function getStreamingDiffHeightFloor() {
@@ -1174,13 +1187,10 @@ function clearEstimatedEditorHeightFloor() {
   pendingEstimatedEditorHeightFloor.value = null
 }
 
-function clearDiffFallbackExitTimer() {
-  if (diffFallbackExitTimer != null && typeof window !== 'undefined')
-    window.clearTimeout(diffFallbackExitTimer)
-  diffFallbackExitTimer = null
-}
-
 async function revealEditorDisplay() {
+  if (isDiff.value && props.stream !== false && isCodeBlockLoading())
+    return
+
   if (!isDiff.value) {
     editorDisplayReady.value = true
     await nextTick()
@@ -1189,24 +1199,15 @@ async function revealEditorDisplay() {
     return
   }
 
+  // The editor is fully prepared while hidden. Flip the two layers in one Vue
+  // patch so there is no visible pre-reveal or post-reveal validation state.
   syncDiffRevealHostHeight()
   layoutEditorToHost(true)
   syncInlineFoldProxies()
-  syncDiffRevealHostHeight()
-  await waitForAnimationFrame()
-  syncDiffRevealHostHeight()
-  layoutEditorToHost(true)
-
-  if (isUnmounted)
-    return
-
-  diffFallbackExitActive.value = false
-  diffFallbackFadingOut.value = false
   editorDisplayReady.value = true
   await nextTick()
   syncDiffRevealHostHeight()
   layoutEditorToHost(true)
-  clearDiffFallbackExitTimer()
   syncFallbackFontMetricsFromEditor()
   syncInlineFoldProxies()
   scheduleEditorHeightSync()
@@ -1268,7 +1269,21 @@ function resolveHeightWithEstimatedEditorFloor(
 
 function waitForAnimationFrame() {
   return new Promise<void>((resolve) => {
-    safeRaf(() => resolve())
+    let settled = false
+    let rafId: number | null = null
+    let timeoutId: ReturnType<typeof globalThis.setTimeout> | null = null
+    const finish = () => {
+      if (settled)
+        return
+      settled = true
+      if (timeoutId != null)
+        globalThis.clearTimeout(timeoutId)
+      if (rafId != null)
+        safeCancelRaf(rafId)
+      resolve()
+    }
+    timeoutId = globalThis.setTimeout(finish, 50)
+    rafId = safeRaf(finish)
   })
 }
 
@@ -1406,9 +1421,41 @@ function estimateDiffStats(originalSource: string, modifiedSource: string) {
     modifiedEnd--
   }
 
+  const originalMiddleLength = Math.max(0, originalEnd - start + 1)
+  const modifiedMiddleLength = Math.max(0, modifiedEnd - start + 1)
+  if (originalMiddleLength === 0 || modifiedMiddleLength === 0) {
+    return {
+      removed: originalMiddleLength,
+      added: modifiedMiddleLength,
+    }
+  }
+
+  const maxCells = 1_500_000
+  if ((originalMiddleLength + 1) * (modifiedMiddleLength + 1) <= maxCells) {
+    const columns = modifiedMiddleLength + 1
+    let next = new Uint32Array(columns)
+    let current = new Uint32Array(columns)
+    for (let i = originalMiddleLength - 1; i >= 0; i--) {
+      current[modifiedMiddleLength] = 0
+      for (let j = modifiedMiddleLength - 1; j >= 0; j--) {
+        current[j] = originalLines[start + i] === modifiedLines[start + j]
+          ? next[j + 1] + 1
+          : Math.max(next[j], current[j + 1])
+      }
+      const swap = next
+      next = current
+      current = swap
+    }
+    const commonMiddleLines = next[0]
+    return {
+      removed: originalMiddleLength - commonMiddleLines,
+      added: modifiedMiddleLength - commonMiddleLines,
+    }
+  }
+
   return {
-    removed: Math.max(0, originalEnd - start + 1),
-    added: Math.max(0, modifiedEnd - start + 1),
+    removed: originalMiddleLength,
+    added: modifiedMiddleLength,
   }
 }
 
@@ -1440,7 +1487,7 @@ function hasInlineDeletedMarginReady(root: HTMLElement | null | undefined) {
 
 function hasExpectedChangedDiffDom(
   root: HTMLElement | null | undefined,
-  expected: { added: number; removed: number },
+  expected: { added: number, removed: number },
 ) {
   if (!root)
     return false
@@ -1483,7 +1530,7 @@ function hasMountedDiffNode(root: HTMLElement | null | undefined, selector: stri
 
 function hasExpectedChangedDiffGutterDom(
   root: HTMLElement | null | undefined,
-  expected: { added: number; removed: number },
+  expected: { added: number, removed: number },
 ) {
   if (!root)
     return false
@@ -1559,6 +1606,140 @@ function hasDiffContentLayoutReady(root: HTMLElement | null | undefined) {
   const gapToCode = Number.isFinite(rawGap) ? rawGap : 7.8
   const expectedContentLeft = numberRect.right + gapToCode
   return Math.abs(viewRect.left - expectedContentLeft) <= 1.25
+}
+
+function hasInlineDiffNativePresentationReady(
+  root: HTMLElement | null | undefined,
+  expectsChangedDom: boolean,
+) {
+  if (!preFallbackDiffInline.value)
+    return true
+  const hasChangedMarkers = expectsChangedDom || Boolean(root?.querySelector([
+    '.line-insert',
+    '.line-delete',
+    '.gutter-insert',
+    '.gutter-delete',
+    '.stream-monaco-line-number-insert',
+    '.stream-monaco-line-number-delete',
+    '.stream-monaco-line-insert-fill',
+    '.stream-monaco-line-delete-fill',
+    '.stream-monaco-fallback-line-insert',
+    '.stream-monaco-fallback-line-delete',
+    '.stream-monaco-fallback-inline-delete-line',
+  ].join(',')))
+  if (!hasChangedMarkers)
+    return true
+  return Boolean(
+    root?.classList.contains('stream-monaco-diff-inline-native-ready')
+    && !root.classList.contains('stream-monaco-diff-native-stale'),
+  )
+}
+
+function hasVisibleChangedViewLineFill(
+  root: HTMLElement | null | undefined,
+  side: 'original' | 'modified',
+  lineNumberClassName: string,
+  fillClassName: string,
+) {
+  const editorRoot = root?.querySelector<HTMLElement>(`.monaco-diff-editor .editor.${side}`)
+  if (!editorRoot)
+    return false
+
+  const changedLineNumbers = Array.from(
+    editorRoot.querySelectorAll<HTMLElement>(
+      `.margin-view-overlays .line-numbers.${lineNumberClassName}`,
+    ),
+  )
+  if (!changedLineNumbers.length)
+    return true
+
+  const viewLines = Array.from(
+    editorRoot.querySelectorAll<HTMLElement>(
+      '.lines-content > .view-lines:not(.line-delete) > .view-line',
+    ),
+  )
+  if (!viewLines.length)
+    return false
+
+  return changedLineNumbers.every((lineNumberNode) => {
+    const numberRect = lineNumberNode.getBoundingClientRect()
+    let nearest: { node: HTMLElement, distance: number } | null = null
+    for (const viewLine of viewLines) {
+      const lineRect = viewLine.getBoundingClientRect()
+      const distance = Math.abs(lineRect.top - numberRect.top)
+      if (!nearest || distance < nearest.distance)
+        nearest = { node: viewLine, distance }
+    }
+    return !nearest || nearest.distance > 1.25 || nearest.node.classList.contains(fillClassName)
+  })
+}
+
+function hasExpectedChangedDiffViewLineFill(
+  root: HTMLElement | null | undefined,
+  expected: { added: number, removed: number },
+) {
+  if (!root)
+    return false
+
+  const addedReady = expected.added <= 0 || hasVisibleChangedViewLineFill(
+    root,
+    'modified',
+    'stream-monaco-line-number-insert',
+    'stream-monaco-line-insert-fill',
+  )
+  const removedReady = expected.removed <= 0 || (
+    preFallbackDiffInline.value
+      ? Boolean(root.classList.contains('stream-monaco-diff-inline-native-ready'))
+      : hasVisibleChangedViewLineFill(
+          root,
+          'original',
+          'stream-monaco-line-number-delete',
+          'stream-monaco-line-delete-fill',
+        )
+  )
+
+  return addedReady && removedReady
+}
+
+function hasLanguageHighlightReady(root: HTMLElement | null | undefined) {
+  if (isPlainTextLanguage.value)
+    return true
+  if (!root)
+    return false
+
+  const viewLines = Array.from(
+    root.querySelectorAll<HTMLElement>(
+      '.monaco-diff-editor .view-lines .view-line, .monaco-editor .view-lines .view-line',
+    ),
+  ).filter((line) => {
+    if (!line.textContent?.trim())
+      return false
+    const rect = line.getBoundingClientRect()
+    return rect.width > 0 || rect.height > 0
+  })
+  if (!viewLines.length)
+    return false
+
+  const tokenCandidateLines = viewLines.filter(line => expectsLanguageTokensForLine(line.textContent ?? ''))
+  if (!tokenCandidateLines.length)
+    return true
+  const linesToCheck = tokenCandidateLines
+  const tokenizedLineCount = linesToCheck.filter((line) => {
+    const spans = Array.from(line.querySelectorAll<HTMLElement>('span'))
+      .filter(span => span.textContent?.trim())
+    return spans.some((span) => {
+      const tokenClasses = String(span.className || '').split(/\s+/)
+      return tokenClasses.some(className => /^mtk\d+$/.test(className) && className !== 'mtk1')
+    })
+  }).length
+
+  return tokenizedLineCount > 0
+}
+
+function expectsLanguageTokensForLine(text: string) {
+  return /['"`{}()[\]:;=<>.,]|\/\/|\/\*|\b(?:async|await|class|const|enum|export|for|function|if|import|interface|let|return|switch|type|var|while)\b/.test(
+    text.replace(/\u00A0/g, ' ').trim(),
+  )
 }
 
 function expectsDiffLineNumberGutter() {
@@ -1664,13 +1845,14 @@ function computeContentHeight(): number | null {
       const mh = (m?.getContentHeight?.() as number) || 0
       const h = Math.max(oh, mh)
       if (h > 0)
-        return Math.ceil(h + PIXEL_EPSILON)
+        return Math.ceil(h)
       // fallback per-editor line count
       const olc = o?.getModel?.()?.getLineCount?.() || 1
       const mlc = m?.getModel?.()?.getLineCount?.() || 1
       const lc = Math.max(olc, mlc)
       const lh = Math.max(getLineHeightSafe(o), getLineHeightSafe(m))
-      return Math.ceil(lc * (lh + LINE_EXTRA_PER_LINE) + CONTENT_PADDING + PIXEL_EPSILON)
+      const verticalPadding = Math.max(getVerticalPaddingSafe(o), getVerticalPaddingSafe(m))
+      return Math.ceil(lc * lh + verticalPadding + CONTENT_PADDING)
     }
     else if (editor?.getContentHeight) {
       editor?.layout?.()
@@ -1812,7 +1994,13 @@ function estimateDiffEditorContentHeight(): number | null {
       getVerticalPaddingSafe(originalEditor),
       getVerticalPaddingSafe(modifiedEditor),
     )
-    return Math.ceil(lineCount * (lineHeight + LINE_EXTRA_PER_LINE) + verticalPadding + CONTENT_PADDING + PIXEL_EPSILON)
+    const contentHeight = Math.max(
+      originalEditor.getContentHeight?.() ?? 0,
+      modifiedEditor.getContentHeight?.() ?? 0,
+    )
+    if (contentHeight > 0)
+      return Math.ceil(contentHeight)
+    return Math.ceil(lineCount * lineHeight + verticalPadding + CONTENT_PADDING)
   }
   catch {
     return null
@@ -1993,11 +2181,7 @@ function syncDiffFallbackLayoutVarsFromEditor() {
 function syncDiffEditorHostToFallbackHeight() {
   if (
     !isDiff.value
-    || (
-      !showPreWhileMonacoLoads.value
-      && !diffFallbackExitActive.value
-      && !diffFallbackFadingOut.value
-    )
+    || !showPreWhileMonacoLoads.value
   ) {
     return null
   }
@@ -2016,8 +2200,6 @@ function syncDiffEditorHostToFallbackHeight() {
   editorHost.style.minHeight = `${height}px`
   editorHost.style.maxHeight = `${Math.ceil(getMaxHeightValue())}px`
   editorHost.style.overflow = 'hidden'
-  if (props.loading !== false && height >= getMaxHeightValue() - PIXEL_EPSILON)
-    scheduleStreamingDiffHeightMicrotaskSync()
   return height
 }
 
@@ -2244,13 +2426,16 @@ function clearEditorHeightSyncBindings() {
     safeCancelRaf(deferredHeightSyncRafId)
     deferredHeightSyncRafId = null
   }
+  if (deferredHeightSyncFollowUpRafId != null) {
+    safeCancelRaf(deferredHeightSyncFollowUpRafId)
+    deferredHeightSyncFollowUpRafId = null
+  }
   if (streamingDiffHeightChaseRafId != null) {
     safeCancelRaf(streamingDiffHeightChaseRafId)
     streamingDiffHeightChaseRafId = null
   }
   streamingDiffHeightChaseFrames = 0
   streamingDiffHeightChaseAllowSettled = false
-  streamingDiffHeightMicrotaskPending = false
 }
 
 function clearInlineFoldProxies() {
@@ -2386,9 +2571,11 @@ function syncInlineFoldProxies() {
 }
 
 function scheduleEditorHeightSync(allowDuringStreamingDiff = false) {
-  if (deferredHeightSyncRafId != null)
+  if (isUnmounted || deferredHeightSyncRafId != null)
     return
   const sync = () => {
+    if (isUnmounted)
+      return
     syncInlineFoldProxies()
     syncEditorHostHeight(allowDuringStreamingDiff)
     layoutEditorToHost()
@@ -2396,7 +2583,8 @@ function scheduleEditorHeightSync(allowDuringStreamingDiff = false) {
   deferredHeightSyncRafId = safeRaf(() => {
     deferredHeightSyncRafId = null
     sync()
-    safeRaf(() => {
+    deferredHeightSyncFollowUpRafId = safeRaf(() => {
+      deferredHeightSyncFollowUpRafId = null
       sync()
     })
   })
@@ -2443,25 +2631,6 @@ function scheduleStreamingDiffHeightChase(allowSettled = false) {
   streamingDiffHeightChaseRafId = safeRaf(tick)
 }
 
-function scheduleStreamingDiffHeightMicrotaskSync() {
-  if (streamingDiffHeightMicrotaskPending || typeof window === 'undefined')
-    return
-
-  streamingDiffHeightMicrotaskPending = true
-  queueMicrotask(() => {
-    try {
-      if (!isDiff.value || props.loading === false || isUnmounted)
-        return
-      syncInlineFoldProxies()
-      syncEditorHostHeight({ preferModelDiffHeight: true })
-      layoutEditorToHost()
-    }
-    finally {
-      streamingDiffHeightMicrotaskPending = false
-    }
-  })
-}
-
 function applyCollapsedContainerHeight(
   container: HTMLElement,
   contentHeight: number,
@@ -2502,9 +2671,6 @@ function applyCollapsedContainerHeight(
 
   container.style.height = `${nextHeight}px`
   container.style.maxHeight = `${Math.ceil(maxHeight)}px`
-  if (isDiff.value && props.loading !== false && nextHeight >= maxHeight - PIXEL_EPSILON)
-    scheduleStreamingDiffHeightMicrotaskSync()
-
   if (isDiff.value) {
     container.style.overflow = 'hidden'
   }
@@ -2685,7 +2851,7 @@ function updateCollapsedHeight(options: EditorHostHeightSyncOptions = {}) {
         return
       }
     }
-    if (isDiff.value && !hasRenderedDiffDom && !hasVisibleCollapsedDiffSummary && (showPreWhileMonacoLoads.value || diffFallbackExitActive.value || diffFallbackFadingOut.value)) {
+    if (isDiff.value && !hasRenderedDiffDom && !hasVisibleCollapsedDiffSummary && showPreWhileMonacoLoads.value) {
       const fallbackHeight = syncDiffEditorHostToFallbackHeight()
       if (fallbackHeight != null) {
         const h = applyCollapsedContainerHeight(container, fallbackHeight, max, {
@@ -2870,42 +3036,32 @@ function updateCollapsedHeight(options: EditorHostHeightSyncOptions = {}) {
   catch {}
 }
 
-async function stabilizeInitialEditorHeight() {
-  if (getPendingEstimatedEditorHeightFloor() == null)
-    return
-  syncInlineFoldProxies()
-  syncEditorHostHeight(false)
-  await nextTick()
-  await waitForAnimationFrame()
-  syncInlineFoldProxies()
-  syncEditorHostHeight(false)
-  await waitForAnimationFrame()
-  syncInlineFoldProxies()
-  syncEditorHostHeight(false)
-}
-
-async function settleInitialEditorDisplay() {
-  syncInlineFoldProxies()
-  syncEditorHostHeight(false)
-  await nextTick()
-  await waitForAnimationFrame()
-  syncInlineFoldProxies()
-  syncEditorHostHeight(false)
-  await waitForAnimationFrame()
-  syncInlineFoldProxies()
-  syncEditorHostHeight(false)
-}
-
 function hasRenderedDiffEditorDom(root = codeEditor.value) {
   return Boolean(
     root?.querySelector('.monaco-diff-editor .view-lines .view-line'),
   )
 }
 
+function hasRenderedSingleEditorDom(root = codeEditor.value) {
+  return Boolean(root?.querySelector('.monaco-editor .view-lines .view-line'))
+}
+
+function hasCurrentSingleEditorContent() {
+  const model = getEditorView()?.getModel?.()
+  return typeof model?.getValue === 'function'
+    && model.getValue() === displayCode.value
+}
+
+function hasDiffPresentationRootClass(root = codeEditor.value) {
+  if (!root?.classList.contains('stream-monaco-diff-root'))
+    return false
+  if (preFallbackDiffInline.value && !root.classList.contains('stream-monaco-diff-inline'))
+    return false
+  return true
+}
+
 function shouldAllowDiffDomHeightShrink(host: HTMLElement) {
   return props.loading !== false
-    || diffFallbackExitActive.value
-    || diffFallbackFadingOut.value
     || editorDisplayReady.value
     || host.classList.contains('stream-monaco-diff-native-stale')
     || hasVisibleDiffHiddenLines(host)
@@ -2960,11 +3116,14 @@ async function waitForEditorRuntimeCreation(currentRuntimeCreation: Promise<void
 // one view-line, then does a final presentation pass. This prevents the
 // "plain Monaco editor" intermediate frame (the third state between the pre
 // fallback and the fully decorated diff surface).
-async function waitForDiffEditorVisualReady() {
+async function waitForDiffEditorVisualReady(options: { requireHighlight?: boolean } = {}) {
   if (!isDiff.value)
     return true
 
-  const maxPasses = 120
+  const requireHighlight = options.requireHighlight !== false
+  const maxPasses = 30
+  const requiredStableReadyPasses = 2
+  let stableReadyPasses = 0
   let pair = resolveDiffRenderPair(
     String(props.node.originalCode ?? ''),
     String(props.node.updatedCode ?? ''),
@@ -2984,7 +3143,7 @@ async function waitForDiffEditorVisualReady() {
     }
   }
 
-  for (let i = 0; i < maxPasses; i++) {
+  for (let pass = 0; pass < maxPasses; pass++) {
     if (isUnmounted)
       return false
 
@@ -3022,34 +3181,75 @@ async function waitForDiffEditorVisualReady() {
         return false
       const readyRoot = codeEditor.value
       const readyLineNumberGutter = !expectsDiffLineNumberGutter() || hasDiffLineNumberGutterLayout(readyRoot)
-      if (readyLineNumberGutter && hasDiffContentLayoutReady(readyRoot))
-        return true
+      const readyChangedDom = !expectsChangedDom || hasExpectedChangedDiffDom(readyRoot, expected)
+      const readyGutterDom = !expectsChangedDom || hasExpectedChangedDiffGutterDom(readyRoot, expected)
+      const readyInlineNative = hasInlineDiffNativePresentationReady(readyRoot, expectsChangedDom)
+      const readyLineFill = hasExpectedChangedDiffViewLineFill(readyRoot, expected)
+      const readyHighlight = !requireHighlight || hasLanguageHighlightReady(readyRoot)
+      if (
+        hasDiffPresentationRootClass(readyRoot)
+        && readyLineNumberGutter
+        && hasDiffContentLayoutReady(readyRoot)
+        && readyChangedDom
+        && readyGutterDom
+        && readyInlineNative
+        && readyLineFill
+        && readyHighlight
+      ) {
+        stableReadyPasses++
+        if (stableReadyPasses >= requiredStableReadyPasses)
+          return true
+      }
+      else {
+        stableReadyPasses = 0
+      }
     }
 
     await nextTick()
     await waitForAnimationFrame()
   }
 
-  // Keep the pre fallback visible rather than exposing a plain Monaco frame.
   if (isUnmounted)
     return false
-  try {
-    refreshDiffPresentationSafely()
-    syncInlineFoldProxies()
-    refreshDiffStats()
-    scheduleEditorHeightSync()
-  }
-  catch {}
+
+  refreshDiffPresentationSafely()
+  syncInlineFoldProxies()
+  refreshDiffStats()
+  scheduleEditorHeightSync()
   refreshExpectedDiffStats()
-  const contentLayoutReady = hasDiffContentLayoutReady(codeEditor.value)
-  return contentLayoutReady && (
-    !expectsChangedDom
-    || (
-      hasExpectedChangedDiffDom(codeEditor.value, expected)
-      && hasExpectedChangedDiffGutterDom(codeEditor.value, expected)
-      && (!expectsDiffLineNumberGutter() || hasDiffLineNumberGutterLayout(codeEditor.value))
-    )
-  )
+
+  return false
+}
+
+async function waitForSingleEditorVisualReady() {
+  const maxPasses = 30
+  for (let pass = 0; pass < maxPasses; pass++) {
+    if (isUnmounted || isDiff.value)
+      return false
+
+    const root = codeEditor.value
+    const contentReady = hasCurrentSingleEditorContent()
+    const domReady = hasRenderedSingleEditorDom(root)
+    const highlightReady = !displayCode.value.trim() || hasLanguageHighlightReady(root)
+    if (contentReady && domReady && highlightReady) {
+      await nextTick()
+      await waitForAnimationFrame()
+      if (
+        !isUnmounted
+        && !isDiff.value
+        && hasCurrentSingleEditorContent()
+        && hasRenderedSingleEditorDom(codeEditor.value)
+        && (!displayCode.value.trim() || hasLanguageHighlightReady(codeEditor.value))
+      ) {
+        return true
+      }
+    }
+
+    await nextTick()
+    await waitForAnimationFrame()
+  }
+
+  return false
 }
 
 async function updateDiffCodeWithSettledResult(original: string, updated: string, language: string) {
@@ -3180,8 +3380,6 @@ watch(
     props.stream,
     props.loading,
     showPreWhileMonacoLoads.value,
-    diffFallbackExitActive.value,
-    diffFallbackFadingOut.value,
     preFallbackLocalMinHeight.value,
   ] as const,
   () => {
@@ -3194,14 +3392,19 @@ watch(
   { immediate: true },
 )
 
+let diffCodeUpdateGeneration = 0
+
 watch(
-  () => [props.node.originalCode, props.node.updatedCode, monacoLanguage.value, isDiff.value] as const,
-  async ([, , , diff]) => {
-    if (props.stream === false || !diff)
+  () => [props.node.originalCode, props.node.updatedCode, monacoLanguage.value, isDiff.value, props.stream] as const,
+  async ([, , , diff, stream]) => {
+    const generation = ++diffCodeUpdateGeneration
+    if (!diff)
+      return
+    if (stream === false && !editorCreated.value)
       return
     // If the editor helpers exist but the editor hasn't been created yet,
     // ensure creation first so update calls don't get lost.
-    if (createEditor && !editorCreated.value && codeEditor.value) {
+    if (stream !== false && createEditor && !editorCreated.value && codeEditor.value) {
       try {
         await ensureEditorCreation(codeEditor.value as HTMLElement)
       }
@@ -3214,9 +3417,12 @@ watch(
         await pendingCreation
       }
       catch {}
-      if (isUnmounted || !isDiff.value)
+      if (isUnmounted || !isDiff.value || generation !== diffCodeUpdateGeneration)
         return
     }
+
+    if (generation !== diffCodeUpdateGeneration)
+      return
 
     const pair = resolveDiffRenderPair(
       String(props.node.originalCode ?? ''),
@@ -3232,6 +3438,8 @@ watch(
         pair.updated,
         monacoLanguage.value,
       )
+      if (isUnmounted || !isDiff.value || generation !== diffCodeUpdateGeneration)
+        return
       await nextTick()
       layoutEditorToHost(true)
       syncInlineFoldProxies()
@@ -3546,13 +3754,11 @@ async function runEditorCreation(el: HTMLElement) {
   if (!createEditor || isUnmounted)
     return
 
+  const creationKind = desiredEditorKind.value
   editorCreationFailed.value = false
   failedEditorCreationKey.value = null
   editorRuntimeCreated.value = false
   editorDisplayReady.value = false
-  diffFallbackExitActive.value = false
-  diffFallbackFadingOut.value = false
-  clearDiffFallbackExitTimer()
   measuredEditorFontSize.value = null
   measuredEditorLineHeight.value = null
   clearLayerMeasuredVars()
@@ -3566,7 +3772,7 @@ async function runEditorCreation(el: HTMLElement) {
     return
 
   const runtimeCreation = (async () => {
-    if (isDiff.value) {
+    if (creationKind === 'diff') {
       installPendingDiffResultErrorFilter()
       safeClean()
       const pair = resolveDiffRenderPair(
@@ -3574,14 +3780,17 @@ async function runEditorCreation(el: HTMLElement) {
         String(props.node.updatedCode ?? ''),
       )
       if (createDiffEditor) {
-        await createDiffEditor(el as HTMLElement, pair.original, pair.updated, monacoLanguage.value)
+        await withMonacoPassiveTouchListeners(() =>
+          createDiffEditor!(el as HTMLElement, pair.original, pair.updated, monacoLanguage.value))
       }
       else {
-        await createEditor(el as HTMLElement, props.node.code, monacoLanguage.value)
+        await withMonacoPassiveTouchListeners(() =>
+          createEditor!(el as HTMLElement, props.node.code, monacoLanguage.value))
       }
     }
     else {
-      await createEditor(el as HTMLElement, displayCode.value, monacoLanguage.value)
+      await withMonacoPassiveTouchListeners(() =>
+        createEditor!(el as HTMLElement, displayCode.value, monacoLanguage.value))
     }
     editorRuntimeCreated.value = true
   })()
@@ -3593,9 +3802,11 @@ async function runEditorCreation(el: HTMLElement) {
   await waitForEditorRuntimeCreation(currentRuntimeCreation)
   if (isUnmounted)
     return
+  if (desiredEditorKind.value !== creationKind)
+    return
   editorRuntimeCreated.value = true
 
-  const editor = isDiff.value ? getDiffEditorView() : getEditorView()
+  const editor = creationKind === 'diff' ? getDiffEditorView() : getEditorView()
   if (typeof props.monacoOptions?.fontSize === 'number') {
     editor?.updateOptions({ fontSize: props.monacoOptions.fontSize, automaticLayout: false })
     defaultCodeFontSize.value = props.monacoOptions.fontSize
@@ -3620,9 +3831,6 @@ async function runEditorCreation(el: HTMLElement) {
   if (!isExpanded.value && !isCollapsed.value)
     syncEditorHostHeight(false)
 
-  await stabilizeInitialEditorHeight()
-  if (isUnmounted)
-    return
   editorMounted.value = true
   bindEditorHeightSync()
   syncEditorCssVars()
@@ -3630,17 +3838,20 @@ async function runEditorCreation(el: HTMLElement) {
   syncInlineFoldProxies()
   refreshDiffStats()
   scheduleEditorHeightSync()
-  await settleInitialEditorDisplay()
-  const diffVisualReady = await waitForDiffEditorVisualReady()
+  await nextTick()
+  // Geometry, diff decorations, and syntax tokens must be ready before handoff.
+  const diffVisualReady = creationKind === 'diff'
+    ? await waitForDiffEditorVisualReady({ requireHighlight: true })
+    : await waitForSingleEditorVisualReady()
   if (isUnmounted)
     return
-  if (!diffVisualReady)
+  if (!diffVisualReady) {
+    markEditorCreationFailed()
     return
+  }
   syncFallbackFontMetricsFromEditor()
   syncDiffFallbackLayoutVarsFromEditor()
-  await nextTick()
   syncDiffRevealHostHeight()
-  await waitForAnimationFrame()
   await revealEditorDisplay()
 }
 
@@ -3668,7 +3879,7 @@ function ensureEditorCreation(el: HTMLElement, options: { allowStaleContentRetry
   markLifecyclePending()
   const pending = (async () => {
     try {
-      await withMonacoPassiveTouchListeners(() => runEditorCreation(el))
+      await runEditorCreation(el)
       staleContentRetryFailureKey = null
     }
     catch (error) {
@@ -3977,7 +4188,10 @@ function addRuntimeLanguage(languages: string[], language: unknown) {
 
   const canonical = normalizeLanguageIdentifier(language)
   const monacoId = resolveMonacoLanguageId(canonical)
-  for (const value of [canonical, monacoId]) {
+  const grammarId = ['plain', 'objectivec', 'objectivecpp'].includes(canonical)
+    ? monacoId
+    : canonical
+  for (const value of [grammarId, monacoId]) {
     if (value && !languages.includes(value))
       languages.push(value)
   }
@@ -4349,6 +4563,9 @@ watch(
               layoutEditorToHost(true)
               syncInlineFoldProxies()
               refreshDiffStats()
+              const visualReady = await waitForDiffEditorVisualReady({ requireHighlight: true })
+              if (!isUnmounted && visualReady && !editorDisplayReady.value)
+                await revealEditorDisplay()
               scheduleEditorHeightSync()
               scheduleStreamingDiffHeightChase(true)
             }
@@ -4385,10 +4602,10 @@ function stopExpandAutoResize() {
 onUnmounted(() => {
   // Ensure any RAF loops are stopped and editor resources are released
   stopExpandAutoResize()
-  clearDiffFallbackExitTimer()
   clearEditorHeightSyncBindings()
   clearInlineFoldProxies()
   cleanupEditor()
+  pendingDiffResultErrorFilterCleanup?.()
 
   if (resizeSyncHandler) {
     try {
@@ -4411,6 +4628,7 @@ onUnmounted(() => {
     :loading="props.loading"
     :show-line-numbers="true"
     :diff-inline="preFallbackDiffInline"
+    :diff-hide-unchanged-regions="preFallbackDiffHideUnchangedRegions"
   />
   <div
     v-else
@@ -4480,17 +4698,19 @@ onUnmounted(() => {
         <div
           ref="codeEditor"
           class="code-editor-container"
-          :class="[stream ? '' : 'code-height-placeholder', { 'is-hidden': hideCodeEditorContainer }]"
+          :class="stream ? '' : 'code-height-placeholder'"
+          :data-markstream-host-hidden="hideCodeEditorContainer ? 'true' : undefined"
           :style="codeEditorContainerStyle"
         />
         <PreCodeNode
           v-if="renderPreFallback"
           class="code-pre-fallback"
-          :class="{ 'is-wrap': preFallbackWrap, 'is-fading-out': diffFallbackFadingOut }"
+          :class="{ 'is-wrap': preFallbackWrap }"
           :style="preFallbackStyle"
           :node="preCodeNode"
           :show-line-numbers="true"
           :diff-inline="preFallbackDiffInline"
+          :diff-hide-unchanged-regions="preFallbackDiffHideUnchangedRegions"
         />
       </div>
       <HtmlPreviewFrame
@@ -4817,6 +5037,8 @@ onUnmounted(() => {
 .code-block-container.is-diff :deep(.monaco-diff-editor .editor.original .margin-view-overlays .line-delete.line-numbers),
 .code-block-container.is-diff :deep(.monaco-diff-editor .editor.modified .margin-view-overlays .line-delete.line-numbers),
 .code-block-container.is-diff :deep(.monaco-diff-editor .line-delete.line-numbers),
+.code-block-container.is-diff :deep(.monaco-diff-editor .editor.original .margin-view-overlays .line-numbers.stream-monaco-line-number-delete),
+.code-block-container.is-diff :deep(.monaco-diff-editor .editor.modified .margin-view-overlays .line-numbers.stream-monaco-line-number-delete),
 .code-block-container.is-diff :deep(.monaco-editor .stream-monaco-fallback-line-number-delete),
 .code-block-container.is-diff :deep(.stream-monaco-diff-root.stream-monaco-diff-native-stale .monaco-diff-editor .line-delete.line-numbers) {
   background: var(--stream-monaco-removed-line-fill) !important;
@@ -4827,6 +5049,8 @@ onUnmounted(() => {
 .code-block-container.is-diff :deep(.monaco-diff-editor .editor.original .margin-view-overlays .line-insert.line-numbers),
 .code-block-container.is-diff :deep(.monaco-diff-editor .editor.modified .margin-view-overlays .line-insert.line-numbers),
 .code-block-container.is-diff :deep(.monaco-diff-editor .line-insert.line-numbers),
+.code-block-container.is-diff :deep(.monaco-diff-editor .editor.original .margin-view-overlays .line-numbers.stream-monaco-line-number-insert),
+.code-block-container.is-diff :deep(.monaco-diff-editor .editor.modified .margin-view-overlays .line-numbers.stream-monaco-line-number-insert),
 .code-block-container.is-diff :deep(.monaco-editor .stream-monaco-fallback-line-number-insert),
 .code-block-container.is-diff :deep(.stream-monaco-diff-root.stream-monaco-diff-native-stale .monaco-diff-editor .line-insert.line-numbers) {
   background: var(--stream-monaco-added-line-fill) !important;
@@ -4844,7 +5068,7 @@ onUnmounted(() => {
   ) !important;
 }
 
-.code-editor-container.is-hidden {
+.code-editor-container[data-markstream-host-hidden="true"] {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -4927,14 +5151,6 @@ onUnmounted(() => {
 
 .code-block-container.is-diff :deep(pre.code-pre-fallback.markstream-pre--diff-preview .markstream-pre__diff-line--removed > .markstream-pre__diff-rail) {
   background: var(--stream-monaco-removed-gutter, var(--markstream-diff-removed-gutter, currentColor)) !important;
-}
-
-:deep(pre.code-pre-fallback.is-fading-out) {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  overflow: hidden;
-  pointer-events: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -10,6 +10,7 @@ export interface MonacoDisposableLike {
 
 export interface MonacoModelLike {
   getLineCount?: () => number
+  getValue?: () => string
 }
 
 export interface MonacoEditorViewLike {
@@ -70,7 +71,6 @@ export interface MonacoModule {
 }
 
 let mod: MonacoModule | null = null
-let importFailed = false
 let loadingPromise: Promise<MonacoModule | null> | null = null
 
 function normalizeMonacoModule(value: unknown): MonacoModule | null {
@@ -93,17 +93,12 @@ export async function getUseMonaco(): Promise<MonacoModule | null> {
 
   loadingPromise = (async () => {
     if (!mod) {
-      if (importFailed)
-        return null
       try {
         mod = normalizeMonacoModule(await import('stream-monaco'))
-        if (!mod) {
-          importFailed = true
+        if (!mod)
           return null
-        }
       }
       catch {
-        importFailed = true
         return null
       }
     }

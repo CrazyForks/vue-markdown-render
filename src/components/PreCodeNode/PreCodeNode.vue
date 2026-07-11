@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PreCodeNodeProps } from '../../types/component-props'
+import type { CodeBlockDiffHideUnchangedRegionsOptions, PreCodeNodeProps } from '../../types/component-props'
 
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
@@ -20,11 +20,7 @@ const normalizedLanguage = computed(() => {
 
 const languageClass = computed(() => `language-${normalizedLanguage.value}`)
 const isLoading = computed(() => props.loading === true || props.node?.loading === true)
-const displayCode = computed(() => {
-  if (props.node?.diff === true)
-    return String(props.node?.code ?? '')
-  return getDisplayCode(props.node?.code, isLoading.value)
-})
+const displayCode = computed(() => getDisplayCode(props.node?.code, isLoading.value))
 const codeLines = computed(() => {
   return displayCode.value.split(/\r\n|\n|\r/)
 })
@@ -55,7 +51,7 @@ const reservedHeightStyle = computed(() => {
   }
 })
 
-type DiffPreviewLineKind = 'context' | 'removed' | 'added' | 'hunk'
+type DiffPreviewLineKind = 'context' | 'removed' | 'added' | 'hunk' | 'collapsed' | 'spacer'
 const DIFF_HEADER_PREFIXES = ['diff ', 'index ', '--- ', '+++ ', '@@ ']
 
 interface DiffPreviewLine {
@@ -64,6 +60,12 @@ interface DiffPreviewLine {
   empty: boolean
   key: string
   number: number | string
+}
+
+interface DiffPreviewPane {
+  key: string
+  className: string
+  lines: DiffPreviewLine[]
 }
 
 interface SourceLineMatch {
@@ -86,13 +88,13 @@ function toDiffPreviewLine(
     // Do not paint terminal blank lines / visual spacer rows as added/removed.
     // This keeps the pre fallback close to Monaco, where the empty continuation
     // surface should not flash red/green before highlighting is ready.
-    kind: empty && kind !== 'hunk' && !options.preserveBlankKind ? 'context' : kind,
+    kind: empty && kind !== 'hunk' && kind !== 'spacer' && !options.preserveBlankKind ? 'context' : kind,
     empty,
   }
 }
 
 function splitDiffSource(source: unknown) {
-  const code = String(source ?? '')
+  const code = getDisplayCode(source, isLoading.value)
   if (!code)
     return []
   return code.split(/\r\n|\n|\r/)
@@ -139,7 +141,7 @@ function hasDiffSourcePair() {
   return props.node?.originalCode != null || props.node?.updatedCode != null
 }
 
-function computeSourceLineMatches(original: string[], modified: string[]): SourceLineMatch[] | null {
+function computeSourceLineMatches(original: string[], modified: string[]): SourceLineMatch[] {
   const n = original.length
   const m = modified.length
   const prefixMatches: SourceLineMatch[] = []
@@ -166,10 +168,12 @@ function computeSourceLineMatches(original: string[], modified: string[]): Sourc
   const middleModifiedLength = modifiedEnd - start + 1
   if (middleOriginalLength <= 0 || middleModifiedLength <= 0)
     return prefixMatches.concat(suffixMatches)
+  if (isLoading.value)
+    return prefixMatches.concat(suffixMatches)
 
   const maxCells = 1_500_000
   if ((middleOriginalLength + 1) * (middleModifiedLength + 1) > maxCells)
-    return null
+    return prefixMatches.concat(suffixMatches)
 
   const cols = middleModifiedLength + 1
   const dp = new Uint32Array((middleOriginalLength + 1) * (middleModifiedLength + 1))
@@ -208,11 +212,17 @@ function computeSourceLineMatches(original: string[], modified: string[]): Sourc
 
 function buildInlinePatchPreviewLines(lines: string[]): DiffPreviewLine[] {
   const result: DiffPreviewLine[] = []
+  let originalLine = 1
   let modifiedLine = 1
   const hasHeaders = hasUnifiedDiffHeaders(lines)
 
   for (const [index, raw] of lines.entries()) {
     if (raw.startsWith('@@')) {
+      const match = raw.match(/^@@\s+-(\d+)(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s+@@/)
+      if (match) {
+        originalLine = Number(match[1])
+        modifiedLine = Number(match[2])
+      }
       result.push({
         ...toDiffPreviewLine(raw, 'hunk'),
         key: `inline-hunk-${index}`,
@@ -223,7 +233,7 @@ function buildInlinePatchPreviewLines(lines: string[]): DiffPreviewLine[] {
       result.push({
         ...toDiffPreviewLine(normalizeLooseDiffBody(raw.slice(1), hasHeaders), 'removed', { preserveBlankKind: true }),
         key: `inline-removed-${index}`,
-        number: '',
+        number: originalLine++,
       })
     }
     else if (isAddedDiffLine(raw)) {
@@ -240,6 +250,7 @@ function buildInlinePatchPreviewLines(lines: string[]): DiffPreviewLine[] {
         key: `inline-context-${index}`,
         number: modifiedLine,
       })
+      originalLine++
       modifiedLine++
     }
   }
@@ -251,7 +262,7 @@ function buildInlineSourcePreviewLines(originalSource: unknown, modifiedSource: 
   const original = splitDiffSource(originalSource)
   const modified = splitDiffSource(modifiedSource)
   const matches = computeSourceLineMatches(original, modified)
-  if (matches) {
+  if (matches.length > 0) {
     const result: DiffPreviewLine[] = []
     let originalIndex = 0
     let modifiedIndex = 0
@@ -263,7 +274,7 @@ function buildInlineSourcePreviewLines(originalSource: unknown, modifiedSource: 
             preserveBlankKind: shouldPreserveSourceBlankDiffKind(original, originalIndex),
           }),
           key: `inline-removed-source-${originalIndex}`,
-          number: '',
+          number: originalIndex + 1,
         })
         originalIndex++
       }
@@ -292,7 +303,7 @@ function buildInlineSourcePreviewLines(originalSource: unknown, modifiedSource: 
           preserveBlankKind: shouldPreserveSourceBlankDiffKind(original, originalIndex),
         }),
         key: `inline-removed-source-${originalIndex}`,
-        number: '',
+        number: originalIndex + 1,
       })
       originalIndex++
     }
@@ -349,7 +360,7 @@ function buildInlineSourcePreviewLines(originalSource: unknown, modifiedSource: 
         preserveBlankKind: shouldPreserveSourceBlankDiffKind(original, index),
       }),
       key: `inline-removed-source-${index}`,
-      number: '',
+      number: index + 1,
     })
   }
 
@@ -366,6 +377,158 @@ function buildInlineSourcePreviewLines(originalSource: unknown, modifiedSource: 
   return result.concat(suffix)
 }
 
+function buildSideBySideSourcePreviewPanes(
+  originalSource: unknown,
+  modifiedSource: unknown,
+): DiffPreviewPane[] {
+  const originalSourceLines = splitDiffSource(originalSource)
+  const modifiedSourceLines = splitDiffSource(modifiedSource)
+  const matches = computeSourceLineMatches(originalSourceLines, modifiedSourceLines)
+  const originalLines: DiffPreviewLine[] = []
+  const modifiedLines: DiffPreviewLine[] = []
+  let originalIndex = 0
+  let modifiedIndex = 0
+  let blockIndex = 0
+
+  const appendChangedBlock = (originalEnd: number, modifiedEnd: number) => {
+    const rowCount = Math.max(originalEnd - originalIndex, modifiedEnd - modifiedIndex)
+    for (let offset = 0; offset < rowCount; offset++) {
+      const nextOriginalIndex = originalIndex + offset
+      const nextModifiedIndex = modifiedIndex + offset
+      originalLines.push(nextOriginalIndex < originalEnd
+        ? {
+            ...toDiffPreviewLine(originalSourceLines[nextOriginalIndex], 'removed', {
+              preserveBlankKind: shouldPreserveSourceBlankDiffKind(originalSourceLines, nextOriginalIndex),
+            }),
+            key: `original-changed-${blockIndex}-${nextOriginalIndex}`,
+            number: nextOriginalIndex + 1,
+          }
+        : {
+            ...toDiffPreviewLine('', 'spacer'),
+            key: `original-spacer-${blockIndex}-${offset}`,
+            number: '',
+          })
+      modifiedLines.push(nextModifiedIndex < modifiedEnd
+        ? {
+            ...toDiffPreviewLine(modifiedSourceLines[nextModifiedIndex], 'added', {
+              preserveBlankKind: shouldPreserveSourceBlankDiffKind(modifiedSourceLines, nextModifiedIndex),
+            }),
+            key: `modified-changed-${blockIndex}-${nextModifiedIndex}`,
+            number: nextModifiedIndex + 1,
+          }
+        : {
+            ...toDiffPreviewLine('', 'spacer'),
+            key: `modified-spacer-${blockIndex}-${offset}`,
+            number: '',
+          })
+    }
+    originalIndex = originalEnd
+    modifiedIndex = modifiedEnd
+    blockIndex++
+  }
+
+  for (const match of matches) {
+    appendChangedBlock(match.originalIndex, match.modifiedIndex)
+    originalLines.push({
+      ...toDiffPreviewLine(originalSourceLines[match.originalIndex]),
+      key: `original-context-${match.originalIndex}-${match.modifiedIndex}`,
+      number: match.originalIndex + 1,
+    })
+    modifiedLines.push({
+      ...toDiffPreviewLine(modifiedSourceLines[match.modifiedIndex]),
+      key: `modified-context-${match.originalIndex}-${match.modifiedIndex}`,
+      number: match.modifiedIndex + 1,
+    })
+    originalIndex = match.originalIndex + 1
+    modifiedIndex = match.modifiedIndex + 1
+  }
+  appendChangedBlock(originalSourceLines.length, modifiedSourceLines.length)
+
+  return collapseDiffPanes([
+    {
+      key: 'original',
+      className: 'markstream-pre__diff-pane--original',
+      lines: originalLines,
+    },
+    {
+      key: 'modified',
+      className: 'markstream-pre__diff-pane--modified',
+      lines: modifiedLines,
+    },
+  ])
+}
+
+function resolveDiffCollapseOptions() {
+  const value = props.diffHideUnchangedRegions
+  if (value == null || value === false)
+    return null
+  const options: CodeBlockDiffHideUnchangedRegionsOptions = value === true ? {} : value
+  if (options.enabled === false)
+    return null
+  return {
+    contextLineCount: Math.max(0, Math.floor(options.contextLineCount ?? 2)),
+    minimumLineCount: Math.max(1, Math.floor(options.minimumLineCount ?? 4)),
+  }
+}
+
+function collapseDiffPanes(panes: DiffPreviewPane[]) {
+  const options = resolveDiffCollapseOptions()
+  if (!options || panes.length < 1 || panes.length > 2)
+    return panes
+  if (panes.length === 2 && panes[0].lines.length !== panes[1].lines.length)
+    return panes
+
+  const original = panes[0].lines
+  const modified = panes[1]?.lines
+  const isUnchangedRow = (lineIndex: number) => original[lineIndex].kind === 'context'
+    && (
+      modified === undefined
+      || (
+        modified[lineIndex].kind === 'context'
+        && original[lineIndex].code === modified[lineIndex].code
+      )
+    )
+  const collapsedRanges: Array<{ start: number, end: number }> = []
+  let index = 0
+  while (index < original.length) {
+    const start = index
+    while (index < original.length && isUnchangedRow(index)) {
+      index++
+    }
+    const end = index
+    const runLength = end - start
+    if (runLength >= options.minimumLineCount) {
+      const hiddenStart = start + (start === 0 ? 0 : options.contextLineCount)
+      const hiddenEnd = end - (end === original.length ? 0 : options.contextLineCount)
+      if (hiddenEnd > hiddenStart)
+        collapsedRanges.push({ start: hiddenStart, end: hiddenEnd })
+    }
+    if (index === start)
+      index++
+  }
+
+  if (!collapsedRanges.length)
+    return panes
+
+  return panes.map((pane, paneIndex) => {
+    const lines: DiffPreviewLine[] = []
+    let sourceIndex = 0
+    for (const range of collapsedRanges) {
+      lines.push(...pane.lines.slice(sourceIndex, range.start))
+      lines.push({
+        code: paneIndex === 0 ? 'Unmodified lines' : '',
+        kind: 'collapsed',
+        empty: false,
+        key: `${pane.key}-collapsed-${range.start}-${range.end}`,
+        number: '',
+      })
+      sourceIndex = range.end
+    }
+    lines.push(...pane.lines.slice(sourceIndex))
+    return { ...pane, lines }
+  })
+}
+
 const diffPreviewPanes = computed(() => {
   const hasPatchDiffLines = hasPatchLines(codeLines.value)
   const hasSourcePair = hasDiffSourcePair()
@@ -374,48 +537,20 @@ const diffPreviewPanes = computed(() => {
       ? buildInlineSourcePreviewLines(props.node?.originalCode, props.node?.updatedCode)
       : buildInlinePatchPreviewLines(codeLines.value)
 
-    return [
+    return collapseDiffPanes([
       {
         key: 'inline',
         className: 'markstream-pre__diff-pane--inline',
         lines,
       },
-    ]
+    ])
   }
 
   if (!hasPatchDiffLines && hasSourcePair) {
-    const originalLines = splitDiffSource(props.node?.originalCode)
-    const modifiedLines = splitDiffSource(props.node?.updatedCode)
-    return [
-      {
-        key: 'original',
-        className: 'markstream-pre__diff-pane--original',
-        lines: originalLines.map((line, index) => {
-          const kind = modifiedLines[index] === line ? 'context' : 'removed'
-          return {
-            ...toDiffPreviewLine(line, kind, {
-              preserveBlankKind: shouldPreserveSourceBlankDiffKind(originalLines, index),
-            }),
-            key: `original-${index}`,
-            number: index + 1,
-          }
-        }),
-      },
-      {
-        key: 'modified',
-        className: 'markstream-pre__diff-pane--modified',
-        lines: modifiedLines.map((line, index) => {
-          const kind = originalLines[index] === line ? 'context' : 'added'
-          return {
-            ...toDiffPreviewLine(line, kind, {
-              preserveBlankKind: shouldPreserveSourceBlankDiffKind(modifiedLines, index),
-            }),
-            key: `modified-${index}`,
-            number: index + 1,
-          }
-        }),
-      },
-    ]
+    return buildSideBySideSourcePreviewPanes(
+      props.node?.originalCode,
+      props.node?.updatedCode,
+    )
   }
 
   const original = [] as Array<{ code: string, kind: DiffPreviewLineKind, empty: boolean }>
@@ -440,7 +575,7 @@ const diffPreviewPanes = computed(() => {
     }
   }
 
-  return [
+  return collapseDiffPanes([
     {
       key: 'original',
       className: 'markstream-pre__diff-pane--original',
@@ -451,7 +586,11 @@ const diffPreviewPanes = computed(() => {
       className: 'markstream-pre__diff-pane--modified',
       lines: modified.map((line, index) => ({ ...line, key: `modified-${index}`, number: index + 1 })),
     },
-  ]
+  ])
+})
+
+const hasCollapsedDiffPreview = computed(() => {
+  return diffPreviewPanes.value.some(pane => pane.lines.some(line => line.kind === 'collapsed'))
 })
 
 const ariaLabel = computed(() => {
@@ -474,6 +613,7 @@ interface DiffLineMetric {
 
 const diffLineMetrics = ref<DiffLineMetric[]>([])
 let diffLineMetricsRaf: number | null = null
+let disposed = false
 let diffResizeObserver: ResizeObserver | null = null
 
 function readPx(value: string | null | undefined) {
@@ -494,6 +634,9 @@ function readBaseDiffLineHeight(root: HTMLElement) {
 function readNaturalDiffLineHeight(line: HTMLElement | null, baseLineHeight: number) {
   if (!line)
     return baseLineHeight
+
+  if (line.classList.contains('markstream-pre__diff-line--collapsed'))
+    return 32
 
   const content = line.querySelector('.markstream-pre__diff-content') as HTMLElement | null
   const contentRect = content?.getBoundingClientRect()
@@ -550,13 +693,16 @@ function syncDiffLineMetrics() {
 }
 
 function scheduleDiffLineMetricsSync() {
-  if (typeof window === 'undefined')
+  if (disposed || typeof window === 'undefined')
     return
 
   if (diffLineMetricsRaf != null)
     window.cancelAnimationFrame(diffLineMetricsRaf)
 
   diffLineMetricsRaf = window.requestAnimationFrame(() => {
+    diffLineMetricsRaf = null
+    if (disposed)
+      return
     syncDiffLineMetrics()
   })
 }
@@ -593,6 +739,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  disposed = true
   if (diffLineMetricsRaf != null) {
     window.cancelAnimationFrame(diffLineMetricsRaf)
     diffLineMetricsRaf = null
@@ -620,7 +767,7 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
   <pre
     ref="preRef"
     :style="reservedHeightStyle"
-    :class="[languageClass, { 'markstream-pre--line-numbers': props.showLineNumbers, 'markstream-pre--diff-preview': isDiffPreview, 'markstream-pre--diff-inline': isInlineDiffPreview }]"
+    :class="[languageClass, { 'markstream-pre--line-numbers': props.showLineNumbers, 'markstream-pre--diff-preview': isDiffPreview, 'markstream-pre--diff-inline': isInlineDiffPreview, 'markstream-pre--diff-collapsed': hasCollapsedDiffPreview }]"
     :aria-busy="isLoading"
     :aria-label="ariaLabel"
     :data-language="normalizedLanguage"
@@ -830,6 +977,7 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-pane--modified {
+  --markstream-pre-diff-pane-divider-width: 1px;
   --markstream-pre-diff-line-number-gap-to-code: var(
     --stream-monaco-modified-line-number-gap-to-code,
     var(--stream-monaco-line-number-gap-to-code, var(--markstream-pre-diff-code-gap))
@@ -839,6 +987,31 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
     var(--markstream-pre-diff-gutter-marker-width)
   );
   box-shadow: inset 1px 0 var(--markstream-diff-pane-divider, hsl(var(--ms-border)));
+}
+
+.markstream-vue pre.markstream-pre--diff-preview:not(.markstream-pre--diff-inline) .markstream-pre__diff-pane--modified {
+  --markstream-pre-diff-line-number-left: calc(
+    var(--stream-monaco-line-number-left, var(--markstream-pre-diff-gutter-marker-width))
+    + var(--markstream-pre-diff-pane-divider-width)
+  );
+}
+
+.markstream-vue pre.markstream-pre--diff-preview:not(.markstream-pre--diff-inline) .markstream-pre__diff-pane--modified .markstream-pre__diff-rail {
+  left: var(--markstream-pre-diff-pane-divider-width);
+}
+
+.markstream-vue pre.markstream-pre--diff-preview:not(.markstream-pre--diff-inline) .markstream-pre__diff-pane--modified .markstream-pre__diff-line {
+  padding-left: calc(
+    var(--markstream-pre-diff-code-left)
+    + var(--markstream-pre-diff-pane-divider-width)
+  );
+}
+
+.markstream-vue pre.markstream-pre--diff-preview:not(.markstream-pre--diff-inline) .markstream-pre__diff-pane--modified .markstream-pre__diff-line::before {
+  left: calc(
+    var(--markstream-pre-diff-code-fill-left)
+    + var(--markstream-pre-diff-pane-divider-width)
+  );
 }
 
 .markstream-vue pre.markstream-pre--diff-preview.markstream-pre--diff-inline .markstream-pre__diff-pane--modified {
@@ -970,6 +1143,59 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--hunk::before {
   background: var(--stream-monaco-unchanged-bg, var(--markstream-diff-unchanged-bg, transparent));
+}
+
+.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--spacer::before {
+  background-image: linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--stream-monaco-editor-fg, currentColor) 20%, transparent) 12.5%,
+    transparent 12.5%,
+    transparent 50%,
+    color-mix(in srgb, var(--stream-monaco-editor-fg, currentColor) 20%, transparent) 50%,
+    color-mix(in srgb, var(--stream-monaco-editor-fg, currentColor) 20%, transparent) 62.5%,
+    transparent 62.5%,
+    transparent 100%
+  );
+  background-size: 10px 10px;
+  opacity: 0.38;
+}
+
+.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--spacer::after,
+.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--spacer > .markstream-pre__diff-rail,
+.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--spacer > .markstream-pre__diff-number,
+.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--spacer > .markstream-pre__diff-content {
+  display: none;
+}
+
+.markstream-vue pre.markstream-pre--diff-preview.markstream-pre--diff-collapsed {
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--collapsed {
+  min-height: 32px;
+  padding-left: 0;
+  color: var(--stream-monaco-unchanged-fg, var(--markstream-diff-unchanged-fg, var(--code-line-number)));
+  line-height: 32px;
+}
+
+.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--collapsed::before {
+  left: 0;
+  height: 32px;
+  background: var(--stream-monaco-unchanged-bg, var(--markstream-diff-unchanged-bg, rgb(0 0 0 / 4%)));
+}
+
+.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--collapsed::after,
+.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--collapsed > .markstream-pre__diff-rail,
+.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--collapsed > .markstream-pre__diff-number {
+  display: none;
+}
+
+.markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--collapsed > .markstream-pre__diff-content {
+  width: 100%;
+  min-width: 0;
+  padding-left: calc(var(--markstream-pre-diff-code-left) + 12px);
+  line-height: 32px;
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--added::before {

@@ -12,6 +12,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(__dirname, '..')
 const playgroundDir = path.join(repoRoot, 'playground')
 const host = '127.0.0.1'
+const diffLayoutMode = process.env.DIFF_LAYOUT === 'side-by-side'
+  ? 'side-by-side'
+  : 'inline'
 
 const diffSample = [
   '```diff json:package.json',
@@ -140,6 +143,13 @@ function range(values) {
   return Math.max(...values) - Math.min(...values)
 }
 
+function maxAdjacentDelta(values) {
+  let max = 0
+  for (let index = 1; index < values.length; index++)
+    max = Math.max(max, Math.abs(values[index] - values[index - 1]))
+  return max
+}
+
 async function main() {
   const port = await findFreePort()
   const server = startDevServer(port)
@@ -165,6 +175,7 @@ async function main() {
               { name: 'vmr-test-stream-burstiness', value: '0' },
               { name: 'vmr-test-stream-slice-mode', value: 'pure-random' },
               { name: 'vmr-test-stream-transport-mode', value: 'scheduler' },
+              { name: 'vmr-test-diff-layout-mode', value: diffLayoutMode },
             ],
           },
         ],
@@ -172,7 +183,7 @@ async function main() {
     })
     const page = await context.newPage()
 
-    await page.goto(`http://${host}:${port}/test`, { waitUntil: 'load' })
+    await page.goto(`http://${host}:${port}/test?diffLayout=${diffLayoutMode}`, { waitUntil: 'load' })
     await page.waitForSelector('.editor-textarea')
     await page.evaluate((sample) => {
       const textarea = document.querySelector('.editor-textarea')
@@ -218,7 +229,49 @@ async function main() {
             return a.distance - b.distance
           })[0]
           ?.root ?? null
-        const block = diffRoot?.closest('.code-block-container') ?? null
+        const block = diffRoot?.closest('.code-block-container')
+          ?? Array.from(document.querySelectorAll('.preview-surface .code-block-container'))
+            .find((candidate) => {
+              const rect = candidate.getBoundingClientRect()
+              return rect.width > 0 && rect.height > 0
+            })
+            ?? null
+        const editorHost = block?.querySelector('.code-editor-container') ?? null
+        const fallback = block?.querySelector('pre.code-pre-fallback') ?? null
+        const fallbackStyle = fallback ? getComputedStyle(fallback) : null
+        const fallbackRect = fallback?.getBoundingClientRect() ?? null
+        const fallbackVisible = Boolean(
+          fallback
+          && fallbackRect
+          && fallbackRect.width > 0
+          && fallbackRect.height > 0
+          && fallbackStyle?.display !== 'none'
+          && fallbackStyle?.visibility !== 'hidden'
+          && Number.parseFloat(fallbackStyle?.opacity || '1') > 0.01,
+        )
+        const blockRect = block?.getBoundingClientRect() ?? null
+        const editorHostRect = editorHost?.getBoundingClientRect() ?? null
+        const visibleContentBottom = Math.max(
+          0,
+          ...Array.from(
+            editorHost?.querySelectorAll(
+              '.editor.original .view-line, .editor.modified .view-line, .editor.original .view-zones > div, .editor.modified .view-zones > div',
+            ) ?? [],
+          ).map((element) => {
+            const rect = element.getBoundingClientRect()
+            const style = getComputedStyle(element)
+            return rect.height > 0
+              && style.display !== 'none'
+              && style.visibility !== 'hidden'
+              && Number.parseFloat(style.opacity || '1') > 0.01
+              ? rect.bottom
+              : 0
+          }),
+        )
+        const editorBottomGap = editorHostRect && visibleContentBottom > 0
+          ? Math.round((editorHostRect.bottom - visibleContentBottom) * 1000) / 1000
+          : null
+        const sideBySide = Boolean(diffRoot?.classList.contains('stream-monaco-diff-side-by-side'))
         const diffRootDataset = diffRoot
           ? {
               streamingInlineControlledRaw: diffRoot.dataset.streamingInlineControlledRaw ?? null,
@@ -274,7 +327,9 @@ async function main() {
 
         const visibleDiffTexts = Array.from(
           diffRoot?.querySelectorAll(
-            '.editor.modified .view-line, .editor.modified .stream-monaco-fallback-inline-delete-zone, .editor.modified .inline-deleted-text, .editor.modified .view-lines.line-delete',
+            sideBySide
+              ? '.editor.original .view-line, .editor.modified .view-line'
+              : '.editor.modified .view-line, .editor.modified .stream-monaco-fallback-inline-delete-zone, .editor.modified .inline-deleted-text, .editor.modified .view-lines.line-delete',
           ) ?? [],
         )
           .map((element) => {
@@ -316,7 +371,9 @@ async function main() {
 
         const visibleOldNodes = Array.from(
           diffRoot?.querySelectorAll(
-            '.editor.modified .stream-monaco-fallback-inline-delete-zone, .editor.modified .stream-monaco-fallback-inline-delete-line, .editor.modified .inline-deleted-text, .editor.modified .view-line.line-delete, .editor.modified .view-lines.line-delete',
+            sideBySide
+              ? '.editor.original .view-line.line-delete, .editor.original .view-lines.line-delete'
+              : '.editor.modified .stream-monaco-fallback-inline-delete-zone, .editor.modified .stream-monaco-fallback-inline-delete-line, .editor.modified .inline-deleted-text, .editor.modified .view-line.line-delete, .editor.modified .view-lines.line-delete',
           ) ?? [],
         )
           .map((element) => {
@@ -495,7 +552,14 @@ async function main() {
           )
 
         return {
+          hasBlock: !!block,
           hasRoot: !!diffRoot,
+          sideBySide,
+          fallbackVisible,
+          enhanced: block?.getAttribute('data-markstream-enhanced') === 'true',
+          blockHeight: blockRect ? Math.round(blockRect.height * 1000) / 1000 : null,
+          editorHostHeight: editorHostRect ? Math.round(editorHostRect.height * 1000) / 1000 : null,
+          editorBottomGap,
           targetRootTop: diffRoot ? Math.round(diffRoot.getBoundingClientRect().top) : null,
           streaming: !!diffRoot && diffRoot.classList.contains('stream-monaco-diff-streaming-active'),
           diffStatsText,
@@ -518,8 +582,10 @@ async function main() {
       frames.push(frame)
     }
 
+    const blockFrames = frames.filter(frame => frame.hasBlock)
     const activeFrames = frames.filter(frame => frame.hasRoot || frame.diffStatsText?.includes('-1'))
-    const firstStablePairIndex = activeFrames.findIndex((frame) => {
+    const visibleEditorFrames = activeFrames.filter(frame => frame.enhanced)
+    const firstStablePairIndex = visibleEditorFrames.findIndex((frame) => {
       if (frame.visibleDiffTexts.length !== 2)
         return false
       const texts = frame.visibleDiffTexts.map(item => item.text)
@@ -528,17 +594,17 @@ async function main() {
     })
     const stableFrames = firstStablePairIndex === -1
       ? []
-      : activeFrames.slice(firstStablePairIndex)
+      : visibleEditorFrames.slice(firstStablePairIndex)
     const oldOnlyFramesBeforePair = (firstStablePairIndex === -1
-      ? activeFrames
-      : activeFrames.slice(0, firstStablePairIndex))
+      ? visibleEditorFrames
+      : visibleEditorFrames.slice(0, firstStablePairIndex))
       .filter((frame) => {
         return frame.visibleDiffTexts.some(item => item.text.includes('0.0.49'))
           && !frame.visibleDiffTexts.some(item => item.text.includes('0.0.54-beta.1'))
       })
     const newOnlyFramesBeforePair = (firstStablePairIndex === -1
-      ? activeFrames
-      : activeFrames.slice(0, firstStablePairIndex))
+      ? visibleEditorFrames
+      : visibleEditorFrames.slice(0, firstStablePairIndex))
       .filter((frame) => {
         return frame.visibleDiffTexts.some(item => item.text.includes('0.0.54-beta.1'))
           && !frame.visibleDiffTexts.some(item => item.text.includes('0.0.49'))
@@ -548,16 +614,42 @@ async function main() {
     const signatureValues = versionFrames.map(frame =>
       JSON.stringify(frame.visibleDiffTexts.map(item => item.text)),
     )
-    const zeroDiffStatsFrames = activeFrames.filter((frame) => {
+    const zeroDiffStatsFrames = visibleEditorFrames.filter((frame) => {
       if (!frame.streaming)
         return false
       const stats = (frame.diffStatsText || '').replace(/\s+/g, '')
       return stats === '-0+0' || stats === '-0+0…'
     })
-    const blankViewportFrames = activeFrames.filter(frame =>
+    const blankViewportFrames = visibleEditorFrames.filter(frame =>
       frame.visibleViewportRows.filter(row => !row.text).length >= 4,
     )
+    const firstEnhancedFrameIndex = blockFrames.findIndex(frame => frame.enhanced)
+    const lastFallbackFrame = firstEnhancedFrameIndex > 0
+      ? blockFrames.slice(0, firstEnhancedFrameIndex).findLast(frame => frame.fallbackVisible) ?? null
+      : null
+    const firstEnhancedFrame = firstEnhancedFrameIndex >= 0
+      ? blockFrames[firstEnhancedFrameIndex]
+      : null
+    const handoffHeightDelta = lastFallbackFrame && firstEnhancedFrame
+      ? Math.abs(firstEnhancedFrame.blockHeight - lastFallbackFrame.blockHeight)
+      : null
+    const enhancedFrames = blockFrames.filter(frame => frame.enhanced)
+    const fallbackHeights = blockFrames
+      .filter(frame => frame.fallbackVisible)
+      .map(frame => frame.blockHeight)
+      .filter(Number.isFinite)
     const result = {
+      diffLayoutMode,
+      blockFrameCount: blockFrames.length,
+      fallbackFrameCount: blockFrames.filter(frame => frame.fallbackVisible).length,
+      maxFallbackHeightDelta: maxAdjacentDelta(fallbackHeights),
+      enhancedFrameCount: enhancedFrames.length,
+      handoffHeightDelta,
+      enhancedBlockHeightRange: range(enhancedFrames.map(frame => frame.blockHeight).filter(Number.isFinite)),
+      enhancedEditorHostHeightRange: range(enhancedFrames.map(frame => frame.editorHostHeight).filter(Number.isFinite)),
+      enhancedEditorBottomGapRange: range(enhancedFrames.map(frame => frame.editorBottomGap).filter(Number.isFinite)),
+      maxEnhancedEditorBottomGap: Math.max(0, ...enhancedFrames.map(frame => frame.editorBottomGap).filter(Number.isFinite)),
+      maxStableEditorBottomGap: Math.max(0, ...versionFrames.map(frame => frame.editorBottomGap).filter(Number.isFinite)),
       activeFrameCount: activeFrames.length,
       stableFrameCount: stableFrames.length,
       versionFrameCount: versionFrames.length,
@@ -605,9 +697,16 @@ async function main() {
         return !texts.some(text => text.includes('"version"') && text.includes('0.0.49'))
           || !texts.some(text => text.includes('"version"') && text.includes('0.0.54-beta.1'))
       }) ?? null,
+      lastFallbackFrame,
+      firstEnhancedFrame,
+      finalEnhancedFrame: enhancedFrames.at(-1) ?? null,
     }
 
-    const ok = result.activeFrameCount >= 12
+    const ok = result.blockFrameCount >= 12
+      && result.enhancedFrameCount > 0
+      && result.maxFallbackHeightDelta <= (diffLayoutMode === 'inline' ? 40 : 20)
+      && (result.handoffHeightDelta == null || result.handoffHeightDelta <= 2)
+      && result.maxStableEditorBottomGap <= 10
       && result.stableFrameCount > 0
       && result.versionFrameCount > 0
       && result.oldOnlyFramesBeforePair === 0
