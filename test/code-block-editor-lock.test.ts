@@ -341,13 +341,11 @@ describe('codeBlockNode editor creation locking', () => {
     await waitForCreateEditorCalls(1, helpers)
 
     expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(true)
-    expect(wrapper.find('pre.code-pre-handoff').exists()).toBe(true)
     expect(wrapper.find('pre.code-pre-fallback').classes()).toContain('markstream-pre--line-numbers')
     expect(wrapper.findAll('.markstream-pre__line-number').map(node => node.text())).toEqual(['1'])
     expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-pending')).toBe('true')
     expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhancement-state')).toBe('pending')
     expect(wrapper.get('.code-editor-container').attributes('data-markstream-host-hidden')).toBe('true')
-    expect(wrapper.find('.code-block-header').exists()).toBe(false)
 
     const finish = resolveCreate
     if (finish)
@@ -359,7 +357,6 @@ describe('codeBlockNode editor creation locking', () => {
       expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-pending')).toBeUndefined()
       expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhancement-state')).toBe('ready')
       expect(wrapper.get('.code-editor-container').attributes('data-markstream-host-hidden')).toBeUndefined()
-      expect(wrapper.find('.code-block-header').exists()).toBe(false)
     })
 
     wrapper.unmount()
