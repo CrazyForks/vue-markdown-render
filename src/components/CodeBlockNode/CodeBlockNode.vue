@@ -2740,22 +2740,11 @@ function bindEditorHeightSync() {
           return
         if (!shouldAllowDiffDomHeightShrink(host))
           return
-        const shouldShrinkHostHeight = mutations.some(mutation =>
-          mutation.target === host
-          && mutation.type === 'attributes'
-          && mutation.attributeName === 'style',
-        ) && (() => {
-          const renderedHeight = measureRenderedDiffHeight(host)
-          if (renderedHeight == null)
-            return false
-          const hostHeight = Math.ceil(host.getBoundingClientRect().height || 0)
-          return hostHeight > renderedHeight + PIXEL_EPSILON
-        })()
         const shouldSync = mutations.some(mutation =>
           isRelevantMutationTarget(mutation.target)
           || Array.from(mutation.addedNodes).some(hasRelevantMutationSubtree)
           || Array.from(mutation.removedNodes).some(isRelevantMutationTarget),
-        ) || shouldShrinkHostHeight
+        )
         if (!shouldSync)
           return
         syncInlineFoldProxies()
@@ -2764,7 +2753,7 @@ function bindEditorHeightSync() {
         scheduleStreamingDiffHeightChase()
       })
       observer.observe(host, {
-        attributeFilter: ['class', 'style'],
+        attributeFilter: ['class'],
         attributes: true,
         childList: true,
         characterData: true,

@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import CodeBlockNode from '../src/components/CodeBlockNode/CodeBlockNode.vue'
 import { resetCodeBlockRuntimeReadyForTest } from '../src/components/CodeBlockNode/runtime'
@@ -47,6 +47,49 @@ async function flushPendingMicrotasks() {
 describe('diff CodeBlockNode fallback height stability', () => {
   beforeEach(() => {
     resetHelpers()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('does not observe host style writes during diff height synchronization', async () => {
+    const observations: Array<{ options: MutationObserverInit, target: Node }> = []
+    vi.stubGlobal('MutationObserver', class {
+      constructor(_callback: MutationCallback) {}
+
+      observe(target: Node, options: MutationObserverInit) {
+        observations.push({ options, target })
+      }
+
+      disconnect() {}
+    })
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'ts',
+          code: '',
+          raw: '',
+          diff: true,
+          originalCode: 'const a = 1',
+          updatedCode: 'const a = 2',
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flushPendingMicrotasks()
+
+    const hostObservation = observations.find(({ target }) =>
+      (target as HTMLElement).classList?.contains('code-editor-container'),
+    )
+    expect(hostObservation?.options.attributeFilter).toEqual(['class'])
+
+    wrapper.unmount()
   })
 
   it('provides non-null minHeight for diff fallback even when estimatedContentHeightPx is set', async () => {
