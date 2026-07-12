@@ -795,14 +795,7 @@ function isVisibleNodeSlotReady(slot: HTMLElement) {
   if (!content)
     return false
 
-  const hasBlockingPendingNode = Array
-    .from(content.querySelectorAll<HTMLElement>('[data-markstream-pending="true"]'))
-    .some((node) => {
-      if (node.matches('[data-markstream-code-block="1"]'))
-        return !hasUsableCodeFallback(node.querySelector<HTMLElement>('pre.code-pre-fallback'))
-      return true
-    })
-  if (hasBlockingPendingNode)
+  if (content.querySelector('[data-markstream-pending="true"]'))
     return false
 
   if (!isMathReady(content))
