@@ -592,6 +592,7 @@ describe('typewriter cursor position', () => {
     let wrapper: ReturnType<typeof mount> | null = null
     let rangeNode: Node | null = null
     let measuredText = ''
+    let runBatchDelay: (() => void) | null = null
 
     process.env.NODE_ENV = 'development'
     vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
@@ -605,6 +606,15 @@ describe('typewriter cursor position', () => {
       if (index >= 0)
         queuedFrames.splice(index, 1)
     }) as typeof cancelAnimationFrame)
+
+    const nativeSetTimeout = window.setTimeout.bind(window)
+    vi.spyOn(window, 'setTimeout').mockImplementation(((handler: TimerHandler, timeout?: number, ...args: any[]) => {
+      if (timeout === 20 && typeof handler === 'function') {
+        runBatchDelay = () => handler(...args)
+        return 2_147_483_647
+      }
+      return nativeSetTimeout(handler, timeout, ...args)
+    }) as typeof window.setTimeout)
 
     const originalCreateRange = document.createRange.bind(document)
     vi.spyOn(document, 'createRange').mockImplementation(() => {
@@ -651,7 +661,9 @@ describe('typewriter cursor position', () => {
       await runNextFrame(queuedFrames, performance.now() + 32)
       expect(measuredText).toBe('first')
 
-      await new Promise(resolve => setTimeout(resolve, 25))
+      const batchDelay = runBatchDelay
+      expect(batchDelay).not.toBeNull()
+      batchDelay?.()
       await flushAll()
 
       expect(wrapper.find('.node-slot[data-node-index="1"] .node-content').exists()).toBe(true)
