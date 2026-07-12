@@ -565,7 +565,6 @@ function nowMs() {
 
 function isActiveExternalRestore(seq: number) {
   return seq === externalRestoreSeq
-    && isRestoringThread.value
     && !restorePaintReady.value
 }
 
@@ -1021,6 +1020,9 @@ function finishExternalRestore(seq: number) {
     scrollerRef.value?.scrollToPosition?.(offset)
 
   restoreRowsVisible.value = true
+  // Keep readiness pending while removing restore-only layout styles so the
+  // stability check includes the final row-height reconciliation.
+  isRestoringThread.value = false
   updateScrollMetrics()
   void waitExternalRestoreVisibleReady(seq)
 }
@@ -1360,7 +1362,7 @@ onBeforeUnmount(() => {
         ref="scrollerRef"
         class="message-scroller"
         :class="{
-          'is-restoring-thread': !restorePaintReady,
+          'is-restoring-thread': isRestoringThread,
           'is-restore-layout-hidden': !restoreRowsVisible,
         }"
         :items="items"
