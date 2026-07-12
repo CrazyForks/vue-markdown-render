@@ -565,7 +565,6 @@ function nowMs() {
 
 function isActiveExternalRestore(seq: number) {
   return seq === externalRestoreSeq
-    && isRestoringThread.value
     && !restorePaintReady.value
 }
 
@@ -796,14 +795,7 @@ function isVisibleNodeSlotReady(slot: HTMLElement) {
   if (!content)
     return false
 
-  const hasBlockingPendingNode = Array
-    .from(content.querySelectorAll<HTMLElement>('[data-markstream-pending="true"]'))
-    .some((node) => {
-      if (node.matches('[data-markstream-code-block="1"]'))
-        return !hasUsableCodeFallback(node.querySelector<HTMLElement>('pre.code-pre-fallback'))
-      return true
-    })
-  if (hasBlockingPendingNode)
+  if (content.querySelector('[data-markstream-pending="true"]'))
     return false
 
   if (!isMathReady(content))
@@ -1021,6 +1013,9 @@ function finishExternalRestore(seq: number) {
     scrollerRef.value?.scrollToPosition?.(offset)
 
   restoreRowsVisible.value = true
+  // Keep readiness pending while removing restore-only layout styles so the
+  // stability check includes the final row-height reconciliation.
+  isRestoringThread.value = false
   updateScrollMetrics()
   void waitExternalRestoreVisibleReady(seq)
 }
@@ -1360,7 +1355,7 @@ onBeforeUnmount(() => {
         ref="scrollerRef"
         class="message-scroller"
         :class="{
-          'is-restoring-thread': !restorePaintReady,
+          'is-restoring-thread': isRestoringThread,
           'is-restore-layout-hidden': !restoreRowsVisible,
         }"
         :items="items"

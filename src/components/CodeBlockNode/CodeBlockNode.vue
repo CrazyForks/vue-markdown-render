@@ -1188,9 +1188,6 @@ function clearEstimatedEditorHeightFloor() {
 }
 
 async function revealEditorDisplay() {
-  if (isDiff.value && props.stream !== false && isCodeBlockLoading())
-    return
-
   if (!isDiff.value) {
     editorDisplayReady.value = true
     await nextTick()
@@ -3116,11 +3113,12 @@ async function waitForEditorRuntimeCreation(currentRuntimeCreation: Promise<void
 // one view-line, then does a final presentation pass. This prevents the
 // "plain Monaco editor" intermediate frame (the third state between the pre
 // fallback and the fully decorated diff surface).
-async function waitForDiffEditorVisualReady(options: { requireHighlight?: boolean } = {}) {
+async function waitForDiffEditorVisualReady(options: { requireHighlight?: boolean, allowStreamingSnapshot?: boolean } = {}) {
   if (!isDiff.value)
     return true
 
   const requireHighlight = options.requireHighlight !== false
+  const allowStreamingSnapshot = options.allowStreamingSnapshot === true
   const maxPasses = 30
   const requiredStableReadyPasses = 2
   let stableReadyPasses = 0
@@ -3186,7 +3184,7 @@ async function waitForDiffEditorVisualReady(options: { requireHighlight?: boolea
       const readyInlineNative = hasInlineDiffNativePresentationReady(readyRoot, expectsChangedDom)
       const readyLineFill = hasExpectedChangedDiffViewLineFill(readyRoot, expected)
       const readyHighlight = !requireHighlight || hasLanguageHighlightReady(readyRoot)
-      if (
+      const strictReady = (
         hasDiffPresentationRootClass(readyRoot)
         && readyLineNumberGutter
         && hasDiffContentLayoutReady(readyRoot)
@@ -3195,7 +3193,17 @@ async function waitForDiffEditorVisualReady(options: { requireHighlight?: boolea
         && readyInlineNative
         && readyLineFill
         && readyHighlight
-      ) {
+      )
+      const streamingSnapshotReady = (
+        allowStreamingSnapshot
+        && hasDiffPresentationRootClass(readyRoot)
+        && readyLineNumberGutter
+        && hasDiffContentLayoutReady(readyRoot)
+        && readyChangedDom
+        && readyGutterDom
+        && readyHighlight
+      )
+      if (strictReady || streamingSnapshotReady) {
         stableReadyPasses++
         if (stableReadyPasses >= requiredStableReadyPasses)
           return true
@@ -3841,7 +3849,10 @@ async function runEditorCreation(el: HTMLElement) {
   await nextTick()
   // Geometry, diff decorations, and syntax tokens must be ready before handoff.
   const diffVisualReady = creationKind === 'diff'
-    ? await waitForDiffEditorVisualReady({ requireHighlight: true })
+    ? await waitForDiffEditorVisualReady({
+        requireHighlight: true,
+        allowStreamingSnapshot: isCodeBlockLoading(),
+      })
     : await waitForSingleEditorVisualReady()
   if (isUnmounted)
     return

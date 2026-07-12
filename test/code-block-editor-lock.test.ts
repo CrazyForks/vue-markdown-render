@@ -3470,7 +3470,7 @@ describe('codeBlockNode diff defaults', () => {
     )
 
     const visualReadyStart = source.indexOf('async function waitForDiffEditorVisualReady(')
-    const ensureStart = source.indexOf('? await waitForDiffEditorVisualReady({ requireHighlight: true })')
+    const ensureStart = source.indexOf('allowStreamingSnapshot: isCodeBlockLoading()', visualReadyStart)
 
     expect(visualReadyStart).toBeGreaterThanOrEqual(0)
     expect(source).toContain('const requiredStableReadyPasses = 2')
@@ -4287,7 +4287,7 @@ describe('codeBlockNode diff defaults', () => {
     wrapper.unmount()
   })
 
-  it('keeps the streaming diff fallback until the settled editor is ready without recreating it', async () => {
+  it('reveals a ready streaming diff snapshot and updates it without recreating the editor', async () => {
     const helpers = getStreamMonacoHelpers()
     const diffEditor = helpers.getDiffEditorView() as any
 
@@ -4310,8 +4310,8 @@ describe('codeBlockNode diff defaults', () => {
 
     await waitForCreateDiffEditorCalls(1, helpers)
     await flushPendingMicrotasks()
-    expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(true)
-    expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhanced')).toBe('false')
+    expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(false)
+    expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhanced')).toBe('true')
 
     helpers.createDiffEditor.mockClear()
     helpers.safeClean.mockClear()
