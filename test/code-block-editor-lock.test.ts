@@ -1037,9 +1037,9 @@ describe('codeBlockNode editor creation locking', () => {
       const fallback = wrapper.get('pre.code-pre-fallback')
       expect(fallback.classes()).toContain('markstream-pre--diff-preview')
       expect(fallback.classes()).toContain('markstream-pre--diff-inline')
-      expect(fallback.element.style.getPropertyValue('--stream-monaco-line-number-width')).toBe('2ch')
-      expect(fallback.element.style.getPropertyValue('--stream-monaco-line-number-gap-to-code')).toBe('var(--stream-monaco-layout-character-width)')
-      expect(fallback.element.style.getPropertyValue('--stream-monaco-diff-code-gap')).toBe('1ch')
+      expect(fallback.element.style.getPropertyValue('--stream-monaco-line-number-width')).toContain('--markstream-code-layout-character-width')
+      expect(fallback.element.style.getPropertyValue('--stream-monaco-line-number-gap-to-code')).toBe('var(--markstream-code-layout-character-width, 1ch)')
+      expect(fallback.element.style.getPropertyValue('--stream-monaco-diff-code-gap')).toBe('var(--markstream-code-layout-character-width, 1ch)')
       expect(fallback.element.style.getPropertyValue('--stream-monaco-diff-code-padding')).toBe('0px')
       expect(wrapper.findAll('.markstream-pre__diff-pane')).toHaveLength(1)
       expect(wrapper.findAll('.markstream-pre__diff-content').map(node => node.text())).toEqual([
@@ -2796,7 +2796,7 @@ describe('codeBlockNode language normalization', () => {
     wrapper.unmount()
   })
 
-  it('waits for code before initializing Monaco for a partial streaming fence language', async () => {
+  it('preloads Monaco but waits for code before creating an editor for a partial streaming fence language', async () => {
     const helpers = getStreamMonacoHelpers()
 
     const wrapper = mount(CodeBlockNode, {
@@ -2814,6 +2814,7 @@ describe('codeBlockNode language normalization', () => {
     })
 
     await flushPendingMicrotasks()
+    expect(helpers.useMonaco).toHaveBeenCalledTimes(1)
     expect(helpers.createEditor).not.toHaveBeenCalled()
 
     await wrapper.setProps({
@@ -3546,12 +3547,14 @@ describe('codeBlockNode diff defaults', () => {
     expect(source).toContain('--stream-monaco-line-number-left: 0px;')
     expect(source).toContain('--stream-monaco-line-number-width: 2ch;')
     expect(source).toContain('--stream-monaco-line-number-box-width: calc(')
-    expect(source).toContain('\'--stream-monaco-line-number-width\': \'2ch\'')
+    expect(source).toContain('const characterWidth = \'var(--markstream-code-layout-character-width, 1ch)\'')
+    expect(source).toContain('\'--stream-monaco-line-number-width\': doubleCharacterWidth')
     expect(source).toContain('--markstream-diff-gutter-guide: hsl(var(--ms-border) / 0.72);')
-    expect(source).toContain('\'--stream-monaco-line-number-padding-left\': \'2ch\'')
-    expect(source).toContain('\'--stream-monaco-line-number-padding-right\': \'1ch\'')
+    expect(source).toContain('\'--stream-monaco-line-number-padding-left\': doubleCharacterWidth')
+    expect(source).toContain('\'--stream-monaco-line-number-padding-right\': characterWidth')
     expect(source).toContain('\'--stream-monaco-line-number-separator-width\': \'2px\'')
-    expect(source).toContain('\'--stream-monaco-line-number-gap-to-code\': \'var(--stream-monaco-layout-character-width)\'')
+    expect(source).toContain('\'--stream-monaco-line-number-gap-to-code\': characterWidth')
+    expect(source).toContain('\'--stream-monaco-modified-margin-width\': marginWidth')
     expect(source).toContain('\'--stream-monaco-line-number-bg\': lineNumberBg')
     expect(source).toContain('\'--stream-monaco-diff-code-padding\': \'0px\'')
     expect(preSource).toContain('--stream-monaco-line-number-width,\n    2ch')

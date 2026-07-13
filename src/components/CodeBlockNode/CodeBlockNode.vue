@@ -1026,6 +1026,10 @@ function getDiffVisualVars(isDark: boolean) {
   const addedGutter = `linear-gradient(90deg, ${addedFg} 0 4px, transparent 4px 100%)`
   const removedGutter = `linear-gradient(90deg, ${removedFg} 0 4px, transparent 4px 100%)`
   const lineNumberBg = isDark ? 'hsl(0 0% 7% / 0.98)' : 'hsl(var(--ms-muted) / 0.45)'
+  const characterWidth = 'var(--markstream-code-layout-character-width, 1ch)'
+  const doubleCharacterWidth = `calc(${characterWidth} + ${characterWidth})`
+  const lineNumberBoxWidth = `calc(${characterWidth} + ${characterWidth} + ${characterWidth} + ${characterWidth} + ${characterWidth} + 2px)`
+  const marginWidth = `calc(${lineNumberBoxWidth} + ${characterWidth})`
   return {
     '--markstream-diff-line-number-bg': lineNumberBg,
     '--markstream-diff-added-fg': addedFg,
@@ -1051,15 +1055,22 @@ function getDiffVisualVars(isDark: boolean) {
     '--stream-monaco-gutter-marker-width': '4px',
     '--stream-monaco-gutter-gap': '1ch',
     '--stream-monaco-line-number-left': '0px',
-    '--stream-monaco-line-number-width': '2ch',
-    '--stream-monaco-line-number-padding-left': '2ch',
-    '--stream-monaco-line-number-padding-right': '1ch',
+    '--stream-monaco-line-number-width': doubleCharacterWidth,
+    '--stream-monaco-line-number-padding-left': doubleCharacterWidth,
+    '--stream-monaco-line-number-padding-right': characterWidth,
     '--stream-monaco-line-number-separator-width': '2px',
-    '--stream-monaco-layout-character-width': '1ch',
-    '--stream-monaco-line-number-gap-to-code': 'var(--stream-monaco-layout-character-width)',
+    '--stream-monaco-layout-character-width': characterWidth,
+    '--stream-monaco-line-number-box-width': lineNumberBoxWidth,
+    '--stream-monaco-line-number-gap-to-code': characterWidth,
     '--stream-monaco-line-number-bg': lineNumberBg,
-    '--stream-monaco-diff-code-gap': '1ch',
+    '--stream-monaco-diff-code-gap': characterWidth,
     '--stream-monaco-diff-code-padding': '0px',
+    '--stream-monaco-original-margin-width': marginWidth,
+    '--stream-monaco-original-scrollable-left': marginWidth,
+    '--stream-monaco-original-scrollable-width': `calc(100% - ${marginWidth})`,
+    '--stream-monaco-modified-margin-width': marginWidth,
+    '--stream-monaco-modified-scrollable-left': marginWidth,
+    '--stream-monaco-modified-scrollable-width': `calc(100% - ${marginWidth})`,
   }
 }
 
@@ -3920,8 +3931,6 @@ const stopCreateEditorWatch = watch(
     // If streaming is disabled, defer editor creation until loading is finished
     if (stream === false && loading !== false)
       return
-    if (shouldDeferStreamingEditorCreation())
-      return
     if (!createEditor) {
       await ensureMonacoRuntime()
       if (watchEpoch !== createEditorWatchEpoch)
@@ -3943,6 +3952,8 @@ const stopCreateEditorWatch = watch(
         return
       }
     }
+    if (shouldDeferStreamingEditorCreation())
+      return
 
     const creation = ensureEditorCreation(el as HTMLElement)
     if (!creation)
