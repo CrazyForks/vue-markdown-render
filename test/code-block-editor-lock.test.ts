@@ -5308,9 +5308,21 @@ describe('codeBlockNode diff defaults', () => {
     }
   })
 
-  it('releases diff fallback height floor after unchanged lines are folded', async () => {
+  it('releases the folded height floor and restores model height when unchanged lines expand', async () => {
     const helpers = getStreamMonacoHelpers()
     const fullFallbackHeight = 41 * 18
+    let didUpdateDiff: (() => void) | null = null
+    const originalResizeObserver = globalThis.ResizeObserver
+    const resizeObserverCallbacks: ResizeObserverCallback[] = []
+    globalThis.ResizeObserver = class {
+      constructor(callback: ResizeObserverCallback) {
+        resizeObserverCallbacks.push(callback)
+      }
+
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as typeof ResizeObserver
     const rect = (top: number, height: number, width = 240, left = 0) => ({
       x: left,
       y: top,
@@ -5349,7 +5361,10 @@ describe('codeBlockNode diff defaults', () => {
       ]),
       getOriginalEditor: vi.fn(() => makeSideEditor()),
       getModifiedEditor: vi.fn(() => makeSideEditor()),
-      onDidUpdateDiff: vi.fn(() => ({ dispose: vi.fn() })),
+      onDidUpdateDiff: vi.fn((listener: () => void) => {
+        didUpdateDiff = listener
+        return { dispose: vi.fn() }
+      }),
       updateOptions: vi.fn(),
       layout: vi.fn(),
     }
@@ -5445,9 +5460,41 @@ describe('codeBlockNode diff defaults', () => {
         expect(height).toBeLessThan(500)
         expect(minHeight).toBe(0)
       })
+
+      const unchangedCenter = editorHost.querySelector('.diff-hidden-lines .center')
+      unchangedCenter?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      for (const [index, line] of Array.from(editorHost.querySelectorAll('.view-lines .view-line')).entries())
+        setRect(line, index % 2 === 0 ? 0 : 482, 18, 240, 50.8)
+      didUpdateDiff?.()
+      await flushPendingMicrotasks()
+
+      await vi.waitFor(() => {
+        expect(Number.parseFloat(editorHost.style.height || '0')).toBe(500)
+      })
+
+      for (const [index, line] of Array.from(editorHost.querySelectorAll('.view-lines .view-line')).entries())
+        setRect(line, index % 2 === 0 ? 0 : 458, 18, 240, 50.8)
+      editorHost.style.height = '476px'
+      for (const callback of resizeObserverCallbacks)
+        callback([], {} as ResizeObserver)
+      await flushPendingMicrotasks()
+
+      await vi.waitFor(() => {
+        expect(Number.parseFloat(editorHost.style.height || '0')).toBe(500)
+      })
+
+      for (const hiddenLines of Array.from(editorHost.querySelectorAll('.diff-hidden-lines')))
+        hiddenLines.remove()
+      didUpdateDiff?.()
+      await flushPendingMicrotasks()
+
+      await vi.waitFor(() => {
+        expect(Number.parseFloat(editorHost.style.height || '0')).toBe(500)
+      })
     }
     finally {
       wrapper.unmount()
+      globalThis.ResizeObserver = originalResizeObserver
     }
   })
 

@@ -201,7 +201,6 @@ let streamingDiffHeightChaseAllowSettled = false
 let lifecyclePendingIndexKey = ''
 const heightBeforeCollapse = ref<number | null>(null)
 const lastStableCollapsedDiffHeight = ref<number | null>(null)
-let collapsedDiffSettleGuardUntil = 0
 let resumeGuardFrames = 0
 const registerVisibility = useViewportPriority()
 const viewportPriorityOptions = useViewportPriorityOptions()
@@ -2046,9 +2045,10 @@ function estimateDiffEditorContentHeight(): number | null {
       originalEditor.getContentHeight?.() ?? 0,
       modifiedEditor.getContentHeight?.() ?? 0,
     )
-    if (contentHeight > 0)
-      return Math.ceil(contentHeight)
-    return Math.ceil(lineCount * lineHeight + verticalPadding + CONTENT_PADDING)
+    return Math.ceil(Math.max(
+      contentHeight,
+      lineCount * lineHeight + verticalPadding + CONTENT_PADDING,
+    ))
   }
   catch {
     return null
@@ -2732,6 +2732,27 @@ function bindEditorHeightSync() {
       })
       editorHeightSyncDisposables.push({ dispose: () => observer.disconnect() })
     }
+    if (host) {
+      const startUnchangedRegionExpansion = (event: MouseEvent) => {
+        const target = event.target instanceof Element ? event.target : null
+        if (!target?.closest([
+          '.stream-monaco-unchanged-summary',
+          '.stream-monaco-unchanged-reveal',
+          '.stream-monaco-unchanged-expand',
+          '.markstream-inline-fold-proxy',
+          '.diff-hidden-lines .center',
+        ].join(','))) {
+          return
+        }
+        const height = Math.ceil(host.getBoundingClientRect().height || 0)
+        if (height > 0)
+          lastStableCollapsedDiffHeight.value = height
+      }
+      host.addEventListener('click', startUnchangedRegionExpansion, true)
+      editorHeightSyncDisposables.push({
+        dispose: () => host.removeEventListener('click', startUnchangedRegionExpansion, true),
+      })
+    }
     if (host && typeof ResizeObserver !== 'undefined') {
       const resizeObserver = new ResizeObserver(() => {
         if (!isDiff.value)
@@ -2742,6 +2763,17 @@ function bindEditorHeightSync() {
         if (renderedHeight == null)
           return
         const hostHeight = Math.ceil(host.getBoundingClientRect().height || 0)
+        const stableHeight = lastStableCollapsedDiffHeight.value
+        if (hasVisibleDiffHiddenLines(host) && stableHeight != null) {
+          if (hostHeight > stableHeight + PIXEL_EPSILON) {
+            lastStableCollapsedDiffHeight.value = hostHeight
+          }
+          else if (hostHeight < stableHeight - PIXEL_EPSILON) {
+            applyCollapsedContainerHeight(host, stableHeight, getMaxHeightValue())
+            layoutEditorToHost()
+            return
+          }
+        }
         if (hostHeight <= renderedHeight + PIXEL_EPSILON)
           return
         syncInlineFoldProxies()
@@ -2847,7 +2879,9 @@ function updateCollapsedHeight(options: EditorHostHeightSyncOptions = {}) {
         && currentHostHeight > 0
         && estimatedDiffHeight < currentHostHeight - PIXEL_EPSILON
       if (props.loading === false && measuredDiffHeight != null) {
-        h0 = measuredDiffHeight
+        h0 = hasVisibleCollapsedDiffSummary || estimatedDiffHeight == null
+          ? measuredDiffHeight
+          : Math.max(measuredDiffHeight, estimatedDiffHeight)
       }
       else {
         h0 = shouldShrinkToModel
@@ -2910,24 +2944,21 @@ function updateCollapsedHeight(options: EditorHostHeightSyncOptions = {}) {
     }
     // 1) 有实时内容高度 -> 采用并记忆原始内容高度（未裁剪前），用于下一次恢复
     if (h0 != null && h0 > 0) {
-      const shouldKeepLastStableCollapsedDiffHeight = lastStableCollapsedDiffHeight.value != null
-        && Date.now() < collapsedDiffSettleGuardUntil
-        && h0 >= max - PIXEL_EPSILON
+      const shouldKeepLastStableCollapsedDiffHeight = hasVisibleCollapsedDiffSummary
+        && lastStableCollapsedDiffHeight.value != null
       const shouldKeepCurrentCollapsedDiffHeight = hasVisibleCollapsedDiffSummary
         && rectH > 0
         && rectH < max - PIXEL_EPSILON
         && h0 >= max - PIXEL_EPSILON
       const measuredHeight = shouldKeepLastStableCollapsedDiffHeight
-        ? lastStableCollapsedDiffHeight.value!
+        ? Math.max(lastStableCollapsedDiffHeight.value!, h0)
         : shouldKeepCurrentCollapsedDiffHeight ? rectH : h0
       const h = applyCollapsedContainerHeight(container, measuredHeight, max, {
         clearEstimatedFloor: true,
         allowBelowEstimatedFloor: foldedDiffReadyForShrink || allowBelowPlainEstimatedFloor || allowBelowStreamingDiffEstimatedFloor,
       })
-      if (hasVisibleCollapsedDiffSummary && h < max - PIXEL_EPSILON) {
-        lastStableCollapsedDiffHeight.value = h
-        collapsedDiffSettleGuardUntil = Date.now() + 160
-      }
+      if (hasVisibleCollapsedDiffSummary && lastStableCollapsedDiffHeight.value != null)
+        lastStableCollapsedDiffHeight.value = Math.max(lastStableCollapsedDiffHeight.value, h)
       adjustScrollAfterHeightChange(container, oldHeight, h)
       return
     }
@@ -2951,23 +2982,20 @@ function updateCollapsedHeight(options: EditorHostHeightSyncOptions = {}) {
           )
     // 3) 使用当前 DOM 高度或保守估算高度（不更新记忆值）
     if (stableFallbackHeight > 0) {
-      const shouldKeepLastStableCollapsedDiffHeight = lastStableCollapsedDiffHeight.value != null
-        && Date.now() < collapsedDiffSettleGuardUntil
-        && stableFallbackHeight >= max - PIXEL_EPSILON
+      const shouldKeepLastStableCollapsedDiffHeight = hasVisibleCollapsedDiffSummary
+        && lastStableCollapsedDiffHeight.value != null
       const shouldKeepCurrentCollapsedDiffHeight = hasVisibleCollapsedDiffSummary
         && rectH > 0
         && rectH < max - PIXEL_EPSILON
         && stableFallbackHeight >= max - PIXEL_EPSILON
       const fallbackHeight = shouldKeepLastStableCollapsedDiffHeight
-        ? lastStableCollapsedDiffHeight.value!
+        ? Math.max(lastStableCollapsedDiffHeight.value!, stableFallbackHeight)
         : shouldKeepCurrentCollapsedDiffHeight ? rectH : stableFallbackHeight
       const h = applyCollapsedContainerHeight(container, fallbackHeight, max, {
         allowBelowEstimatedFloor: foldedDiffReadyForShrink,
       })
-      if (hasVisibleCollapsedDiffSummary && h < max - PIXEL_EPSILON) {
-        lastStableCollapsedDiffHeight.value = h
-        collapsedDiffSettleGuardUntil = Date.now() + 160
-      }
+      if (hasVisibleCollapsedDiffSummary && lastStableCollapsedDiffHeight.value != null)
+        lastStableCollapsedDiffHeight.value = Math.max(lastStableCollapsedDiffHeight.value, h)
       adjustScrollAfterHeightChange(container, oldHeight, h)
       return
     }
@@ -3340,6 +3368,7 @@ watch(
 watch(
   () => [props.node.originalCode, props.node.updatedCode, isDiff.value] as const,
   () => {
+    lastStableCollapsedDiffHeight.value = null
     syncEstimatedDiffStats()
     safeRaf(() => refreshDiffStats())
   },
