@@ -405,6 +405,8 @@ describe('pre code node diff preview', () => {
     expect(source).toContain('.markstream-pre__diff-line--removed > .markstream-pre__diff-number')
     expect(source).toContain('background: var(--stream-monaco-added-line-fill, var(--markstream-diff-added-line-fill, transparent));')
     expect(source).toContain('background: var(--stream-monaco-removed-line-fill, var(--markstream-diff-removed-line-fill, transparent));')
+    expect(source).toContain('linear-gradient(\n      var(--stream-monaco-added-line-fill')
+    expect(source).toContain('linear-gradient(\n      var(--stream-monaco-removed-line-fill')
     expect(source).toContain('--markstream-pre-diff-line-number-bg: var(')
     expect(source).toContain('background: var(--markstream-pre-diff-line-number-bg);')
     expect(source).toContain('border-right: var(--markstream-pre-diff-line-number-separator-width, 2px) solid var(--stream-monaco-editor-bg, var(--code-bg));')

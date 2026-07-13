@@ -1206,11 +1206,21 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--added::before {
-  background: var(--stream-monaco-added-line-fill, var(--markstream-diff-added-line-fill, transparent));
+  background:
+    linear-gradient(
+      var(--stream-monaco-added-line-fill, var(--markstream-diff-added-line-fill, transparent)),
+      var(--stream-monaco-added-line-fill, var(--markstream-diff-added-line-fill, transparent))
+    ),
+    var(--stream-monaco-added-line-fill, var(--markstream-diff-added-line-fill, transparent));
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--removed::before {
-  background: var(--stream-monaco-removed-line-fill, var(--markstream-diff-removed-line-fill, transparent));
+  background:
+    linear-gradient(
+      var(--stream-monaco-removed-line-fill, var(--markstream-diff-removed-line-fill, transparent)),
+      var(--stream-monaco-removed-line-fill, var(--markstream-diff-removed-line-fill, transparent))
+    ),
+    var(--stream-monaco-removed-line-fill, var(--markstream-diff-removed-line-fill, transparent));
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--added::after {

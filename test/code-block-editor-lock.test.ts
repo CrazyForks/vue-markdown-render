@@ -3402,6 +3402,8 @@ describe('codeBlockNode diff defaults', () => {
     expect(source).toContain('background: var(--stream-monaco-removed-line-fill) !important;')
     expect(source).toContain('margin-left: 0 !important;')
     expect(source).toContain('background: var(--stream-monaco-removed-gutter), var(--stream-monaco-removed-line-fill) !important;')
+    expect(source).toContain('.margin-view-overlays > .gutter-insert > .cmdr.gutter-insert')
+    expect(source).toContain('.margin-view-overlays > .gutter-delete > .cmdr.gutter-delete')
     expect(source).toContain('.editor.modified .inline-deleted-margin-view-zone')
     expect(source).toContain('.editor.modified .stream-monaco-fallback-inline-delete-margin')
     const root = document.createElement('div')
@@ -4009,7 +4011,7 @@ describe('codeBlockNode diff defaults', () => {
     wrapper.unmount()
   })
 
-  it('removes inline diff horizontal scrollbar from Monaco layout while preserving vertical scrollbar options', async () => {
+  it('removes hidden diff scrollbar reserves from Monaco layout', async () => {
     const helpers = getStreamMonacoHelpers()
 
     const wrapper = mount(CodeBlockNode, {
@@ -4042,6 +4044,7 @@ describe('codeBlockNode diff defaults', () => {
       horizontal: 'hidden',
       horizontalScrollbarSize: 0,
       vertical: 'visible',
+      verticalScrollbarSize: 0,
       alwaysConsumeMouseWheel: false,
     })
     expect(monacoOptions.padding).toEqual({ top: 0, bottom: 0 })
@@ -5370,10 +5373,11 @@ describe('codeBlockNode diff defaults', () => {
     }
 
     helpers.getDiffEditorView.mockReturnValue(diffView as any)
+    let hostWidth = 480
     helpers.createDiffEditor.mockImplementation(async (el: HTMLElement) => {
       Object.defineProperty(el, 'getBoundingClientRect', {
         configurable: true,
-        value: () => rect(0, Number.parseFloat(el.style.height || '') || fullFallbackHeight, 480),
+        value: () => rect(0, Number.parseFloat(el.style.height || '') || fullFallbackHeight, hostWidth),
       })
       el.innerHTML = `
         <div class="monaco-diff-editor">
@@ -5459,6 +5463,17 @@ describe('codeBlockNode diff defaults', () => {
 
         expect(height).toBeLessThan(500)
         expect(minHeight).toBe(0)
+      })
+
+      diffView.layout.mockClear()
+      hostWidth = 640
+      for (const callback of resizeObserverCallbacks)
+        callback([], {} as ResizeObserver)
+      await vi.waitFor(() => {
+        expect(diffView.layout).toHaveBeenCalledWith({
+          width: 640,
+          height: Number.parseFloat(editorHost.style.height),
+        })
       })
 
       const unchangedCenter = editorHost.querySelector('.diff-hidden-lines .center')

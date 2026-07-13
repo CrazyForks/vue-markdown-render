@@ -390,6 +390,7 @@ function resolveDiffScrollbar(raw: Record<string, unknown>) {
 
   return {
     ...rawScrollbar,
+    verticalScrollbarSize: 0,
     horizontalScrollbarSize: 0,
     ...(shouldUseInlineDiffLayout(raw) ? { horizontal: 'hidden' } : {}),
   }
@@ -2757,6 +2758,7 @@ function bindEditorHeightSync() {
       const resizeObserver = new ResizeObserver(() => {
         if (!isDiff.value)
           return
+        layoutEditorToHost()
         if (!shouldAllowDiffDomHeightShrink(host))
           return
         const renderedHeight = measureRenderedDiffHeight(host)
@@ -5235,6 +5237,22 @@ onUnmounted(() => {
 
 .code-block-container.is-diff :deep(pre.code-pre-fallback.markstream-pre--diff-preview .markstream-pre__diff-line--removed > .markstream-pre__diff-rail) {
   background: var(--stream-monaco-removed-gutter, var(--markstream-diff-removed-gutter, currentColor)) !important;
+}
+
+.code-block-container.is-diff :deep(.monaco-diff-editor .margin-view-overlays > .gutter-insert > .cmdr.gutter-insert) {
+  background: linear-gradient(
+    90deg,
+    transparent 0 var(--stream-monaco-line-number-box-width),
+    var(--stream-monaco-added-line-fill) var(--stream-monaco-line-number-box-width) 100%
+  ) !important;
+}
+
+.code-block-container.is-diff :deep(.monaco-diff-editor .margin-view-overlays > .gutter-delete > .cmdr.gutter-delete) {
+  background: linear-gradient(
+    90deg,
+    transparent 0 var(--stream-monaco-line-number-box-width),
+    var(--stream-monaco-removed-line-fill) var(--stream-monaco-line-number-box-width) 100%
+  ) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
