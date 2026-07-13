@@ -642,6 +642,56 @@ describe('codeBlockNode editor creation locking', () => {
     }
   })
 
+  it('releases the ordinary pre fallback outer reserve when collapsed', async () => {
+    const helpers = getStreamMonacoHelpers()
+    let resolveCreate: (() => void) | null = null
+    helpers.createEditor.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreate = () => resolve()
+        }),
+    )
+
+    const code = Array.from({ length: 80 }, (_, index) => `print(${index})`).join('\n')
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'python',
+          code,
+          raw: `\`\`\`python\n${code}\n\`\`\``,
+        },
+        estimatedHeightPx: 1200,
+        estimatedContentHeightPx: 1200,
+        loading: true,
+        stream: true,
+        showHeader: true,
+        showCollapseButton: true,
+        monacoOptions: {
+          MAX_HEIGHT: 320,
+        },
+      },
+    })
+
+    try {
+      await flushPendingMicrotasks()
+      await waitForCreateEditorCalls(1, helpers)
+
+      const block = wrapper.get('.code-block-container').element as HTMLElement
+      expect(block.style.minHeight).toBe('320px')
+
+      const collapseButton = wrapper.findAll('.code-action-btn')[1]
+      await collapseButton.trigger('click')
+      await flushPendingMicrotasks()
+
+      expect(block.style.minHeight).toBe('')
+    }
+    finally {
+      resolveCreate?.()
+      wrapper.unmount()
+    }
+  })
+
   it('keeps ordinary streaming pre fallback tight to rendered lines despite estimates', async () => {
     const helpers = getStreamMonacoHelpers()
     let resolveCreate: (() => void) | null = null

@@ -3589,7 +3589,7 @@ const containerStyle = computed(() => {
   // shell. The diff fallback pre and the hidden editor host already reserve the
   // content row height. Applying a block-level estimate here leaves extra blank
   // space under the editor layer until Monaco finishes.
-  if (shouldReserveEstimatedEditorHeight.value && !isDiff.value) {
+  if (shouldReserveEstimatedEditorHeight.value && !isDiff.value && !isCollapsed.value) {
     const reserved = reservedOuterBlockHeight.value
     if (reserved != null)
       s.minHeight = `${reserved}px`
