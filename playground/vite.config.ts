@@ -13,18 +13,6 @@ import Pages from 'vite-plugin-pages'
 
 const require = createRequire(import.meta.url)
 
-const localStreamMonacoRoot = path.resolve(
-  __dirname,
-  '../../stream-monaco',
-)
-const localStreamMonacoSource = path.resolve(
-  localStreamMonacoRoot,
-  'src/index.ts',
-)
-const localStreamMonacoDist = path.resolve(
-  localStreamMonacoRoot,
-  'dist/index.js',
-)
 const preferredVueI18nEntry = path.resolve(
   path.dirname(require.resolve('vue-i18n/package.json', { paths: [__dirname] })),
   'dist/vue-i18n.mjs',
@@ -34,22 +22,13 @@ const antvInfographicBrowserEntry = path.resolve(
   'dist/infographic.min.js',
 )
 
-export default defineConfig(({ command }) => {
-  const streamMonacoAlias = command === 'serve'
-    ? (fs.existsSync(localStreamMonacoSource) ? localStreamMonacoSource : null)
-    : (
-        fs.existsSync(localStreamMonacoDist)
-          ? localStreamMonacoDist
-          : (fs.existsSync(localStreamMonacoSource) ? localStreamMonacoSource : null)
-      )
-
+export default defineConfig(() => {
   return {
     base: './',
     server: {
       fs: {
         allow: [
           path.resolve(__dirname, '..'),
-          localStreamMonacoRoot,
         ],
       },
     },
@@ -67,9 +46,6 @@ export default defineConfig(({ command }) => {
         'markstream-core': path.resolve(__dirname, '../packages/markstream-core/src/index.ts'),
         'vue-i18n': preferredVueI18nEntry,
         '@antv/infographic': antvInfographicBrowserEntry,
-        ...(streamMonacoAlias
-          ? { 'stream-monaco': streamMonacoAlias }
-          : {}),
       },
     },
     optimizeDeps: {
@@ -79,7 +55,6 @@ export default defineConfig(({ command }) => {
       exclude: [
         'stream-markdown-parser',
         'markstream-core',
-        ...(streamMonacoAlias === localStreamMonacoSource ? ['stream-monaco'] : []),
       ],
     },
     plugins: [

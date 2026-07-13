@@ -529,7 +529,7 @@ importers:
         version: link:../packages/markdown-parser
       stream-monaco:
         specifier: latest
-        version: 0.0.36(monaco-editor@0.52.2)
+        version: 0.0.48(monaco-editor@0.52.2)
       vite:
         specifier: ^7.3.6
         version: 7.3.6(@types/node@20.19.43)(jiti@2.7.0)(less@4.6.7)(sass@1.101.0)(terser@5.49.0)(tsx@4.23.0)(yaml@2.9.0)

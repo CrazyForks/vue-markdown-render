@@ -3474,7 +3474,7 @@ describe('codeBlockNode diff defaults', () => {
     )
 
     const visualReadyStart = source.indexOf('async function waitForDiffEditorVisualReady(')
-    const ensureStart = source.indexOf('allowStreamingSnapshot: isCodeBlockLoading()', visualReadyStart)
+    const streamingGuard = source.indexOf('if (creationKind === \'diff\' && isCodeBlockLoading())')
 
     expect(visualReadyStart).toBeGreaterThanOrEqual(0)
     expect(source).toContain('const requiredStableReadyPasses = 2')
@@ -3503,8 +3503,8 @@ describe('codeBlockNode diff defaults', () => {
     expect(source).toContain('function expectsDiffLineNumberGutter()')
     expect(source).toContain('const lineNumberGutterReady = !expectsLineNumberGutter || hasDiffLineNumberGutterLayout(root)')
     expect(source).toContain('lineChangesReady = Array.isArray(changes)')
-    expect(ensureStart).toBeGreaterThan(visualReadyStart)
-    expect(source.slice(ensureStart)).toContain('if (!diffVisualReady) {\n    markEditorCreationFailed()\n    return')
+    expect(streamingGuard).toBeGreaterThan(visualReadyStart)
+    expect(source.slice(streamingGuard)).toContain('if (!diffVisualReady) {\n    markEditorCreationFailed()\n    return')
   })
 
   it('keeps diff fallback bottom aligned during Monaco handoff', () => {
@@ -3664,6 +3664,32 @@ describe('codeBlockNode diff defaults', () => {
     expect(monacoOptions.maxComputationTime).toBe(0)
     expect(monacoOptions.diffAlgorithm).toBe('legacy')
     expect(monacoOptions.diffUpdateThrottleMs).toBe(120)
+
+    wrapper.unmount()
+  })
+
+  it('uses the compact diffs.com gutter defaults for ordinary code blocks', async () => {
+    const helpers = getStreamMonacoHelpers()
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'ts',
+          code: 'const value = 1',
+          raw: '```ts\nconst value = 1\n```',
+        },
+        loading: false,
+        showHeader: false,
+      },
+    })
+
+    await waitForCreateEditorCalls(1, helpers)
+
+    const monacoOptions = helpers.useMonaco.mock.calls[0]?.[0] ?? {}
+    expect(monacoOptions.lineDecorationsWidth).toBe(0)
+    expect(monacoOptions.lineNumbersMinChars).toBe(2)
+    expect(monacoOptions.glyphMargin).toBe(false)
 
     wrapper.unmount()
   })
@@ -4292,9 +4318,8 @@ describe('codeBlockNode diff defaults', () => {
     wrapper.unmount()
   })
 
-  it('reveals a ready streaming diff snapshot and updates it without recreating the editor', async () => {
+  it('recreates a streaming diff once after loading settles', async () => {
     const helpers = getStreamMonacoHelpers()
-    const diffEditor = helpers.getDiffEditorView() as any
 
     const wrapper = mount(CodeBlockNode, {
       props: {
@@ -4305,7 +4330,7 @@ describe('codeBlockNode diff defaults', () => {
           diff: true,
           originalCode: 'const a = 1\\nconst b = 2\\n',
           updatedCode: 'const a = 1\\nconst c = 3\\n',
-          raw: '```diff\\n-const b = 2\\n+const c = 3\\n```',
+          raw: '```diff\\n-const b = 2\\n+const c = 3',
         },
         loading: true,
         stream: true,
@@ -4313,31 +4338,35 @@ describe('codeBlockNode diff defaults', () => {
       },
     })
 
+    await flushPendingMicrotasks()
     await waitForCreateDiffEditorCalls(1, helpers)
-    await flushPendingMicrotasks()
-    expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(false)
-    expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhanced')).toBe('true')
+    expect(helpers.createDiffEditor).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(true)
+    expect(wrapper.get('pre.code-pre-fallback').text()).toContain('const b = 2')
+    expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhanced')).toBe('false')
 
-    helpers.createDiffEditor.mockClear()
-    helpers.safeClean.mockClear()
-    helpers.refreshDiffPresentation.mockClear()
-    helpers.updateDiff.mockClear()
-    diffEditor?.layout?.mockClear()
-
-    await wrapper.setProps({ loading: false })
-    await flushPendingMicrotasks()
-
-    await vi.waitFor(() => {
-      expect(helpers.refreshDiffPresentation).toHaveBeenCalled()
+    await wrapper.setProps({
+      loading: false,
+      node: {
+        type: 'code_block',
+        language: 'diff',
+        code: '@@ -1 +1 @@',
+        diff: true,
+        originalCode: 'const a = 1\\nconst b = 2\\n',
+        updatedCode: 'const a = 1\\nconst c = 3\\n',
+        raw: '```diff\\n-const b = 2\\n+const c = 3\\n```',
+      },
     })
-    expect(helpers.safeClean).not.toHaveBeenCalled()
-    expect(helpers.createDiffEditor).not.toHaveBeenCalled()
-    expect(helpers.updateDiff).toHaveBeenCalledWith(
+    await waitForCreateDiffEditorCalls(2, helpers)
+    await flushPendingMicrotasks()
+
+    expect(helpers.createDiffEditor).toHaveBeenCalledTimes(2)
+    expect(helpers.createDiffEditor).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
       'const a = 1\\nconst b = 2\\n',
       'const a = 1\\nconst c = 3\\n',
       'diff',
     )
-    expect(diffEditor?.layout).toHaveBeenCalled()
     await vi.waitFor(() => {
       expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(false)
       expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhanced')).toBe('true')

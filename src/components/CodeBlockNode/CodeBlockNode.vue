@@ -459,8 +459,14 @@ function refreshDiffPresentationSafely() {
 
 const resolvedMonacoOptions = computed(() => {
   const raw = props.monacoOptions ? { ...props.monacoOptions } : {}
-  if (!isDiff.value)
-    return raw
+  if (!isDiff.value) {
+    return {
+      lineDecorationsWidth: 0,
+      lineNumbersMinChars: 2,
+      glyphMargin: false,
+      ...raw,
+    }
+  }
   const diffHideUnchangedRegions = raw.diffHideUnchangedRegions === undefined
     ? { ...defaultDiffHideUnchangedRegions }
     : resolveDiffHideUnchangedRegionsOption(raw.diffHideUnchangedRegions)
@@ -564,6 +570,7 @@ const plainEditorContentMeasured = ref(false)
 let staleContentRetryFailureKey: string | null = null
 let editorCreationFailureRetryInProgress = false
 let editorCreationFailureKeyRetriedKey: string | null = null
+let diffEditorCreatedWhileStreaming = false
 const preFallbackWrap = computed(() => {
   if (isDiff.value) {
     const diffWordWrap = resolvedMonacoOptions.value?.diffWordWrap
@@ -724,6 +731,7 @@ const codeFontSize = ref<number>(defaultCodeFontSize.value)
 // Set by syncFallbackFontMetricsFromEditor() after Monaco renders; drive preFallback* computeds.
 const measuredEditorFontSize = ref<number | null>(null)
 const measuredEditorLineHeight = ref<number | null>(null)
+const measuredEditorCharacterWidth = ref<number | null>(null)
 const fontBaselineReady = computed(() => {
   const a = defaultCodeFontSize.value
   const b = codeFontSize.value
@@ -1173,6 +1181,14 @@ function clearEstimatedEditorHeightFloor() {
   pendingEstimatedEditorHeightFloor.value = null
 }
 
+function syncDiffScrollFromFallback() {
+  const fallback = container.value?.querySelector('pre.code-pre-fallback') as HTMLElement | null
+  const diffEditor = getDiffEditorView()
+  const scrollTop = fallback?.scrollTop ?? 0
+  diffEditor?.getOriginalEditor?.()?.setScrollTop?.(scrollTop)
+  diffEditor?.getModifiedEditor?.()?.setScrollTop?.(scrollTop)
+}
+
 async function revealEditorDisplay() {
   if (!isDiff.value) {
     editorDisplayReady.value = true
@@ -1186,6 +1202,7 @@ async function revealEditorDisplay() {
   // patch so there is no visible pre-reveal or post-reveal validation state.
   syncDiffRevealHostHeight()
   layoutEditorToHost(true)
+  syncDiffScrollFromFallback()
   syncInlineFoldProxies()
   editorDisplayReady.value = true
   await nextTick()
@@ -1478,13 +1495,23 @@ function hasInlineDeletedContentReady(root: HTMLElement | null | undefined) {
   if (!hasInlineRemovedDiffRows())
     return true
 
+  const fallbackLine = root?.querySelector<HTMLElement>('.stream-monaco-fallback-inline-delete-line')
+  if (
+    fallbackLine?.textContent?.trim()
+    && (
+      fallbackLine.hasAttribute('data-stream-monaco-colorize-signature')
+      || fallbackLine.querySelector('[class*="mtk"]')
+    )
+  ) {
+    return true
+  }
+
   const zone = root?.querySelector<HTMLElement>(
     [
       '.editor.modified .view-zones .view-lines.line-delete',
       '.editor.modified .view-lines .view-line.line-delete',
       '.editor.original .view-zones .view-lines.line-delete',
       '.editor.original .view-lines .view-line.line-delete',
-      '.stream-monaco-fallback-inline-delete-line',
     ].join(','),
   )
   if (!zone || (!zone.matches('.view-line') && !zone.querySelector('.view-line')))
@@ -2173,7 +2200,7 @@ function syncEditorCssVars() {
   const bg = bgVar || String(bgStyles?.backgroundColor ?? rootStyles?.backgroundColor ?? '').trim()
   const characterWidth = readActualCharacterWidthFromEditor()
   if (characterWidth != null)
-    rootEl.style.setProperty('--markstream-code-layout-character-width', `${characterWidth}px`)
+    measuredEditorCharacterWidth.value = characterWidth
 
   if (isDiff.value) {
     const setDiffVar = (name: string, value: string) => {
@@ -3040,12 +3067,11 @@ async function waitForEditorRuntimeCreation(currentRuntimeCreation: Promise<void
 // one view-line, then does a final presentation pass. This prevents the
 // "plain Monaco editor" intermediate frame (the third state between the pre
 // fallback and the fully decorated diff surface).
-async function waitForDiffEditorVisualReady(options: { requireHighlight?: boolean, allowStreamingSnapshot?: boolean } = {}) {
+async function waitForDiffEditorVisualReady(options: { requireHighlight?: boolean } = {}) {
   if (!isDiff.value)
     return true
 
   const requireHighlight = options.requireHighlight !== false
-  const allowStreamingSnapshot = options.allowStreamingSnapshot === true
   const maxPasses = 30
   const requiredStableReadyPasses = 2
   let stableReadyPasses = 0
@@ -3121,9 +3147,8 @@ async function waitForDiffEditorVisualReady(options: { requireHighlight?: boolea
         && readyLineFill
         && readyHighlight
       )
-      const streamingSnapshotReady = (
-        allowStreamingSnapshot
-        && hasDiffPresentationRootClass(readyRoot)
+      const fallbackDeletedContentReady = (
+        hasDiffPresentationRootClass(readyRoot)
         && readyLineNumberGutter
         && hasDiffContentLayoutReady(readyRoot)
         && readyChangedDom
@@ -3131,7 +3156,7 @@ async function waitForDiffEditorVisualReady(options: { requireHighlight?: boolea
         && hasInlineDeletedContentReady(readyRoot)
         && readyHighlight
       )
-      if (strictReady || streamingSnapshotReady) {
+      if (strictReady || fallbackDeletedContentReady) {
         stableReadyPasses++
         if (stableReadyPasses >= requiredStableReadyPasses)
           return true
@@ -3504,7 +3529,9 @@ const languageIcon = computed(() => {
 // Compute inline style for container to respect optional min/max width
 const containerStyle = computed(() => {
   const s: Record<string, string> = {}
-  s['--markstream-code-layout-character-width'] = '1ch'
+  s['--markstream-code-layout-character-width'] = measuredEditorCharacterWidth.value == null
+    ? '1ch'
+    : `${measuredEditorCharacterWidth.value}px`
   const fmt = (v: string | number | undefined) => {
     if (v == null)
       return undefined
@@ -3692,12 +3719,15 @@ async function runEditorCreation(el: HTMLElement) {
     return
 
   const creationKind = desiredEditorKind.value
+  diffEditorCreatedWhileStreaming = creationKind === 'diff'
+    && isCodeBlockLoading()
   editorCreationFailed.value = false
   failedEditorCreationKey.value = null
   editorRuntimeCreated.value = false
   editorDisplayReady.value = false
   measuredEditorFontSize.value = null
   measuredEditorLineHeight.value = null
+  measuredEditorCharacterWidth.value = null
   clearLayerMeasuredVars()
   resetEditorLayoutCache()
   armEstimatedEditorHeightFloor()
@@ -3769,6 +3799,7 @@ async function runEditorCreation(el: HTMLElement) {
     syncEditorHostHeight(false)
 
   editorMounted.value = true
+  currentEditorKind.value = creationKind
   bindEditorHeightSync()
   syncEditorCssVars()
   syncFallbackFontMetricsFromEditor()
@@ -3776,12 +3807,11 @@ async function runEditorCreation(el: HTMLElement) {
   refreshDiffStats()
   scheduleEditorHeightSync()
   await nextTick()
+  if (creationKind === 'diff' && isCodeBlockLoading())
+    return
   // Geometry, diff decorations, and syntax tokens must be ready before handoff.
   const diffVisualReady = creationKind === 'diff'
-    ? await waitForDiffEditorVisualReady({
-        requireHighlight: true,
-        allowStreamingSnapshot: isCodeBlockLoading(),
-      })
+    ? await waitForDiffEditorVisualReady({ requireHighlight: true })
     : await waitForSingleEditorVisualReady()
   if (isUnmounted)
     return
@@ -3939,8 +3969,9 @@ watch(
   async (nextKind, prevKind) => {
     if (nextKind === prevKind)
       return
+    if (editorCreationFailed.value || editorCreationFailureRetryInProgress)
+      return
     clearPlainCodeUpdateQueue()
-    currentEditorKind.value = nextKind
 
     // If Monaco isn't mounted yet (or not available), just let the normal
     // creation path pick up the latest kind.
@@ -3963,6 +3994,8 @@ watch(
       if (isUnmounted || !codeEditor.value)
         return
     }
+    if (currentEditorKind.value === nextKind && editorCreated.value && editorMounted.value)
+      return
 
     try {
       editorMounted.value = false
@@ -4378,6 +4411,8 @@ watch(
       if (isUnmounted || !codeEditor.value)
         return
     }
+    if (currentEditorKind.value === desiredEditorKind.value && editorCreated.value && editorMounted.value)
+      return
 
     try {
       editorMounted.value = false
@@ -4477,6 +4512,26 @@ watch(
             syncEditorHostHeight(false)
             return
           }
+          if (
+            loadingJustFinished
+            && isDiff.value
+            && editorCreated.value
+            && diffEditorCreatedWhileStreaming
+            && codeEditor.value
+          ) {
+            diffEditorCreatedWhileStreaming = false
+            editorMounted.value = false
+            editorDisplayReady.value = false
+            editorCreated.value = false
+            editorRuntimeCreated.value = false
+            clearEditorHeightSyncBindings()
+            clearInlineFoldProxies()
+            safeClean()
+            await nextTick()
+            await ensureEditorCreation(codeEditor.value as HTMLElement, { allowStaleContentRetry: false })
+            scheduleStreamingDiffHeightChase(true)
+            return
+          }
           if (loadingJustFinished && editorCreated.value) {
             if (isDiff.value && codeEditor.value) {
               const pendingCreation = createEditorPromise
@@ -4500,6 +4555,7 @@ watch(
                 return
               refreshDiffPresentationSafely()
               layoutEditorToHost(true)
+              syncDiffScrollFromFallback()
               syncInlineFoldProxies()
               refreshDiffStats()
               const visualReady = await waitForDiffEditorVisualReady({ requireHighlight: true })

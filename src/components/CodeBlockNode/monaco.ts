@@ -19,6 +19,8 @@ export interface MonacoEditorViewLike {
   updateOptions?: (options: Record<string, unknown>) => void
   layout?: (dimension?: { width: number, height: number }) => void
   getContentHeight?: () => number
+  getScrollTop?: () => number
+  setScrollTop?: (scrollTop: number) => void
   onDidContentSizeChange?: (listener: () => void) => MonacoDisposableLike | void
   onDidLayoutChange?: (listener: () => void) => MonacoDisposableLike | void
 }
