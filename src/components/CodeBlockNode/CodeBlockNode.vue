@@ -3294,8 +3294,20 @@ function isCodeBlockLoading() {
   return typeof props.node.loading === 'boolean' ? props.node.loading : props.loading === true
 }
 
+function hasCompletedStreamingFenceInfo() {
+  if (!isCodeBlockLoading())
+    return true
+
+  const raw = String(props.node.raw ?? '')
+  const openingLine = raw.split(/\r\n|\n|\r/, 1)[0]?.trimStart() ?? ''
+  if (!/^(?:`{3,}|~{3,})/.test(openingLine))
+    return true
+
+  return /\r\n|\n|\r/.test(raw)
+}
+
 function resolveStreamingCodeLanguage(language: unknown, code: unknown, loading: boolean) {
-  if (loading && !String(code ?? ''))
+  if (loading && (!hasCompletedStreamingFenceInfo() || !String(code ?? '')))
     return 'plain'
   return normalizeLanguageIdentifier(String(language ?? ''))
 }
@@ -3303,6 +3315,8 @@ function resolveStreamingCodeLanguage(language: unknown, code: unknown, loading:
 function shouldDeferStreamingEditorCreation() {
   if (!isCodeBlockLoading())
     return false
+  if (!isDiff.value && !hasCompletedStreamingFenceInfo())
+    return true
   if (isDiff.value) {
     return !String(props.node.originalCode ?? '')
       && !String(props.node.updatedCode ?? '')
@@ -3357,8 +3371,8 @@ function queuePlainCodeUpdate(code: string, language: string) {
 }
 
 watch(
-  () => [props.node.language, props.node.code, props.node.loading, props.loading] as const,
-  ([newLanguage, code, nodeLoading, propLoading]) => {
+  () => [props.node.language, props.node.code, props.node.raw, props.node.loading, props.loading] as const,
+  ([newLanguage, code, _raw, nodeLoading, propLoading]) => {
     codeLanguage.value = resolveStreamingCodeLanguage(
       newLanguage,
       code,
@@ -3947,6 +3961,8 @@ const stopCreateEditorWatch = watch(
     props.loading,
     monacoReady.value,
     viewportReady.value,
+    props.node.language,
+    props.node.raw,
     props.node.code,
     props.node.loading,
   ] as const,
@@ -4219,7 +4235,8 @@ const runtimeMonacoLanguages = computed(() => {
       addRuntimeLanguage(languages, language)
   }
 
-  addRuntimeLanguage(languages, props.node.language)
+  if (hasCompletedStreamingFenceInfo())
+    addRuntimeLanguage(languages, props.node.language)
   addRuntimeLanguage(languages, codeLanguage.value)
   addRuntimeLanguage(languages, monacoLanguage.value)
   addRuntimeLanguage(languages, 'plaintext')

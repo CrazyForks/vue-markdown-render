@@ -2846,16 +2846,16 @@ describe('codeBlockNode language normalization', () => {
     wrapper.unmount()
   })
 
-  it('preloads Monaco but waits for code before creating an editor for a partial streaming fence language', async () => {
+  it('preloads Monaco but waits for a complete streaming fence language before creating an editor', async () => {
     const helpers = getStreamMonacoHelpers()
 
     const wrapper = mount(CodeBlockNode, {
       props: {
         node: {
           type: 'code_block',
-          language: 'javascri',
-          code: '',
-          raw: '```javascri',
+          language: 'ja',
+          code: 'const app = createApp()',
+          raw: '```ja',
           loading: true,
         },
         stream: true,
@@ -2866,13 +2866,14 @@ describe('codeBlockNode language normalization', () => {
     await flushPendingMicrotasks()
     expect(helpers.useMonaco).toHaveBeenCalledTimes(1)
     expect(helpers.createEditor).not.toHaveBeenCalled()
+    expect(helpers.useMonaco.mock.calls[0]?.[0]?.languages).not.toContain('ja')
 
     await wrapper.setProps({
       node: {
         type: 'code_block',
         language: 'javascript:electron/main.js',
-        code: 'const { app } = require(\'electron\')',
-        raw: '```javascript:electron/main.js\nconst { app } = require(\'electron\')',
+        code: 'const app = createApp()',
+        raw: '```javascript:electron/main.js\nconst app = createApp()',
         loading: true,
       },
     })
@@ -2880,7 +2881,7 @@ describe('codeBlockNode language normalization', () => {
 
     expect(helpers.createEditor).toHaveBeenLastCalledWith(
       expect.any(HTMLElement),
-      'const { app } = require(\'electron\')',
+      'const app = createApp()',
       'javascript',
     )
 
