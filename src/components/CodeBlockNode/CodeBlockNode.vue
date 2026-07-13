@@ -384,18 +384,15 @@ function shouldUseInlineDiffLayout(options: Record<string, unknown>) {
   return width > 0 && width <= breakpoint
 }
 
-function resolveInlineDiffScrollbar(raw: Record<string, unknown>) {
-  if (!shouldUseInlineDiffLayout(raw))
-    return undefined
-
+function resolveDiffScrollbar(raw: Record<string, unknown>) {
   const rawScrollbar = raw.scrollbar && typeof raw.scrollbar === 'object'
     ? raw.scrollbar as Record<string, unknown>
     : {}
 
   return {
     ...rawScrollbar,
-    horizontal: 'hidden',
     horizontalScrollbarSize: 0,
+    ...(shouldUseInlineDiffLayout(raw) ? { horizontal: 'hidden' } : {}),
   }
 }
 
@@ -482,7 +479,7 @@ const resolvedMonacoOptions = computed(() => {
     ...((raw.experimental as Record<string, unknown> | undefined) ?? {}),
   }
   const diffUnchangedRegionStyle = raw.diffUnchangedRegionStyle ?? 'line-info'
-  const inlineDiffScrollbar = resolveInlineDiffScrollbar(raw)
+  const diffScrollbar = resolveDiffScrollbar(raw)
   const diffDefaults = {
     maxComputationTime: 0,
     diffAlgorithm: 'legacy',
@@ -497,6 +494,7 @@ const resolvedMonacoOptions = computed(() => {
     lineDecorationsWidth: 4,
     lineNumbersMinChars: 2,
     glyphMargin: false,
+    padding: { top: 0, bottom: 0 },
     minimap: { enabled: false },
     renderOverviewRuler: false,
     overviewRulerBorder: false,
@@ -519,7 +517,7 @@ const resolvedMonacoOptions = computed(() => {
     ...(activeHideUnchangedRegions === undefined ? {} : { hideUnchangedRegions: activeHideUnchangedRegions }),
     diffHideUnchangedRegions: activeDiffHideUnchangedRegions,
     diffWordWrap,
-    ...(inlineDiffScrollbar === undefined ? {} : { scrollbar: inlineDiffScrollbar }),
+    scrollbar: diffScrollbar,
   }
 })
 
@@ -852,22 +850,6 @@ function countSideBySideDiffPreviewLines() {
   return Math.max(1, originalCount, modifiedCount)
 }
 
-function getDiffLayoutUnitPx() {
-  return 7.8
-}
-
-function formatDiffPx(value: number) {
-  return `${Math.round(value * 100) / 100}px`
-}
-
-function getDiffLineNumberColumnWidth(unitPx: number) {
-  const lineCount = preFallbackDiffInline.value
-    ? countInlineDiffPreviewLines()
-    : countSideBySideDiffPreviewLines()
-  const digits = Math.max(2, String(Math.max(1, lineCount)).length)
-  return formatDiffPx(digits * unitPx)
-}
-
 // Max line count across both diff panes.
 const diffPreFallbackLineCount = computed(() => {
   if (preFallbackDiffInline.value)
@@ -894,7 +876,7 @@ const preFallbackVerticalPadding = computed(() => {
 })
 // Keep computed height tight to content. Extra padding caused visible bottom gap.
 const CONTENT_PADDING = 0
-const DIFF_PREVIEW_BOTTOM_PADDING = 0
+const SIDE_BY_SIDE_DIFF_PREVIEW_BOTTOM_PADDING = 4
 // Fine-tuned to avoid bottom gap at default font size
 const LINE_EXTRA_PER_LINE = 1.5
 const PIXEL_EPSILON = 1
@@ -1036,8 +1018,6 @@ function getDiffVisualVars(isDark: boolean) {
   const addedGutter = `linear-gradient(90deg, ${addedFg} 0 4px, transparent 4px 100%)`
   const removedGutter = `linear-gradient(90deg, ${removedFg} 0 4px, transparent 4px 100%)`
   const lineNumberBg = isDark ? 'hsl(0 0% 7% / 0.98)' : 'hsl(var(--ms-muted) / 0.45)'
-  const unitPx = getDiffLayoutUnitPx()
-
   return {
     '--markstream-diff-line-number-bg': lineNumberBg,
     '--markstream-diff-added-fg': addedFg,
@@ -1061,14 +1041,16 @@ function getDiffVisualVars(isDark: boolean) {
     '--stream-monaco-added-inline': addedInline,
     '--stream-monaco-removed-inline': removedInline,
     '--stream-monaco-gutter-marker-width': '4px',
-    '--stream-monaco-gutter-gap': '8px',
-    '--stream-monaco-line-number-left': '4px',
-    '--stream-monaco-line-number-width': getDiffLineNumberColumnWidth(unitPx),
-    '--stream-monaco-line-number-padding-left': formatDiffPx(unitPx * 2),
-    '--stream-monaco-line-number-padding-right': formatDiffPx(unitPx),
-    '--stream-monaco-line-number-gap-to-code': formatDiffPx(unitPx),
+    '--stream-monaco-gutter-gap': '1ch',
+    '--stream-monaco-line-number-left': '0px',
+    '--stream-monaco-line-number-width': '2ch',
+    '--stream-monaco-line-number-padding-left': '2ch',
+    '--stream-monaco-line-number-padding-right': '1ch',
+    '--stream-monaco-line-number-separator-width': '2px',
+    '--stream-monaco-layout-character-width': '1ch',
+    '--stream-monaco-line-number-gap-to-code': 'var(--stream-monaco-layout-character-width)',
     '--stream-monaco-line-number-bg': lineNumberBg,
-    '--stream-monaco-diff-code-gap': formatDiffPx(unitPx),
+    '--stream-monaco-diff-code-gap': '1ch',
     '--stream-monaco-diff-code-padding': '0px',
   }
 }
@@ -1107,15 +1089,19 @@ const preFallbackStyle = computed(() => {
   } as Record<string, string | number>
 
   style['--markstream-pre-line-number-top'] = `${preFallbackVerticalPadding.value.top}px`
-  style['--markstream-code-padding-left'] = '48px'
-  style['--markstream-pre-line-number-left'] = '4px'
-  style['--markstream-pre-line-number-width'] = '44px'
-  style['--markstream-pre-line-number-gap'] = '8px'
+  style['--markstream-code-padding-left'] = 'calc(2ch + 2ch + 1ch + 2px + 1ch)'
+  style['--markstream-pre-line-number-left'] = '0px'
+  style['--markstream-pre-line-number-width'] = '2ch'
+  style['--markstream-pre-line-number-padding-left'] = '2ch'
+  style['--markstream-pre-line-number-padding-right'] = '1ch'
+  style['--markstream-pre-line-number-separator-width'] = '2px'
 
   if (isDiff.value) {
     // Keep the pre diff fallback visually close to stream-monaco's diff line box.
     style['--markstream-pre-diff-line-height'] = `${preFallbackEffectiveLineHeight.value}px`
-    style['--markstream-pre-diff-pane-bottom-padding'] = `${DIFF_PREVIEW_BOTTOM_PADDING}px`
+    style['--markstream-pre-diff-pane-bottom-padding'] = preFallbackDiffInline.value
+      ? '0px'
+      : `${SIDE_BY_SIDE_DIFF_PREVIEW_BOTTOM_PADDING}px`
     Object.assign(style, getDiffVisualVars(resolvedSurfaceIsDark.value))
   }
 
@@ -1334,6 +1320,22 @@ function readActualFontSizeFromEditor(): number | null {
   return null
 }
 
+function readActualCharacterWidthFromEditor(): number | null {
+  try {
+    const ed = isDiff.value ? getDiffEditorView()?.getModifiedEditor?.() ?? getDiffEditorView() : getEditorView()
+    const mon = getEditor()
+    const key = mon?.EditorOption?.fontInfo
+    if (ed && key != null) {
+      const info = ed.getOption?.(key) as { typicalHalfwidthCharacterWidth?: unknown } | undefined
+      const width = info?.typicalHalfwidthCharacterWidth
+      if (typeof width === 'number' && Number.isFinite(width) && width > 0)
+        return width
+    }
+  }
+  catch {}
+  return null
+}
+
 function getLineHeightSafe(editor: MonacoEditorViewLike | null | undefined): number {
   try {
     const monacoEditor = getEditor()
@@ -1472,14 +1474,28 @@ function hasInlineRemovedDiffRows() {
     .some(line => isRemovedDiffLine(line))
 }
 
-function hasInlineDeletedMarginReady(root: HTMLElement | null | undefined) {
+function hasInlineDeletedContentReady(root: HTMLElement | null | undefined) {
   if (!hasInlineRemovedDiffRows())
     return true
 
-  return Boolean(
-    root?.classList.contains('stream-monaco-diff-inline-native-ready')
-    || root?.querySelector('.inline-deleted-margin-view-zone, .stream-monaco-fallback-inline-delete-margin'),
+  const zone = root?.querySelector<HTMLElement>(
+    [
+      '.editor.modified .view-zones .view-lines.line-delete',
+      '.editor.modified .view-lines .view-line.line-delete',
+      '.editor.original .view-zones .view-lines.line-delete',
+      '.editor.original .view-lines .view-line.line-delete',
+      '.stream-monaco-fallback-inline-delete-line',
+    ].join(','),
   )
+  if (!zone || (!zone.matches('.view-line') && !zone.querySelector('.view-line')))
+    return false
+
+  const rect = zone.getBoundingClientRect()
+  const rootRect = root?.getBoundingClientRect()
+  if (rootRect?.width === 0 && rootRect.height === 0)
+    return true
+
+  return rect.width > 0 && rect.height > 0
 }
 
 function hasExpectedChangedDiffDom(
@@ -1598,11 +1614,8 @@ function hasDiffContentLayoutReady(root: HTMLElement | null | undefined) {
   if (numberRect.width <= 0 && numberRect.height <= 0)
     return true
 
-  const rootStyle = root ? window.getComputedStyle(root) : null
-  const rawGap = Number.parseFloat(rootStyle?.getPropertyValue('--stream-monaco-line-number-gap-to-code') || '')
-  const gapToCode = Number.isFinite(rawGap) ? rawGap : 7.8
-  const expectedContentLeft = numberRect.right + gapToCode
-  return Math.abs(viewRect.left - expectedContentLeft) <= 1.25
+  const gapToCode = viewRect.left - numberRect.right
+  return gapToCode >= 0 && gapToCode <= 32
 }
 
 function hasInlineDiffNativePresentationReady(
@@ -2048,12 +2061,6 @@ function getCodeEditorLayerElement() {
   return parent instanceof HTMLElement ? parent : null
 }
 
-function setLayerPxVar(name: string, value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value) || value <= 0)
-    return
-  getCodeEditorLayerElement()?.style.setProperty(name, `${value}px`)
-}
-
 function clearLayerMeasuredVars() {
   const layerEl = getCodeEditorLayerElement()
   if (!layerEl)
@@ -2096,81 +2103,6 @@ function syncFallbackFontMetricsFromEditor() {
 
 function shouldFreezeVisibleDiffFallbackMetrics() {
   return isDiff.value && renderPreFallback.value
-}
-
-function syncDiffFallbackLayoutVarsFromEditor() {
-  if (!isDiff.value)
-    return
-  const host = codeEditor.value
-  if (!host)
-    return
-  const diffRoot = host.querySelector('.monaco-diff-editor') as HTMLElement | null
-  if (!diffRoot)
-    return
-
-  function measurePane(
-    root: HTMLElement,
-    paneSelector: string,
-    scrollableVar: '--stream-monaco-original-scrollable-left' | '--stream-monaco-modified-scrollable-left',
-    gapVar: '--stream-monaco-original-line-number-gap-to-code' | '--stream-monaco-modified-line-number-gap-to-code',
-  ) {
-    const pane = root.querySelector(paneSelector) as HTMLElement | null
-    if (!pane)
-      return
-    const paneRect = pane.getBoundingClientRect()
-    if (paneRect.width <= 0)
-      return
-    const lineNumber = pane.querySelector('.line-numbers') as HTMLElement | null
-    const viewLine = pane.querySelector('.view-lines .view-line') as HTMLElement | null
-    const margin = pane.querySelector('.margin') as HTMLElement | null
-
-    let contentLeft: number | null = null
-
-    if (viewLine) {
-      const rect = viewLine.getBoundingClientRect()
-      contentLeft = rect.left - paneRect.left
-      setLayerPxVar(scrollableVar, contentLeft)
-    }
-    else if (margin) {
-      const rect = margin.getBoundingClientRect()
-      contentLeft = rect.width
-      setLayerPxVar(scrollableVar, contentLeft)
-    }
-
-    if (lineNumber) {
-      const rect = lineNumber.getBoundingClientRect()
-      const style = window.getComputedStyle(lineNumber)
-      const paddingLeft = Number.parseFloat(style.paddingLeft || '0') || 0
-      const paddingRight = Number.parseFloat(style.paddingRight || '0') || 0
-      const contentWidth = Math.max(0, rect.width - paddingLeft - paddingRight)
-
-      // Monaco exposes border-box geometry here; the diff layout variable
-      // tracks only the numeric content width, matching diffs.com's gutter box.
-      if (contentWidth >= 8 && contentWidth <= 64)
-        setLayerPxVar('--stream-monaco-line-number-width', contentWidth)
-
-      if (contentLeft != null) {
-        const gapToCode = contentLeft - (rect.right - paneRect.left)
-        if (Number.isFinite(gapToCode) && gapToCode >= 0 && gapToCode <= 32) {
-          setLayerPxVar(gapVar, gapToCode)
-          setLayerPxVar('--stream-monaco-line-number-gap-to-code', gapToCode)
-        }
-      }
-    }
-  }
-
-  measurePane(
-    diffRoot,
-    '.editor.original',
-    '--stream-monaco-original-scrollable-left',
-    '--stream-monaco-original-line-number-gap-to-code',
-  )
-  measurePane(
-    diffRoot,
-    '.editor.modified',
-    '--stream-monaco-modified-scrollable-left',
-    '--stream-monaco-modified-line-number-gap-to-code',
-  )
 }
 
 // Sync the Monaco host to the fallback pre height while the fallback is visible,
@@ -2239,6 +2171,9 @@ function syncEditorCssVars() {
 
   const fg = fgVar || String(fgStyles?.color ?? rootStyles?.color ?? '').trim()
   const bg = bgVar || String(bgStyles?.backgroundColor ?? rootStyles?.backgroundColor ?? '').trim()
+  const characterWidth = readActualCharacterWidthFromEditor()
+  if (characterWidth != null)
+    rootEl.style.setProperty('--markstream-code-layout-character-width', `${characterWidth}px`)
 
   if (isDiff.value) {
     const setDiffVar = (name: string, value: string) => {
@@ -2713,8 +2648,6 @@ function bindEditorHeightSync() {
     catch {}
     bind(originalEditor, 'onDidContentSizeChange')
     bind(modifiedEditor, 'onDidContentSizeChange')
-    bind(originalEditor, 'onDidLayoutChange')
-    bind(modifiedEditor, 'onDidLayoutChange')
     const host = codeEditor.value
     if (host && typeof MutationObserver !== 'undefined') {
       const syncMutationSelector = [
@@ -2875,15 +2808,20 @@ function updateCollapsedHeight(options: EditorHostHeightSyncOptions = {}) {
         && props.loading === false
         && currentHostHeight > 0
         && estimatedDiffHeight < currentHostHeight - PIXEL_EPSILON
-      h0 = shouldShrinkToModel
-        ? estimatedDiffHeight
-        : measuredDiffHeight != null && estimatedDiffHeight != null
-          ? Math.max(measuredDiffHeight, estimatedDiffHeight, props.loading !== false ? currentHostHeight : 0)
-          : Math.max(
-            measuredDiffHeight ?? 0,
-            estimatedDiffHeight ?? 0,
-            props.loading !== false ? currentHostHeight : 0,
-          ) || null
+      if (props.loading === false && measuredDiffHeight != null) {
+        h0 = measuredDiffHeight
+      }
+      else {
+        h0 = shouldShrinkToModel
+          ? estimatedDiffHeight
+          : measuredDiffHeight != null && estimatedDiffHeight != null
+            ? Math.max(measuredDiffHeight, estimatedDiffHeight, props.loading !== false ? currentHostHeight : 0)
+            : Math.max(
+              measuredDiffHeight ?? 0,
+              estimatedDiffHeight ?? 0,
+              props.loading !== false ? currentHostHeight : 0,
+            ) || null
+      }
     }
     else if (hasVisibleCollapsedDiffSummary) {
       h0 = renderedDiffHeight
@@ -3154,7 +3092,7 @@ async function waitForDiffEditorVisualReady(options: { requireHighlight?: boolea
     const changedDomReady = !expectsChangedDom || hasExpectedChangedDiffDom(root, expected)
     const gutterReady = !expectsChangedDom || hasExpectedChangedDiffGutterDom(root, expected)
     const lineNumberGutterReady = !expectsLineNumberGutter || hasDiffLineNumberGutterLayout(root)
-    if (hasDiffRoot && hasRenderedLines && lineChangesReady && changedDomReady && gutterReady && lineNumberGutterReady && hasInlineDeletedMarginReady(root)) {
+    if (hasDiffRoot && hasRenderedLines && lineChangesReady && changedDomReady && gutterReady && lineNumberGutterReady && hasInlineDeletedContentReady(root)) {
       try {
         refreshDiffPresentationSafely()
         syncInlineFoldProxies()
@@ -3190,6 +3128,7 @@ async function waitForDiffEditorVisualReady(options: { requireHighlight?: boolea
         && hasDiffContentLayoutReady(readyRoot)
         && readyChangedDom
         && readyGutterDom
+        && hasInlineDeletedContentReady(readyRoot)
         && readyHighlight
       )
       if (strictReady || streamingSnapshotReady) {
@@ -3565,6 +3504,7 @@ const languageIcon = computed(() => {
 // Compute inline style for container to respect optional min/max width
 const containerStyle = computed(() => {
   const s: Record<string, string> = {}
+  s['--markstream-code-layout-character-width'] = '1ch'
   const fmt = (v: string | number | undefined) => {
     if (v == null)
       return undefined
@@ -3850,7 +3790,6 @@ async function runEditorCreation(el: HTMLElement) {
     return
   }
   syncFallbackFontMetricsFromEditor()
-  syncDiffFallbackLayoutVarsFromEditor()
   syncDiffRevealHostHeight()
   await revealEditorDisplay()
 }
@@ -4936,20 +4875,25 @@ onUnmounted(() => {
   --stream-monaco-gutter-bg: var(--markstream-diff-gutter-bg);
   --stream-monaco-gutter-guide: var(--markstream-diff-gutter-guide);
   --stream-monaco-gutter-marker-width: 4px;
-  --stream-monaco-gutter-gap: 8px;
+  --stream-monaco-gutter-gap: 1ch;
   --stream-monaco-line-number-bg: var(--markstream-diff-line-number-bg);
   --stream-monaco-line-number: var(--markstream-diff-line-number);
   --stream-monaco-line-number-active: var(--markstream-diff-line-number-active);
-  --stream-monaco-line-number-left: var(--stream-monaco-gutter-marker-width);
-  --stream-monaco-line-number-width: 15.6px;
-  --stream-monaco-line-number-padding-left: 15.6px;
-  --stream-monaco-line-number-padding-right: 7.8px;
+  --stream-monaco-line-number-left: 0px;
+  --stream-monaco-line-number-width: 2ch;
+  --stream-monaco-line-number-padding-left: 2ch;
+  --stream-monaco-line-number-padding-right: 1ch;
+  --stream-monaco-line-number-separator-width: 2px;
+  --stream-monaco-layout-character-width: var(--markstream-code-layout-character-width, 1ch);
   --stream-monaco-line-number-box-width: calc(
-    var(--stream-monaco-line-number-padding-left) +
-      var(--stream-monaco-line-number-width) +
-      var(--stream-monaco-line-number-padding-right)
+    var(--stream-monaco-layout-character-width) +
+      var(--stream-monaco-layout-character-width) +
+      var(--stream-monaco-layout-character-width) +
+      var(--stream-monaco-layout-character-width) +
+      var(--stream-monaco-layout-character-width) +
+      var(--stream-monaco-line-number-separator-width)
   );
-  --stream-monaco-diff-code-gap: 7.8px;
+  --stream-monaco-diff-code-gap: 1ch;
   --stream-monaco-diff-code-padding: 0px;
   --stream-monaco-line-number-gap-to-code: var(--stream-monaco-diff-code-gap);
   --stream-monaco-line-number-align: var(
@@ -4998,31 +4942,35 @@ onUnmounted(() => {
 .code-block-container.is-diff :deep(.monaco-diff-editor .editor.original .margin-view-overlays .line-numbers) {
   left: var(--stream-monaco-line-number-left) !important;
   width: var(--stream-monaco-line-number-width) !important;
+  min-width: var(--stream-monaco-line-number-width) !important;
   box-sizing: content-box !important;
   background: var(--stream-monaco-line-number-bg, var(--markstream-diff-line-number-bg)) !important;
-  padding-left: var(--stream-monaco-line-number-padding-left, 15.6px) !important;
-  padding-right: var(--stream-monaco-line-number-padding-right, 7.8px) !important;
+  padding-left: var(--stream-monaco-line-number-padding-left, 2ch) !important;
+  padding-right: var(--stream-monaco-line-number-padding-right, 1ch) !important;
+  border-right: var(--stream-monaco-line-number-separator-width, 2px) solid var(--stream-monaco-editor-bg) !important;
   text-align: var(
     --markstream-diff-line-number-align,
     var(--markstream-code-line-number-align, right)
   ) !important;
   font-variant-numeric: tabular-nums;
-  box-shadow: inset -1px 0 var(--stream-monaco-gutter-guide, var(--markstream-diff-gutter-guide));
+  box-shadow: none;
 }
 
 .code-block-container.is-diff :deep(.monaco-diff-editor .editor.modified .margin-view-overlays .line-numbers) {
   left: var(--stream-monaco-line-number-left) !important;
   width: var(--stream-monaco-line-number-width) !important;
+  min-width: var(--stream-monaco-line-number-width) !important;
   box-sizing: content-box !important;
   background: var(--stream-monaco-line-number-bg, var(--markstream-diff-line-number-bg)) !important;
-  padding-left: var(--stream-monaco-line-number-padding-left, 15.6px) !important;
-  padding-right: var(--stream-monaco-line-number-padding-right, 7.8px) !important;
+  padding-left: var(--stream-monaco-line-number-padding-left, 2ch) !important;
+  padding-right: var(--stream-monaco-line-number-padding-right, 1ch) !important;
+  border-right: var(--stream-monaco-line-number-separator-width, 2px) solid var(--stream-monaco-editor-bg) !important;
   text-align: var(
     --markstream-diff-line-number-align,
     var(--markstream-code-line-number-align, right)
   ) !important;
   font-variant-numeric: tabular-nums;
-  box-shadow: inset -1px 0 var(--stream-monaco-gutter-guide, var(--markstream-diff-gutter-guide));
+  box-shadow: none;
 }
 
 .code-block-container.is-diff :deep(.monaco-diff-editor .margin-view-overlays .line-numbers),
@@ -5043,7 +4991,7 @@ onUnmounted(() => {
 .code-block-container.is-diff :deep(.stream-monaco-diff-root.stream-monaco-diff-native-stale .monaco-diff-editor .line-delete.line-numbers) {
   background: var(--stream-monaco-removed-line-fill) !important;
   color: var(--stream-monaco-removed-fg) !important;
-  box-shadow: inset -1px 0 var(--stream-monaco-gutter-guide, var(--markstream-diff-gutter-guide)) !important;
+  box-shadow: none !important;
 }
 
 .code-block-container.is-diff :deep(.monaco-diff-editor .editor.original .margin-view-overlays .line-insert.line-numbers),
@@ -5055,7 +5003,7 @@ onUnmounted(() => {
 .code-block-container.is-diff :deep(.stream-monaco-diff-root.stream-monaco-diff-native-stale .monaco-diff-editor .line-insert.line-numbers) {
   background: var(--stream-monaco-added-line-fill) !important;
   color: var(--stream-monaco-added-fg) !important;
-  box-shadow: inset -1px 0 var(--stream-monaco-gutter-guide, var(--markstream-diff-gutter-guide)) !important;
+  box-shadow: none !important;
 }
 
 .code-block-container.is-diff :deep(.monaco-diff-editor),
@@ -5066,6 +5014,46 @@ onUnmounted(() => {
     --markstream-diff-line-number-align,
     var(--markstream-code-line-number-align, right)
   ) !important;
+}
+
+.code-block-container:not(.is-diff) {
+  --markstream-code-line-number-box-width: calc(
+    var(--markstream-code-layout-character-width, 1ch) +
+      var(--markstream-code-layout-character-width, 1ch) +
+      var(--markstream-code-layout-character-width, 1ch) +
+      var(--markstream-code-layout-character-width, 1ch) +
+      var(--markstream-code-layout-character-width, 1ch) + 2px
+  );
+  --markstream-code-content-left: calc(
+    var(--markstream-code-line-number-box-width) +
+      var(--markstream-code-layout-character-width, 1ch)
+  );
+}
+
+.code-block-container:not(.is-diff) :deep(.monaco-editor .margin),
+.code-block-container:not(.is-diff) :deep(.monaco-editor .margin-view-overlays) {
+  width: var(--markstream-code-content-left) !important;
+}
+
+.code-block-container:not(.is-diff) :deep(.monaco-editor .line-numbers) {
+  left: 0 !important;
+  width: 2ch !important;
+  min-width: 2ch !important;
+  box-sizing: content-box !important;
+  padding-left: 2ch !important;
+  padding-right: 1ch !important;
+  border-right: 2px solid var(--vscode-editor-background) !important;
+  text-align: var(--markstream-code-line-number-align, right) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.code-block-container:not(.is-diff) :deep(.monaco-editor .monaco-scrollable-element.editor-scrollable) {
+  left: var(--markstream-code-content-left) !important;
+  width: calc(100% - var(--markstream-code-content-left)) !important;
+}
+
+.code-block-container:not(.is-diff) :deep(.monaco-editor .lines-content) {
+  left: 0 !important;
 }
 
 .code-editor-container[data-markstream-host-hidden="true"] {

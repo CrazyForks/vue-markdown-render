@@ -224,6 +224,40 @@ describe('pre code node diff preview', () => {
     wrapper.unmount()
   })
 
+  it('does not collapse fewer hidden rows than Monaco minimumLineCount', () => {
+    const originalLines = ['one', 'two', 'three', 'old', ...Array.from({ length: 8 }, (_, index) => `tail${index}`)]
+    const modifiedLines = [...originalLines]
+    modifiedLines[3] = 'new'
+
+    const wrapper = mount(PreCodeNode, {
+      props: {
+        showLineNumbers: true,
+        diffHideUnchangedRegions: {
+          enabled: true,
+          contextLineCount: 2,
+          minimumLineCount: 3,
+        },
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          diff: true,
+          originalCode: originalLines.join('\n'),
+          updatedCode: modifiedLines.join('\n'),
+          code: '',
+          raw: '',
+        },
+      },
+    })
+
+    const numbers = wrapper
+      .findAll('.markstream-pre__diff-pane--original .markstream-pre__diff-number')
+      .map(row => row.text())
+    expect(numbers.slice(0, 6)).toEqual(['1', '2', '3', '4', '5', '6'])
+    expect(wrapper.findAll('.markstream-pre__diff-line--collapsed')).toHaveLength(2)
+
+    wrapper.unmount()
+  })
+
   it('preserves exact common prefix and suffix rows when a diff exceeds the LCS limit', () => {
     const middleLength = 1230
     const originalLines = [
@@ -372,10 +406,8 @@ describe('pre code node diff preview', () => {
     expect(source).toContain('background: var(--stream-monaco-added-line-fill, var(--markstream-diff-added-line-fill, transparent));')
     expect(source).toContain('background: var(--stream-monaco-removed-line-fill, var(--markstream-diff-removed-line-fill, transparent));')
     expect(source).toContain('--markstream-pre-diff-line-number-bg: var(')
-    expect(source).toContain('--markstream-pre-diff-line-number-border: var(')
-    expect(source).toContain('var(--markstream-diff-gutter-guide, hsl(var(--ms-border, 214 32% 91%) / 0.72))')
     expect(source).toContain('background: var(--markstream-pre-diff-line-number-bg);')
-    expect(source).toContain('box-shadow: inset -1px 0 var(--markstream-pre-diff-line-number-border);')
+    expect(source).toContain('border-right: var(--markstream-pre-diff-line-number-separator-width, 2px) solid var(--stream-monaco-editor-bg, var(--code-bg));')
     expect(source).toContain('--markstream-pre-diff-content-height')
     expect(source).toContain('color: var(--stream-monaco-added-fg, var(--markstream-diff-added-fg, var(--code-line-number)));')
     expect(source).toContain('color: var(--stream-monaco-removed-fg, var(--markstream-diff-removed-fg, var(--code-line-number)));')
@@ -421,15 +453,14 @@ describe('pre code node diff preview', () => {
 
     expect(source).toContain('pre.markstream-pre--diff-preview.markstream-pre--diff-inline {')
     expect(source).toContain('--markstream-pre-diff-gutter-marker-width: var(--stream-monaco-gutter-marker-width, 4px);')
-    expect(source).toContain('--markstream-pre-diff-code-gap: var(--stream-monaco-diff-code-gap, 7.8px);')
+    expect(source).toContain('--markstream-pre-diff-code-gap: var(--stream-monaco-diff-code-gap, 1ch);')
     expect(source).toContain('--markstream-pre-diff-code-padding: var(--stream-monaco-diff-code-padding, 0px);')
     expect(source).toContain('--markstream-diff-added-gutter: linear-gradient(')
     expect(source).toContain('--markstream-diff-removed-gutter: linear-gradient(')
-    expect(source).toContain('--markstream-pre-diff-line-number-padding-left: var(--stream-monaco-line-number-padding-left, 15.6px);')
-    expect(source).toContain('--markstream-pre-diff-line-number-padding-right: var(--stream-monaco-line-number-padding-right, 7.8px);')
+    expect(source).toContain('--markstream-pre-diff-line-number-padding-left: var(--stream-monaco-line-number-padding-left, 2ch);')
+    expect(source).toContain('--markstream-pre-diff-line-number-padding-right: var(--stream-monaco-line-number-padding-right, 1ch);')
+    expect(source).toContain('--markstream-pre-diff-line-number-separator-width: var(--stream-monaco-line-number-separator-width, 2px);')
     expect(source).toContain('--markstream-pre-diff-line-number-bg: var(')
-    expect(source).toContain('--markstream-pre-diff-line-number-border: var(')
-    expect(source).toContain('var(--markstream-diff-gutter-guide, hsl(var(--ms-border, 214 32% 91%) / 0.72))')
     expect(source).toContain('--markstream-pre-diff-line-number-box-width: calc(')
     expect(source).toContain('--markstream-pre-diff-code-fill-left: calc(')
     expect(source).toContain('--markstream-pre-diff-code-left: calc(')
@@ -440,9 +471,10 @@ describe('pre code node diff preview', () => {
     expect(source).not.toContain('left: var(--markstream-pre-diff-scrollable-left);')
     expect(source).toContain('padding-left: var(--markstream-pre-diff-code-left);')
     expect(source).toContain('left: var(--markstream-pre-diff-code-fill-left);')
-    expect(source).toContain('padding-left: var(--markstream-pre-diff-line-number-padding-left, 15.6px);')
-    expect(source).toContain('padding-right: var(--markstream-pre-diff-line-number-padding-right, 7.8px);')
-    expect(source).toContain('box-shadow: inset -1px 0 var(--markstream-pre-diff-line-number-border);')
+    expect(source).toContain('padding-left: var(--markstream-pre-diff-line-number-padding-left, 2ch);')
+    expect(source).toContain('padding-right: var(--markstream-pre-diff-line-number-padding-right, 1ch);')
+    expect(source).toContain('min-width: var(--markstream-pre-diff-line-number-width);')
+    expect(source).toContain('border-right: var(--markstream-pre-diff-line-number-separator-width, 2px) solid var(--stream-monaco-editor-bg, var(--code-bg));')
     expect(source).toContain('width: var(--markstream-pre-diff-gutter-marker-width, 4px);')
   })
 

@@ -500,7 +500,7 @@ function collapseDiffPanes(panes: DiffPreviewPane[]) {
     if (runLength >= options.minimumLineCount) {
       const hiddenStart = start + (start === 0 ? 0 : options.contextLineCount)
       const hiddenEnd = end - (end === original.length ? 0 : options.contextLineCount)
-      if (hiddenEnd > hiddenStart)
+      if (hiddenEnd - hiddenStart >= options.minimumLineCount)
         collapsedRanges.push({ start: hiddenStart, end: hiddenEnd })
     }
     if (index === start)
@@ -804,10 +804,12 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
 
 .markstream-vue pre.code-pre-fallback[data-markstream-code-loading='1'] {
   --markstream-pre-line-number-top: var(--markstream-code-padding-y, 8px);
-  --markstream-pre-line-number-left: 4px;
-  --markstream-pre-line-number-width: 44px;
-  --markstream-pre-line-number-gap: 8px;
-  --markstream-code-padding-left: 48px;
+  --markstream-pre-line-number-left: 0px;
+  --markstream-pre-line-number-width: 2ch;
+  --markstream-pre-line-number-padding-left: 2ch;
+  --markstream-pre-line-number-padding-right: 1ch;
+  --markstream-pre-line-number-separator-width: 2px;
+  --markstream-code-padding-left: calc(2ch + 2ch + 1ch + 2px + 1ch);
   box-sizing: border-box;
   width: 100%;
   margin: 0;
@@ -833,15 +835,15 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
   position: absolute;
   top: var(--markstream-pre-line-number-top, 0);
   left: var(--markstream-pre-line-number-left, 0);
-  box-sizing: border-box;
+  box-sizing: content-box;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  width: var(
-    --markstream-pre-line-number-width,
-    calc(var(--markstream-code-padding-left, 52px) - var(--markstream-code-padding-x, 12px))
-  );
-  padding-right: var(--markstream-pre-line-number-gap, 12px);
+  width: var(--markstream-pre-line-number-width, 2ch);
+  min-width: var(--markstream-pre-line-number-width, 2ch);
+  padding-left: var(--markstream-pre-line-number-padding-left, 2ch);
+  padding-right: var(--markstream-pre-line-number-padding-right, 1ch);
+  border-right: var(--markstream-pre-line-number-separator-width, 2px) solid var(--code-bg);
   color: var(--code-line-number);
   font: inherit;
   font-variant-numeric: tabular-nums;
@@ -869,8 +871,8 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
   width: 100%;
 
   --markstream-pre-diff-gutter-marker-width: var(--stream-monaco-gutter-marker-width, 4px);
-  --markstream-pre-diff-gutter-gap: var(--stream-monaco-gutter-gap, 8px);
-  --markstream-pre-diff-code-gap: var(--stream-monaco-diff-code-gap, 7.8px);
+  --markstream-pre-diff-gutter-gap: var(--stream-monaco-gutter-gap, 1ch);
+  --markstream-pre-diff-code-gap: var(--stream-monaco-diff-code-gap, 1ch);
   --markstream-pre-diff-code-padding: var(--stream-monaco-diff-code-padding, 0px);
   --markstream-diff-added-fg: var(--diff-added-fg, #2f8f68);
   --markstream-diff-removed-fg: var(--diff-removed-fg, #c24141);
@@ -888,22 +890,20 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
   );
   --markstream-pre-diff-line-number-width: var(
     --stream-monaco-line-number-width,
-    15.6px
+    2ch
   );
-  --markstream-pre-diff-line-number-padding-left: var(--stream-monaco-line-number-padding-left, 15.6px);
-  --markstream-pre-diff-line-number-padding-right: var(--stream-monaco-line-number-padding-right, 7.8px);
+  --markstream-pre-diff-line-number-padding-left: var(--stream-monaco-line-number-padding-left, 2ch);
+  --markstream-pre-diff-line-number-padding-right: var(--stream-monaco-line-number-padding-right, 1ch);
+  --markstream-pre-diff-line-number-separator-width: var(--stream-monaco-line-number-separator-width, 2px);
   --markstream-pre-diff-line-number-box-width: calc(
     var(--markstream-pre-diff-line-number-padding-left)
     + var(--markstream-pre-diff-line-number-width)
     + var(--markstream-pre-diff-line-number-padding-right)
+    + var(--markstream-pre-diff-line-number-separator-width)
   );
   --markstream-pre-diff-line-number-bg: var(
     --stream-monaco-line-number-bg,
     var(--markstream-diff-line-number-bg, transparent)
-  );
-  --markstream-pre-diff-line-number-border: var(
-    --stream-monaco-gutter-guide,
-    var(--markstream-diff-gutter-guide, hsl(var(--ms-border, 214 32% 91%) / 0.72))
   );
   --markstream-pre-diff-line-number-gap-to-code: var(
     --stream-monaco-original-line-number-gap-to-code,
@@ -911,7 +911,7 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
   );
   --markstream-pre-diff-line-number-left: var(
     --stream-monaco-line-number-left,
-    var(--markstream-pre-diff-gutter-marker-width)
+    0px
   );
   --markstream-pre-diff-line-number-align: var(--markstream-diff-line-number-align, right);
   --markstream-pre-diff-code-fill-left: calc(
@@ -923,6 +923,11 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
     + var(--markstream-pre-diff-line-number-gap-to-code)
     + var(--markstream-pre-diff-code-padding)
   );
+}
+
+.markstream-vue pre.markstream-pre--diff-preview::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
 }
 
 .markstream-vue pre.markstream-pre--diff-preview.is-wrap {
@@ -937,7 +942,7 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
   );
   --markstream-pre-diff-line-number-left: var(
     --stream-monaco-line-number-left,
-    var(--markstream-pre-diff-gutter-marker-width)
+    0px
   );
 }
 
@@ -984,14 +989,14 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
   );
   --markstream-pre-diff-line-number-left: var(
     --stream-monaco-line-number-left,
-    var(--markstream-pre-diff-gutter-marker-width)
+    0px
   );
   box-shadow: inset 1px 0 var(--markstream-diff-pane-divider, hsl(var(--ms-border)));
 }
 
 .markstream-vue pre.markstream-pre--diff-preview:not(.markstream-pre--diff-inline) .markstream-pre__diff-pane--modified {
   --markstream-pre-diff-line-number-left: calc(
-    var(--stream-monaco-line-number-left, var(--markstream-pre-diff-gutter-marker-width))
+    var(--stream-monaco-line-number-left, 0px)
     + var(--markstream-pre-diff-pane-divider-width)
   );
 }
@@ -1061,7 +1066,7 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
   z-index: 0;
   pointer-events: none;
   background: var(--markstream-pre-diff-line-number-bg);
-  box-shadow: inset -1px 0 var(--markstream-pre-diff-line-number-border);
+  box-shadow: none;
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-rail {
@@ -1083,15 +1088,17 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
   top: 0;
   left: var(--markstream-pre-diff-line-number-left);
   width: var(--markstream-pre-diff-line-number-width);
+  min-width: var(--markstream-pre-diff-line-number-width);
   height: var(
     --markstream-pre-diff-content-height,
     var(--markstream-pre-diff-line-height, 18px)
   );
   box-sizing: content-box;
   background: var(--markstream-pre-diff-line-number-bg);
-  box-shadow: inset -1px 0 var(--markstream-pre-diff-line-number-border);
-  padding-left: var(--markstream-pre-diff-line-number-padding-left, 15.6px);
-  padding-right: var(--markstream-pre-diff-line-number-padding-right, 7.8px);
+  box-shadow: none;
+  padding-left: var(--markstream-pre-diff-line-number-padding-left, 2ch);
+  padding-right: var(--markstream-pre-diff-line-number-padding-right, 1ch);
+  border-right: var(--markstream-pre-diff-line-number-separator-width, 2px) solid var(--stream-monaco-editor-bg, var(--code-bg));
   color: var(--code-line-number);
   font-variant-numeric: tabular-nums;
   line-height: var(--markstream-pre-diff-line-height, 18px);
@@ -1173,15 +1180,15 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--collapsed {
-  min-height: 32px;
+  min-height: 28px;
   padding-left: 0;
   color: var(--stream-monaco-unchanged-fg, var(--markstream-diff-unchanged-fg, var(--code-line-number)));
-  line-height: 32px;
+  line-height: 28px;
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--collapsed::before {
   left: 0;
-  height: 32px;
+  height: 28px;
   background: var(--stream-monaco-unchanged-bg, var(--markstream-diff-unchanged-bg, rgb(0 0 0 / 4%)));
 }
 
@@ -1195,7 +1202,7 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
   width: 100%;
   min-width: 0;
   padding-left: calc(var(--markstream-pre-diff-code-left) + 12px);
-  line-height: 32px;
+  line-height: 28px;
 }
 
 .markstream-vue pre.markstream-pre--diff-preview .markstream-pre__diff-line--added::before {
