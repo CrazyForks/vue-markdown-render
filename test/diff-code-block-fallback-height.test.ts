@@ -170,7 +170,7 @@ describe('diff CodeBlockNode fallback height stability', () => {
   it('releases the fallback height when unchanged diff rows are folded', async () => {
     const helpers = getStreamMonacoHelpers()
     helpers.createDiffEditor.mockImplementation(() => new Promise<void>(() => {}))
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function() {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
       const height = this.matches('pre.code-pre-fallback') ? 360 : 0
       return {
         x: 0,

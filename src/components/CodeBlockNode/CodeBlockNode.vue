@@ -780,10 +780,6 @@ function isRemovedDiffLine(line: string) {
   return line.startsWith('-') && !line.startsWith('---')
 }
 
-function isAddedDiffLine(line: string) {
-  return line.startsWith('+') && !line.startsWith('+++')
-}
-
 function hasDiffSourcePair() {
   return props.node.originalCode != null || props.node.updatedCode != null
 }
@@ -971,11 +967,11 @@ const preFallbackStyle = computed(() => {
     paddingTop: `${preFallbackVerticalPadding.value.top}px`,
     paddingBottom: `${preFallbackVerticalPadding.value.bottom}px`,
     ...(!isDiff.value && cappedEstimatedContentHeight != null && !useStreamingLocalHeight
-        ? {
-            height: `${cappedEstimatedContentHeight}px`,
-            minHeight: `${cappedEstimatedContentHeight}px`,
-          }
-        : !isDiff.value && cappedLocalMinHeight != null
+      ? {
+          height: `${cappedEstimatedContentHeight}px`,
+          minHeight: `${cappedEstimatedContentHeight}px`,
+        }
+      : !isDiff.value && cappedLocalMinHeight != null
           ? {
               minHeight: `${cappedLocalMinHeight}px`,
             }

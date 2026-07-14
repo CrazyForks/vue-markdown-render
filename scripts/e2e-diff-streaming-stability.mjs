@@ -323,12 +323,12 @@ async function verifyFinalCollapseCycle(page) {
     const sameSurface = allFrames.every(state => !state.preVisible && state.diffsCount === 1)
     const heightRestored = initial && restored
       ? Math.abs(restored.contentHeight - initial.contentHeight) <= 2
-        && Math.abs(restored.blockHeight - initial.blockHeight) <= 2
+      && Math.abs(restored.blockHeight - initial.blockHeight) <= 2
       : false
     const collapsedReduced = initial && collapsed
       ? collapsed.collapsed
-        && collapsed.contentHeight < initial.contentHeight
-        && collapsed.blockHeight < initial.blockHeight
+      && collapsed.contentHeight < initial.contentHeight
+      && collapsed.blockHeight < initial.blockHeight
       : false
 
     return {
@@ -396,7 +396,7 @@ async function runCase(browser, port, layout, renderMode) {
 
     const visibleStates = states.filter(state => state.exists)
     const streamingStates = visibleStates.filter(state => state.codeBlockState === 'streaming')
-    const stateKinds = visibleStates.map(state => {
+    const stateKinds = visibleStates.map((state) => {
       // Diffs is mounted into the hidden host before the visible `<pre>` is
       // removed. That is still the pre state from the user's perspective.
       if (state.preVisible)

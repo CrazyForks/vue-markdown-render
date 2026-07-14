@@ -2,8 +2,8 @@ import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import CodeBlockNode from '../src/components/CodeBlockNode/CodeBlockNode.vue'
-import MarkdownCodeBlockNode from '../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue'
 import { resetCodeBlockRuntimeReadyForTest } from '../src/components/CodeBlockNode/runtime'
+import MarkdownCodeBlockNode from '../src/components/MarkdownCodeBlockNode/MarkdownCodeBlockNode.vue'
 
 function helpers() {
   return (globalThis as any).__streamMonacoHelpers
@@ -26,7 +26,7 @@ function node(code: string, loading: boolean) {
   }
 }
 
-describe('MarkdownCodeBlockNode Diffs adapter', () => {
+describe('markdownCodeBlockNode Diffs adapter', () => {
   beforeEach(() => {
     resetCodeBlockRuntimeReadyForTest()
     const runtime = helpers()

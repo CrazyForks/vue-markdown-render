@@ -3,6 +3,29 @@ import type { CodeBlockPreviewPayload, MarkdownCodeBlockPreviewPayload, ShikiCod
 import { computed, useAttrs } from 'vue'
 import CodeBlockNode from '../CodeBlockNode/CodeBlockNode.vue'
 
+const props = withDefaults(defineProps<MarkdownCodeBlockNodeProps>(), {
+  isShowPreview: true,
+  darkTheme: 'vitesse-dark',
+  lightTheme: 'vitesse-light',
+  isDark: false,
+  loading: true,
+  stream: true,
+  enableFontSizeControl: true,
+  minWidth: undefined,
+  maxWidth: undefined,
+  showHeader: true,
+  showCopyButton: true,
+  showExpandButton: true,
+  showPreviewButton: true,
+  showCollapseButton: true,
+  showFontSizeButtons: true,
+})
+
+const emits = defineEmits<{
+  (e: 'previewCode', payload: MarkdownCodeBlockPreviewPayload): void
+  (e: 'copy', code: string): void
+}>()
+
 const CodeBlockNodeAdapter = CodeBlockNode as any
 
 interface MarkdownCodeBlockNodeProps extends ShikiCodeBlockProps {
@@ -34,29 +57,6 @@ interface MarkdownCodeBlockNodeProps extends ShikiCodeBlockProps {
   estimatedHeightPx?: number
   estimatedContentHeightPx?: number
 }
-
-const props = withDefaults(defineProps<MarkdownCodeBlockNodeProps>(), {
-  isShowPreview: true,
-  darkTheme: 'vitesse-dark',
-  lightTheme: 'vitesse-light',
-  isDark: false,
-  loading: true,
-  stream: true,
-  enableFontSizeControl: true,
-  minWidth: undefined,
-  maxWidth: undefined,
-  showHeader: true,
-  showCopyButton: true,
-  showExpandButton: true,
-  showPreviewButton: true,
-  showCollapseButton: true,
-  showFontSizeButtons: true,
-})
-
-const emits = defineEmits<{
-  (e: 'previewCode', payload: MarkdownCodeBlockPreviewPayload): void
-  (e: 'copy', code: string): void
-}>()
 
 const attrs = useAttrs()
 const codeBlockProps = computed<Record<string, unknown>>(() => ({

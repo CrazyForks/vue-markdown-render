@@ -57,7 +57,7 @@ const codeBlockMonacoOptions = {
 
 <template>
   <MarkdownRender
-    :content="'```ts\\nconst answer = 42\\n```'"
+    :content="['```ts', 'const answer = 42', '```'].join('\n')"
     :code-block-monaco-options="codeBlockMonacoOptions"
   />
 </template>

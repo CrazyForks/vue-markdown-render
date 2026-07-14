@@ -104,7 +104,7 @@ function makeNode(code: string, loading: boolean) {
   }
 }
 
-describe('CodeBlockNode final Diffs gate', () => {
+describe('codeBlockNode final Diffs gate', () => {
   beforeEach(() => {
     observers.length = 0
     vi.stubGlobal('IntersectionObserver', IntersectionObserverStub)
