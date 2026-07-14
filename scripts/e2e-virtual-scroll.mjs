@@ -1065,7 +1065,7 @@ async function runVirtualScrollerMarkstreamReloadProbe(page, port, ensureServerR
 
     await api.scrollTo(58772)
 
-    for (let i = 0; i < 60; i++)
+    for (let i = 0; i < 180; i++)
       await api.nextFrame()
 
     snapshot = api.read()

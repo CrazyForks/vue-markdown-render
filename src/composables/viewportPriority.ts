@@ -99,6 +99,7 @@ export function provideViewportPriority(
   const targets = new Map<Element, TargetState>()
   const idleQueue = new Set<Element>()
   let idleJob: number | null = null
+  let refreshFrame: number | null = null
 
   function normalizeConfig(target?: HTMLElement, opts?: ViewportPriorityRegisterOptions): ObserverConfig {
     return {
@@ -270,6 +271,16 @@ export function provideViewportPriority(
     }
   }
 
+  function scheduleTargetRefresh() {
+    if (!isBrowser || refreshFrame != null)
+      return
+
+    refreshFrame = window.requestAnimationFrame(() => {
+      refreshFrame = null
+      refreshTargets()
+    })
+  }
+
   const register: RegisterFn = (el, opts) => {
     const visible = ref(false)
     let settled = false
@@ -319,6 +330,7 @@ export function provideViewportPriority(
     targets.set(el, data)
     observer.bucket.targets.set(el, data)
     observer.bucket.io.observe(el)
+    scheduleTargetRefresh()
     if (opts?.allowIdle !== false) {
       idleQueue.add(el)
       scheduleIdleDrain()
