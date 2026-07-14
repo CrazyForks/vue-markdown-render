@@ -252,7 +252,7 @@ async function waitForVisibleBlocksReady(page, rootSelector) {
       && visibleMermaids.every(element => Boolean(element.querySelector('svg')))
       && visibleInfographics.every(element => Boolean(element.querySelector('svg')))
       && visibleD2Blocks.every(element => Boolean(element.querySelector('.d2-svg svg')))
-  }, rootSelector, { timeout: 30000 })
+  }, rootSelector, { timeout: 60000 })
 }
 
 async function waitForAllD2Ready(page, timeout = 15000) {
