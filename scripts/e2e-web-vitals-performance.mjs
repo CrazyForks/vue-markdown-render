@@ -768,7 +768,7 @@ async function captureVitalsSnapshot(page, label, performanceDelta = null) {
       fallbackCount: fallbackElements.length,
       terminalPreFallbackCount: terminalPreFallbackElements.length,
       visibleFallbackCount: fallbackElements.filter(isVisible).length,
-      hasMonacoDom: Boolean(document.querySelector('.monaco-editor, .monaco-diff-editor')),
+      hasMonacoDom: Boolean(document.querySelector('.monaco-editor, .monaco-diff-editor, diffs-container')),
       jsHeapUsedBytes: null,
       parsePerformance: diffParsePerformance(state.parsePerformance, state.parseBaseline),
       layoutReads: normalizeLayoutReadPerformance(window.__markstreamLayoutReadPerformance),

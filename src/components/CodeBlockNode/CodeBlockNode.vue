@@ -218,7 +218,7 @@ if (typeof window !== 'undefined') {
       }
 
       let active = true
-      const handle = registerVisibility(el, { rootMargin: '0px', allowIdle: false })
+      const handle = registerVisibility(el, { rootMargin: '0px' })
 
       viewportHandle.value = handle
       // Latch readiness once visible so observer reconfiguration does not hide an enhanced block.
