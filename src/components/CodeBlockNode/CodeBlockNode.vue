@@ -6,7 +6,7 @@ import type { MonacoDiffEditorViewLike, MonacoDisposableLike, MonacoEditorViewLi
 import { computed, getCurrentInstance, inject, nextTick, onBeforeUnmount, onUnmounted, ref, shallowRef, useAttrs, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 // Tooltip is provided as a singleton via composable to avoid many DOM nodes
-import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
+import { hideTooltip } from '../../composables/useSingletonTooltip'
 import { useViewportPriority } from '../../composables/viewportPriority'
 import { languageIconsRevision, languageMap, normalizeLanguageIdentifier, resolveMonacoLanguageId } from '../../utils'
 import { MARKSTREAM_LANGUAGE_ICON_RESOLVER_KEY } from '../../utils/languageIconContext'
@@ -179,7 +179,6 @@ const { t } = useSafeI18n()
 const codeEditor = ref<HTMLElement | null>(null)
 const container = ref<HTMLElement | null>(null)
 const copyText = ref(false)
-// local tooltip logic removed; use shared `showTooltipForAnchor` / `hideTooltip`
 
 const codeLanguage = ref(resolveStreamingCodeLanguage(props.node.language, props.node.code, isCodeBlockLoading()))
 const monacoLanguage = computed(() => resolveMonacoLanguageId(codeLanguage.value))
@@ -3538,23 +3537,8 @@ watch(tooltipsEnabled, (enabled) => {
     hideTooltip()
 })
 
-function resolveTooltipTarget(e: Event) {
-  const btn = (e.currentTarget || e.target) as HTMLButtonElement | null
-  if (!btn || btn.disabled)
-    return null
-  return btn
-}
-
-function toggleExpand(e?: Event) {
+function toggleExpand() {
   isExpanded.value = !isExpanded.value
-
-  if (e && tooltipsEnabled.value) {
-    const target = resolveTooltipTarget(e)
-    if (target) {
-      const txt = isExpanded.value ? (t('common.collapse') || 'Collapse') : (t('common.expand') || 'Expand')
-      showTooltipForAnchor(target, txt, 'top', false, undefined, props.isDark)
-    }
-  }
 
   const editor = isDiff.value
     ? getDiffEditorView()
