@@ -27,7 +27,10 @@ const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY, null)
 const registerViewport = useViewportPriority()
 const viewportPriorityOptions = useViewportPriorityOptions()
 const offscreenHeavyNodeDeferral = useOffscreenHeavyNodeDeferral()
-const hydratedFromServer = typeof window !== 'undefined' && getCurrentInstance()?.vnode.el?.nodeType === 1
+const safeNodeSrc = computed(() => sanitizeImageSrc(props.node.src))
+const existingImage = getCurrentInstance()?.vnode.el?.querySelector?.('img')
+const hydratedFromServer = typeof window !== 'undefined'
+  && existingImage?.getAttribute('src') === safeNodeSrc.value
 const viewportReady = ref(
   typeof window === 'undefined'
   || hydratedFromServer
@@ -37,7 +40,6 @@ const viewportHandle = shallowRef<ReturnType<typeof registerViewport> | null>(nu
 let lifecyclePendingIndexKey = ''
 let lifecyclePendingTimer: ReturnType<typeof setTimeout> | null = null
 
-const safeNodeSrc = computed(() => sanitizeImageSrc(props.node.src))
 const safeFallbackSrc = computed(() => sanitizeImageSrc(props.fallbackSrc))
 const displaySrc = computed(() => activeSrc.value)
 const useEagerImagePath = computed(() => !props.lazy)

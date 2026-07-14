@@ -679,11 +679,14 @@ function assertScenario(result) {
 
   if (result.sample !== 'stress' && !(result.codeBlockCount > 0))
     throw new Error(`[${result.mode}] Expected at least one rendered code block.`)
-  if (result.sample === 'baseline' && !(result.mermaidCount > 0))
+  const hasMermaidBlock = result.mermaidCount > 0 || result.fullScroll?.mermaidCount > 0
+  const hasInfographicBlock = result.infographicCount > 0 || result.fullScroll?.infographicCount > 0
+  const hasD2Block = result.d2Count > 0 || result.fullScroll?.d2Count > 0
+  if (result.sample === 'baseline' && !hasMermaidBlock)
     throw new Error(`[${result.mode}] Baseline sample should include at least one mermaid block.`)
-  if (result.sample === 'baseline' && !(result.infographicCount > 0))
+  if (result.sample === 'baseline' && !hasInfographicBlock)
     throw new Error(`[${result.mode}] Baseline sample should include at least one infographic block.`)
-  if (result.sample === 'baseline' && !(result.d2Count > 0))
+  if (result.sample === 'baseline' && !hasD2Block)
     throw new Error(`[${result.mode}] Baseline sample should include at least one D2 block.`)
   if (result.visibleFallbackCount !== 0)
     throw new Error(`[${result.mode}] Visible code fallback should be gone after initial settle.`)

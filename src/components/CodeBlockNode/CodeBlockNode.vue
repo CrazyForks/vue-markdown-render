@@ -207,7 +207,10 @@ const viewportPriorityOptions = useViewportPriorityOptions()
 const offscreenHeavyNodeDeferral = useOffscreenHeavyNodeDeferral()
 const viewportHandle = shallowRef<ReturnType<typeof registerVisibility> | null>(null)
 const viewportReady = ref(typeof window === 'undefined' || !offscreenHeavyNodeDeferral.value)
-const hydratedFromServer = typeof window !== 'undefined' && getCurrentInstance()?.vnode.el?.nodeType === 1
+const existingCode = getCurrentInstance()?.vnode.el?.textContent ?? ''
+const hydratedFromServer = typeof window !== 'undefined'
+  && String(props.node.code ?? '').length > 0
+  && existingCode.includes(String(props.node.code))
 const viewportPendingMarkerReady = ref(!hydratedFromServer)
 onMounted(() => {
   viewportPendingMarkerReady.value = true

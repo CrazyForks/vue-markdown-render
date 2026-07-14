@@ -1085,6 +1085,12 @@ async function runVirtualScrollerMarkstreamReloadProbe(page, port, ensureServerR
     return Boolean(api && typeof api.read === 'function' && typeof api.nextFrame === 'function')
   }, { timeout: 60000 })
 
+  await page.evaluate(async () => {
+    const api = window.__markstreamVirtualScrollerMarkstream
+    for (let i = 0; i < 30; i++)
+      await api.nextFrame()
+  })
+
   const result = await page.evaluate(async (before) => {
     const api = window.__markstreamVirtualScrollerMarkstream
     const samples = []
