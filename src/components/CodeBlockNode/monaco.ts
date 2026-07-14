@@ -96,7 +96,7 @@ export async function getUseMonaco(): Promise<MonacoModule | null> {
   loadingPromise = (async () => {
     if (!mod) {
       try {
-        mod = normalizeMonacoModule(await import('stream-monaco'))
+        mod = normalizeMonacoModule(await import('stream-diffs'))
         if (!mod)
           return null
       }

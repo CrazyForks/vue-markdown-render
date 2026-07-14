@@ -51,7 +51,7 @@ export const CodeBlockNodeAsync = defineAsyncComponent({
     }
     catch (e) {
       console.warn(
-        '[markstream-vue] Optional peer dependencies for CodeBlockNode are missing. Falling back to preformatted code rendering (no Monaco). To enable full code block features, please install "stream-monaco".',
+        '[markstream-vue] Optional peer dependency stream-diffs is missing. Falling back to preformatted code rendering. To enable enhanced code block features, please install "stream-diffs".',
         e,
       )
       return PreCodeNode

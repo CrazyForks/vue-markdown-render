@@ -273,6 +273,7 @@
     "@terrastruct/d2": ">=0.1.33",
     "katex": ">=0.16.22",
     "mermaid": ">=11",
+    "stream-diffs": ">=0.0.1",
     "stream-markdown": ">=0.0.16",
     "stream-monaco": ">=0.0.48",
     "vue": ">=3.0.0",
@@ -289,6 +290,9 @@
       "optional": true
     },
     "mermaid": {
+      "optional": true
+    },
+    "stream-diffs": {
       "optional": true
     },
     "stream-markdown": {
@@ -335,6 +339,7 @@
     "rollup": "^3.30.0",
     "rollup-plugin-dts": "^5.3.1",
     "rollup-plugin-visualizer": "^6.0.11",
+    "stream-diffs": "latest",
     "stream-markdown": "latest",
     "streamdown": "2.5.0",
     "tailwindcss": "^3.4.19",

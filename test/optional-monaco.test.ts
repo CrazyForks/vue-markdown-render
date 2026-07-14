@@ -1,17 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
 
-describe('optional monaco dependency', () => {
-  it('should handle missing stream-monaco gracefully', async () => {
+describe('optional stream-diffs dependency', () => {
+  it('handles an unavailable stream-diffs peer gracefully', async () => {
     // Dynamically import the monaco module
     const { getUseMonaco } = await import('../src/components/CodeBlockNode/monaco')
 
-    // Mock the import to simulate missing package
-    // In a real scenario where stream-monaco is not installed,
+    // In a real scenario where stream-diffs is not installed,
     // the import will fail and getUseMonaco should return null
     // This test verifies the function exists and can be called
     const result = await getUseMonaco()
 
-    // If stream-monaco is installed (as it is in the dev environment),
+    // If stream-diffs is installed (as it is in the dev environment),
     // result will be the module. If not installed, result will be null.
     // The important thing is that no error is thrown.
     expect(typeof result === 'object' || result === null).toBe(true)
@@ -30,7 +29,7 @@ describe('optional monaco dependency', () => {
 
   it('treats an empty optional-peer stub as unavailable', async () => {
     vi.resetModules()
-    vi.doMock('stream-monaco', () => ({
+    vi.doMock('stream-diffs', () => ({
       default: {},
     }))
 

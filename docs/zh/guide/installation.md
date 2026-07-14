@@ -23,7 +23,7 @@ yarn add markstream-vue
 | 能力 | 需要的包 | 适用场景 |
 |------|---------|---------|
 | 轻量高亮代码块 | `stream-markdown` | 文档站、SSR、包体积敏感场景 |
-| Monaco 代码块 | `stream-monaco` | 需要复制、预览、展开、字体控制等完整代码块体验 |
+| 增强代码块与 diff | `stream-diffs` | 需要复制、预览、展开、字体控制、语法高亮和 File/Diff surface |
 | Mermaid 图表 | `mermaid` | 渲染 `mermaid` fenced code block |
 | D2 图表 | `@terrastruct/d2` | 渲染 `d2` / `d2lang` fenced code block |
 | KaTeX 数学公式 | `katex` | 行内或块级公式 |
@@ -41,7 +41,7 @@ pnpm add markstream-vue stream-markdown
 ### AI / 聊天 UI，且需要更强的代码块和图表体验
 
 ```bash
-pnpm add markstream-vue stream-monaco mermaid katex
+pnpm add markstream-vue stream-diffs mermaid katex
 ```
 
 然后继续看 [AI 聊天与流式输出](/zh/guide/ai-chat-streaming)，里面会串起 `mode="chat"`、`content` 流式渲染、`final` 结束态处理，以及由上层负责解析时才需要的可选 `nodes` 路径。
@@ -55,7 +55,7 @@ pnpm add markstream-vue mermaid @terrastruct/d2 katex
 ### 一次性全开
 
 ```bash
-pnpm add markstream-vue stream-markdown stream-monaco mermaid @terrastruct/d2 katex
+pnpm add markstream-vue stream-markdown stream-diffs mermaid @terrastruct/d2 katex
 ```
 
 ## 4. CSS 顺序和安装同样重要
@@ -84,7 +84,7 @@ import 'markstream-vue/index.css'
 import 'katex/dist/katex.min.css'
 ```
 
-`stream-monaco`、`mermaid` 和 `@terrastruct/d2` 不需要再从本包额外引入 CSS。
+`stream-diffs`、`mermaid` 和 `@terrastruct/d2` 不需要再从本包额外引入 CSS。
 
 ## 5. 功能加载器（只在 CDN 或自定义控制时需要）
 
@@ -102,7 +102,7 @@ enableD2()
 
 - 如果你单独使用节点组件，而不是 `MarkdownRender`，请外层包一层 `<div class="markstream-vue">...</div>`。
 - 如果公式不显示，优先检查 `katex` 是否安装、CSS 是否导入。
-- 如果 Monaco 空白，优先检查 worker 打包和浏览器端执行时机。
+- 如果增强代码块始终停留在 `<pre>`，确认已安装 `stream-diffs`，并确认 `CodeBlockNode` 已结束流式输出且进入可视区域。这个时机由 markstream-vue 适配层决定，`stream-diffs` 根 runtime 本身与框架无关。
 - 如果样式错乱，先看 [故障排除](/zh/guide/troubleshooting#css-looks-wrong-start-here)。
 
 ## 7. 快速测试

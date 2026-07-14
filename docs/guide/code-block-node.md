@@ -1,24 +1,24 @@
 # CodeBlockNode (Component)
 
-`CodeBlockNode` 是库中用于渲染富交互代码块的组件。对于需要编辑/高亮/增量渲染的场景，推荐安装 `stream-monaco`。组件为头部提供灵活的自定义点（props + slots），并在常见场景下提供可拦截的事件。
+`CodeBlockNode` 是库中用于渲染富交互代码块的组件。对于需要高亮、File/Diff surface 与交互的场景，推荐安装 `stream-diffs`。Vue 组件负责流式结束、可见性和卸载；`stream-diffs` 根 runtime 只负责 framework-agnostic DOM surface。
 
 ## Quick summary
-- Monaco mode (install `stream-monaco`) — editor-like rendering with workers
-- Fallback — plain `<pre><code>` when `stream-monaco` is not installed
-- If you want Shiki-based highlighting (no Monaco), use `MarkdownCodeBlockNode` (peer: `stream-markdown`)
+- Enhanced mode (install `stream-diffs`) — finalized File/FileDiff surface with syntax highlighting and diff interactions
+- Fallback — plain `<pre><code>` when `stream-diffs` is not installed
+- If you want Shiki-based highlighting, use `MarkdownCodeBlockNode` (peer: `stream-markdown`)
 
 ## Props
 Refer to `src/types/component-props.ts` for full signature. Key props:
 - `node` — code_block node (required)
 - `loading`, `stream`, `isShowPreview`
-- `monacoOptions` — typed as `CodeBlockMonacoOptions` and forwarded to `stream-monaco`
+- `monacoOptions` — typed as `CodeBlockMonacoOptions` for API compatibility and forwarded to the `stream-diffs` adapter
   - diff options such as `diffHideUnchangedRegions`, `diffLineStyle`, `diffAppearance`, `diffUnchangedRegionStyle`, `diffHunkActionsOnHover`, `diffHunkHoverHideDelayMs`, and `onDiffHunkAction` belong here
 - Header controls: `showHeader`, `showCollapseButton`, `showCopyButton`, `showExpandButton`, `showPreviewButton`, `showFontSizeButtons`, `showTooltips`
 - HTML preview sandbox: `htmlPreviewAllowScripts` defaults to `false`, and `htmlPreviewSandbox` lets you override the iframe sandbox tokens directly
 
 Built-in inline HTML preview uses `sandbox=""` by default so untrusted preview documents do not run scripts or inherit the host origin. `htmlPreviewSandbox` takes precedence over `htmlPreviewAllowScripts`; passing `htmlPreviewSandbox=""` keeps the iframe fully sandboxed, omitting `htmlPreviewSandbox` leaves `htmlPreviewAllowScripts` in control, and invalid non-string overrides such as `null` fall back to the safe default. Only opt into `htmlPreviewAllowScripts` for trusted demos, and avoid combining `allow-scripts` with `allow-same-origin` for untrusted preview content.
 
-Default diff UX in Monaco mode:
+Default diff UX in enhanced mode:
 
 - `diffHideUnchangedRegions: { enabled: true, contextLineCount: 2, minimumLineCount: 4, revealLineCount: 5 }`
 - `diffLineStyle: 'background'`
@@ -28,7 +28,7 @@ Default diff UX in Monaco mode:
 - `diffHunkHoverHideDelayMs: 160`
 
 You can override any of them through `monacoOptions`.
-When the preset uses `diffAppearance: 'auto'`, `CodeBlockNode` resolves it to the current light/dark surface before passing the options to `stream-monaco`.
+When the preset uses `diffAppearance: 'auto'`, `CodeBlockNode` resolves it to the current light/dark surface before passing the options to its `stream-diffs` adapter.
 
 Diff blocks also show `- / +` line counts in the built-in header.
 
@@ -42,10 +42,10 @@ Diff blocks also show `- / +` line counts in the built-in header.
 - `previewCode(payload)` — only emitted when you attach a `@preview-code` listener; payload is `{ node, artifactType, artifactTitle, id }`
 
 ## Examples
-### Install and run (Monaco)
+### Install and run
 
 ```bash
-pnpm add stream-monaco
+pnpm add stream-diffs
 ```
 
 ### Basic example

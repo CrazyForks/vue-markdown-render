@@ -301,7 +301,7 @@ createApp({
 }).mount('#app')
 ```
 
-Import `markstream-vue/index.css` after your reset (e.g., use `@import 'markstream-vue/index.css' layer(components);` for Tailwind) so renderer styles win over utility classes. Install optional peers such as `stream-monaco`, `shiki`, `stream-markdown`, `mermaid`, and `katex` only when you need Monaco code blocks, Shiki highlighting, diagrams, or math.
+Import `markstream-vue/index.css` after your reset (e.g., use `@import 'markstream-vue/index.css' layer(components);` for Tailwind) so renderer styles win over utility classes. Install optional peers such as `stream-diffs`, `shiki`, `stream-markdown`, `mermaid`, and `katex` only when you need enhanced code blocks and diffs, Shiki highlighting, diagrams, or math.
 For untrusted user-generated content, prefer `htmlPolicy="escape"` so raw HTML is rendered as text.
 If your app intentionally scales root font size on mobile, use `markstream-vue/index.px.css` to avoid `rem`-based global scaling side effects.
 
@@ -327,7 +327,8 @@ Choose the renderer mode by surface:
 
 Use `mode="minimal"` when you want the same lightweight defaults as `chat`, but prefer a neutral mode name for non-chat surfaces. Avoid combining high-frequency `smooth-streaming` with `fade`; it can turn a steady stream into repeated opacity restarts.
 For the same chat message, do not switch from `mode="chat"` to `mode="docs"` only because `final` changed. Keep the mode stable and switch pacing/animation props (`smooth-streaming`, `typewriter`, `fade`) instead; `docs` changes the default code renderer and layout strategy.
-For docs pages that do not need Monaco-backed code blocks, set `:render-code-blocks-as-pre="true"`. If you want the rich Monaco-backed code-block UI, install `stream-monaco`; otherwise the renderer intentionally falls back to `<pre>` rendering.
+For docs pages that do not need enhanced code blocks, set `:render-code-blocks-as-pre="true"`. If you want the rich `CodeBlockNode` UI and File/Diff rendering, install `stream-diffs`; otherwise the renderer intentionally falls back to `<pre>` rendering.
+`stream-diffs` is a framework-agnostic DOM runtime. `CodeBlockNode` owns the Vue-side decision of when to replace the streaming `<pre>` with its finalized File or FileDiff surface.
 
 Renderer CSS is scoped under an internal `.markstream-vue` container to minimize global style conflicts. If you render exported node components outside of `MarkdownRender`, wrap them in an element with class `markstream-vue`.
 
@@ -611,7 +612,7 @@ If markstream-vue helps your work, you can support ongoing maintenance with one 
 | Needs | Typical Markdown preview | markstream-vue |
 | --- | --- | --- |
 | Streaming input | Re-renders whole tree, flashes | Incremental batches with virtual windowing |
-| Large code blocks | Slow re-highlight | Monaco streaming updates + Shiki option |
+| Large code blocks | Slow re-highlight | `stream-diffs` File/Diff surface + Shiki option |
 | Diagrams | Blocks while parsing | Progressive Mermaid with graceful fallback |
 | Custom UI | Limited slots | Inline Vue components & typed nodes |
 | Long docs | Memory spikes | Configurable live-node cap for steady usage |
@@ -653,7 +654,7 @@ Watch on Bilibili: [Open in Bilibili](https://www.bilibili.com/video/BV17Z4qzpE9
 
 - ⚡ Extreme performance: minimal re-rendering and efficient DOM updates for streaming scenarios
 - 🌊 Streaming-first: native support for incomplete or frequently updated tokenized Markdown
-- 🧠 Monaco streaming updates: high-performance Monaco integration for smooth incremental updates of large code blocks
+- 🧠 Enhanced code blocks: `stream-diffs` File/Diff surfaces with syntax highlighting and diff interactions
 - 🪄 Progressive Mermaid: charts render instantly when syntax is available, and improve with later updates
 - 🧩 Custom components: embed framework components in Markdown content
 - 📝 Full Markdown support: tables, formulas, emoji, checkboxes, code blocks, etc.
@@ -706,7 +707,7 @@ Thanks to all the people who have contributed to this project!
 ### Dependencies
 
 This project uses and benefits from:
-- [stream-monaco](https://github.com/Simon-He95/stream-monaco)
+- [stream-diffs](https://github.com/Simon-He95/stream-diffs)
 - [stream-markdown](https://github.com/Simon-He95/stream-markdown)
 - [mermaid](https://mermaid-js.github.io/mermaid)
 - [katex](https://katex.org/)

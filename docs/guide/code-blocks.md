@@ -4,24 +4,24 @@
 
 Code blocks can be rendered in three ways depending on which optional dependencies you install and how you configure the library:
 
-- Monaco (recommended for large/interactive code blocks): installs and uses `stream-monaco` to provide an editor-like, incremental rendering experience. The library lazy-loads `stream-monaco` at runtime when available.
+- Enhanced surface (recommended for large or interactive code blocks): install `stream-diffs` for File and FileDiff rendering, syntax highlighting, and diff interactions. `CodeBlockNode` loads the core runtime on demand after the code block has completed streaming and entered the viewport.
 - Shiki (MarkdownCodeBlockNode): install `stream-markdown` and override the `code_block` node via `setCustomComponents` to use a lightweight Markdown-driven renderer.
-- Fallback (no extra deps): if neither optional package is installed, code blocks render as plain `<pre><code>` blocks (basic styling / no Monaco features).
+- Fallback (no extra deps): if neither optional package is installed, code blocks render as plain `<pre><code>` blocks with basic styling.
 
-## Monaco (recommended)
+## stream-diffs surface (recommended)
 
 - Install:
 
 ```bash
-pnpm add stream-monaco
+pnpm add stream-diffs
 # or
-npm i stream-monaco
+npm i stream-diffs
 ```
 
-- Behavior: when `stream-monaco` is present the built-in `CodeBlockNode` will use Monaco-based streaming updates for large or frequently-updated code blocks.
-
-- Vite worker note: Monaco and some worker-backed features require appropriate worker bundling configuration in your bundler (Vite) so the editor/workers are available at runtime. See [/nuxt-ssr](/nuxt-ssr) for guidance and examples of configuring workers and client-only initialization.
-- See also: [/guide/monaco](/guide/monaco) for worker bundling tips and preload snippets.
+- Boundary: the `stream-diffs` root entry is framework-agnostic. Its controllers receive an `HTMLElement` and plain code/diff data; it has no Vue lifecycle. `stream-diffs/vue` is a separate optional convenience entry and is not used by `markstream-vue`.
+- Behavior: this Vue adapter keeps the stable `PreCodeNode` representation while content is streaming. Once the block is complete and visible, `CodeBlockNode` mounts one `stream-diffs` File or FileDiff surface and applies language highlighting.
+- `CodeBlockShell` owns the title and action bar. The inner `data-diffs-header` is disabled so File surfaces do not render a second header.
+- No worker plugin or extra CSS import is required for this integration. See also: [/guide/monaco](/guide/monaco) for runtime and preload details.
 
 ## Shiki mode (MarkdownCodeBlockNode)
 

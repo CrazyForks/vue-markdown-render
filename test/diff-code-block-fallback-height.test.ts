@@ -50,10 +50,11 @@ describe('diff CodeBlockNode fallback height stability', () => {
   })
 
   afterEach(() => {
+    vi.restoreAllMocks()
     vi.unstubAllGlobals()
   })
 
-  it('does not observe host style writes during diff height synchronization', async () => {
+  it('does not create an editor host observer while a diff is streaming', async () => {
     const observations: Array<{ options: MutationObserverInit, target: Node }> = []
     vi.stubGlobal('MutationObserver', class {
       constructor(_callback: MutationCallback) {}
@@ -87,12 +88,12 @@ describe('diff CodeBlockNode fallback height stability', () => {
     const hostObservation = observations.find(({ target }) =>
       (target as HTMLElement).classList?.contains('code-editor-container'),
     )
-    expect(hostObservation?.options.attributeFilter).toEqual(['class'])
+    expect(hostObservation).toBeUndefined()
 
     wrapper.unmount()
   })
 
-  it('provides non-null minHeight for diff fallback even when estimatedContentHeightPx is set', async () => {
+  it('keeps diff fallback height owned by its rendered rows when an estimate is set', async () => {
     const helpers = getStreamMonacoHelpers()
     // Hold createDiffEditor so Monaco is never "ready" during this test
     helpers.createDiffEditor.mockImplementation(() => new Promise<void>(() => {}))
@@ -125,14 +126,12 @@ describe('diff CodeBlockNode fallback height stability', () => {
     const pre = wrapper.find('pre.code-pre-fallback')
     expect(pre.exists()).toBe(true)
 
-    const minHeight = Number.parseFloat((pre.element as HTMLElement).style.minHeight ?? '0')
-    // 3 lines * 18px lineHeight = 54px minimum; must not be 0 despite estimatedContentHeightPx
-    expect(minHeight).toBeGreaterThan(0)
+    expect((pre.element as HTMLElement).style.minHeight).toBe('')
 
     wrapper.unmount()
   })
 
-  it('diff fallback minHeight uses line-count, not estimatedContentHeightPx', async () => {
+  it('does not reserve the full source height for a folded diff fallback', async () => {
     const helpers = getStreamMonacoHelpers()
     helpers.createDiffEditor.mockImplementation(() => new Promise<void>(() => {}))
 
@@ -150,7 +149,7 @@ describe('diff CodeBlockNode fallback height stability', () => {
           originalCode: tenLines,
           updatedCode: twoLines,
         },
-        // A large estimated height that should NOT override the line-count-based fallback
+        // A large estimate must not force the fallback to its full source height.
         estimatedContentHeightPx: 500,
         loading: false,
         stream: true,
@@ -163,10 +162,53 @@ describe('diff CodeBlockNode fallback height stability', () => {
     const pre = wrapper.find('pre.code-pre-fallback')
     expect(pre.exists()).toBe(true)
 
-    const minHeight = Number.parseFloat((pre.element as HTMLElement).style.minHeight ?? '0')
-    // max(10, 2) = 10 lines; minHeight should reflect line count, not 500px estimated
-    expect(minHeight).toBeGreaterThan(0)
-    expect(minHeight).toBeLessThan(500)
+    expect((pre.element as HTMLElement).style.minHeight).toBe('')
+
+    wrapper.unmount()
+  })
+
+  it('releases the fallback height when unchanged diff rows are folded', async () => {
+    const helpers = getStreamMonacoHelpers()
+    helpers.createDiffEditor.mockImplementation(() => new Promise<void>(() => {}))
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+      const height = this.matches('pre.code-pre-fallback') ? 360 : 0
+      return {
+        x: 0,
+        y: 0,
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: height,
+        width: 0,
+        height,
+        toJSON: () => ({}),
+      } as DOMRect
+    })
+
+    const unchanged = Array.from({ length: 24 }, (_, index) => `const shared${index} = ${index}`).join('\n')
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'ts',
+          code: '',
+          raw: '',
+          diff: true,
+          originalCode: `const before = true\n${unchanged}`,
+          updatedCode: `const after = true\n${unchanged}`,
+        },
+        loading: true,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flushPendingMicrotasks()
+
+    const pre = wrapper.get('pre.code-pre-fallback')
+    expect(pre.classes()).toContain('markstream-pre--diff-collapsed')
+    expect((pre.element as HTMLElement).style.height).toBe('')
+    expect((pre.element as HTMLElement).style.minHeight).toBe('')
 
     wrapper.unmount()
   })
@@ -211,7 +253,7 @@ describe('diff CodeBlockNode fallback height stability', () => {
     expect(pre.exists()).toBe(true)
     expect(wrapper.findAll('.markstream-pre__diff-pane--original .markstream-pre__diff-line')).toHaveLength(6)
     expect(wrapper.findAll('.markstream-pre__diff-pane--modified .markstream-pre__diff-line')).toHaveLength(6)
-    expect(Number.parseFloat((pre.element as HTMLElement).style.minHeight)).toBe(108)
+    expect((pre.element as HTMLElement).style.minHeight).toBe('')
 
     wrapper.unmount()
   })
@@ -275,7 +317,7 @@ describe('diff CodeBlockNode fallback height stability', () => {
     const pre = wrapper.find('pre.code-pre-fallback')
     expect(pre.exists()).toBe(true)
     expect((pre.element as HTMLElement).style.height).toBe('')
-    expect(Number.parseFloat((pre.element as HTMLElement).style.minHeight)).toBe(468)
+    expect((pre.element as HTMLElement).style.minHeight).toBe('')
 
     wrapper.unmount()
   })

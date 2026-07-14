@@ -156,7 +156,7 @@ const STREAM_SLICE_OPTIONS = [
   { value: 'boundary-aware', label: 'Boundary Aware' },
 ] as const satisfies ReadonlyArray<{ value: StreamSliceMode, label: string }>
 const RENDER_MODE_OPTIONS = [
-  { value: 'monaco', label: 'Monaco' },
+  { value: 'monaco', label: 'stream-diffs' },
   { value: 'markdown', label: 'MarkdownCodeBlock' },
   { value: 'pre', label: 'PreCodeNode' },
 ] as const satisfies ReadonlyArray<{ value: 'monaco' | 'markdown' | 'pre', label: string }>
@@ -376,7 +376,7 @@ const renderModeLabel = computed(() => {
     return 'MarkdownCodeBlock'
   if (renderMode.value === 'pre')
     return 'PreCodeNode'
-  return 'Monaco'
+  return 'stream-diffs'
 })
 const previewDiagramMaxHeight = computed(() => isPreviewFullscreen.value ? 'none' : '500px')
 const previewD2MaxHeight = computed(() => 'none')

@@ -13,7 +13,7 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 - Homepage: https://markstream.simonhe.me/frameworks/vue
 - Docs URL: https://markstream.simonhe.me/frameworks/vue
 - Playground URL: https://markstream-vue.simonhe.me/
-- Peer dependencies: @antv/infographic, @terrastruct/d2, katex, mermaid, stream-markdown, stream-monaco, vue, vue-i18n
+- Peer dependencies: @antv/infographic, @terrastruct/d2, katex, mermaid, stream-diffs, stream-markdown, stream-monaco, vue, vue-i18n
 - Keywords: markdown, markdown-renderer, streaming-markdown, streaming-markdown-renderer, markdown-streaming, ai-markdown-renderer, ai-chat, llm, llm-markdown, llm-streaming, sse, sse-markdown, websocket, websocket-markdown, vue, vue3, nuxt, vitepress, vue-markdown, vue-streaming-markdown, nuxt-markdown, vitepress-markdown, incomplete-markdown, mermaid, streaming-mermaid, katex, streaming-katex, shiki, monaco-editor, streaming-code-blocks, large-documents, safe-html, mobile-webview, markstream-vue, markstream
 - Key capabilities: content input path; nodes input path; safe HTML policy; progressive Mermaid; streaming code blocks with Monaco/Shiki; KaTeX math; virtualization for long documents; worker client subpaths; SSR imports; mobile px CSS; Tailwind support
 - Known limitations: Vue package is the most mature path; optional peers are installed only when needed.

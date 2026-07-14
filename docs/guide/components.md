@@ -18,7 +18,7 @@ If you are still deciding where to customize the pipeline, start with:
 | Component | Best for | Key props/events | Extra CSS / peers | Troubleshooting hooks |
 | --------- | -------- | ---------------- | ----------------- | --------------------- |
 | `MarkdownRender` | Rendering full AST trees (default export) | Props: `content` / `nodes`, `custom-id`, `final`, `parse-options`, `custom-html-tags`, `is-dark`, `code-block-props`, `mermaid-props`, `d2-props`, `infographic-props`; events: `copy-code` for code copy text, `copy` (deprecated compatibility alias), `handleArtifactClick`, `click`, `mouseover`, `mouseout` | Import `markstream-vue/index.css` inside a reset-aware layer (CSS is scoped under an internal `.markstream-vue` container) | Use `setCustomComponents(customId, mapping)` + `custom-id` to scope overrides; see [CSS checklist](/guide/troubleshooting#css-looks-wrong-start-here) |
-| `CodeBlockNode` | Monaco-powered code blocks, streaming diffs | `node`, `monacoOptions`, `stream`, `loading`; events: `copy`, `previewCode`; slots `header-left` / `header-right`; diff hover actions live under `monacoOptions` (`diffHunkActionsOnHover`, `diffHunkHoverHideDelayMs`, `onDiffHunkAction`) | Install `stream-monaco` (peer) + bundle Monaco workers | SSR sends a `<pre><code>` fallback first; blank editor => check worker bundling + client enhancement setup |
+| `CodeBlockNode` | Enhanced File/FileDiff code blocks | `node`, `monacoOptions`, `stream`, `loading`; events: `copy`, `previewCode`; slots `header-left` / `header-right`; diff hover actions live under `monacoOptions` (`diffHunkActionsOnHover`, `diffHunkHoverHideDelayMs`, `onDiffHunkAction`) | Install `stream-diffs`; no worker plugin or extra CSS import | SSR sends a `<pre><code>` fallback first; enhanced surface mounts after completion and visibility |
 | `MarkdownCodeBlockNode` | Lightweight highlighting via `shiki` | `node`, `stream`, `loading`; slots `header-left` / `header-right` | Requires `stream-markdown` | Use for SSR-friendly or low-bundle scenarios |
 | `MermaidBlockNode` | Progressive Mermaid diagrams | `node`, `isDark`, `isStrict`, `maxHeight`, `estimatedPreviewHeightPx`; emits `copy`, `export`, `openModal`, `toggleMode` | Peer `mermaid` >= 11; no extra CSS required | SSR sends readable fallback markup first; for async errors see `/guide/mermaid` |
 | `D2BlockNode` | Progressive D2 diagrams | `node`, `isDark`, `maxHeight`, `progressiveRender`, `progressiveIntervalMs`; toolbar toggles | Peer `@terrastruct/d2`; no extra CSS | SSR sends fallback/source first; missing peer stays on fallback; see `/guide/d2` |
@@ -213,16 +213,16 @@ setCustomComponents('docs', {
 
 ## CodeBlockNode
 
-> Monaco-backed code block renderer with streaming diff support and interactive toolbar actions.
+> File/FileDiff code block renderer with diff support and interactive toolbar actions.
 
 - **Best for**: rich code review, diff inspection, live patches, hover actions.
 - **Key props**: `node`, `monacoOptions`, `stream`, `loading`
 - **Events**: `copy`, `previewCode`
 - **Slots**: `header-left`, `header-right`
-- **Peers**: `stream-monaco`, plus Monaco worker setup in your bundler
-- **Common gotcha**: if the editor area is blank, verify worker bundling and SSR guards first
+- **Peer**: `stream-diffs`
+- **Common gotcha**: the enhanced surface waits for the block to finish streaming and enter the viewport
 
-Reach for this when the code block itself is part of the product experience. If you only need syntax highlighting, prefer `MarkdownCodeBlockNode`.
+Reach for this when the code block itself is part of the product experience. If you only need syntax highlighting, prefer `MarkdownCodeBlockNode`. `stream-diffs` is framework-agnostic; Vue mount and unmount decisions stay in `CodeBlockNode`.
 
 Deep dive: [CodeBlockNode](/guide/code-block-node), [Monaco](/guide/monaco)
 

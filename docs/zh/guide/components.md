@@ -18,7 +18,7 @@ description: 快速查阅 MarkdownRender、CodeBlockNode、MermaidBlockNode、Im
 | 组件 | 推荐场景 | 关键 props / 事件 | 额外 CSS / 同伴依赖 | 排障提示 |
 | ---- | -------- | ---------------- | ------------------- | -------- |
 | `MarkdownRender` | 渲染完整 AST（默认导出） | Props：`content` / `nodes`、`custom-id`、`final`、`parse-options`、`custom-html-tags`、`is-dark`、`code-block-props`、`mermaid-props`、`d2-props`、`infographic-props`；事件：`copy-code` 用于代码复制文本、`copy`（已弃用的兼容别名）、`handleArtifactClick`、`click`、`mouseover`、`mouseout` | 在 reset 之后引入 `markstream-vue/index.css`（CSS 已被限定在内部 `.markstream-vue` 容器中），并放入受控 layer | 用 `setCustomComponents(customId, mapping)` + `custom-id` 限定覆盖范围；配合 [CSS 排查清单](/zh/guide/troubleshooting#css-looks-wrong-start-here) |
-| `CodeBlockNode` | 基于 Monaco 的交互式代码块、流式 diff | `node`、`monacoOptions`、`stream`、`loading`；事件：`copy`、`previewCode`；插槽 `header-left` / `header-right`；diff 悬浮操作配置放在 `monacoOptions`（`diffHunkActionsOnHover`、`diffHunkHoverHideDelayMs`、`onDiffHunkAction`） | 安装 `stream-monaco`（peer）并打包 Monaco workers | SSR 首包会先给 `<pre><code>` fallback；编辑器空白时优先检查 worker 打包和客户端增强链路 |
+| `CodeBlockNode` | 增强 File/FileDiff 代码块 | `node`、`monacoOptions`、`stream`、`loading`；事件：`copy`、`previewCode`；插槽 `header-left` / `header-right`；diff 悬浮操作配置放在 `monacoOptions`（`diffHunkActionsOnHover`、`diffHunkHoverHideDelayMs`、`onDiffHunkAction`） | 安装 `stream-diffs`；不需要 worker plugin 或额外 CSS import | SSR 首包会先给 `<pre><code>` fallback；结束流式输出且进入视口后才挂载增强 surface |
 | `MarkdownCodeBlockNode` | 轻量级高亮（Shiki） | `node`、`stream`、`loading`；插槽 `header-left` / `header-right` | 同伴依赖 `stream-markdown` | SSR/低体积场景优先使用 |
 | `MermaidBlockNode` | 渐进式 Mermaid 图 | `node`、`isDark`、`isStrict`、`maxHeight`、`estimatedPreviewHeightPx`；事件 `copy`、`export`、`openModal`、`toggleMode` | `mermaid` >= 11；无需额外 CSS | SSR 首包先给可读 fallback；异步渲染问题详见 `/zh/guide/mermaid` |
 | `D2BlockNode` | 渐进式 D2 图 | `node`、`isDark`、`maxHeight`、`progressiveRender`、`progressiveIntervalMs`；工具栏开关 | `@terrastruct/d2`；无需额外 CSS | SSR 首包先给 fallback / 源码；缺少依赖时保持 fallback；详见 `/zh/guide/d2` |
@@ -213,16 +213,16 @@ setCustomComponents('docs', {
 
 ## CodeBlockNode
 
-> 基于 Monaco 的代码块渲染器，支持流式 diff 和交互式工具栏。
+> 基于 File/FileDiff surface 的代码块渲染器，支持 diff 和交互式工具栏。
 
 - **适合**：代码审阅、diff 检查、补丁预览、悬浮操作
 - **关键 props**：`node`、`monacoOptions`、`stream`、`loading`
 - **事件**：`copy`、`previewCode`
 - **插槽**：`header-left`、`header-right`
-- **同伴依赖**：`stream-monaco`，以及 bundler 里的 Monaco worker 配置
-- **常见问题**：编辑器空白时，优先检查 worker 打包和 SSR 边界
+- **同伴依赖**：`stream-diffs`
+- **常见问题**：增强 surface 会等待代码块结束流式输出并进入视口
 
-如果代码块本身就是产品体验的一部分，用它最合适；如果你只是想高亮代码，不需要 Monaco 的编辑能力，优先看 `MarkdownCodeBlockNode`。
+如果代码块本身就是产品体验的一部分，用它最合适；如果你只是想高亮代码，优先看 `MarkdownCodeBlockNode`。`stream-diffs` 与框架无关，Vue 的 mount/unmount 决策保留在 `CodeBlockNode`。
 
 深入页面： [CodeBlockNode](/zh/guide/code-block-node)、[Monaco](/zh/guide/monaco)
 
