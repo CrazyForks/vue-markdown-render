@@ -16,6 +16,7 @@ export interface VisibilityHandle {
 export interface ViewportPriorityRegisterOptions {
   rootMargin?: string
   threshold?: number
+  allowIdle?: boolean
 }
 
 export interface RegisterFn {
@@ -305,8 +306,10 @@ export function provideViewportPriority(
     targets.set(el, data)
     observer.bucket.targets.set(el, data)
     observer.bucket.io.observe(el)
-    idleQueue.add(el)
-    scheduleIdleDrain()
+    if (opts?.allowIdle !== false) {
+      idleQueue.add(el)
+      scheduleIdleDrain()
+    }
     return { isVisible: visible, whenVisible, destroy: cleanup }
   }
   register.refresh = refreshTargets
@@ -332,6 +335,7 @@ export function useViewportPriority() {
 
   interface LocalObserverBucket {
     io: IntersectionObserver
+    targets: Set<Element>
   }
 
   const localTargets = new WeakMap<Element, LocalTargetState>()
@@ -370,11 +374,8 @@ export function useViewportPriority() {
     if (!bucket)
       return
 
-    for (const target of localIdleQueue) {
-      const data = localTargets.get(target)
-      if (data?.bucketKey === bucketKey)
-        return
-    }
+    if (bucket.targets.size)
+      return
 
     try {
       bucket.io.disconnect()
@@ -400,6 +401,7 @@ export function useViewportPriority() {
     }
     catch {}
     localTargets.delete(target)
+    bucket?.targets.delete(target)
     localIdleQueue.delete(target)
     cleanupLocalBucket(data.bucketKey)
     if (!localIdleQueue.size)
@@ -447,7 +449,7 @@ export function useViewportPriority() {
       return null
     }
 
-    const bucket: LocalObserverBucket = { io }
+    const bucket: LocalObserverBucket = { io, targets: new Set() }
     localBuckets.set(bucketKey, bucket)
     return { key: bucketKey, bucket }
   }
@@ -478,6 +480,7 @@ export function useViewportPriority() {
       }
       catch {}
       localTargets.delete(el)
+      bucket?.targets.delete(el)
       localIdleQueue.delete(el)
       cleanupLocalBucket(data.bucketKey)
       if (!localIdleQueue.size)
@@ -490,9 +493,12 @@ export function useViewportPriority() {
       return { isVisible, whenVisible, destroy: cleanup }
     }
     localTargets.set(el, { resolve, visible: isVisible, bucketKey: observer.key })
+    observer.bucket.targets.add(el)
     observer.bucket.io.observe(el)
-    localIdleQueue.add(el)
-    scheduleLocalIdleDrain()
+    if (opts?.allowIdle !== false) {
+      localIdleQueue.add(el)
+      scheduleLocalIdleDrain()
+    }
     return { isVisible, whenVisible, destroy: cleanup }
   }
 

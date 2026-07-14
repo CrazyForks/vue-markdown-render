@@ -1,12 +1,12 @@
 # CodeBlockNode 组件
 
-`CodeBlockNode` 是库中用于渲染富交互代码块的组件。对于需要编辑/高亮/增量渲染的场景，推荐安装 `stream-monaco`。组件为头部提供灵活的自定义点（props + slots），并在常见场景下提供可拦截的事件。
+`CodeBlockNode` 是库中用于渲染富交互代码块的组件。对于需要高亮、File/Diff surface 与交互的场景，推荐安装 `stream-diffs`。Vue 组件负责流式结束、可见性和卸载；`stream-diffs` 根 runtime 只负责与框架无关的 DOM surface。
 
 ## 快速概览
 
-- Monaco 模式（安装 `stream-monaco`）— 类编辑器渲染，带 worker 支持
-- 降级模式 — 未安装 `stream-monaco` 时会回退为纯 `<pre><code>` 渲染
-- 如果你希望用 Shiki（不引入 Monaco），请使用 `MarkdownCodeBlockNode`（同伴依赖：`stream-markdown`）
+- 增强模式（安装 `stream-diffs`）— 结束态 File/FileDiff surface，支持语法高亮与 diff 交互
+- 降级模式 — 未安装 `stream-diffs` 时会回退为纯 `<pre><code>` 渲染
+- 如果你希望使用 Shiki，请使用 `MarkdownCodeBlockNode`（同伴依赖：`stream-markdown`）
 
 ## Props
 
@@ -14,14 +14,14 @@
 
 - `node` — code_block 节点（必需）
 - `loading`、`stream`、`isShowPreview`
-- `monacoOptions` — 类型为 `CodeBlockMonacoOptions`，会透传给 `stream-monaco`
+- `monacoOptions` — 为兼容已有 API，类型仍为 `CodeBlockMonacoOptions`，会透传给 `stream-diffs` adapter
   - `diffHideUnchangedRegions`、`diffLineStyle`、`diffAppearance`、`diffUnchangedRegionStyle`、`diffHunkActionsOnHover`、`diffHunkHoverHideDelayMs`、`onDiffHunkAction` 这类 diff 配置都应该放这里
 - 头部控制：`showHeader`、`showCollapseButton`、`showCopyButton`、`showExpandButton`、`showPreviewButton`、`showFontSizeButtons`、`showTooltips`
 - HTML preview sandbox：`htmlPreviewAllowScripts` 默认 `false`，`htmlPreviewSandbox` 可直接覆盖 iframe sandbox token
 
 内置 inline HTML preview 默认使用 `sandbox=""`，因此不可信预览文档不会默认执行脚本，也不会继承宿主页面 origin。`htmlPreviewSandbox` 的优先级高于 `htmlPreviewAllowScripts`；传入 `htmlPreviewSandbox=""` 会保留完整 sandbox，不传 `htmlPreviewSandbox` 时由 `htmlPreviewAllowScripts` 控制，而 `null` 这类无效非 string override 会回退到安全默认值。只有在可信 demo 场景下才建议显式开启 `htmlPreviewAllowScripts`；对于不可信预览内容，不要把 `allow-scripts` 和 `allow-same-origin` 组合在一起。
 
-Monaco diff 模式下的默认行为：
+增强 diff 模式下的默认行为：
 
 - `diffHideUnchangedRegions: { enabled: true, contextLineCount: 2, minimumLineCount: 4, revealLineCount: 5 }`
 - `diffLineStyle: 'background'`
@@ -31,7 +31,7 @@ Monaco diff 模式下的默认行为：
 - `diffHunkHoverHideDelayMs: 160`
 
 你可以通过 `monacoOptions` 覆盖这些默认值。
-当 preset 使用 `diffAppearance: 'auto'` 时，`CodeBlockNode` 会先根据当前明暗外观解析成实际的 light/dark，再传给 `stream-monaco`。
+当 preset 使用 `diffAppearance: 'auto'` 时，`CodeBlockNode` 会先根据当前明暗外观解析成实际的 light/dark，再传给自身的 `stream-diffs` adapter。
 
 Diff 代码块的内置 header 现在也会显示 `- / +` 行数统计。
 
@@ -48,10 +48,10 @@ Diff 代码块的内置 header 现在也会显示 `- / +` 行数统计。
 
 ## 示例
 
-### 安装并运行（Monaco 模式）
+### 安装并运行
 
 ```bash
-pnpm add stream-monaco
+pnpm add stream-diffs
 ```
 
 ### 基础示例

@@ -277,7 +277,7 @@ createApp({
 }).mount('#app')
 ```
 
-确保在 CSS reset（如 `@tailwind base` 或 `@unocss/reset`）之后导入 `markstream-vue/index.css`，推荐使用 `@import 'markstream-vue/index.css' layer(components);` 以避免 Tailwind/UnoCSS 覆盖组件样式。根据需求再按需安装可选 peer 依赖：`stream-monaco`（Monaco 代码块）、`shiki` + `stream-markdown`（Shiki 高亮）、`mermaid`（Mermaid 图表）、`katex`（数学公式）。
+确保在 CSS reset（如 `@tailwind base` 或 `@unocss/reset`）之后导入 `markstream-vue/index.css`，推荐使用 `@import 'markstream-vue/index.css' layer(components);` 以避免 Tailwind/UnoCSS 覆盖组件样式。根据需求再按需安装可选 peer 依赖：`stream-diffs`（增强代码块与 diff）、`shiki` + `stream-markdown`（Shiki 高亮）、`mermaid`（Mermaid 图表）、`katex`（数学公式）。
 如果你的移动端会主动调大根字号（`html`/`body`），建议改用 `markstream-vue/index.px.css`，避免 `rem` 跟随根字号导致整体放大。
 
 按使用场景选择渲染模式：
@@ -302,7 +302,8 @@ createApp({
 
 当你想要和 `chat` 相同的轻量默认值，但当前页面不是聊天语义时，可以使用 `mode="minimal"`。避免把高频 `smooth-streaming` 和 `fade` 同时开启，否则稳定的流式输出可能变成反复重启的透明度动画。
 同一条聊天消息不要仅因为 `final` 变为 `true` 就从 `mode="chat"` 切到 `mode="docs"`。保持 mode 稳定，只切换 `smooth-streaming`、`typewriter`、`fade` 等节奏/动画 props；`docs` 会改变默认代码块渲染器和布局策略。
-如果文档页不需要 Monaco 代码块，建议设置 `:render-code-blocks-as-pre="true"`；如果需要富 Monaco 代码块 UI，请安装 `stream-monaco`，否则渲染器会按设计降级为 `<pre>` 渲染。
+如果文档页不需要增强代码块，建议设置 `:render-code-blocks-as-pre="true"`；如果需要富 `CodeBlockNode` UI 与 File/Diff 渲染，请安装 `stream-diffs`，否则渲染器会按设计降级为 `<pre>` 渲染。
+`stream-diffs` 是与框架无关的 DOM runtime；由 `CodeBlockNode` 决定何时把流式 `<pre>` 切换为最终的 File 或 FileDiff surface。
 
 渲染器的 CSS 会作用于内部 `.markstream-vue` 容器下，以尽量降低对全局的影响；如果你脱离 `MarkdownRender` 单独使用导出的节点组件，请在外层包一层带 `markstream-vue` 类名的容器。
 
@@ -619,7 +620,7 @@ setCustomComponents('docs', {
 - 🔄 实时更新：支持增量内容而不破坏格式
 - 📦 TypeScript 优先：提供完善的类型定义与智能提示
 - 🔌 默认配置：各框架入口开箱即可接入
-- 🎨 灵活的代码块渲染：可选 Monaco 编辑器 (`CodeBlockNode`) 或轻量的 Shiki 高亮 (`MarkdownCodeBlockNode`)
+- 🎨 灵活的代码块渲染：可选基于 `stream-diffs` 的 `CodeBlockNode` 或轻量的 Shiki 高亮 (`MarkdownCodeBlockNode`)
 - 🧰 解析工具集：[`stream-markdown-parser`](./packages/markdown-parser) 文档现已覆盖如何在 Worker/SSE 流中复用解析器、直接向 `<MarkdownRender :nodes>` 输送 AST、以及注册全局插件/数学辅助函数的方式。
 
 ## 🙌 贡献与社区
@@ -666,7 +667,7 @@ https://github.com/Simon-He95/markstream-vue/issues
 
 本项目使用并受益于：
 
-- [stream-monaco](https://github.com/Simon-He95/stream-monaco)
+- [stream-diffs](https://github.com/Simon-He95/stream-diffs)
 - [stream-markdown](https://github.com/Simon-He95/stream-markdown)
 - [mermaid](https://mermaid-js.github.io/mermaid)
 - [katex](https://katex.org/)

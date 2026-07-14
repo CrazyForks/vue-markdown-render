@@ -127,6 +127,7 @@ export default defineConfig(({ mode }) => {
             'katex/contrib/mhchem',
             'katex/dist/contrib/mhchem',
             'stream-monaco',
+            'stream-diffs',
             'stream-markdown',
             'stream-markdown-parser',
             'markstream-core',
@@ -195,6 +196,6 @@ export default defineConfig(({ mode }) => {
     css: {
       postcss: './postcss.config.cjs',
     },
-    resolve: { alias, dedupe: ['react', 'react-dom', 'stream-monaco'] },
+    resolve: { alias, dedupe: ['react', 'react-dom', 'stream-diffs'] },
   }
 })

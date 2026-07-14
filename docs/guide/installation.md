@@ -31,7 +31,7 @@ Then continue with [Quick Start](/guide/quick-start) if you only need basic Mark
 | Capability | Packages | When you need it |
 |------------|----------|------------------|
 | Lightweight highlighted code blocks | `stream-markdown` | Docs sites, SSR, lower bundle budgets |
-| Monaco-powered code blocks | `stream-monaco` | Copy/preview/expand controls and richer code UX |
+| Enhanced code blocks and diffs | `stream-diffs` | Copy/preview/expand controls, syntax highlighting, and File/Diff surfaces |
 | Mermaid diagrams | `mermaid` | Fenced `mermaid` blocks |
 | D2 diagrams | `@terrastruct/d2` | Fenced `d2` or `d2lang` blocks |
 | KaTeX math | `katex` | Inline or block math rendering |
@@ -49,7 +49,7 @@ Then continue with [Docs Site & VitePress](/guide/vitepress-docs-integration) if
 ### AI / chat UI with richer code blocks and diagrams
 
 ```bash
-pnpm add markstream-vue stream-monaco mermaid katex
+pnpm add markstream-vue stream-diffs mermaid katex
 ```
 
 Then follow [AI Chat & Streaming](/guide/ai-chat-streaming) for `mode="chat"`, `content` streaming, `final` handling, and the optional `nodes` path when another layer owns parsing.
@@ -63,7 +63,7 @@ pnpm add markstream-vue mermaid @terrastruct/d2 katex
 ### Everything enabled
 
 ```bash
-pnpm add markstream-vue stream-markdown stream-monaco mermaid @terrastruct/d2 katex
+pnpm add markstream-vue stream-markdown stream-diffs mermaid @terrastruct/d2 katex
 ```
 
 ## 4. CSS order matters as much as installation
@@ -92,7 +92,7 @@ Also import KaTeX CSS when you use math:
 import 'katex/dist/katex.min.css'
 ```
 
-`stream-monaco`, `mermaid`, and `@terrastruct/d2` do not need extra CSS imports from this package.
+`stream-diffs`, `mermaid`, and `@terrastruct/d2` do not need extra CSS imports from this package.
 
 ## 5. Optional loaders (only for CDN or custom control)
 
@@ -110,7 +110,7 @@ enableD2()
 
 - If you render standalone node components, wrap them in `<div class="markstream-vue">...</div>`.
 - If math does not render, check that `katex` is installed and its CSS is imported.
-- If Monaco is blank, verify worker bundling and browser-only guards.
+- If enhanced code blocks stay on `<pre>`, verify that `stream-diffs` is installed and that the `CodeBlockNode` block has completed streaming and entered the viewport. This timing is markstream-vue's adapter policy; the `stream-diffs` root runtime is framework-agnostic.
 - If styles look wrong, check [Troubleshooting](/guide/troubleshooting#css-looks-wrong-start-here).
 
 ## 7. Quick test

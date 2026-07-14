@@ -906,9 +906,9 @@ export const greet = (name: string) => \`hello \${name}\`
 
     expect(html).toContain('code-block-container')
     expect(html).toContain('code-block-header')
-    expect(html).toContain('code-block-content')
+    expect(html).toContain('code-editor-layer')
     expect(html).toContain('Typescript')
-    expect(html).toContain('shiki-fallback')
+    expect(html).toContain('markstream-pre--line-numbers')
     expect(html).toContain('const value = &quot;&lt;safe&gt;&quot;')
   })
 

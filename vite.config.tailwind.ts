@@ -64,6 +64,7 @@ export default defineConfig({
         'monaco-editor',
         'monaco-editor-core',
         'stream-monaco',
+        'stream-diffs',
         'stream-markdown',
         'stream-markdown-parser',
         '@floating-ui/dom',

@@ -495,7 +495,7 @@ describe('markdownRender deferNodesUntilVisible', () => {
     }
   })
 
-  it('passes viewport-priority heavyBlockMargin through to shiki code blocks', async () => {
+  it('uses actual viewport intersection for MarkdownCodeBlockNode', async () => {
     const OriginalIO = globalThis.IntersectionObserver
     const benchmarkWindow = window as any
     vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)
@@ -534,7 +534,7 @@ describe('markdownRender deferNodesUntilVisible', () => {
       const codeBlock = wrapper.get('[data-markstream-code-block="1"]')
       const codeBlockObserver = FakeIntersectionObserver.instances.find(instance => instance.elements.has(codeBlock.element))
       expect(codeBlockObserver).toBeTruthy()
-      expect(codeBlockObserver?.options.rootMargin).toBe('222px')
+      expect(codeBlockObserver?.options.rootMargin).toBe('0px')
     }
     finally {
       wrapper?.unmount()
@@ -543,7 +543,7 @@ describe('markdownRender deferNodesUntilVisible', () => {
     }
   })
 
-  it('passes viewportPriorityOptions heavyBlockMargin from MarkdownRender to shiki code blocks', async () => {
+  it('uses actual viewport intersection for MarkdownRender code blocks', async () => {
     const OriginalIO = globalThis.IntersectionObserver
     const benchmarkWindow = window as any
     vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)
@@ -579,7 +579,7 @@ describe('markdownRender deferNodesUntilVisible', () => {
       const codeBlock = wrapper.get('[data-markstream-code-block="1"]')
       const codeBlockObserver = FakeIntersectionObserver.instances.find(instance => instance.elements.has(codeBlock.element))
       expect(codeBlockObserver).toBeTruthy()
-      expect(codeBlockObserver?.options.rootMargin).toBe('222px')
+      expect(codeBlockObserver?.options.rootMargin).toBe('0px')
     }
     finally {
       wrapper?.unmount()
@@ -632,14 +632,12 @@ describe('markdownRender deferNodesUntilVisible', () => {
       await flushAll()
 
       const codeBlock = wrapper.get('[data-markstream-code-block="1"]')
-      const component = wrapper.findComponent(MarkdownCodeBlockNode as any)
       const initialObserver = FakeIntersectionObserver.instances.find(instance => instance.elements.has(codeBlock.element))
       expect(initialObserver).toBeTruthy()
-      expect((component.vm as any).viewportReady).toBe(false)
+      expect(initialObserver?.options.rootMargin).toBe('0px')
 
       initialObserver?.trigger(codeBlock.element, true)
       await flushAll()
-      expect((component.vm as any).viewportReady).toBe(true)
 
       ;(wrapper.vm as any).updateMargin()
       await flushAll()
@@ -647,8 +645,7 @@ describe('markdownRender deferNodesUntilVisible', () => {
       const updatedObserver = FakeIntersectionObserver.instances.find(instance =>
         instance.options.rootMargin === '333px' && instance.elements.has(codeBlock.element),
       )
-      expect(updatedObserver).toBeTruthy()
-      expect((component.vm as any).viewportReady).toBe(true)
+      expect(updatedObserver).toBeUndefined()
     }
     finally {
       wrapper?.unmount()
@@ -716,7 +713,7 @@ describe('markdownRender deferNodesUntilVisible', () => {
       const updatedObserver = FakeIntersectionObserver.instances.find(instance =>
         instance.options.rootMargin === '333px' && instance.elements.has(codeBlock.element),
       )
-      expect(updatedObserver).toBeTruthy()
+      expect(updatedObserver).toBeUndefined()
       expect((component.vm as any).viewportReady).toBe(true)
     }
     finally {

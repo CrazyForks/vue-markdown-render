@@ -1,8 +1,8 @@
 # CodeBlockNode (component)
 
-`CodeBlockNode` renders rich interactive code blocks. It supports Monaco streaming integration (optional), Markdown mode, and a flexible header API with slots and events.
+`CodeBlockNode` renders rich interactive code blocks. It uses the optional framework-agnostic `stream-diffs` runtime for finalized File/FileDiff surfaces, supports Markdown mode, and exposes a flexible header API with slots and events.
 
-Quick example — inline usage (fallback to a simple rendering if Monaco not installed):
+Quick example — inline usage (falls back to a simple rendering when `stream-diffs` is not installed):
 
 ```vue
 <CodeBlockNode :node="{ type: 'code_block', language: 'js', code: 'console.log(1)', raw: 'console.log(1)' }" />
@@ -25,7 +25,7 @@ Docs and usage examples:
 - Docs: /guide/code-block-node
 - Header API: /guide/codeblock-header
 
-Monaco diff notes:
+Enhanced diff notes:
 
 - `monacoOptions` is typed as `CodeBlockMonacoOptions`
 - diff-friendly options such as `diffHideUnchangedRegions`, `diffLineStyle`, `diffAppearance`, `diffUnchangedRegionStyle`, `diffHunkActionsOnHover`, `diffHunkHoverHideDelayMs`, and `onDiffHunkAction` belong there
@@ -36,5 +36,5 @@ Monaco diff notes:
   - `diffUnchangedRegionStyle: 'line-info'`
   - `diffHunkActionsOnHover: true`
   - `diffHunkHoverHideDelayMs: 160`
-- runtime note: `diffAppearance: 'auto'` resolves to the current light/dark surface before it is passed to `stream-monaco`
+- runtime note: `diffAppearance: 'auto'` resolves to the current light/dark surface before it is passed to the `stream-diffs` adapter
 - the header also shows `- / +` line counts for diff blocks

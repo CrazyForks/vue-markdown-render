@@ -236,7 +236,11 @@ const fontIncreaseDisabled = computed(() =>
   </div>
 
   <!-- Content: keep slot subtree mounted so Monaco/renderer state survives collapse. -->
-  <div v-show="!isCollapsed && (stream ? true : !loading)" class="code-block-shell-content">
+  <div
+    v-show="stream ? true : !loading"
+    class="code-block-shell-content"
+    :class="{ 'code-block-shell-content--collapsed': isCollapsed }"
+  >
     <slot />
   </div>
 
@@ -385,6 +389,13 @@ const fontIncreaseDisabled = computed(() =>
   overflow: hidden;
   border-radius: 0 0 var(--ms-radius) var(--ms-radius);
   contain: content;
+}
+
+.code-block-shell-content--collapsed {
+  height: 0;
+  min-height: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* ── Menu transition ── */
