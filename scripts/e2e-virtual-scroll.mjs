@@ -1051,7 +1051,7 @@ async function runVirtualScrollerMarkstreamReloadProbe(page, port, ensureServerR
     return Boolean(api && typeof api.read === 'function' && typeof api.nextFrame === 'function')
   }, { timeout: 60000 })
 
-  const beforeReload = await page.evaluate(async () => {
+  await page.evaluate(async () => {
     const api = window.__markstreamVirtualScrollerMarkstream
 
     let snapshot = api.read()
@@ -1067,9 +1067,27 @@ async function runVirtualScrollerMarkstreamReloadProbe(page, port, ensureServerR
 
     for (let i = 0; i < 180; i++)
       await api.nextFrame()
+  })
 
-    snapshot = api.read()
+  await reloadWithServer(page, { waitUntil: 'domcontentloaded', timeout: 60000 }, ensureServerRunning)
 
+  await page.waitForFunction(() => {
+    const api = window.__markstreamVirtualScrollerMarkstream
+    return Boolean(api && typeof api.read === 'function' && typeof api.nextFrame === 'function')
+  }, { timeout: 60000 })
+
+  await page.evaluate(async () => {
+    const api = window.__markstreamVirtualScrollerMarkstream
+    for (let i = 0; i < 30; i++)
+      await api.nextFrame()
+  })
+
+  const beforeReload = await page.evaluate(async () => {
+    const api = window.__markstreamVirtualScrollerMarkstream
+    for (let i = 0; i < 180; i++)
+      await api.nextFrame()
+
+    const snapshot = api.read()
     return {
       scrollTop: snapshot.scrollTop,
       totalHeight: snapshot.totalHeight,
