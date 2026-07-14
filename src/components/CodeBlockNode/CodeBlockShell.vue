@@ -61,7 +61,7 @@ const emit = defineEmits<{
   (e: 'resetFont'): void
   (e: 'increaseFont'): void
   (e: 'copy'): void
-  (e: 'toggleExpand', event: MouseEvent): void
+  (e: 'toggleExpand'): void
   (e: 'preview'): void
 }>()
 const moreMenuOpen = ref(false)
@@ -217,7 +217,7 @@ const fontIncreaseDisabled = computed(() =>
               </template>
 
               <!-- Expand -->
-              <button v-if="props.showExpandButton" type="button" role="menuitem" class="flex items-center gap-2 w-full py-1.5 px-2 rounded text-xs text-[var(--code-action-fg)] cursor-pointer whitespace-nowrap hover:bg-[var(--code-action-hover-bg)] hover:text-[var(--code-action-hover-fg)] transition-colors" @click="closeMoreMenu(); emit('toggleExpand', $event)">
+              <button v-if="props.showExpandButton" type="button" role="menuitem" class="flex items-center gap-2 w-full py-1.5 px-2 rounded text-xs text-[var(--code-action-fg)] cursor-pointer whitespace-nowrap hover:bg-[var(--code-action-hover-bg)] hover:text-[var(--code-action-hover-fg)] transition-colors" @click="closeMoreMenu(); emit('toggleExpand')">
                 <svg v-if="isExpanded" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m14 10l7-7m-1 7h-6V4M3 21l7-7m-6 0h6v6" /></svg>
                 <svg v-else xmlns="http://www.w3.org/2000/svg" aria-hidden="true" width="1em" height="1em" viewBox="0 0 24 24" class="action-icon"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 3h6v6m0-6l-7 7M3 21l7-7m-1 7H3v-6" /></svg>
                 <span>{{ isExpanded ? (t('common.collapse') || 'Collapse') : (t('common.expand') || 'Expand') }}</span>

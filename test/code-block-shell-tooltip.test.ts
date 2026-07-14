@@ -53,4 +53,30 @@ describe('codeBlockShell overflow menu tooltip', () => {
 
     wrapper.unmount()
   })
+
+  it('does not expose a removed expand menu item as a tooltip anchor', async () => {
+    const wrapper = mount(CodeBlockShell, {
+      attachTo: document.body,
+      props: {
+        showCollapseButton: false,
+        showCopyButton: false,
+        showExpandButton: true,
+        showFontSizeButtons: false,
+        isPreviewable: false,
+      },
+    })
+
+    await wrapper.get('button[aria-haspopup="true"]').trigger('click')
+    await nextTick()
+
+    const expandButton = wrapper.get('button[role="menuitem"]')
+    const expandElement = expandButton.element as HTMLElement
+    await expandButton.trigger('click')
+    await nextTick()
+
+    expect(expandElement.isConnected).toBe(false)
+    expect(wrapper.emitted('toggleExpand')).toEqual([[]])
+
+    wrapper.unmount()
+  })
 })
