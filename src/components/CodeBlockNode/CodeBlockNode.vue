@@ -183,6 +183,7 @@ const copyText = ref(false)
 
 const codeLanguage = ref(resolveStreamingCodeLanguage(props.node.language, props.node.code, isCodeBlockLoading()))
 const monacoLanguage = computed(() => resolveMonacoLanguageId(codeLanguage.value))
+const runtimeLanguage = computed(() => monacoLanguage.value === 'plaintext' ? 'text' : monacoLanguage.value)
 const isPlainTextLanguage = computed(() => monacoLanguage.value === 'plaintext')
 const isExpanded = ref(false)
 const isCollapsed = ref(false)
@@ -3305,7 +3306,7 @@ watch(
 let diffCodeUpdateGeneration = 0
 
 watch(
-  () => [props.node.originalCode, props.node.updatedCode, monacoLanguage.value, isDiff.value, props.stream] as const,
+  () => [props.node.originalCode, props.node.updatedCode, runtimeLanguage.value, isDiff.value, props.stream] as const,
   async ([, , , diff, stream]) => {
     const generation = ++diffCodeUpdateGeneration
     if (!diff)
@@ -3348,7 +3349,7 @@ watch(
       await updateDiffCodeWithSettledResult(
         pair.original,
         pair.updated,
-        monacoLanguage.value,
+        runtimeLanguage.value,
       )
       if (isUnmounted || !isDiff.value || generation !== diffCodeUpdateGeneration)
         return
@@ -3411,7 +3412,7 @@ watch(
       catch {}
     }
 
-    queuePlainCodeUpdate(getDisplayCode(props.node.code), monacoLanguage.value)
+    queuePlainCodeUpdate(getDisplayCode(props.node.code), runtimeLanguage.value)
 
     if (isExpanded.value) {
       safeRaf(() => updateExpandedHeight())
@@ -3702,16 +3703,16 @@ async function runEditorCreation(el: HTMLElement) {
       )
       if (createDiffEditor) {
         await withMonacoPassiveTouchListeners(() =>
-          createDiffEditor!(el as HTMLElement, pair.original, pair.updated, monacoLanguage.value))
+          createDiffEditor!(el as HTMLElement, pair.original, pair.updated, runtimeLanguage.value))
       }
       else {
         await withMonacoPassiveTouchListeners(() =>
-          createEditor!(el as HTMLElement, props.node.code, monacoLanguage.value))
+          createEditor!(el as HTMLElement, props.node.code, runtimeLanguage.value))
       }
     }
     else {
       await withMonacoPassiveTouchListeners(() =>
-        createEditor!(el as HTMLElement, displayCode.value, monacoLanguage.value))
+        createEditor!(el as HTMLElement, displayCode.value, runtimeLanguage.value))
     }
     editorRuntimeCreated.value = true
   })()
@@ -4142,7 +4143,7 @@ const runtimeMonacoLanguages = computed(() => {
   if (hasCompletedStreamingFenceInfo())
     addRuntimeLanguage(languages, props.node.language)
   addRuntimeLanguage(languages, codeLanguage.value)
-  addRuntimeLanguage(languages, monacoLanguage.value)
+  addRuntimeLanguage(languages, runtimeLanguage.value)
   addRuntimeLanguage(languages, 'plaintext')
   return languages
 })
@@ -4283,7 +4284,7 @@ function getEditorCreationFailureKey() {
   const requestedTheme = resolveRequestedTheme()
   return JSON.stringify({
     kind: desiredEditorKind.value,
-    language: monacoLanguage.value,
+    language: runtimeLanguage.value,
     structural: monacoStructuralSignature.value,
     optionsRevision: editorCreationOptionsRevision.value,
     settledContentGeneration: editorCreationSettledContentGeneration.value,
@@ -4551,7 +4552,7 @@ watch(
               await updateDiffCodeWithSettledResult(
                 pair.original,
                 pair.updated,
-                monacoLanguage.value,
+                runtimeLanguage.value,
               )
               if (isUnmounted || !isDiff.value)
                 return
@@ -4568,7 +4569,7 @@ watch(
             }
             else {
               clearPlainCodeUpdateQueue()
-              queuePlainCodeUpdate(displayCode.value, monacoLanguage.value)
+              queuePlainCodeUpdate(displayCode.value, runtimeLanguage.value)
             }
           }
           if (loadingJustFinished && isDiff.value) {
