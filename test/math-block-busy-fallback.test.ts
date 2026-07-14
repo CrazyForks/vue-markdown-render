@@ -33,7 +33,27 @@ describe('mathBlockNode busy worker fallback', () => {
     vi.useRealTimers()
   })
 
-  it('falls back to sync KaTeX render instead of raw when worker is busy', async () => {
+  it('falls back to sync KaTeX render for settled math when the worker is busy', async () => {
+    const wrapper = mount(MathBlockNode as any, {
+      props: {
+        node: {
+          type: 'math_block',
+          content: 'a^2 + b^2 = c^2',
+          raw: '$$a^2 + b^2 = c^2$$',
+          loading: false,
+        },
+      },
+    })
+    await flushAll()
+
+    const html = wrapper.html()
+    // Should contain our mocked KaTeX HTML
+    expect(html).toContain('katex block')
+    // Should not show raw text fallback
+    expect(html).not.toContain('$$a^2 + b^2 = c^2$$')
+  })
+
+  it('does not move streaming KaTeX work back to the main thread when the worker is busy', async () => {
     const wrapper = mount(MathBlockNode as any, {
       props: {
         node: {
@@ -46,10 +66,20 @@ describe('mathBlockNode busy worker fallback', () => {
     })
     await flushAll()
 
-    const html = wrapper.html()
-    // Should contain our mocked KaTeX HTML
-    expect(html).toContain('katex block')
-    // Should not show raw text fallback
-    expect(html).not.toContain('$$a^2 + b^2 = c^2$$')
+    expect(wrapper.attributes('data-markstream-mode')).toBe('loading')
+    expect(wrapper.html()).not.toContain('katex block')
+    expect(wrapper.text()).not.toContain('$$a^2 + b^2 = c^2$$')
+
+    await wrapper.setProps({
+      node: {
+        type: 'math_block',
+        content: 'a^2 + b^2 = c^2',
+        raw: '$$a^2 + b^2 = c^2$$',
+        loading: false,
+      },
+    })
+    await flushAll()
+
+    expect(wrapper.html()).toContain('katex block')
   })
 })

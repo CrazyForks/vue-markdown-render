@@ -84,6 +84,18 @@ export const InfographicBlockNodeLoading = defineComponent({
           background: 'var(--diagram-bg)',
         },
       }, [
+        h('pre', {
+          class: 'infographic-pending-source text-sm font-mono whitespace-pre-wrap',
+          style: {
+            position: 'absolute',
+            inset: '0',
+            zIndex: '1',
+            margin: '0',
+            padding: 'var(--ms-inset-panel-body)',
+            overflow: 'auto',
+            textAlign: 'left',
+          },
+        }, String((loadingProps.node as RuntimeCodeBlockNode).code ?? '')),
         h('div', { class: 'absolute inset-0' }, [
           h('div', { class: 'w-full text-center flex items-center justify-center min-h-full' }),
         ]),

@@ -1,6 +1,7 @@
 import type { ParsedNode } from 'stream-markdown-parser'
 import type { ComputedRef, Ref } from 'vue'
 import type { EstimatedNodeHeight } from '../../../internal/heightEstimationExperiment'
+import { clampInfographicPreviewHeight, clampMermaidPreviewHeight, estimateInfographicPreviewHeight, estimateMermaidPreviewHeight } from '../../../utils/diagramHeight'
 
 const HEIGHT_CACHE_WIDTH_BUCKET_PX = 32
 
@@ -44,6 +45,7 @@ export interface BuildVirtualHeightSummaryOptions {
 
 type HeightFallbackNode = ParsedNode & {
   code?: unknown
+  language?: unknown
   header?: { cells?: unknown[] }
   content?: string
   level?: unknown
@@ -335,13 +337,20 @@ export function estimateStaticNodeHeightFallback(node: ParsedNode | undefined, w
       return estimateTableFallbackHeight(fallbackNode, fallbackWidth)
     }
 
-    case 'code_block':
+    case 'code_block': {
+      const language = String(fallbackNode.language ?? '').trim().toLowerCase()
+      const code = String(fallbackNode.code ?? fallbackNode.raw ?? '')
+      if (language === 'mermaid')
+        return clampMermaidPreviewHeight(estimateMermaidPreviewHeight(code))
+      if (language === 'infographic')
+        return clampInfographicPreviewHeight(estimateInfographicPreviewHeight(code))
       return estimateTextFallbackHeight(
-        String(fallbackNode.code ?? fallbackNode.raw ?? ''),
+        code,
         fallbackWidth,
         96,
         20,
       )
+    }
 
     case 'math_block':
       return 72

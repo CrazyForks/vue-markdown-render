@@ -3,7 +3,7 @@ import type { D2BlockNodeProps } from '../../types/component-props'
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, useAttrs, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
-import { useViewportPriority } from '../../composables/viewportPriority'
+import { useOffscreenHeavyNodeDeferral, useViewportPriority, useViewportPriorityOptions } from '../../composables/viewportPriority'
 import { resolveLifecycleIndexKey } from '../../utils/lifecycleIndexKey'
 import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import { getD2 } from './d2'
@@ -41,10 +41,12 @@ const bodyRef = ref<HTMLElement | null>(null)
 const bodyMinHeight = ref<number | null>(null)
 const viewportTarget = ref<HTMLElement | null>(null)
 const registerViewport = useViewportPriority()
+const viewportPriorityOptions = useViewportPriorityOptions()
+const offscreenHeavyNodeDeferral = useOffscreenHeavyNodeDeferral()
 const viewportHandle = ref<ReturnType<typeof registerViewport> | null>(null)
 const isClient = typeof window !== 'undefined'
 const hasMounted = ref(false)
-const viewportReady = ref(typeof window === 'undefined')
+const viewportReady = ref(typeof window === 'undefined' || !offscreenHeavyNodeDeferral.value)
 
 const baseCode = computed(() => props.node.code ?? '')
 const lifecycleIndexKey = computed(() => {
@@ -140,15 +142,25 @@ function clearLifecyclePending() {
 
 if (typeof window !== 'undefined') {
   watch(
-    () => viewportTarget.value,
-    (el) => {
+    [() => viewportTarget.value, offscreenHeavyNodeDeferral],
+    ([el, shouldDefer]) => {
       viewportHandle.value?.destroy()
       viewportHandle.value = null
+      if (!shouldDefer || viewportReady.value) {
+        viewportReady.value = true
+        return
+      }
       if (!el) {
         viewportReady.value = false
         return
       }
-      const handle = registerViewport(el, { rootMargin: '160px' })
+      const rootMargin = viewportPriorityOptions?.value.heavyBlockMargin
+        ?? viewportPriorityOptions?.value.rootMargin
+        ?? '160px'
+      const handle = registerViewport(el, {
+        rootMargin,
+        allowIdle: false,
+      })
       viewportHandle.value = handle
       viewportReady.value = handle.isVisible.value
       handle.whenVisible.then(() => {
@@ -331,7 +343,7 @@ async function ensureD2Instance() {
   if (d2Instance)
     return d2Instance
   const D2Ctor = await getD2()
-  if (!D2Ctor)
+  if (unmounted || !D2Ctor)
     return null
   if (typeof D2Ctor === 'function') {
     const inst = new D2Ctor()
@@ -348,6 +360,10 @@ async function ensureD2Instance() {
   if (typeof D2Ctor.compile === 'function')
     d2Instance = D2Ctor
   return d2Instance
+}
+
+function isStaleRender(token: number) {
+  return unmounted || token !== renderToken.value
 }
 
 async function renderDiagram() {
@@ -381,6 +397,8 @@ async function renderDiagram() {
 
   try {
     const instance = await ensureD2Instance()
+    if (isStaleRender(token))
+      return
     if (!instance) {
       d2Available.value = false
       showSource.value = true
@@ -395,7 +413,7 @@ async function renderDiagram() {
     d2Available.value = true
 
     const compileResult = await instance.compile(code)
-    if (token !== renderToken.value)
+    if (isStaleRender(token))
       return
 
     const diagram = compileResult?.diagram ?? compileResult
@@ -419,7 +437,7 @@ async function renderDiagram() {
       }
     }
     const renderResult = await instance.render(diagram, renderOptions)
-    if (token !== renderToken.value)
+    if (isStaleRender(token))
       return
 
     const svg = extractSvg(renderResult)
@@ -433,7 +451,7 @@ async function renderDiagram() {
     renderError.value = null
   }
   catch (err: any) {
-    if (token !== renderToken.value)
+    if (isStaleRender(token))
       return
     const message = err?.message ? String(err.message) : 'D2 render failed.'
     if (!props.loading) {
@@ -447,7 +465,7 @@ async function renderDiagram() {
     }
   }
   finally {
-    if (token === renderToken.value) {
+    if (!isStaleRender(token)) {
       isRendering.value = false
       if (pendingRender) {
         pendingRender = false
@@ -578,6 +596,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   unmounted = true
+  renderToken.value += 1
+  pendingRender = false
   clearLifecyclePending()
   lastCompletedRenderSignature.value = ''
   viewportHandle.value?.destroy()

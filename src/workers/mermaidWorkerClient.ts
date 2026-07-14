@@ -11,6 +11,7 @@ interface Pending {
 }
 
 const rpcMap = new Map<string, Pending>()
+const sharedCalls = new Map<string, Promise<unknown>>()
 
 // Basic concurrency cap to reduce flurries of in-flight checks during typing/polling
 const MAX_CONCURRENCY_DEFAULT = 5
@@ -113,6 +114,7 @@ export function clearMermaidWorker() {
         p.reject(new Error('Worker cleared'))
       }
       rpcMap.clear()
+      sharedCalls.clear()
       worker.terminate?.()
     }
     catch {}
@@ -131,7 +133,7 @@ function ensureWorker() {
   return worker
 }
 
-function callWorker<T>(action: 'canParse' | 'findPrefix', payload: any, timeout = 1400): Promise<T> {
+function callWorkerRaw<T>(action: 'canParse' | 'findPrefix', payload: any, timeout = 1400): Promise<T> {
   if (!isMermaidEnabled()) {
     const err: any = new Error('Mermaid rendering disabled')
     err.name = 'MermaidDisabled'
@@ -202,22 +204,71 @@ function callWorker<T>(action: 'canParse' | 'findPrefix', payload: any, timeout 
   })
 }
 
-export async function canParseOffthread(code: string, theme: Theme, timeout = 1400) {
-  try {
-    return await callWorker<boolean>('canParse', { code, theme }, timeout)
+function withAbortSignal<T>(promise: Promise<T>, signal?: AbortSignal) {
+  if (!signal)
+    return promise
+  if (signal.aborted) {
+    const error = new Error('Aborted')
+    error.name = 'AbortError'
+    return Promise.reject(error)
   }
-  catch (e) {
-    return Promise.reject(e)
-  }
+
+  return new Promise<T>((resolve, reject) => {
+    let onAbort: () => void = () => {}
+    const cleanup = () => signal.removeEventListener('abort', onAbort)
+    onAbort = () => {
+      cleanup()
+      const error = new Error('Aborted')
+      error.name = 'AbortError'
+      reject(error)
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+    promise.then(
+      (value) => {
+        cleanup()
+        resolve(value)
+      },
+      (error) => {
+        cleanup()
+        reject(error)
+      },
+    )
+  })
 }
 
-export async function findPrefixOffthread(code: string, theme: Theme, timeout = 1400) {
-  try {
-    return await callWorker<string | null>('findPrefix', { code, theme }, timeout)
+function callWorker<T>(
+  action: 'canParse' | 'findPrefix',
+  payload: { code: string, theme: Theme },
+  timeout: number,
+  signal?: AbortSignal,
+) {
+  if (!isMermaidEnabled()) {
+    const error: any = new Error('Mermaid rendering disabled')
+    error.name = 'MermaidDisabled'
+    error.code = MERMAID_DISABLED_CODE
+    return Promise.reject(error) as Promise<T>
   }
-  catch (e) {
-    return Promise.reject(e)
+
+  const key = `${action}\0${payload.theme}\0${timeout}\0${payload.code}`
+  let request = sharedCalls.get(key) as Promise<T> | undefined
+  if (!request) {
+    request = callWorkerRaw<T>(action, payload, timeout)
+    sharedCalls.set(key, request)
+    request.then(
+      () => sharedCalls.delete(key),
+      () => sharedCalls.delete(key),
+    )
   }
+
+  return withAbortSignal(request, signal)
+}
+
+export function canParseOffthread(code: string, theme: Theme, timeout = 1400, signal?: AbortSignal) {
+  return callWorker<boolean>('canParse', { code, theme }, timeout, signal)
+}
+
+export function findPrefixOffthread(code: string, theme: Theme, timeout = 1400, signal?: AbortSignal) {
+  return callWorker<string | null>('findPrefix', { code, theme }, timeout, signal)
 }
 
 export function terminateWorker() {
@@ -228,6 +279,7 @@ export function terminateWorker() {
         p.reject(new Error('Worker terminated'))
       }
       rpcMap.clear()
+      sharedCalls.clear()
       worker.terminate()
     }
     finally {

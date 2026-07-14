@@ -1,8 +1,9 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { nextTick } from 'vue'
+import { computed, defineComponent, h, nextTick } from 'vue'
 import CodeBlockNode from '../src/components/CodeBlockNode/CodeBlockNode.vue'
 import { resetCodeBlockRuntimeReadyForTest } from '../src/components/CodeBlockNode/runtime'
+import { provideOffscreenHeavyNodeDeferral, provideViewportPriority } from '../src/composables/viewportPriority'
 
 interface VisibilityObserver {
   emit: () => void
@@ -104,6 +105,15 @@ function makeNode(code: string, loading: boolean) {
   }
 }
 
+const DeferredCodeBlockNode = defineComponent({
+  inheritAttrs: false,
+  setup(_props, { attrs }) {
+    provideOffscreenHeavyNodeDeferral(computed(() => true))
+    provideViewportPriority(() => null, true)
+    return () => h(CodeBlockNode as any, attrs)
+  },
+})
+
 describe('codeBlockNode final Diffs gate', () => {
   beforeEach(() => {
     observers.length = 0
@@ -117,7 +127,7 @@ describe('codeBlockNode final Diffs gate', () => {
 
   it('keeps a streaming block in pre even after it becomes visible', async () => {
     const runtime = helpers()
-    const wrapper = mount(CodeBlockNode, {
+    const wrapper = mount(DeferredCodeBlockNode, {
       props: {
         node: makeNode('const first = true', true),
         loading: true,
@@ -150,7 +160,7 @@ describe('codeBlockNode final Diffs gate', () => {
 
   it('waits for both completion and actual visibility before creating one File surface', async () => {
     const runtime = helpers()
-    const wrapper = mount(CodeBlockNode, {
+    const wrapper = mount(DeferredCodeBlockNode, {
       props: {
         node: makeNode('const ready = true', false),
         loading: false,
@@ -183,7 +193,7 @@ describe('codeBlockNode final Diffs gate', () => {
 
   it('applies the active theme after a visible File surface mounts', async () => {
     const runtime = helpers()
-    const wrapper = mount(CodeBlockNode, {
+    const wrapper = mount(DeferredCodeBlockNode, {
       props: {
         node: makeNode('const ready = true', false),
         loading: false,
@@ -224,7 +234,7 @@ describe('codeBlockNode final Diffs gate', () => {
       updatedCode: 'const after = 2',
       loading: true,
     }
-    const wrapper = mount(CodeBlockNode, {
+    const wrapper = mount(DeferredCodeBlockNode, {
       props: {
         node: diffNode,
         loading: true,

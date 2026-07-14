@@ -159,6 +159,50 @@ describe('infographicBlockNode streaming errors', () => {
     wrapper.unmount()
   })
 
+  it('does not create an infographic instance when loading resolves after unmount', async () => {
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    let resolveLoader: ((value: unknown) => void) | null = null
+    const loaderStarted = vi.fn()
+    const constructInstance = vi.fn()
+    const renderInstance = vi.fn()
+    const loaderPromise = new Promise<unknown>((resolve) => {
+      resolveLoader = resolve
+    })
+
+    class AsyncInfographic {
+      constructor() {
+        constructInstance()
+      }
+
+      render() {
+        renderInstance()
+      }
+    }
+
+    setInfographicLoader(() => {
+      loaderStarted()
+      return loaderPromise
+    })
+
+    const wrapper = mount(InfographicBlockNode as any, {
+      props: {
+        node: createNode('infographic list-row-simple-horizontal-arrow'),
+        loading: false,
+      },
+    })
+
+    await flushAll()
+    expect(loaderStarted).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+    resolveLoader?.(AsyncInfographic)
+    await flushAll()
+
+    expect(constructInstance).not.toHaveBeenCalled()
+    expect(renderInstance).not.toHaveBeenCalled()
+  })
+
   it('keeps an externally estimated preview height stable after render', async () => {
     vi.stubGlobal('IntersectionObserver', undefined as any)
     setInfographicLoader(() => HeightChangingInfographic)

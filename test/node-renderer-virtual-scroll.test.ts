@@ -1083,8 +1083,9 @@ describe('node renderer virtual-scroll coordination', () => {
 
     expect(handle.getVirtualMetrics().totalHeight).not.toBe(500)
 
-    platform.heights.set(contentEl, 120)
-    platform.resizeCallbacks.get(contentEl)?.([], {} as ResizeObserver)
+    const switchedContentEl = getRootNodeContentElements(wrapper.element)[0]!
+    platform.heights.set(switchedContentEl, 120)
+    platform.resizeCallbacks.get(switchedContentEl)?.([], {} as ResizeObserver)
     platform.flushFrames()
     await nextTick()
 

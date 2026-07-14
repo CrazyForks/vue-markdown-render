@@ -86,6 +86,27 @@ async function renderServerMathBlock() {
   )
 }
 
+async function renderServerAsyncMathBlock(loader: () => Promise<unknown>) {
+  return withGlobalOverrides(
+    Object.fromEntries(browserKeys.map(key => [key, undefined])) as Partial<Record<(typeof browserKeys)[number], undefined>>,
+    async () => {
+      vi.resetModules()
+      const vue = await import('vue')
+      const { renderToString } = await import('vue/server-renderer')
+      const { setKatexLoader } = await import('../src/components/MathInlineNode/katex')
+      const { MathBlockNodeAsync } = await import('../src/components/NodeRenderer/asyncComponent')
+
+      setKatexLoader(loader)
+
+      const app = vue.createSSRApp({
+        render: () => vue.h(MathBlockNodeAsync, { node: mathNode }),
+      })
+
+      return renderToString(app)
+    },
+  )
+}
+
 describe('mathBlockNode hydration', () => {
   afterEach(() => {
     document.body.innerHTML = ''
@@ -129,5 +150,60 @@ describe('mathBlockNode hydration', () => {
     expect(container.innerHTML).toContain('katex-display')
     expect(diagnostics).not.toMatch(/Hydration/i)
     expect(diagnostics).not.toMatch(/mismatch/i)
+  })
+
+  it('awaits an async KaTeX loader before rendering the async SSR component', async () => {
+    const loader = vi.fn(async () => katexRenderer)
+    const html = await renderServerAsyncMathBlock(loader)
+
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(html).toContain('data-markstream-mode="katex"')
+    expect(html).toContain('katex-display')
+  })
+
+  it('awaits the async KaTeX loader before hydrating server-rendered KaTeX markup', async () => {
+    const serverHtml = await renderServerAsyncMathBlock(async () => katexRenderer)
+    document.body.innerHTML = `<div id="app">${serverHtml}</div>`
+
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    vi.resetModules()
+    const vue = await import('vue')
+    const { setKatexLoader } = await import('../src/components/MathInlineNode/katex')
+    const { MathBlockNodeAsync } = await import('../src/components/NodeRenderer/asyncComponent')
+    const clientLoader = vi.fn(async () => katexRenderer)
+    setKatexLoader(clientLoader)
+
+    const app = vue.createSSRApp({
+      render: () => vue.h(MathBlockNodeAsync, { node: mathNode }),
+    })
+    const container = document.querySelector('#app') as HTMLElement
+    app.mount(container)
+
+    await vi.waitFor(() => {
+      expect(container.innerHTML).toContain('katex-display')
+    })
+
+    const diagnostics = [
+      ...consoleError.mock.calls.flat(),
+      ...consoleWarn.mock.calls.flat(),
+    ].join(' ')
+
+    expect(clientLoader).toHaveBeenCalledTimes(1)
+    expect(diagnostics).not.toMatch(/Hydration/i)
+    expect(diagnostics).not.toMatch(/mismatch/i)
+    app.unmount()
+  })
+
+  it('does not invoke a rejected async KaTeX loader again from sync SSR setup', async () => {
+    const loader = vi.fn(async () => {
+      throw new Error('KaTeX unavailable')
+    })
+    const html = await renderServerAsyncMathBlock(loader)
+
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(html).toContain('data-markstream-mode="fallback"')
+    expect(html).toContain('\\sum_{n=1}^{3} n = 6')
   })
 })

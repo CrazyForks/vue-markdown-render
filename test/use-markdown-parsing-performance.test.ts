@@ -656,6 +656,65 @@ describe('useMarkdownParsing performance behavior', () => {
     scope.stop()
   })
 
+  it('keeps a previously customized markdown-it instance on the sync parser path', () => {
+    const headings = (count: number) => `${Array.from({ length: count }, (_, index) => `# Heading ${index + 1}`).join('\n\n')}\n\n`
+    const content = ref(headings(40))
+    const { props, scope, state } = createParsingState(content, ref(false), {
+      customMarkdownIt: (md: any) => {
+        if (md.__headingCountInstalled)
+          return md
+        md.__headingCountInstalled = true
+        md.core.ruler.push('test_heading_count', (parserState: any) => {
+          const headingTokens = (parserState.tokens ?? []).filter((token: any) => token.type === 'heading_open')
+          for (const token of headingTokens)
+            setTokenAttr(token, 'data-total', String(headingTokens.length))
+        })
+        return md
+      },
+    })
+
+    expect((state.parsedNodes.value[0] as any)?.attrs?.['data-total']).toBe('40')
+
+    props.customMarkdownIt = undefined
+    content.value += '# Heading 41\n\n'
+
+    expect((state.parsedNodes.value[0] as any)?.attrs?.['data-total']).toBe('41')
+    expect((state.mdInstance.value as any).stream.stats().total).toBe(0)
+
+    scope.stop()
+  })
+
+  it('does not reuse renderer-owned parser nodes across custom component mutation boundaries', () => {
+    const content = ref(`${buildParagraphs(40)}\n\n`)
+    const customComponents = ref<Record<string, unknown>>({ paragraph: {} })
+    const props = reactive({
+      parseOptions: { __reuseStableTopLevelNodes: true } as any,
+    } as NodeRendererProps)
+    const scope = effectScope()
+    const state = scope.run(() => useMarkdownParsing(props, {
+      instanceMsgId: 'custom-component-mutation-boundary',
+      renderContent: computed(() => content.value),
+      effectiveFinal: computed(() => false),
+      debugPerformanceEnabled: computed(() => false),
+      customComponentsMap: computed(() => customComponents.value),
+      logPerf: vi.fn(),
+    }))
+
+    if (!state) {
+      throw new Error('failed to create parsing state')
+    }
+
+    ;(state.parsedNodes.value[0] as any).raw = 'caller mutation'
+    ;(state.parsedNodes.value[0] as any).children[0].content = 'caller mutation'
+    customComponents.value = {}
+    content.value += 'Appended paragraph.\n\n'
+
+    expect(state.parsedNodes.value[0]?.raw).toContain('Paragraph 1')
+    expect((state.parsedNodes.value[0] as any).children[0].content).toContain('Paragraph 1')
+
+    scope.stop()
+  })
+
   it('does not reuse a paragraph when children differ but raw is unchanged', () => {
     const content = ref('[x](https://example.com)')
     const { props, scope, state } = createParsingState(content)
@@ -988,7 +1047,7 @@ describe('useMarkdownParsing performance behavior', () => {
 
       const data = logPerf.mock.calls.at(-1)?.[1]
       expect(data?.dirtyStartIndex).toBeGreaterThanOrEqual(1)
-      expect(data?.stabilizeSignatureCallCount).toBe(data?.dirtyStartIndex)
+      expect(data?.stabilizeSignatureCallCount).toBeLessThanOrEqual(data?.dirtyStartIndex)
       expect(data?.primeSignatureCallCount).toBeLessThanOrEqual(2)
     }
     finally {
@@ -1508,5 +1567,23 @@ describe('useMarkdownParsing performance behavior', () => {
     expect(appendHits + tailHits + cacheHits).toBeGreaterThan(0)
     expect(fullParses).toBeLessThanOrEqual(1)
     expect(tokenCloneMs).toBeLessThanOrEqual(totalMs * 0.35)
+  })
+
+  it('reuses stable parser nodes inside the renderer-owned parse pipeline', () => {
+    const content = ref(`${buildParagraphs(40)}\n\n`)
+    const logPerf = vi.fn()
+    const { scope, state } = createParsingState(content, ref(false), {}, ref(true), logPerf)
+
+    expect(state.parsedNodes.value).toHaveLength(40)
+    logPerf.mockClear()
+
+    content.value += 'Appended paragraph.\n\n'
+    expect(state.parsedNodes.value).toHaveLength(41)
+
+    const data = logPerf.mock.calls.at(-1)?.[1]
+    expect(data?.processTokensReusedTopLevelNodes).toBeGreaterThanOrEqual(40)
+    expect(data?.processTokensInputTokens).toBeLessThanOrEqual(3)
+
+    scope.stop()
   })
 })

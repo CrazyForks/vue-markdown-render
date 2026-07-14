@@ -21,11 +21,53 @@ const normalizedLanguage = computed(() => {
 const languageClass = computed(() => `language-${normalizedLanguage.value}`)
 const isLoading = computed(() => props.loading === true || props.node?.loading === true)
 const displayCode = computed(() => getDisplayCode(props.node?.code, isLoading.value))
+
+let countedCode = ''
+let countedLines = 1
+function countCodeLines(code: string) {
+  let start = 0
+  let count = 1
+
+  if (code.startsWith(countedCode)) {
+    start = countedCode.length
+    count = countedLines
+    if (start > 0 && code[start - 1] === '\r' && code[start] === '\n')
+      start++
+  }
+
+  for (let index = start; index < code.length; index++) {
+    if (code[index] === '\n') {
+      count++
+    }
+    else if (code[index] === '\r') {
+      count++
+      if (code[index + 1] === '\n')
+        index++
+    }
+  }
+
+  countedCode = code
+  countedLines = count
+  return count
+}
+
+const codeLineCount = computed(() => countCodeLines(displayCode.value))
 const codeLines = computed(() => {
   return displayCode.value.split(/\r\n|\n|\r/)
 })
-const lineNumbers = computed(() => {
-  return Array.from({ length: Math.max(1, codeLines.value.length) }, (_, index) => index + 1)
+
+let lineNumbersTextCount = 0
+let lineNumbersTextCache = ''
+const lineNumbersText = computed(() => {
+  const count = codeLineCount.value
+  if (count < lineNumbersTextCount) {
+    lineNumbersTextCount = 0
+    lineNumbersTextCache = ''
+  }
+  for (let line = lineNumbersTextCount + 1; line <= count; line++)
+    lineNumbersTextCache += `${lineNumbersTextCache ? '\n' : ''}${line}`
+  lineNumbersTextCount = count
+  return lineNumbersTextCache
 })
 const isDiffPreview = computed(() => props.showLineNumbers === true && props.node?.diff === true)
 const isInlineDiffPreview = computed(() => isDiffPreview.value && props.diffInline === true)
@@ -530,6 +572,9 @@ function collapseDiffPanes(panes: DiffPreviewPane[]) {
 }
 
 const diffPreviewPanes = computed(() => {
+  if (!isDiffPreview.value)
+    return []
+
   const hasPatchDiffLines = hasPatchLines(codeLines.value)
   const hasSourcePair = hasDiffSourcePair()
   if (isInlineDiffPreview.value) {
@@ -662,7 +707,12 @@ function syncDiffLineMetrics() {
   diffLineMetricsRaf = null
 
   const root = preRef.value
-  if (!root || !isDiffPreview.value) {
+  if (
+    !root
+    || !isDiffPreview.value
+    || isInlineDiffPreview.value
+    || !root.classList.contains('is-wrap')
+  ) {
     if (diffLineMetrics.value.length)
       diffLineMetrics.value = []
     return
@@ -711,8 +761,14 @@ function setupDiffResizeObserver(el: HTMLElement | null) {
   diffResizeObserver?.disconnect()
   diffResizeObserver = null
 
-  if (!el || !isDiffPreview.value || typeof ResizeObserver === 'undefined')
+  if (
+    !el
+    || !isDiffPreview.value
+    || isInlineDiffPreview.value
+    || typeof ResizeObserver === 'undefined'
+  ) {
     return
+  }
 
   diffResizeObserver = new ResizeObserver(() => {
     scheduleDiffLineMetricsSync()
@@ -730,7 +786,7 @@ watch(
 )
 
 watch(
-  [isDiffPreview, diffPreviewPanes],
+  [isDiffPreview, isInlineDiffPreview, diffPreviewPanes],
   () => {
     setupDiffResizeObserver(preRef.value)
     void nextTick(() => scheduleDiffLineMetricsSync())
@@ -774,7 +830,7 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
     :data-markstream-line-numbers="props.showLineNumbers ? '1' : undefined"
     data-markstream-pre="1"
     tabindex="0"
-  ><code v-if="isDiffPreview" translate="no" class="markstream-pre__diff-code"><span v-for="pane in diffPreviewPanes" :key="pane.key" class="markstream-pre__diff-pane" :class="pane.className"><span class="markstream-pre__diff-pane-content"><span v-for="(line, index) in pane.lines" :key="line.key" class="markstream-pre__diff-line" :class="[`markstream-pre__diff-line--${line.kind}`, { 'markstream-pre__diff-line--empty': line.empty }]" :style="getDiffLineStyle(index, pane.key as 'original' | 'modified')"><span class="markstream-pre__diff-rail" aria-hidden="true" /><span class="markstream-pre__diff-number" aria-hidden="true">{{ line.number }}</span><span class="markstream-pre__diff-content"><span class="markstream-pre__diff-content-inner">{{ line.code }}</span></span></span></span></span></code><template v-else><span v-if="props.showLineNumbers" class="markstream-pre__line-numbers" aria-hidden="true"><span v-for="line in lineNumbers" :key="line" class="markstream-pre__line-number">{{ line }}</span></span><code translate="no" class="markstream-pre__code" v-text="displayCode" /></template></pre>
+  ><code v-if="isDiffPreview" translate="no" class="markstream-pre__diff-code"><span v-for="pane in diffPreviewPanes" :key="pane.key" class="markstream-pre__diff-pane" :class="pane.className"><span class="markstream-pre__diff-pane-content"><span v-for="(line, index) in pane.lines" :key="line.key" class="markstream-pre__diff-line" :class="[`markstream-pre__diff-line--${line.kind}`, { 'markstream-pre__diff-line--empty': line.empty }]" :style="getDiffLineStyle(index, pane.key as 'original' | 'modified')"><span class="markstream-pre__diff-rail" aria-hidden="true" /><span class="markstream-pre__diff-number" aria-hidden="true">{{ line.number }}</span><span class="markstream-pre__diff-content"><span class="markstream-pre__diff-content-inner">{{ line.code }}</span></span></span></span></span></code><template v-else><span v-if="props.showLineNumbers" class="markstream-pre__line-numbers" aria-hidden="true"><span class="markstream-pre__line-numbers-text" v-text="lineNumbersText" /></span><code translate="no" class="markstream-pre__code" v-text="displayCode" /></template></pre>
 </template>
 
 <style>
@@ -862,6 +918,13 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
 .markstream-vue pre.markstream-pre--line-numbers > .markstream-pre__line-numbers > .markstream-pre__line-number {
   display: block;
   min-height: 1lh;
+}
+
+.markstream-vue pre.markstream-pre--line-numbers > .markstream-pre__line-numbers > .markstream-pre__line-numbers-text {
+  display: block;
+  min-height: 1lh;
+  text-align: right;
+  white-space: pre;
 }
 
 .markstream-vue pre.markstream-pre--diff-preview {

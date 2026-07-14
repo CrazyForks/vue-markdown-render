@@ -57,9 +57,66 @@ const STREAMING_ADMONITION_OPEN_RE = /(^|\r?\n)[\t ]*:::[\t ]*(?:warning|info|no
 
 interface ParseTimingMetrics {
   tokenCloneMs?: number
+  processTokensInputTokens?: number
+  processTokensReusedTopLevelNodes?: number
   processTokensMs?: number
   parseMarkdownToStructureTotalMs?: number
 }
+
+interface StructuredStreamCacheEntry {
+  groupBoundaries: StructuredStreamGroupBoundary[]
+  source: string
+  nodes: ParsedNode[]
+  stableGroupCount: number
+  requireClosingStrong: boolean | undefined
+}
+
+interface StructuredStreamGroupBoundary {
+  firstToken: MarkdownToken
+  lastToken: MarkdownToken
+  tokenCount: number
+}
+
+interface ReusableTopLevelTokenGroups {
+  mixed: boolean
+  starts: number[]
+}
+
+const structuredStreamCache = new WeakMap<object, StructuredStreamCacheEntry>()
+const topLevelStreamParseMode = new WeakMap<object, string>()
+const REUSABLE_INLINE_TOKEN_TYPES = new Set([
+  'code_inline',
+  'em_close',
+  'em_open',
+  'emoji',
+  'hardbreak',
+  'ins_close',
+  'ins_open',
+  'mark_close',
+  'mark_open',
+  's_close',
+  's_open',
+  'softbreak',
+  'strong_close',
+  'strong_open',
+  'sub',
+  'sup',
+  'text',
+])
+const REUSABLE_TOP_LEVEL_PAIRED_TOKEN_TYPES = new Map([
+  ['paragraph_open', 'paragraph_close'],
+  ['heading_open', 'heading_close'],
+  ['bullet_list_open', 'bullet_list_close'],
+  ['ordered_list_open', 'ordered_list_close'],
+  ['blockquote_open', 'blockquote_close'],
+  ['table_open', 'table_close'],
+])
+const REUSABLE_TOP_LEVEL_SINGLE_TOKEN_TYPES = new Set([
+  'code_block',
+  'fence',
+  'hr',
+  'math_block',
+])
 
 type TimedParseOptions = ParseOptions & {
   __timing?: ParseTimingMetrics
@@ -115,9 +172,208 @@ function processTokensWithTiming(tokens: MarkdownToken[], options: ParseOptions 
   if (!timing)
     return processTokens(tokens, options)
 
+  addTiming(timing, 'processTokensInputTokens', tokens.length)
   const startedAt = getParserNow()
   const result = processTokens(tokens, options)
   addTiming(timing, 'processTokensMs', getParserNow() - startedAt)
+  return result
+}
+
+function hasOnlyReusableInlineTokens(tokens: MarkdownToken[]): boolean {
+  return tokens.every((token) => {
+    if (!REUSABLE_INLINE_TOKEN_TYPES.has(token.type))
+      return false
+
+    const children = token.children as MarkdownToken[] | null
+    return !Array.isArray(children) || hasOnlyReusableInlineTokens(children)
+  })
+}
+
+function getReusableTopLevelTokenGroups(tokens: MarkdownToken[]): ReusableTopLevelTokenGroups | null {
+  const groupStarts: number[] = []
+  let mixed = false
+  let index = 0
+
+  while (index < tokens.length) {
+    const token = tokens[index]
+    if (!token || token.level !== 0)
+      return null
+
+    const closeType = REUSABLE_TOP_LEVEL_PAIRED_TOKEN_TYPES.get(token.type)
+    let groupEnd = index + 1
+
+    if (closeType) {
+      if (token.nesting !== 1)
+        return null
+
+      while (groupEnd < tokens.length) {
+        const current = tokens[groupEnd]
+        if (current.level === 0) {
+          if (current.type !== closeType || current.nesting !== -1)
+            return null
+          groupEnd++
+          break
+        }
+        groupEnd++
+      }
+
+      if (tokens[groupEnd - 1]?.type !== closeType)
+        return null
+
+      if (token.type === 'paragraph_open' || token.type === 'heading_open') {
+        if (groupEnd !== index + 3 || tokens[index + 1]?.type !== 'inline')
+          return null
+      }
+      else {
+        mixed = true
+      }
+    }
+    else if (REUSABLE_TOP_LEVEL_SINGLE_TOKEN_TYPES.has(token.type)) {
+      if (token.nesting !== 0)
+        return null
+      mixed = true
+    }
+    else {
+      return null
+    }
+
+    for (let tokenIndex = index; tokenIndex < groupEnd; tokenIndex++) {
+      const current = tokens[tokenIndex]
+      if (current.type !== 'inline')
+        continue
+      const children = current.children as MarkdownToken[] | null
+      if (!Array.isArray(children) || !hasOnlyReusableInlineTokens(children))
+        return null
+    }
+
+    groupStarts.push(index)
+    index = groupEnd
+  }
+
+  return {
+    mixed,
+    starts: groupStarts,
+  }
+}
+
+function sourceEndsWithBlankLine(source: string) {
+  return /\r?\n[\t ]*\r?\n[\t ]*$/.test(source)
+}
+
+function canReuseStructuredStreamNodes(options: ParseOptions) {
+  return (options as InternalParseOptions).__reuseStableTopLevelNodes === true
+    && options.final !== true
+    && !options.preTransformTokens
+    && !options.postTransformTokens
+    && !options.postTransformNodes
+    && !options.customHtmlTags?.length
+    && options.includeSourceMap !== true
+}
+
+function updateStructuredStreamCache(
+  md: MarkdownIt,
+  source: string,
+  tokens: MarkdownToken[],
+  groups: ReusableTopLevelTokenGroups,
+  nodes: ParsedNode[],
+  options: ParseOptions,
+) {
+  const groupStarts = groups.starts
+  if (groupStarts.length === 0 || nodes.length !== groupStarts.length) {
+    structuredStreamCache.delete(md as unknown as object)
+    return
+  }
+
+  const groupBoundaries = groupStarts.map((start, index) => {
+    const end = groupStarts[index + 1] ?? tokens.length
+    return {
+      firstToken: tokens[start],
+      lastToken: tokens[end - 1],
+      tokenCount: end - start,
+    }
+  })
+
+  structuredStreamCache.set(md as unknown as object, {
+    groupBoundaries,
+    source,
+    nodes,
+    stableGroupCount: groups.mixed
+      ? Math.max(0, groupStarts.length - 1)
+      : sourceEndsWithBlankLine(source) ? groupStarts.length : Math.max(0, groupStarts.length - 1),
+    requireClosingStrong: options.requireClosingStrong,
+  })
+}
+
+function hasStableStructuredStreamGroupBoundaries(
+  previous: StructuredStreamCacheEntry,
+  tokens: MarkdownToken[],
+  groupStarts: number[],
+  stableGroupCount: number,
+) {
+  for (let index = 0; index < stableGroupCount; index++) {
+    const start = groupStarts[index]
+    const end = groupStarts[index + 1] ?? tokens.length
+    const boundary = previous.groupBoundaries[index]
+    if (
+      !boundary
+      || boundary.firstToken !== tokens[start]
+      || boundary.lastToken !== tokens[end - 1]
+      || boundary.tokenCount !== end - start
+    ) {
+      return false
+    }
+  }
+
+  return true
+}
+
+function processTopLevelTokensWithReuse(
+  md: MarkdownIt,
+  source: string,
+  tokens: MarkdownToken[],
+  options: InternalParseOptions,
+  timing: ParseTimingMetrics | undefined,
+) {
+  const owner = md as unknown as object
+  const groups = getReusableTopLevelTokenGroups(tokens)
+  const cacheable = shouldUseTopLevelStreamParse(md, options)
+    && canReuseStructuredStreamNodes(options)
+    && groups !== null
+
+  if (!cacheable) {
+    structuredStreamCache.delete(owner)
+    return processTokensWithTiming(tokens, options, timing)
+  }
+
+  const groupStarts = groups.starts
+  const previous = structuredStreamCache.get(owner)
+  const mode = topLevelStreamParseMode.get(owner)
+  const stableGroupCount = previous && groups.mixed
+    ? Math.min(previous.stableGroupCount, Math.max(0, previous.groupBoundaries.length - 1))
+    : previous?.stableGroupCount ?? 0
+  if (
+    previous
+    && stableGroupCount > 0
+    && previous.requireClosingStrong === options.requireClosingStrong
+    && source.startsWith(previous.source)
+    && groupStarts.length >= stableGroupCount
+    && (mode === 'append' || mode === 'tail')
+    && hasStableStructuredStreamGroupBoundaries(previous, tokens, groupStarts, stableGroupCount)
+  ) {
+    const tailStart = groupStarts[stableGroupCount] ?? tokens.length
+    const tailNodes = processTokensWithTiming(tokens.slice(tailStart), options, timing)
+    const expectedTailNodes = groupStarts.length - stableGroupCount
+
+    if (tailNodes.length === expectedTailNodes) {
+      const result = previous.nodes.slice(0, stableGroupCount).concat(tailNodes)
+      addTiming(timing, 'processTokensReusedTopLevelNodes', stableGroupCount)
+      updateStructuredStreamCache(md, source, tokens, groups, result, options)
+      return result
+    }
+  }
+
+  const result = processTokensWithTiming(tokens, options, timing)
+  updateStructuredStreamCache(md, source, tokens, groups, result, options)
   return result
 }
 
@@ -328,6 +584,7 @@ function shouldUseTopLevelStreamParse(md: MarkdownIt, options: ParseOptions) {
   const stream = md.stream
   const streamParse = options.streamParse ?? 'auto'
   return internalOptions.__disableStreamParse !== true
+    && (md as unknown as Record<string, unknown>).__markstreamHasCustomParserExtensions !== true
     && (streamParse === true || (streamParse === 'auto' && options.final !== true))
     && stream?.enabled === true
     && typeof stream.parse === 'function'
@@ -341,6 +598,7 @@ function shouldResetTopLevelStreamCacheForFinalAutoParse(md: MarkdownIt, options
   return options.final === true
     && streamParse === 'auto'
     && internalOptions.__disableStreamParse !== true
+    && (md as unknown as Record<string, unknown>).__markstreamHasCustomParserExtensions !== true
     && stream?.enabled === true
     && typeof stream.reset === 'function'
 }
@@ -1253,21 +1511,30 @@ function parseTopLevelTokens(
   env: Record<string, unknown>,
   options: ParseOptions,
 ) {
+  const owner = md as unknown as object
   if (options.customHtmlTags?.length)
     env.__markstreamCustomHtmlTags = options.customHtmlTags
 
-  if (!shouldUseTopLevelStreamParse(md, options))
+  if (!shouldUseTopLevelStreamParse(md, options)) {
+    topLevelStreamParseMode.set(owner, 'sync')
     return md.parse(source, env)
+  }
 
   syncTolerantMathBoundaryStreamCache(md, source)
-  if (shouldUseSyncParseForPendingTolerantMathBoundary(md))
+  if (shouldUseSyncParseForPendingTolerantMathBoundary(md)) {
+    topLevelStreamParseMode.set(owner, 'sync')
     return md.parse(source, env)
+  }
 
   const tokens = md.stream!.parse!(source, getStableStreamEnv(md, env))
   if (shouldFallbackDuplicateTolerantMathStreamTokens(md, source, tokens)) {
     md.stream?.reset?.()
+    topLevelStreamParseMode.set(owner, 'sync')
     return md.parse(source, env)
   }
+
+  const stats = md.stream?.stats?.() as { lastMode?: string } | undefined
+  topLevelStreamParseMode.set(owner, stats?.lastMode ?? 'stream')
 
   if (!shouldCloneTopLevelStreamTokens(options))
     return tokens
@@ -3440,7 +3707,7 @@ export function parseMarkdownToStructure(
     __sourceMarkdown: safeMarkdown,
     __customHtmlBlockCursor: 0,
   }
-  let result = processTokensWithTiming(transformedTokens, internalOptions, timing)
+  let result = processTopLevelTokensWithReuse(md, safeMarkdown, transformedTokens, internalOptions, timing)
 
   // Backwards compatible token-level post hook: if provided and returns
   // a modified token array, re-process tokens and override node-level result.

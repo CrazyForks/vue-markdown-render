@@ -50,7 +50,7 @@ import TableNode from '../../components/TableNode'
 import TextNode from '../../components/TextNode'
 import ThematicBreakNode from '../../components/ThematicBreakNode'
 import VmrContainerNode from '../../components/VmrContainerNode'
-import { DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN, provideViewportPriority, provideViewportPriorityOptions } from '../../composables/viewportPriority'
+import { DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN, provideOffscreenHeavyNodeDeferral, provideViewportPriority, provideViewportPriorityOptions } from '../../composables/viewportPriority'
 import {
   buildBlockTextProfile,
   createEmptySimpleTextProbeProfile,
@@ -73,7 +73,7 @@ import { normalizeTypewriterCursorMode } from '../../utils/typewriter'
 import HtmlBlockNode from '../HtmlBlockNode/HtmlBlockNode.vue'
 import HtmlInlineNode from '../HtmlInlineNode/HtmlInlineNode.vue'
 import { createMathBlockMinHeightCache, provideMathBlockMinHeightCache } from '../MathBlockNode/minHeightCache'
-import { CodeBlockNodeAsync, CodeBlockNodeLoading, MathBlockNodeAsync, MathInlineNodeAsync } from './asyncComponent'
+import { CodeBlockNodeAsync, CodeBlockNodeLoading, MathBlockNodeAsync, MathInlineNodeAsync, withViewportDeferredLoading } from './asyncComponent'
 import { useBatchRenderingScheduler } from './composables/useBatchRenderingScheduler'
 import { useBatchRenderingState } from './composables/useBatchRenderingState'
 import { useFocusSyncScheduler } from './composables/useFocusSyncScheduler'
@@ -122,6 +122,7 @@ const props = withDefaults(defineProps<NodeRendererProps>(), {
   fade: undefined,
   batchRendering: undefined,
   debugPerformance: false,
+  viewportPriority: undefined,
   deferNodesUntilVisible: undefined,
   nodeVirtual: undefined,
 })
@@ -811,13 +812,17 @@ const shouldMeasureNodeHeights = computed(() => virtualizationEnabled.value || h
 // Viewport priority is used to defer heavy work (Monaco/Mermaid/KaTeX) until
 // nodes approach the viewport. Node-level deferral is controlled separately
 // via `deferNodes`.
+const heavyViewportPriorityEnabled = computed(() => rendererProps.viewportPriority !== false)
 const viewportPriorityEnabled = computed(() => {
-  if (rendererProps.viewportPriority === false)
+  if (!heavyViewportPriorityEnabled.value)
     return false
   if (viewportPriorityAutoDisabled.value)
     return false
   return true
 })
+provideOffscreenHeavyNodeDeferral(computed(() =>
+  heavyViewportPriorityEnabled.value,
+))
 const deferNodesDomRequired = computed(() => {
   if (renderAsFragment.value)
     return false
@@ -834,7 +839,7 @@ const deferNodesDomRequired = computed(() => {
 // Provide viewport-priority registrar so heavy nodes can defer work until visible
 const registerNodeVisibility = provideViewportPriority(
   target => resolveViewportRoot(target ?? containerRef.value ?? null),
-  viewportPriorityEnabled,
+  heavyViewportPriorityEnabled,
 )
 const {
   requestFrame,
@@ -1152,7 +1157,7 @@ const stableLayoutDomEnabled = computed(() => {
     && !deferNodes.value
     && !incrementalRenderingConfigured.value
 })
-const shouldObserveSlots = computed(() => !!registerNodeVisibility && (deferNodes.value || virtualizationEnabled.value))
+const shouldObserveSlots = computed(() => !!registerNodeVisibility && deferNodes.value)
 const scrollListenerEnabled = computed(() => virtualizationEnabled.value || virtualScrollEnabled.value)
 const {
   focusIndex,
@@ -1596,7 +1601,7 @@ function setupExperimentResizeObserver() {
   experimentResizeObserver.observe(containerRef.value)
 }
 
-const MarkdownCodeBlockNodeAsync = defineAsyncComponent({
+const MarkdownCodeBlockNodeInnerAsync = defineAsyncComponent({
   loader: async () => {
     const mod = await import('../MarkdownCodeBlockNode')
     return mod.default
@@ -1605,6 +1610,11 @@ const MarkdownCodeBlockNodeAsync = defineAsyncComponent({
   delay: 0,
   suspensible: false,
 })
+const MarkdownCodeBlockNodeAsync = withViewportDeferredLoading(
+  'ViewportDeferredMarkdownCodeBlockNode',
+  MarkdownCodeBlockNodeInnerAsync,
+  CodeBlockNodeLoading,
+)
 
 function isMarkdownCodeBlockComponent(component: unknown) {
   return component === MarkdownCodeBlockNodeAsync
@@ -1902,6 +1912,9 @@ function getVirtualThreadKey() {
   const key = props.virtualScroll?.threadKey
   return key == null || key === '' ? undefined : String(key)
 }
+
+const rendererSessionIdentity = computed(() => getVirtualThreadKey()
+  ?? String(props.indexKey ?? rendererProps.customId ?? instanceMsgId))
 
 function isSameVirtualThreadKey(threadKey: string | undefined) {
   return (threadKey ?? '') === (getVirtualThreadKey() ?? '')
@@ -4047,7 +4060,7 @@ function setNodeSlotElement(index: number, el: HTMLElement | null) {
 
   if (!shouldObserveSlots.value || !registerNodeVisibility) {
     destroyNodeHandle(index)
-    if (el)
+    if (el && deferNodes.value)
       markNodeVisible(index, true)
     return
   }
@@ -4565,9 +4578,14 @@ watch(
   (enabled) => {
     if (!enabled) {
       destroyNodeVisibilityState()
-      for (const [index, el] of nodeSlotElements) {
-        if (el)
-          markNodeVisible(index, true)
+      if (virtualizationEnabled.value) {
+        scheduleFocusSync({ immediate: true })
+      }
+      else {
+        for (const [index, el] of nodeSlotElements) {
+          if (el)
+            markNodeVisible(index, true)
+        }
       }
       return
     }
@@ -5128,7 +5146,7 @@ onBeforeUnmount(() => {
   cancelScheduledFocusSync()
 })
 
-const MermaidBlockNodeAsync = defineAsyncComponent({
+const MermaidBlockNodeInnerAsync = defineAsyncComponent({
   loader: async () => {
     try {
       const mod = await import('../../components/MermaidBlockNode')
@@ -5145,8 +5163,13 @@ const MermaidBlockNodeAsync = defineAsyncComponent({
   loadingComponent: MermaidBlockNodeLoading,
   delay: 0,
 })
+const MermaidBlockNodeAsync = withViewportDeferredLoading(
+  'ViewportDeferredMermaidBlockNode',
+  MermaidBlockNodeInnerAsync,
+  MermaidBlockNodeLoading,
+)
 
-const InfographicBlockNodeAsync = defineAsyncComponent({
+const InfographicBlockNodeInnerAsync = defineAsyncComponent({
   loader: async () => {
     try {
       const mod = await import('../../components/InfographicBlockNode')
@@ -5163,8 +5186,13 @@ const InfographicBlockNodeAsync = defineAsyncComponent({
   loadingComponent: InfographicBlockNodeLoading,
   delay: 0,
 })
+const InfographicBlockNodeAsync = withViewportDeferredLoading(
+  'ViewportDeferredInfographicBlockNode',
+  InfographicBlockNodeInnerAsync,
+  InfographicBlockNodeLoading,
+)
 
-const D2BlockNodeAsync = defineAsyncComponent(async () => {
+const D2BlockNodeInnerAsync = defineAsyncComponent(async () => {
   try {
     const mod = await import('../../components/D2BlockNode')
     return mod.default
@@ -5177,6 +5205,11 @@ const D2BlockNodeAsync = defineAsyncComponent(async () => {
     return PreCodeNode
   }
 })
+const D2BlockNodeAsync = withViewportDeferredLoading(
+  'ViewportDeferredD2BlockNode',
+  D2BlockNodeInnerAsync,
+  PreCodeNode,
+)
 
 // 组件映射表
 const nodeComponents: Partial<CustomComponents> = {
@@ -5482,6 +5515,7 @@ const renderedItems = computed(() => {
       slotContent: String((node as any).content ?? ''),
       isCodeBlock: node.type === 'code_block',
       indexKey: `${indexPrefix.value}-${item.index}`,
+      vnodeKey: `${rendererSessionIdentity.value}\u0000${item.index}`,
     }
   })
 })
@@ -6101,7 +6135,7 @@ onBeforeUnmount(() => {
   <template v-if="renderAsFragment">
     <template
       v-for="item in renderedItems"
-      :key="item.index"
+      :key="item.vnodeKey"
     >
       <component
         :is="item.component"
@@ -6194,7 +6228,7 @@ onBeforeUnmount(() => {
       />
     </template>
     <template v-if="minimalDomActive">
-      <template v-for="item in renderedItems" :key="item.index">
+      <template v-for="item in renderedItems" :key="item.vnodeKey">
         <component
           :is="item.component"
           v-if="shouldRenderNode(item.index)"
@@ -6212,7 +6246,7 @@ onBeforeUnmount(() => {
       </template>
     </template>
     <template v-else>
-      <template v-for="item in renderedItems" :key="item.index">
+      <template v-for="item in renderedItems" :key="item.vnodeKey">
         <div
           :ref="el => setNodeSlotElement(item.index, el as HTMLElement | null)"
           class="node-slot"
@@ -6393,27 +6427,10 @@ onBeforeUnmount(() => {
   margin: 0.25rem 0;
   border-radius: var(--ms-radius);
   background-image: linear-gradient(90deg, var(--loading-shimmer), transparent, var(--loading-shimmer));
-  background-size: 200% 100%;
-  animation: node-placeholder-shimmer 1.1s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .node-placeholder {
-    animation: none;
-  }
 }
 
 .node-placeholder:first-child {
   margin-top: 0;
-}
-
-@keyframes node-placeholder-shimmer {
-  from {
-    background-position: 200% 0%;
-  }
-  to {
-    background-position: -200% 0%;
-  }
 }
 
 .node-spacer {

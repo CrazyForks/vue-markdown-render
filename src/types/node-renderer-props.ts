@@ -312,7 +312,7 @@ export interface NodeRendererProps {
   domMode?: NodeRendererDomMode
   /** HTML rendering policy for html_block/html_inline nodes. Default: safe */
   htmlPolicy?: HtmlPolicy
-  /** Enable priority rendering for visible viewport area */
+  /** Defer built-in heavy nodes until they approach the viewport. Set false to render them immediately. Default: true. */
   viewportPriority?: boolean
   /** Experimental viewport priority observer tuning; not part of the 1.x compatibility promise. */
   viewportPriorityOptions?: MarkstreamViewportPriorityOptions

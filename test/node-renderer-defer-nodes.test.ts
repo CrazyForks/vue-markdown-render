@@ -495,7 +495,7 @@ describe('markdownRender deferNodesUntilVisible', () => {
     }
   })
 
-  it('uses actual viewport intersection for MarkdownCodeBlockNode', async () => {
+  it('uses the heavy-block preload margin for MarkdownCodeBlockNode', async () => {
     const OriginalIO = globalThis.IntersectionObserver
     const benchmarkWindow = window as any
     vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)
@@ -513,6 +513,7 @@ describe('markdownRender deferNodesUntilVisible', () => {
             heavyBlockMargin: '222px',
           })
           viewportPriority.provideViewportPriorityOptions(computed(() => viewportPriorityOptions.value))
+          viewportPriority.provideOffscreenHeavyNodeDeferral(computed(() => true))
           viewportPriority.provideViewportPriority(() => null, true)
 
           const node = {
@@ -534,7 +535,7 @@ describe('markdownRender deferNodesUntilVisible', () => {
       const codeBlock = wrapper.get('[data-markstream-code-block="1"]')
       const codeBlockObserver = FakeIntersectionObserver.instances.find(instance => instance.elements.has(codeBlock.element))
       expect(codeBlockObserver).toBeTruthy()
-      expect(codeBlockObserver?.options.rootMargin).toBe('0px')
+      expect(codeBlockObserver?.options.rootMargin).toBe('222px')
     }
     finally {
       wrapper?.unmount()
@@ -543,7 +544,7 @@ describe('markdownRender deferNodesUntilVisible', () => {
     }
   })
 
-  it('uses actual viewport intersection for MarkdownRender code blocks', async () => {
+  it('uses the heavy-block preload margin for MarkdownRender code blocks', async () => {
     const OriginalIO = globalThis.IntersectionObserver
     const benchmarkWindow = window as any
     vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)
@@ -579,7 +580,85 @@ describe('markdownRender deferNodesUntilVisible', () => {
       const codeBlock = wrapper.get('[data-markstream-code-block="1"]')
       const codeBlockObserver = FakeIntersectionObserver.instances.find(instance => instance.elements.has(codeBlock.element))
       expect(codeBlockObserver).toBeTruthy()
-      expect(codeBlockObserver?.options.rootMargin).toBe('0px')
+      expect(codeBlockObserver?.options.rootMargin).toBe('222px')
+    }
+    finally {
+      wrapper?.unmount()
+      delete benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__
+      vi.stubGlobal('IntersectionObserver', OriginalIO as any)
+    }
+  })
+
+  it('does not reuse heavy-node viewport readiness after the renderer session changes', async () => {
+    const OriginalIO = globalThis.IntersectionObserver
+    const benchmarkWindow = window as any
+    vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver as any)
+    benchmarkWindow.__MARKSTREAM_DISABLE_VIEWPORT_PRIORITY_IDLE_DRAIN__ = true
+
+    let wrapper: ReturnType<typeof mount> | null = null
+    try {
+      const { default: MarkdownRender } = await import('../src/components/NodeRenderer')
+      wrapper = mount(MarkdownRender, {
+        props: {
+          indexKey: 'stable-message-key',
+          content: '![Thread A](https://example.com/thread-a.png)\n\nStreaming t',
+          final: false,
+          mode: 'chat',
+          smoothStreaming: false,
+          batchRendering: false,
+          deferNodesUntilVisible: false,
+          viewportPriority: true,
+          virtualScroll: {
+            enabled: true,
+            sessionKey: 'thread-a:message-1',
+            threadKey: 'thread-a',
+          },
+        },
+      })
+
+      await flushAll()
+
+      const firstTarget = wrapper.get('.image-node-container')
+      const firstImage = wrapper.get('img')
+      expect(firstImage.attributes('src')).toBeUndefined()
+
+      const firstObserver = FakeIntersectionObserver.instances.find(instance => instance.elements.has(firstTarget.element))
+      expect(firstObserver).toBeTruthy()
+      firstObserver?.trigger(firstTarget.element)
+      await flushAll()
+      expect(wrapper.get('img').attributes('src')).toBe('https://example.com/thread-a.png')
+
+      await wrapper.setProps({
+        content: '![Thread A](https://example.com/thread-a.png)\n\nStreaming tail',
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'thread-a:message-2',
+          threadKey: 'thread-a',
+        },
+      })
+      await flushAll()
+      expect(wrapper.get('.image-node-container').element).toBe(firstTarget.element)
+
+      await wrapper.setProps({
+        content: '![Thread B](https://example.com/thread-b.png)\n\nThread B stream',
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'thread-b:message-1',
+          threadKey: 'thread-b',
+        },
+      })
+      await flushAll()
+
+      const secondTarget = wrapper.get('.image-node-container')
+      const secondImage = wrapper.get('img')
+      expect(secondTarget.element).not.toBe(firstTarget.element)
+      expect(secondImage.attributes('src')).toBeUndefined()
+
+      const secondObserver = FakeIntersectionObserver.instances.find(instance => instance.elements.has(secondTarget.element))
+      expect(secondObserver).toBeTruthy()
+      secondObserver?.trigger(secondTarget.element)
+      await flushAll()
+      expect(wrapper.get('img').attributes('src')).toBe('https://example.com/thread-b.png')
     }
     finally {
       wrapper?.unmount()
@@ -606,6 +685,7 @@ describe('markdownRender deferNodesUntilVisible', () => {
             heavyBlockMargin: '222px',
           })
           viewportPriority.provideViewportPriorityOptions(computed(() => viewportPriorityOptions.value))
+          viewportPriority.provideOffscreenHeavyNodeDeferral(computed(() => true))
           viewportPriority.provideViewportPriority(() => null, true)
 
           function updateMargin() {
@@ -634,7 +714,7 @@ describe('markdownRender deferNodesUntilVisible', () => {
       const codeBlock = wrapper.get('[data-markstream-code-block="1"]')
       const initialObserver = FakeIntersectionObserver.instances.find(instance => instance.elements.has(codeBlock.element))
       expect(initialObserver).toBeTruthy()
-      expect(initialObserver?.options.rootMargin).toBe('0px')
+      expect(initialObserver?.options.rootMargin).toBe('222px')
 
       initialObserver?.trigger(codeBlock.element, true)
       await flushAll()
@@ -672,6 +752,7 @@ describe('markdownRender deferNodesUntilVisible', () => {
             heavyBlockMargin: '222px',
           })
           viewportPriority.provideViewportPriorityOptions(computed(() => viewportPriorityOptions.value))
+          viewportPriority.provideOffscreenHeavyNodeDeferral(computed(() => true))
           viewportPriority.provideViewportPriority(() => null, true)
 
           function updateMargin() {

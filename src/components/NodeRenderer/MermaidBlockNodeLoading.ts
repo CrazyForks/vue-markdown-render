@@ -66,6 +66,17 @@ export const MermaidBlockNodeLoading = defineComponent({
           background: 'var(--diagram-bg)',
         },
       }, [
+        h('pre', {
+          class: 'mermaid-source-code text-sm font-mono whitespace-pre-wrap',
+          style: {
+            position: 'absolute',
+            inset: '0',
+            margin: '0',
+            padding: 'var(--ms-inset-panel-body)',
+            overflow: 'auto',
+            textAlign: 'left',
+          },
+        }, String((loadingProps.node as RuntimeCodeBlockNode).code ?? '')),
         h('div', {
           class: '_mermaid w-full text-center flex items-center justify-center min-h-full',
           style: {

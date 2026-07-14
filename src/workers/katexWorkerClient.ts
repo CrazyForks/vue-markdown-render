@@ -5,6 +5,8 @@ interface Pending {
   resolve: (val: string) => void
   reject: (err: any) => void
   timeoutId: number
+  aborted: boolean
+  cleanup: () => void
 }
 
 let worker: Worker | null = null
@@ -23,9 +25,12 @@ const drainWaiters = new Set<() => void>()
 
 function notifyDrainIfBelowCap() {
   if (pending.size < MAX_CONCURRENCY && drainWaiters.size) {
-    const copy = Array.from(drainWaiters)
-    drainWaiters.clear()
-    for (const fn of copy) {
+    let available = MAX_CONCURRENCY - pending.size
+    for (const fn of Array.from(drainWaiters)) {
+      if (available <= 0)
+        break
+      drainWaiters.delete(fn)
+      available--
       try {
         fn()
       }
@@ -70,11 +75,13 @@ export function setKaTeXWorker(w: Worker) {
 
     pending.delete(id)
     clearTimeout(p.timeoutId)
+    p.cleanup()
     // notify possible waiters if we freed capacity
     notifyDrainIfBelowCap()
 
     if (error) {
-      p.reject(new Error(error))
+      if (!p.aborted)
+        p.reject(new Error(error))
     }
     else {
       // Cache the result
@@ -87,7 +94,8 @@ export function setKaTeXWorker(w: Worker) {
           cache.delete(firstKey)
         }
       }
-      p.resolve(html)
+      if (!p.aborted)
+        p.resolve(html)
     }
   }
 
@@ -97,7 +105,9 @@ export function setKaTeXWorker(w: Worker) {
     // Reject all pending requests
     for (const [_id, p] of pending.entries()) {
       clearTimeout(p.timeoutId)
-      p.reject(new Error(`Worker error: ${e.message}`))
+      p.cleanup()
+      if (!p.aborted)
+        p.reject(new Error(`Worker error: ${e.message}`))
     }
     pending.clear()
     // capacity is effectively zeroed; notify to allow callers to decide
@@ -109,6 +119,14 @@ export function setKaTeXWorker(w: Worker) {
  * Remove the current worker instance (for cleanup or SSR).
  */
 export function clearKaTeXWorker() {
+  for (const p of pending.values()) {
+    clearTimeout(p.timeoutId)
+    p.cleanup()
+    if (!p.aborted)
+      p.reject(new Error('Worker cleared'))
+  }
+  pending.clear()
+  notifyDrainIfBelowCap()
   if (worker) {
     worker.terminate?.()
   }
@@ -153,6 +171,7 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
   const cacheKey = `${displayMode ? 'd' : 'i'}:${normalizedContent}`
   const cached = cache.get(cacheKey)
   if (cached) {
+    notifyDrainIfBelowCap()
     // Record cache hit performance
     if (perfMonitor) {
       perfMonitor.recordRender({
@@ -201,8 +220,18 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
       return
     }
     const id = Math.random().toString(36).slice(2)
+    let onAbort: (() => void) | null = null
+    const cleanup = () => {
+      if (signal && onAbort)
+        signal.removeEventListener('abort', onAbort)
+      onAbort = null
+    }
     const timeoutId = (globalThis as any).setTimeout(() => {
+      const current = pending.get(id)
+      if (!current)
+        return
       pending.delete(id)
+      current.cleanup()
       const err = new Error('Worker render timed out')
       ; (err as any).name = 'WorkerTimeout'
       ; (err as any).code = 'WORKER_TIMEOUT'
@@ -218,20 +247,23 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
           error: 'timeout',
         })
       }
-      reject(err)
+      if (!current.aborted)
+        current.reject(err)
       // a slot freed (this request is no longer pending)
       notifyDrainIfBelowCap()
     }, timeout)
 
-    // Listen for abort to cancel this pending request
-    const onAbort = () => {
-      (globalThis as any).clearTimeout(timeoutId)
-      if (pending.has(id))
-        pending.delete(id)
+    // Reject the caller immediately, but keep the slot occupied until the
+    // worker actually replies because posted worker work cannot be cancelled.
+    onAbort = () => {
+      const current = pending.get(id)
+      if (!current || current.aborted)
+        return
+      current.aborted = true
+      current.cleanup()
       const err = new Error('Aborted')
       ; (err as any).name = 'AbortError'
       reject(err)
-      notifyDrainIfBelowCap()
     }
     if (signal)
       signal.addEventListener('abort', onAbort, { once: true })
@@ -265,9 +297,25 @@ export async function renderKaTeXInWorker(content: string, displayMode = true, t
       originalReject(err)
     }
 
-    pending.set(id, { resolve: wrappedResolve, reject: wrappedReject, timeoutId })
+    pending.set(id, {
+      resolve: wrappedResolve,
+      reject: wrappedReject,
+      timeoutId,
+      aborted: false,
+      cleanup,
+    })
 
-    wk.postMessage({ id, content: normalizedContent, displayMode })
+    try {
+      wk.postMessage({ id, content: normalizedContent, displayMode })
+    }
+    catch (error) {
+      const current = pending.get(id)
+      pending.delete(id)
+      clearTimeout(timeoutId)
+      current?.cleanup()
+      current?.reject(error)
+      notifyDrainIfBelowCap()
+    }
   })
 }
 
@@ -306,13 +354,21 @@ export function waitForKaTeXWorkerSlot(timeout = 2000, signal?: AbortSignal): Pr
   return new Promise((resolve, reject) => {
     let settled = false
     let timer: any
-    const onDrain = () => {
-      if (settled)
-        return
-      settled = true
+    let onAbort: (() => void) | null = null
+    let onDrain: () => void = () => {}
+    const cleanup = () => {
       if (timer)
         (globalThis as any).clearTimeout(timer)
       drainWaiters.delete(onDrain)
+      if (signal && onAbort)
+        signal.removeEventListener('abort', onAbort)
+      onAbort = null
+    }
+    onDrain = () => {
+      if (settled)
+        return
+      settled = true
+      cleanup()
       resolve()
     }
     drainWaiters.add(onDrain)
@@ -320,7 +376,7 @@ export function waitForKaTeXWorkerSlot(timeout = 2000, signal?: AbortSignal): Pr
       if (settled)
         return
       settled = true
-      drainWaiters.delete(onDrain)
+      cleanup()
       const err = new Error('Wait for worker slot timed out')
       ; (err as any).name = 'WorkerBusyTimeout'
       ; (err as any).code = 'WORKER_BUSY_TIMEOUT'
@@ -329,13 +385,11 @@ export function waitForKaTeXWorkerSlot(timeout = 2000, signal?: AbortSignal): Pr
     // If capacity appears in the next microtask, resolve quickly
     queueMicrotask(() => notifyDrainIfBelowCap())
     if (signal) {
-      const onAbort = () => {
+      onAbort = () => {
         if (settled)
           return
         settled = true
-        if (timer)
-          (globalThis as any).clearTimeout(timer)
-        drainWaiters.delete(onDrain)
+        cleanup()
         const err = new Error('Aborted')
         ; (err as any).name = 'AbortError'
         reject(err)

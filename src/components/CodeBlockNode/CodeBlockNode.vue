@@ -3,11 +3,11 @@ import type { CodeBlockDiffHideUnchangedRegions, CodeBlockDiffHideUnchangedRegio
 import type { MonacoDiffEditorViewLike, MonacoDisposableLike, MonacoEditorViewLike, MonacoNamespaceLike, MonacoRuntimeOptions } from './monaco'
 // Avoid static import of `stream-monaco` for types so the runtime bundle
 // doesn't get a reference. Define minimal local types we need here.
-import { computed, getCurrentInstance, inject, nextTick, onBeforeUnmount, onUnmounted, ref, shallowRef, useAttrs, watch } from 'vue'
+import { computed, getCurrentInstance, inject, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, shallowRef, useAttrs, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 // Tooltip is provided as a singleton via composable to avoid many DOM nodes
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
-import { useViewportPriority } from '../../composables/viewportPriority'
+import { useOffscreenHeavyNodeDeferral, useViewportPriority, useViewportPriorityOptions } from '../../composables/viewportPriority'
 import { languageIconsRevision, languageMap, normalizeLanguageIdentifier, resolveMonacoLanguageId } from '../../utils'
 import { MARKSTREAM_LANGUAGE_ICON_RESOLVER_KEY } from '../../utils/languageIconContext'
 import { resolveLifecycleIndexKey } from '../../utils/lifecycleIndexKey'
@@ -204,14 +204,26 @@ const lastStableCollapsedDiffHeight = ref<number | null>(null)
 let collapsedDiffHandlesMouseWheel: boolean | null = null
 let resumeGuardFrames = 0
 const registerVisibility = useViewportPriority()
+const viewportPriorityOptions = useViewportPriorityOptions()
+const offscreenHeavyNodeDeferral = useOffscreenHeavyNodeDeferral()
 const viewportHandle = shallowRef<ReturnType<typeof registerVisibility> | null>(null)
-const viewportReady = ref(typeof window === 'undefined')
+const viewportReady = ref(typeof window === 'undefined' || !offscreenHeavyNodeDeferral.value)
+const hydratedFromServer = typeof window !== 'undefined' && getCurrentInstance()?.vnode.el?.nodeType === 1
+const viewportPendingMarkerReady = ref(!hydratedFromServer)
+onMounted(() => {
+  viewportPendingMarkerReady.value = true
+})
 if (typeof window !== 'undefined') {
   watch(
-    () => container.value,
-    (el, _oldValue, onCleanup) => {
+    [() => container.value, offscreenHeavyNodeDeferral],
+    ([el, shouldDefer], _oldValue, onCleanup) => {
       viewportHandle.value?.destroy()
       viewportHandle.value = null
+
+      if (!shouldDefer || viewportReady.value) {
+        viewportReady.value = true
+        return
+      }
 
       if (!el) {
         viewportReady.value = false
@@ -219,7 +231,13 @@ if (typeof window !== 'undefined') {
       }
 
       let active = true
-      const handle = registerVisibility(el, { rootMargin: '0px' })
+      const rootMargin = viewportPriorityOptions?.value.heavyBlockMargin
+        ?? viewportPriorityOptions?.value.rootMargin
+        ?? '0px'
+      const handle = registerVisibility(el, {
+        rootMargin,
+        allowIdle: false,
+      })
 
       viewportHandle.value = handle
       // Latch readiness once visible so observer reconfiguration does not hide an enhanced block.
@@ -4638,6 +4656,7 @@ onUnmounted(() => {
     :data-markstream-enhancement-state="codeBlockEnhancementState"
     :data-markstream-code-block-state="isCodeBlockLoading() ? 'streaming' : 'settled'"
     :data-markstream-pending="restoreVisualPending ? 'true' : undefined"
+    :data-markstream-viewport-pending="viewportPendingMarkerReady && offscreenHeavyNodeDeferral && !viewportReady ? 'true' : undefined"
     :class="[
       { 'dark': props.isDark, 'is-rendering': props.loading, 'is-dark': resolvedSurfaceIsDark, 'is-diff': isDiff, 'is-plain-text': isPlainTextLanguage },
     ]"
@@ -5264,6 +5283,11 @@ onUnmounted(() => {
 
 .skeleton-line.short {
   width: 60%;
+}
+
+.code-block-container[data-markstream-viewport-pending='true'] .code-height-placeholder,
+.code-block-container[data-markstream-viewport-pending='true'] .skeleton-line {
+  animation: none;
 }
 
 @keyframes code-skeleton-shimmer {

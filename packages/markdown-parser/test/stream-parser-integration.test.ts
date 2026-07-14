@@ -8,6 +8,32 @@ function buildLargeAppendFriendlyDoc(paragraphs: number) {
   ).join('\n\n')}\n\n`
 }
 
+function buildMixedSection(index: number) {
+  return [
+    `### Section ${index}`,
+    '',
+    `Paragraph ${index} with **strong** text and \`inline code\`.`,
+    '',
+    `- item ${index}.1`,
+    `- item ${index}.2`,
+    '',
+    `> Quote ${index}`,
+    '',
+    '```ts',
+    `const value${index} = ${index}`,
+    '```',
+    '',
+    '| Name | Value |',
+    '| - | -: |',
+    `| row ${index} | ${index} |`,
+    '',
+    '$$',
+    `x_${index}^2`,
+    '$$',
+    '',
+  ].join('\n')
+}
+
 function getStreamStats(md: ReturnType<typeof getMarkdown>) {
   return (md as any).stream.stats()
 }
@@ -47,6 +73,359 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     expect(stats.appendHits + stats.tailHits + stats.cacheHits).toBeGreaterThan(0)
     expect(stats.fullParses).toBe(1)
     expect(stats.lastMode).not.toBe('full')
+  })
+
+  it('does not reprocess the stable top-level token prefix after stream append hits', () => {
+    const md = getMarkdown('stream-parser-structured-tail-reuse')
+    ;(md as any).stream.resetStats()
+
+    const timing: {
+      processTokensInputTokens?: number
+      processTokensReusedTopLevelNodes?: number
+    } = {}
+    let markdown = buildLargeAppendFriendlyDoc(40)
+
+    parseMarkdownToStructure(markdown, md, {
+      final: false,
+      streamParse: true,
+      __reuseStableTopLevelNodes: true,
+      __timing: timing,
+    } as any)
+
+    for (let index = 40; index < 160; index++) {
+      markdown += `Paragraph ${index + 1} with enough text to keep this document above the stream optimization threshold.\n\n`
+      parseMarkdownToStructure(markdown, md, {
+        final: false,
+        streamParse: true,
+        __reuseStableTopLevelNodes: true,
+        __timing: timing,
+      } as any)
+    }
+
+    const finalTokenCount = (md as any).stream.peek().length
+    const stats = getStreamStats(md)
+
+    expect(stats.appendHits + stats.tailHits).toBeGreaterThan(0)
+    expect(timing.processTokensInputTokens).toBeLessThanOrEqual(finalTokenCount * 4)
+    expect(timing.processTokensReusedTopLevelNodes).toBeGreaterThan(0)
+  })
+
+  it('keeps every reusable dirty-tail result equivalent to a cold parse', () => {
+    const md = getMarkdown('stream-parser-structured-tail-equivalence')
+    const coldMd = getMarkdown('stream-parser-structured-tail-equivalence-cold')
+    const timing: { processTokensReusedTopLevelNodes?: number } = {}
+    const base = `${buildLargeAppendFriendlyDoc(40)}Formatted **strong** and \`inline code\` paragraph.\n\n`
+    const appended = [
+      'Tail paragraph continues across chunk boundaries with ordinary words.',
+      '',
+      '# Stable heading',
+      '',
+      'Another paragraph remains visible while it is still arriving.',
+    ].join('\n')
+
+    for (let end = 7; end < appended.length + 7; end += 7) {
+      const source = base + appended.slice(0, Math.min(end, appended.length))
+      const streamed = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+        __reuseStableTopLevelNodes: true,
+        __timing: timing,
+      } as any)
+      const cold = parseMarkdownToStructure(source, coldMd, {
+        final: false,
+        streamParse: false,
+      })
+
+      expect(streamed).toEqual(cold)
+    }
+
+    const finalSource = base + appended
+    const streamedFinal = parseMarkdownToStructure(finalSource, md, { final: true })
+    const coldFinal = parseMarkdownToStructure(finalSource, coldMd, {
+      final: true,
+      streamParse: false,
+    })
+
+    expect(timing.processTokensReusedTopLevelNodes).toBeGreaterThan(0)
+    expect(streamedFinal).toEqual(coldFinal)
+  })
+
+  it('keeps progressive mixed top-level group reuse equivalent to a cold parse', () => {
+    const md = getMarkdown('stream-parser-mixed-progressive-equivalence')
+    const coldMd = getMarkdown('stream-parser-mixed-progressive-equivalence-cold')
+    const timing: {
+      processTokensInputTokens?: number
+      processTokensReusedTopLevelNodes?: number
+    } = {}
+    const markdown = Array.from({ length: 8 }, (_, index) => buildMixedSection(index + 1)).join('')
+
+    for (let end = 37; end < markdown.length + 37; end += 37) {
+      const source = markdown.slice(0, Math.min(end, markdown.length))
+      const streamed = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+        __reuseStableTopLevelNodes: true,
+        __timing: timing,
+      } as any)
+      const cold = parseMarkdownToStructure(source, coldMd, {
+        final: false,
+        streamParse: false,
+      })
+
+      expect(streamed).toEqual(cold)
+    }
+
+    expect(timing.processTokensReusedTopLevelNodes).toBeGreaterThan(0)
+  })
+
+  it('reprocesses the previous last group when content becomes mixed', () => {
+    const md = getMarkdown('stream-parser-mixed-last-group-overlap')
+    const base = 'alpha\n\nbeta\n\n'
+    const first = parseMarkdownToStructure(base, md, {
+      final: false,
+      streamParse: true,
+      __reuseStableTopLevelNodes: true,
+    } as any)
+    const timing: { processTokensReusedTopLevelNodes?: number } = {}
+    const second = parseMarkdownToStructure(`${base}- one\n- two\n\n`, md, {
+      final: false,
+      streamParse: true,
+      __reuseStableTopLevelNodes: true,
+      __timing: timing,
+    } as any)
+
+    expect(second[0]).toBe(first[0])
+    expect(second[1]).not.toBe(first[1])
+    expect(timing.processTokensReusedTopLevelNodes).toBe(1)
+  })
+
+  it('falls back instead of losing cross-block linkify context', () => {
+    const md = getMarkdown('stream-parser-mixed-linkify-context')
+    const base = '# Assets\n\n- docs below\n\nFiles:\n\n'
+
+    parseMarkdownToStructure(base, md, {
+      final: false,
+      streamParse: true,
+      __reuseStableTopLevelNodes: true,
+    } as any)
+    parseMarkdownToStructure(`${base}foo.md\n\n`, md, {
+      final: false,
+      streamParse: true,
+      __reuseStableTopLevelNodes: true,
+    } as any)
+
+    const source = `${base}foo.md\n\nbar.md\n\n`
+    const timing: {
+      processTokensInputTokens?: number
+      processTokensReusedTopLevelNodes?: number
+    } = {}
+    const streamed = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+      __reuseStableTopLevelNodes: true,
+      __timing: timing,
+    } as any) as any[]
+    const cold = parseMarkdownToStructure(
+      source,
+      getMarkdown('stream-parser-mixed-linkify-context-cold'),
+      { final: false, streamParse: false },
+    ) as any[]
+
+    expect(streamed).toEqual(cold)
+    expect(streamed.find(node => node.raw === 'foo.md')?.children?.[0]?.type).toBe('text')
+    expect(streamed.find(node => node.raw === 'bar.md')?.children?.[0]?.type).toBe('text')
+    expect(timing.processTokensInputTokens).toBe((md as any).stream.peek().length)
+    expect(timing.processTokensReusedTopLevelNodes ?? 0).toBe(0)
+  })
+
+  it('does not reuse mixed streaming nodes for a final sync parse', () => {
+    const md = getMarkdown('stream-parser-mixed-final-fallback')
+    const source = Array.from({ length: 4 }, (_, index) => buildMixedSection(index + 1)).join('')
+    const streamed = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+      __reuseStableTopLevelNodes: true,
+    } as any)
+    const timing: {
+      processTokensInputTokens?: number
+      processTokensReusedTopLevelNodes?: number
+    } = {}
+    const finalNodes = parseMarkdownToStructure(source, md, {
+      final: true,
+      __reuseStableTopLevelNodes: true,
+      __timing: timing,
+    } as any)
+    const coldFinal = parseMarkdownToStructure(
+      source,
+      getMarkdown('stream-parser-mixed-final-fallback-cold'),
+      { final: true, streamParse: false },
+    )
+
+    expect(finalNodes).toEqual(coldFinal)
+    expect(finalNodes[0]).not.toBe(streamed[0])
+    expect(timing.processTokensInputTokens).toBeGreaterThan(0)
+    expect(timing.processTokensReusedTopLevelNodes ?? 0).toBe(0)
+  })
+
+  it('keeps mixed stable-prefix token conversion below a deterministic budget', () => {
+    const md = getMarkdown('stream-parser-mixed-token-budget')
+    const baselineMd = getMarkdown('stream-parser-mixed-token-budget-baseline')
+    const timing: {
+      processTokensInputTokens?: number
+      processTokensReusedTopLevelNodes?: number
+    } = {}
+    const baselineTiming: { processTokensInputTokens?: number } = {}
+    let source = ''
+
+    for (let index = 1; index <= 40; index++) {
+      source += buildMixedSection(index)
+      parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+        __reuseStableTopLevelNodes: true,
+        __timing: timing,
+      } as any)
+      parseMarkdownToStructure(source, baselineMd, {
+        final: false,
+        streamParse: true,
+        __timing: baselineTiming,
+      } as any)
+    }
+
+    expect(timing.processTokensReusedTopLevelNodes).toBeGreaterThan(0)
+    expect(timing.processTokensInputTokens).toBeLessThan((baselineTiming.processTokensInputTokens ?? 0) * 0.15)
+  })
+
+  it('does not reuse parsed nodes for custom markdown-it plugins', () => {
+    const countHeadings = (md: any) => {
+      md.core.ruler.push('test_global_heading_count', (state: any) => {
+        const headings = (state.tokens ?? []).filter((token: any) => token.type === 'heading_open')
+        for (const token of headings)
+          token.attrSet('data-total', String(headings.length))
+      })
+    }
+    const buildHeadings = (count: number) => `${Array.from({ length: count }, (_, index) => `# Heading ${index + 1}`).join('\n\n')}\n\n`
+    const md = getMarkdown('stream-parser-custom-plugin-nodes', { plugin: [countHeadings] })
+    const firstSource = buildHeadings(40)
+
+    parseMarkdownToStructure(firstSource, md, { final: false, streamParse: true })
+
+    const source = `${firstSource}# Heading 41\n\n`
+    const timing: { processTokensReusedTopLevelNodes?: number } = {}
+    const streamed = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+      __timing: timing,
+    } as any) as any[]
+    const cold = parseMarkdownToStructure(
+      source,
+      getMarkdown('stream-parser-custom-plugin-nodes-cold', { plugin: [countHeadings] }),
+      { final: false, streamParse: false },
+    ) as any[]
+
+    expect(streamed).toEqual(cold)
+    expect(streamed[0]?.attrs?.['data-total']).toBe('41')
+    expect(timing.processTokensReusedTopLevelNodes ?? 0).toBe(0)
+  })
+
+  it('does not retain caller mutations in public parser results', () => {
+    const md = getMarkdown('stream-parser-result-mutation')
+    const firstSource = buildLargeAppendFriendlyDoc(40)
+    const first = parseMarkdownToStructure(firstSource, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    first[0].raw = 'caller mutation'
+    first[0].children[0].content = 'caller mutation'
+
+    const source = `${firstSource}Appended paragraph.\n\n`
+    const streamed = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+    })
+    const cold = parseMarkdownToStructure(
+      source,
+      getMarkdown('stream-parser-result-mutation-cold'),
+      { final: false, streamParse: false },
+    )
+
+    expect(streamed).toEqual(cold)
+  })
+
+  it.each([
+    ['image', '![alt](https://example.com/image.png)\n\n'],
+    ['html', '<div>raw</div>\n\n'],
+    ['reference', '[ref]: https://example.com\n'],
+  ])('falls back to full node processing when appended content contains a %s', (kind, appended) => {
+    const md = getMarkdown(`stream-parser-structured-tail-${kind}-fallback`)
+    const base = buildLargeAppendFriendlyDoc(40)
+
+    parseMarkdownToStructure(base, md, {
+      final: false,
+      streamParse: true,
+      __reuseStableTopLevelNodes: true,
+    } as any)
+
+    const source = base + appended
+    const timing: {
+      processTokensInputTokens?: number
+      processTokensReusedTopLevelNodes?: number
+    } = {}
+    const streamed = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+      __reuseStableTopLevelNodes: true,
+      __timing: timing,
+    } as any)
+    const cold = parseMarkdownToStructure(
+      source,
+      getMarkdown(`stream-parser-structured-tail-${kind}-fallback-cold`),
+      { final: false, streamParse: false },
+    )
+
+    expect(streamed).toEqual(cold)
+    expect(timing.processTokensInputTokens).toBe((md as any).stream.peek().length)
+    expect(timing.processTokensReusedTopLevelNodes ?? 0).toBe(0)
+    if (kind === 'reference')
+      expect(getStreamStats(md).lastMode).toBe('full')
+  })
+
+  it('falls back to full node processing when token transforms are present', () => {
+    const md = getMarkdown('stream-parser-structured-tail-transform-fallback')
+    const base = buildLargeAppendFriendlyDoc(40)
+
+    parseMarkdownToStructure(base, md, {
+      final: false,
+      streamParse: true,
+      __reuseStableTopLevelNodes: true,
+    } as any)
+
+    const source = `${base}Transformed append.\n\n`
+    const timing: {
+      processTokensInputTokens?: number
+      processTokensReusedTopLevelNodes?: number
+    } = {}
+    let transformCalls = 0
+    const streamed = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+      __reuseStableTopLevelNodes: true,
+      __timing: timing,
+      preTransformTokens(tokens) {
+        transformCalls++
+        return tokens
+      },
+    } as any)
+
+    expect(streamed).toEqual(parseMarkdownToStructure(
+      source,
+      getMarkdown('stream-parser-structured-tail-transform-fallback-cold'),
+      { final: false, streamParse: false },
+    ))
+    expect(transformCalls).toBe(1)
+    expect(timing.processTokensInputTokens).toBe((md as any).stream.peek().length)
+    expect(timing.processTokensReusedTopLevelNodes ?? 0).toBe(0)
   })
 
   it('resolves references in appended content when reference definitions already exist', () => {

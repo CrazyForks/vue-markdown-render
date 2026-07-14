@@ -30,6 +30,8 @@ interface StreamStatsLike {
 
 interface ParserTimingMetrics {
   tokenCloneMs?: number
+  processTokensInputTokens?: number
+  processTokensReusedTopLevelNodes?: number
   processTokensMs?: number
   parseMarkdownToStructureTotalMs?: number
 }
@@ -121,6 +123,8 @@ const STREAM_STAT_COUNTER_KEYS: Array<keyof StreamStatsLike> = [
 ]
 const PARSE_TIMING_KEYS: Array<keyof ParserTimingMetrics> = [
   'tokenCloneMs',
+  'processTokensInputTokens',
+  'processTokensReusedTopLevelNodes',
   'processTokensMs',
   'parseMarkdownToStructureTotalMs',
 ]
@@ -574,6 +578,11 @@ function hasRegisteredMarkdownPlugins(md: MarkdownIt) {
   return Number((md as unknown as Record<string, unknown>).__markstreamRegisteredPluginCount ?? 0) > 0
 }
 
+function hasCustomParserExtensions(md: MarkdownIt) {
+  return (md as unknown as Record<string, unknown>).__markstreamHasCustomParserExtensions === true
+    || hasRegisteredMarkdownPlugins(md)
+}
+
 function getStablePrefixScanStartIndex(context: StablePrefixReuseContext) {
   if (context.previousDirtyStartIndex <= 0)
     return 0
@@ -583,7 +592,7 @@ function getStablePrefixScanStartIndex(context: StablePrefixReuseContext) {
     return 0
   if (context.customMarkdownIt)
     return 0
-  if (hasRegisteredMarkdownPlugins(context.md))
+  if (hasCustomParserExtensions(context.md))
     return 0
   if (appendMayDefineGlobalReferences(context.previousContent, context.content))
     return 0
@@ -940,6 +949,7 @@ export function useMarkdownParsing(
   let previousParserCacheSemanticKey = ''
   let previousNodeReuseSemanticKey = ''
   let previousContent = ''
+  let previousExternalNodeMutationBoundary = false
   let parseCoalesceTimer: ReturnType<typeof setTimeout> | undefined
   let parseCommitCount = 0
   let parseCoalescedCount = 0
@@ -1034,9 +1044,13 @@ export function useMarkdownParsing(
   const mdInstance = computed(() => {
     const base = mdBase.value
 
-    return props.customMarkdownIt
-      ? props.customMarkdownIt(base)
-      : base
+    if (!props.customMarkdownIt)
+      return base
+
+    const customized = props.customMarkdownIt(base)
+    ;(base as unknown as Record<string, unknown>).__markstreamHasCustomParserExtensions = true
+    ;(customized as unknown as Record<string, unknown>).__markstreamHasCustomParserExtensions = true
+    return customized
   })
 
   const mergedParseOptions = computed(() => {
@@ -1145,7 +1159,14 @@ export function useMarkdownParsing(
       previousContent = ''
     }
 
-    const canReuseParsedNodes = previousParsedNodes.length > 0
+    const hasExternalNodeMutationBoundary = Object.keys(options.customComponentsMap?.value ?? {}).length > 0
+      || typeof mergedParseOptions.value.postTransformNodes === 'function'
+    if (hasExternalNodeMutationBoundary !== previousExternalNodeMutationBoundary) {
+      previousParsedNodes = []
+      previousContent = ''
+    }
+    const canReuseParsedNodes = !hasExternalNodeMutationBoundary
+      && previousParsedNodes.length > 0
       && content.startsWith(previousContent)
       && currentNodeReuseSemanticKey === previousNodeReuseSemanticKey
 
@@ -1156,9 +1177,19 @@ export function useMarkdownParsing(
     const parserTiming: ParserTimingMetrics | undefined = collectPerformanceMetrics
       ? {}
       : undefined
-    const parseOptionsForCall = parserTiming
-      ? ({ ...mergedParseOptions.value, __timing: parserTiming } as RendererParseOptions & { __timing: ParserTimingMetrics })
-      : mergedParseOptions.value
+    const parserHasCustomExtensions = hasCustomParserExtensions(md)
+    const reuseStableTopLevelNodes = !parserHasCustomExtensions
+      && !hasExternalNodeMutationBoundary
+    const parseOptionsForCall = {
+      ...mergedParseOptions.value,
+      __reuseStableTopLevelNodes: reuseStableTopLevelNodes,
+      ...(parserHasCustomExtensions ? { __disableStreamParse: true } : {}),
+      ...(parserTiming ? { __timing: parserTiming } : {}),
+    } as RendererParseOptions & {
+      __disableStreamParse?: boolean
+      __reuseStableTopLevelNodes: boolean
+      __timing?: ParserTimingMetrics
+    }
 
     const nextParsed = parseMarkdownToStructure(
       content,
@@ -1245,6 +1276,7 @@ export function useMarkdownParsing(
     previousContent = content
     previousParserCacheSemanticKey = currentParserCacheSemanticKey
     previousNodeReuseSemanticKey = currentNodeReuseSemanticKey
+    previousExternalNodeMutationBoundary = hasExternalNodeMutationBoundary
     previousParsedNodes = parsed
     commitParsedNodesDirtyStartIndex(stabilizeMetrics?.dirtyStartIndex ?? 0)
 

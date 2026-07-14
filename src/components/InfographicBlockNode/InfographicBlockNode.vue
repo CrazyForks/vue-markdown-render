@@ -3,7 +3,7 @@ import type { InfographicBlockNodeProps } from '../../types/component-props'
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, useAttrs, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
-import { useViewportPriority } from '../../composables/viewportPriority'
+import { useOffscreenHeavyNodeDeferral, useViewportPriority, useViewportPriorityOptions } from '../../composables/viewportPriority'
 import infographicIcon from '../../icon/infographic.svg?raw'
 import { clampInfographicPreviewHeight, estimateInfographicPreviewHeight, parsePositiveNumber } from '../../utils/diagramHeight'
 import { resolveLifecycleIndexKey } from '../../utils/lifecycleIndexKey'
@@ -29,6 +29,8 @@ const _emits = defineEmits(['copy', 'export', 'openModal'])
 
 const { t } = useSafeI18n()
 const registerViewport = useViewportPriority()
+const viewportPriorityOptions = useViewportPriorityOptions()
+const offscreenHeavyNodeDeferral = useOffscreenHeavyNodeDeferral()
 
 const copyText = ref(false)
 const isCollapsed = ref(false)
@@ -40,8 +42,9 @@ const isModalOpen = ref(false)
 const modalContent = ref<HTMLElement>()
 const modalCloneWrapper = ref<HTMLElement | null>(null)
 const hasPreview = ref(false)
+const hasRenderError = ref(false)
 const viewportHandle = ref<ReturnType<typeof registerViewport> | null>(null)
-const viewportReady = ref(typeof window === 'undefined')
+const viewportReady = ref(typeof window === 'undefined' || !offscreenHeavyNodeDeferral.value)
 const attrs = useAttrs()
 const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY, null)
 let lifecyclePendingIndexKey = ''
@@ -92,15 +95,25 @@ function clearLifecyclePending() {
 
 if (typeof window !== 'undefined') {
   watch(
-    () => viewportTarget.value,
-    (el) => {
+    [() => viewportTarget.value, offscreenHeavyNodeDeferral],
+    ([el, shouldDefer]) => {
       viewportHandle.value?.destroy()
       viewportHandle.value = null
+      if (!shouldDefer || viewportReady.value) {
+        viewportReady.value = true
+        return
+      }
       if (!el) {
         viewportReady.value = false
         return
       }
-      const handle = registerViewport(el, { rootMargin: '160px' })
+      const rootMargin = viewportPriorityOptions?.value.heavyBlockMargin
+        ?? viewportPriorityOptions?.value.rootMargin
+        ?? '160px'
+      const handle = registerViewport(el, {
+        rootMargin,
+        allowIdle: false,
+      })
       viewportHandle.value = handle
       viewportReady.value = handle.isVisible.value
       handle.whenVisible.then(() => {
@@ -399,9 +412,15 @@ let renderInFlight = false
 let rerenderQueued = false
 let rerenderForce = false
 let lastCompletedRenderSignature = ''
+let unmounted = false
+let renderGeneration = 0
+
+function isCurrentRender(generation: number) {
+  return !unmounted && generation === renderGeneration
+}
 
 async function renderInfographic(force = false) {
-  if (!viewportReady.value)
+  if (unmounted || !viewportReady.value)
     return
   if (!infographicContainer.value)
     return
@@ -414,17 +433,25 @@ async function renderInfographic(force = false) {
   if (!force && signature === lastCompletedRenderSignature && hasPreview.value)
     return
 
+  const generation = ++renderGeneration
   renderInFlight = true
   markLifecyclePending()
   const previousHtml = infographicContainer.value.innerHTML
   const previousHasPreview = hasPreview.value
+  const previousHasRenderError = hasRenderError.value
+  hasRenderError.value = false
 
   try {
     const InfographicClass = await getInfographic()
+    if (!isCurrentRender(generation))
+      return
     if (!InfographicClass) {
       console.warn('Infographic library failed to load.')
       return
     }
+    const container = infographicContainer.value
+    if (!container)
+      return
 
     // Clear previous instance
     if (infographicInstance) {
@@ -433,11 +460,11 @@ async function renderInfographic(force = false) {
     }
 
     // Clear container
-    infographicContainer.value.innerHTML = ''
+    container.innerHTML = ''
 
     // Create new instance
     infographicInstance = new InfographicClass({
-      container: infographicContainer.value,
+      container,
       width: '100%',
       height: '100%',
     })
@@ -463,20 +490,25 @@ async function renderInfographic(force = false) {
     infographicInstance.render(baseCode.value)
     if (renderErrorMessage)
       throw new Error(renderErrorMessage)
-    if (!infographicContainer.value.childNodes.length)
+    if (!container.childNodes.length)
       throw new Error('Infographic render returned empty output.')
     hasPreview.value = true
+    hasRenderError.value = false
     lastCompletedRenderSignature = signature
 
     // Update container height after render
     nextTick(() => {
-      updateContainerHeight()
+      if (isCurrentRender(generation))
+        updateContainerHeight()
     })
   }
   catch (error) {
+    if (!isCurrentRender(generation))
+      return
     if (props.loading === false) {
       console.error('Failed to render infographic:', error)
       hasPreview.value = false
+      hasRenderError.value = true
       lastCompletedRenderSignature = ''
       if (infographicContainer.value) {
         infographicContainer.value.innerHTML = `<div style="padding: var(--ms-inset-panel-body); color: hsl(var(--ms-destructive))">Failed to render infographic: ${error instanceof Error ? error.message : 'Unknown error'}</div>`
@@ -484,6 +516,7 @@ async function renderInfographic(force = false) {
     }
     else {
       hasPreview.value = previousHasPreview
+      hasRenderError.value = previousHasRenderError
       if (previousHasPreview && infographicContainer.value) {
         infographicContainer.value.innerHTML = previousHtml
       }
@@ -491,25 +524,28 @@ async function renderInfographic(force = false) {
   }
   finally {
     renderInFlight = false
-    if (rerenderQueued) {
-      const forceNext = rerenderForce
-      rerenderQueued = false
-      rerenderForce = false
-      nextTick(() => {
-        void renderInfographic(forceNext)
-      })
-    }
-    else {
-      void markLifecycleSettled()
+    if (isCurrentRender(generation)) {
+      if (rerenderQueued) {
+        const forceNext = rerenderForce
+        rerenderQueued = false
+        rerenderForce = false
+        nextTick(() => {
+          void renderInfographic(forceNext)
+        })
+      }
+      else {
+        void markLifecycleSettled()
+      }
     }
   }
 }
 
 function queueInfographicRender(force = false) {
-  if (!viewportReady.value || showSource.value || isCollapsed.value)
+  if (unmounted || !viewportReady.value || showSource.value || isCollapsed.value)
     return
   nextTick(() => {
-    void renderInfographic(force)
+    if (!unmounted)
+      void renderInfographic(force)
   })
 }
 
@@ -580,6 +616,10 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  unmounted = true
+  renderGeneration += 1
+  rerenderQueued = false
+  rerenderForce = false
   viewportHandle.value?.destroy()
   viewportHandle.value = null
   clearLifecyclePending()
@@ -603,6 +643,8 @@ const isFullscreenDisabled = computed(() => showSource.value || isCollapsed.valu
 const renderMode = computed(() => {
   if (showSource.value)
     return 'fallback'
+  if (hasRenderError.value)
+    return 'error'
   return hasPreview.value ? 'preview' : 'pending'
 })
 
@@ -790,6 +832,10 @@ watch(
           @touchmove.passive="onDrag"
           @touchend.passive="stopDrag"
         >
+          <pre
+            v-if="!hasPreview && !hasRenderError"
+            class="infographic-pending-source text-sm font-mono whitespace-pre-wrap"
+          >{{ baseCode }}</pre>
           <div
             class="absolute inset-0 cursor-grab"
             :class="{ 'cursor-grabbing': isDragging }"
@@ -957,6 +1003,18 @@ watch(
   background: var(--diagram-bg);
   min-height: var(--ms-size-diagram-min-height);
   transition-duration: var(--ms-duration-fast);
+}
+
+.infographic-pending-source {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  margin: 0;
+  padding: var(--ms-inset-panel-body);
+  overflow: auto;
+  color: hsl(var(--ms-foreground));
+  text-align: left;
+  background: var(--diagram-bg);
 }
 
 /* ── Modal ── */

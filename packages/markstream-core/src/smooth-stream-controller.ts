@@ -301,8 +301,7 @@ class SmoothMarkdownStreamControllerImpl {
     }
 
     const desiredCount = Math.min(Math.floor(this.charBudget), this.maxCharsPerCommit)
-    const rest = this.source.slice(this.visible.length)
-    const nextSlice = takeGraphemes(rest, desiredCount, this.segmenter)
+    const nextSlice = takeGraphemes(this.source, this.visible.length, desiredCount, this.segmenter)
 
     if (nextSlice.text) {
       this.visible += nextSlice.text
@@ -365,31 +364,53 @@ function createGraphemeSegmenter(): GraphemeSegmenter | null {
   return new SegmenterCtor(undefined, { granularity: 'grapheme' })
 }
 
-function takeGraphemes(input: string, count: number, segmenter: GraphemeSegmenter | null): GraphemeSlice {
-  if (!input || count <= 0)
+function takeGraphemes(input: string, start: number, count: number, segmenter: GraphemeSegmenter | null): GraphemeSlice {
+  if (start >= input.length || count <= 0)
     return { text: '', graphemeCount: 0 }
 
   if (!segmenter) {
-    const parts = Array.from(input).slice(0, count)
+    let end = start
+    let used = 0
+    while (end < input.length && used < count) {
+      const code = input.charCodeAt(end)
+      const next = input.charCodeAt(end + 1)
+      end += code >= 0xD800 && code <= 0xDBFF && next >= 0xDC00 && next <= 0xDFFF ? 2 : 1
+      used++
+    }
     return {
-      text: parts.join(''),
-      graphemeCount: parts.length,
+      text: input.slice(start, end),
+      graphemeCount: used,
     }
   }
 
-  let output = ''
-  let used = 0
+  const pendingLength = input.length - start
+  let windowLength = Math.min(pendingLength, Math.max(64, count * 2))
 
-  for (const part of segmenter.segment(input)) {
-    if (used >= count)
-      break
-    output += part.segment
-    used++
-  }
+  while (true) {
+    const reachesEnd = windowLength >= pendingLength
+    const window = input.slice(start, start + windowLength)
+    let outputLength = 0
+    let used = 0
 
-  return {
-    text: output,
-    graphemeCount: used,
+    for (const part of segmenter.segment(window)) {
+      if (used >= count) {
+        return {
+          text: input.slice(start, start + outputLength),
+          graphemeCount: used,
+        }
+      }
+      outputLength += part.segment.length
+      used++
+    }
+
+    if (reachesEnd) {
+      return {
+        text: input.slice(start, start + outputLength),
+        graphemeCount: used,
+      }
+    }
+
+    windowLength = Math.min(pendingLength, windowLength * 2)
   }
 }
 

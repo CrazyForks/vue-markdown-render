@@ -1,10 +1,12 @@
 import type { ComputedRef, InjectionKey, Ref } from 'vue'
 import type { MarkstreamViewportPriorityOptions } from '../types/node-renderer-props'
-import { inject, provide, ref, watch } from 'vue'
+import { computed, inject, provide, ref, watch } from 'vue'
 
 // Injection key for viewport-priority registration
 const ViewportPriorityKey = Symbol('ViewportPriority') as InjectionKey<RegisterFn>
 const ViewportPriorityOptionsKey = Symbol('ViewportPriorityOptions') as InjectionKey<ComputedRef<MarkstreamViewportPriorityOptions>>
+const OffscreenHeavyNodeDeferralKey = Symbol('OffscreenHeavyNodeDeferral') as InjectionKey<ComputedRef<boolean>>
+const disabledOffscreenHeavyNodeDeferral = computed(() => false)
 export const DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN = '400px'
 
 export interface VisibilityHandle {
@@ -40,6 +42,17 @@ export function provideViewportPriorityOptions(options: ComputedRef<MarkstreamVi
 
 export function useViewportPriorityOptions() {
   return inject(ViewportPriorityOptionsKey, undefined)
+}
+
+export function provideOffscreenHeavyNodeDeferral(enabled: ComputedRef<boolean>) {
+  const inherited = inject(OffscreenHeavyNodeDeferralKey, undefined)
+  const resolved = computed(() => inherited?.value === true || enabled.value)
+  provide(OffscreenHeavyNodeDeferralKey, resolved)
+  return resolved
+}
+
+export function useOffscreenHeavyNodeDeferral() {
+  return inject(OffscreenHeavyNodeDeferralKey, disabledOffscreenHeavyNodeDeferral)
 }
 
 /**

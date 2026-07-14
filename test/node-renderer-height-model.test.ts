@@ -91,6 +91,28 @@ describe('useHeightModel', () => {
     expect(estimateStaticNodeHeightFallback(undefined, 640)).toBe(32)
   })
 
+  it('reserves diagram preview height before offscreen nodes mount', () => {
+    const mermaid = estimateStaticNodeHeightFallback({
+      type: 'code_block',
+      language: 'mermaid',
+      code: 'graph LR\nA-->B',
+    } as ParsedNode, 640)
+    const infographic = estimateStaticNodeHeightFallback({
+      type: 'code_block',
+      language: 'infographic',
+      code: 'title: History\ndata:\n  - A\n  - B\n  - C',
+    } as ParsedNode, 640)
+    const ordinaryCode = estimateStaticNodeHeightFallback({
+      type: 'code_block',
+      language: 'ts',
+      code: 'console.log(1)',
+    } as ParsedNode, 640)
+
+    expect(mermaid).toBeGreaterThanOrEqual(360)
+    expect(infographic).toBeGreaterThanOrEqual(360)
+    expect(ordinaryCode).toBe(96)
+  })
+
   it('uses visible text to estimate list and table fallback heights', () => {
     const longItemText = 'Long visible list item text '.repeat(12).trim()
     const list = {

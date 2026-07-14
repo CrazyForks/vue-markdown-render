@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { MathInlineNodeProps } from '../../types/component-props'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useViewportPriority } from '../../composables/viewportPriority'
+import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useOffscreenHeavyNodeDeferral, useViewportPriority, useViewportPriorityOptions } from '../../composables/viewportPriority'
 import { normalizeKaTeXRenderInput } from '../../utils/normalizeKaTeXRenderInput'
 import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from '../../workers/katexWorkerClient'
 
@@ -12,6 +12,14 @@ const props = defineProps<MathInlineNodeProps>()
 const containerEl = ref<HTMLElement | null>(null)
 const displayMode = computed(() => props.node.markup === '$$')
 const mathContent = computed(() => normalizeKaTeXRenderInput(props.node.content))
+const isHydrating = getCurrentInstance()?.vnode.el?.nodeType === 1
+const deferOffscreenHeavyNodes = useOffscreenHeavyNodeDeferral()
+const viewportPriorityOptions = useViewportPriorityOptions()
+const viewportReady = ref(
+  typeof window === 'undefined'
+  || isHydrating
+  || !deferOffscreenHeavyNodes.value,
+)
 
 function resolveInitialState() {
   if (!props.node.content) {
@@ -22,7 +30,17 @@ function resolveInitialState() {
     }
   }
 
-  const katex = getKatexSync()
+  if (props.node.loading) {
+    return {
+      html: '',
+      text: '',
+      loading: true,
+    }
+  }
+
+  const katex = typeof window === 'undefined' || isHydrating || !deferOffscreenHeavyNodes.value
+    ? getKatexSync()
+    : null
   if (!katex) {
     return {
       html: '',
@@ -32,11 +50,13 @@ function resolveInitialState() {
   }
 
   try {
+    const html = katex.renderToString(mathContent.value, {
+      throwOnError: false,
+      displayMode: displayMode.value,
+    })
+    setKaTeXCache(mathContent.value, displayMode.value, html)
     return {
-      html: katex.renderToString(mathContent.value, {
-        throwOnError: props.node.loading,
-        displayMode: displayMode.value,
-      }),
+      html,
       text: '',
       loading: false,
     }
@@ -62,7 +82,7 @@ const renderingPending = ref(false)
 const registerVisibility = useViewportPriority()
 let visibilityHandle: ReturnType<typeof registerVisibility> | null = null
 
-if (initialState.html || initialState.text)
+if (initialState.html)
   hasRenderedOnce = true
 
 function markRenderPending() {
@@ -92,7 +112,7 @@ async function renderMath() {
     renderedHtml.value = ''
     renderedText.value = props.node.loading ? '' : props.node.raw
     renderingLoading.value = props.node.loading
-    hasRenderedOnce = !props.node.loading
+    hasRenderedOnce = false
     return
   }
 
@@ -104,15 +124,23 @@ async function renderMath() {
   markRenderPending()
 
   // Defer heavy work until visible on first render
-  if (!hasRenderedOnce) {
+  if (!hasRenderedOnce && deferOffscreenHeavyNodes.value) {
     try {
       if (!visibilityHandle && containerEl.value) {
         // Observe the always-visible wrapper, not the v-show hidden math span
-        visibilityHandle = registerVisibility(containerEl.value)
+        visibilityHandle = registerVisibility(containerEl.value, {
+          rootMargin: viewportPriorityOptions?.value.rootMargin,
+          allowIdle: false,
+        })
+        viewportReady.value = visibilityHandle.isVisible.value
       }
       await visibilityHandle?.whenVisible
+      viewportReady.value = true
     }
     catch {}
+  }
+  else if (!deferOffscreenHeavyNodes.value) {
+    viewportReady.value = true
   }
 
   if (isUnmounted || renderId !== currentRenderId || abortController.signal.aborted) {
@@ -121,10 +149,9 @@ async function renderMath() {
   }
 
   renderKaTeXWithBackpressure(mathContent.value, displayMode.value, {
-    // Inline math should not wait on worker slots; fallback to sync render immediately
     timeout: 1500,
-    waitTimeout: 0,
-    maxRetries: 0,
+    waitTimeout: 1500,
+    maxRetries: 8,
     signal: abortController.signal,
   })
     .then((html) => {
@@ -147,7 +174,7 @@ async function renderMath() {
       const isBusyOrTimeout = code === WORKER_BUSY_CODE || code === 'WORKER_TIMEOUT'
       const isDisabled = code === 'KATEX_DISABLED'
 
-      if (isWorkerInitFailure || isBusyOrTimeout) {
+      if (isWorkerInitFailure || (isBusyOrTimeout && !props.node.loading)) {
         const katex = await getKatex()
         if (isUnmounted || renderId !== currentRenderId)
           return
@@ -219,6 +246,7 @@ onBeforeUnmount(() => {
     data-markstream-math="inline"
     :data-markstream-mode="renderedHtml ? 'katex' : renderedText ? 'fallback' : 'loading'"
     :data-markstream-pending="renderingPending ? 'true' : undefined"
+    :data-markstream-viewport-pending="deferOffscreenHeavyNodes && !viewportReady ? 'true' : undefined"
   >
     <span v-if="renderedHtml" class="math-inline" v-html="renderedHtml" />
     <span v-else-if="renderedText" class="math-inline math-inline--fallback">{{ renderedText }}</span>
@@ -266,6 +294,11 @@ onBeforeUnmount(() => {
   border: 2px solid color-mix(in srgb, var(--loading-spinner) 25%, transparent);
   border-top-color: color-mix(in srgb, var(--loading-spinner) 80%, transparent);
   will-change: transform;
+}
+
+.math-inline-wrapper[data-markstream-viewport-pending='true'] .math-inline__spinner {
+  animation: none !important;
+  will-change: auto;
 }
 
 .table-node-fade-enter-active,
