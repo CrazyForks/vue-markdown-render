@@ -89,4 +89,20 @@ describe('mermaidWorkerClient shared parsing', () => {
     worker.resolveNext(true)
     await expect(long).resolves.toBe(true)
   })
+
+  it('sends a replacement request to the new worker instead of reusing the old shared call', async () => {
+    const first = canParseOffthread('graph LR\nA-->B', 'light').catch(error => error)
+    const replacement = new FakeWorker()
+
+    expect(worker.inbox).toHaveLength(1)
+    setMermaidWorker(replacement as unknown as Worker)
+
+    const second = canParseOffthread('graph LR\nA-->B', 'light')
+    expect(replacement.inbox).toHaveLength(1)
+
+    replacement.resolveNext(true)
+
+    await expect(first).resolves.toMatchObject({ code: 'WORKER_REPLACED' })
+    await expect(second).resolves.toBe(true)
+  })
 })

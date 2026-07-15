@@ -1578,7 +1578,7 @@ async function renderStaticDiagram() {
 // Note: debouncedInitMermaid is no longer needed; progressive path handles debouncing
 
 // Lightweight partial render that does NOT flip hasRenderedOnce or cache
-async function renderPartial(code: string) {
+async function renderPartial(code: string, source: string, theme: 'light' | 'dark', token: number) {
   const generation = lifecycleGeneration
   if (!isActiveGeneration(generation) || !canApplyPartialPreview())
     return
@@ -1592,43 +1592,58 @@ async function renderPartial(code: string) {
 
   isRendering.value = true
   markLifecyclePending()
-  try {
-    const mermaidInstance = await resolveMermaidInstance()
-    if (!isActiveGeneration(generation) || !mermaidInstance)
-      return
-    const id = `mermaid-partial-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-    const theme = props.isDark ? 'dark' : 'light'
-    // 如果最后一行是不完整的（如以 |、-、> 等连接符结尾），则剪裁到上一行，
-    // 提高在输入过程中可渲染出图像的概率
-    const safePrefix = getSafePrefixCandidate(code)
-    const codeForRender = safePrefix && safePrefix.trim() ? safePrefix : code
-    const codeWithTheme = applyThemeTo(codeForRender, theme)
-    const res: any = await renderMermaidWithSequenceRetry(
-      mermaidInstance,
-      id,
-      codeWithTheme,
-      timeouts.value.render,
-    )
-    if (!isActiveGeneration(generation))
-      return
-    const svg = res?.svg
-    if (mermaidContent.value && svg) {
-      const rendered = renderSvgToTarget(mermaidContent.value, svg, { keepPreviousOnFailure: true })
-      if (rendered) {
-        lastMermaidBindFunctions = res?.bindFunctions ?? null
-        bindMermaidInteractions(rendered.bindTarget)
-        safeRaf(() => updateContainerHeight())
+  const request = createMermaidRenderRequest(source, theme)
+  const partialQueue = (async () => {
+    try {
+      const mermaidInstance = await resolveMermaidInstance()
+      if (!isActiveGeneration(generation) || !mermaidInstance)
+        return false
+      const id = `mermaid-partial-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+      // 如果最后一行是不完整的（如以 |、-、> 等连接符结尾），则剪裁到上一行，
+      // 提高在输入过程中可渲染出图像的概率
+      const safePrefix = getSafePrefixCandidate(code)
+      const codeForRender = safePrefix && safePrefix.trim() ? safePrefix : code
+      const res: any = await renderMermaidWithSequenceRetry(
+        mermaidInstance,
+        id,
+        applyThemeTo(codeForRender, theme),
+        timeouts.value.render,
+      )
+      if (
+        !isActiveGeneration(generation)
+        || renderToken.value !== token
+        || props.loading === false
+        || !canApplyPartialPreview()
+        || !isCurrentRenderRequest(request)
+      ) {
+        return false
       }
+      const svg = res?.svg
+      if (!mermaidContent.value || !svg)
+        return false
+      const rendered = renderSvgToTarget(mermaidContent.value, svg, { keepPreviousOnFailure: true })
+      if (!rendered)
+        return false
+      lastMermaidBindFunctions = res?.bindFunctions ?? null
+      bindMermaidInteractions(rendered.bindTarget)
+      safeRaf(() => updateContainerHeight())
+      return false
     }
-  }
-  catch {
-    // swallow partial errors to keep preview resilient
-  }
-  finally {
-    isRendering.value = false
-    if (isActiveGeneration(generation))
-      void markLifecycleSettled()
-  }
+    catch {
+      // swallow partial errors to keep preview resilient
+      return false
+    }
+    finally {
+      if (renderQueue.value === partialQueue) {
+        isRendering.value = false
+        renderQueue.value = null
+      }
+      if (isActiveGeneration(generation))
+        void markLifecycleSettled()
+    }
+  })()
+  renderQueue.value = partialQueue
+  return partialQueue
 }
 
 // Progressive render: if full parse passes -> run initMermaid; else restore last success (no prefix render)
@@ -1685,7 +1700,7 @@ async function progressiveRender() {
       const justStopped = lastPreviewStopAt && scheduledAt <= lastPreviewStopAt
       if (res.prefixOk && res.prefix && !signal.aborted && renderToken.value === token && canApplyPartialPreview() && !justStopped) {
         // render a best-effort partial preview
-        await renderPartial(res.prefix)
+        await renderPartial(res.prefix, base, theme, token)
         return
       }
     }
@@ -1824,7 +1839,7 @@ function scheduleNextPreviewPoll(delay = previewPollInitialDelay.value) {
           }
         }
         else if (res.prefixOk && res.prefix && canApplyPartialPreview()) {
-          await renderPartial(res.prefix)
+          await renderPartial(res.prefix, base, theme, renderToken.value)
         }
       }
       catch {

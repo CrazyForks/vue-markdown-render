@@ -41,6 +41,18 @@ function notifyDrainIfBelowCap() {
   }
 }
 
+function flushDrainWaiters() {
+  for (const fn of Array.from(drainWaiters)) {
+    drainWaiters.delete(fn)
+    try {
+      fn()
+    }
+    catch {
+      // ignore
+    }
+  }
+}
+
 // Performance monitoring (optional, dev-only by default)
 let perfMonitor: any = null
 try {
@@ -110,8 +122,7 @@ export function setKaTeXWorker(w: Worker) {
         p.reject(new Error(`Worker error: ${e.message}`))
     }
     pending.clear()
-    // capacity is effectively zeroed; notify to allow callers to decide
-    notifyDrainIfBelowCap()
+    flushDrainWaiters()
   }
 }
 
@@ -126,7 +137,7 @@ export function clearKaTeXWorker() {
       p.reject(new Error('Worker cleared'))
   }
   pending.clear()
-  notifyDrainIfBelowCap()
+  flushDrainWaiters()
   if (worker) {
     worker.terminate?.()
   }
@@ -338,8 +349,12 @@ export function getKaTeXWorkerLoad() {
 }
 
 export function setKaTeXWorkerMaxConcurrency(n: number) {
-  if (Number.isFinite(n) && n > 0)
+  if (Number.isFinite(n) && n > 0) {
+    const previous = MAX_CONCURRENCY
     MAX_CONCURRENCY = Math.floor(n)
+    if (MAX_CONCURRENCY > previous)
+      notifyDrainIfBelowCap()
+  }
 }
 
 export const WORKER_BUSY_CODE = 'WORKER_BUSY'

@@ -13,6 +13,13 @@ interface Pending {
 const rpcMap = new Map<string, Pending>()
 const sharedCalls = new Map<string, Promise<unknown>>()
 
+function rejectPendingCalls(error: Error) {
+  for (const p of rpcMap.values())
+    p.reject(error)
+  rpcMap.clear()
+  sharedCalls.clear()
+}
+
 // Basic concurrency cap to reduce flurries of in-flight checks during typing/polling
 const MAX_CONCURRENCY_DEFAULT = 5
 let maxConcurrency = MAX_CONCURRENCY_DEFAULT
@@ -39,6 +46,11 @@ export const MERMAID_DISABLED_CODE = 'MERMAID_DISABLED'
  * Allow user to inject a Worker instance, e.g. from Vite ?worker import.
  */
 export function setMermaidWorker(w: Worker) {
+  if (worker && worker !== w) {
+    const error: any = new Error('Worker replaced')
+    error.code = 'WORKER_REPLACED'
+    rejectPendingCalls(error)
+  }
   worker = w
   workerInitError = null
   const current = w
@@ -75,10 +87,7 @@ export function setMermaidWorker(w: Worker) {
     }
     catch {}
     // Reject all pending requests
-    for (const [_id, p] of rpcMap.entries()) {
-      p.reject(new Error(`Worker error: ${e.message}`))
-    }
-    rpcMap.clear()
+    rejectPendingCalls(new Error(`Worker error: ${e.message}`))
   }
 
   // Optional: messageerror indicates a data cloning issue; handle similarly but quiet when idle
@@ -96,10 +105,7 @@ export function setMermaidWorker(w: Worker) {
         console.debug?.('[mermaidWorkerClient] Worker messageerror:', ev)
     }
     catch {}
-    for (const [_id, p] of rpcMap.entries()) {
-      p.reject(new Error('Worker messageerror'))
-    }
-    rpcMap.clear()
+    rejectPendingCalls(new Error('Worker messageerror'))
   }
 }
 
@@ -110,11 +116,7 @@ export function clearMermaidWorker() {
   if (worker) {
     try {
       // Proactively reject any pending calls to avoid dangling timeouts
-      for (const [_id, p] of rpcMap.entries()) {
-        p.reject(new Error('Worker cleared'))
-      }
-      rpcMap.clear()
-      sharedCalls.clear()
+      rejectPendingCalls(new Error('Worker cleared'))
       worker.terminate?.()
     }
     catch {}
@@ -255,8 +257,14 @@ function callWorker<T>(
     request = callWorkerRaw<T>(action, payload, timeout)
     sharedCalls.set(key, request)
     request.then(
-      () => sharedCalls.delete(key),
-      () => sharedCalls.delete(key),
+      () => {
+        if (sharedCalls.get(key) === request)
+          sharedCalls.delete(key)
+      },
+      () => {
+        if (sharedCalls.get(key) === request)
+          sharedCalls.delete(key)
+      },
     )
   }
 
@@ -275,11 +283,7 @@ export function terminateWorker() {
   if (worker) {
     try {
       // Reject all pending requests explicitly before termination to avoid late timeouts
-      for (const [_id, p] of rpcMap.entries()) {
-        p.reject(new Error('Worker terminated'))
-      }
-      rpcMap.clear()
-      sharedCalls.clear()
+      rejectPendingCalls(new Error('Worker terminated'))
       worker.terminate()
     }
     finally {

@@ -1161,6 +1161,54 @@ describe('node renderer virtual-scroll coordination', () => {
     }
   })
 
+  it('remounts stateful node components when a virtual session changes within one thread', async () => {
+    let mounts = 0
+    const StatefulParagraph = defineComponent({
+      props: {
+        node: { type: Object, required: true },
+      },
+      setup() {
+        const mountId = ++mounts
+        return () => h('p', { class: 'virtual-session-stateful' }, String(mountId))
+      },
+    })
+    setCustomComponents('virtual-lifecycle-test', { paragraph: StatefulParagraph as any })
+
+    const NodeRenderer = (await import('../src/components/NodeRenderer')).default
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        customId: 'virtual-lifecycle-test',
+        indexKey: 'stable-message-key',
+        nodes: [createParagraph(1)],
+        final: true,
+        fade: false,
+        viewportPriority: false,
+        virtualScroll: {
+          enabled: true,
+          sessionKey: 'thread-a:message-1:revision-1',
+          threadKey: 'thread-a',
+          settleMode: 'manual',
+        },
+      },
+    })
+
+    await flushAll()
+    expect(wrapper.get('.virtual-session-stateful').text()).toBe('1')
+
+    await wrapper.setProps({
+      virtualScroll: {
+        enabled: true,
+        sessionKey: 'thread-a:message-1:revision-2',
+        threadKey: 'thread-a',
+        settleMode: 'manual',
+      },
+    })
+    await flushAll()
+
+    expect(wrapper.get('.virtual-session-stateful').text()).toBe('2')
+    wrapper.unmount()
+  })
+
   it('auto-virtualizes standalone final chat content restore', async () => {
     const NodeRenderer = (await import('../src/components/NodeRenderer')).default
     const wrapper = mount(NodeRenderer, {

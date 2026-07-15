@@ -6,6 +6,7 @@ import {
   renderKaTeXWithBackpressure,
   setKaTeXWorker,
   setKaTeXWorkerMaxConcurrency,
+  waitForKaTeXWorkerSlot,
   WORKER_BUSY_CODE,
 } from '../../src/workers/katexWorkerClient'
 
@@ -148,5 +149,20 @@ describe('katexWorkerClient concurrency cap', () => {
       '<cached>cache-first</cached>',
       '<other>cache-other</other>',
     ])
+  })
+
+  it('releases every queued waiter when the worker is cleared', async () => {
+    setKaTeXWorkerMaxConcurrency(1)
+    const render = renderKaTeXInWorker('in-flight', true, 2000).catch(error => error)
+    const waiters = [
+      waitForKaTeXWorkerSlot(2000),
+      waitForKaTeXWorkerSlot(2000),
+      waitForKaTeXWorkerSlot(2000),
+    ]
+
+    clearKaTeXWorker()
+
+    await expect(render).resolves.toBeInstanceOf(Error)
+    await expect(Promise.all(waiters)).resolves.toEqual([undefined, undefined, undefined])
   })
 })

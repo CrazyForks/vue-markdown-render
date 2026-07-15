@@ -59,10 +59,8 @@ export function useViewportPriorityOptions() {
 }
 
 export function provideOffscreenHeavyNodeDeferral(enabled: ComputedRef<boolean>) {
-  const inherited = inject(OffscreenHeavyNodeDeferralKey, undefined)
-  const resolved = computed(() => inherited?.value === true || enabled.value)
-  provide(OffscreenHeavyNodeDeferralKey, resolved)
-  return resolved
+  provide(OffscreenHeavyNodeDeferralKey, enabled)
+  return enabled
 }
 
 export function useOffscreenHeavyNodeDeferral() {
