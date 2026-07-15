@@ -95,6 +95,160 @@ describe('infographicBlockNode streaming errors', () => {
     wrapper.unmount()
   })
 
+  it('does not report an in-flight streaming failure after loading settles', async () => {
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    let resolveLoader: ((value: unknown) => void) | null = null
+    const loaderPromise = new Promise<unknown>((resolve) => {
+      resolveLoader = resolve
+    })
+    let renderCount = 0
+
+    class StreamingRaceInfographic {
+      private container: HTMLElement
+      private errorHandler?: (error: unknown) => void
+
+      constructor(options: { container: HTMLElement }) {
+        this.container = options.container
+      }
+
+      on(event: string, handler: (error: unknown) => void) {
+        if (event === 'error')
+          this.errorHandler = handler
+      }
+
+      render() {
+        renderCount++
+        if (renderCount === 1) {
+          this.errorHandler?.(new Error('Incomplete streaming options'))
+          return
+        }
+        this.container.innerHTML = '<svg data-infographic="final"></svg>'
+      }
+
+      destroy() {}
+    }
+
+    setInfographicLoader(() => loaderPromise)
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const wrapper = mount(InfographicBlockNode as any, {
+      props: {
+        node: createNode('infographic list-row-simple-horizontal-arrow'),
+        loading: true,
+      },
+    })
+
+    await flushAll()
+    expect(renderCount).toBe(0)
+
+    await wrapper.setProps({ loading: false })
+    await flushAll()
+    resolveLoader?.(StreamingRaceInfographic)
+    await flushAll()
+
+    expect(renderCount).toBe(2)
+    expect(errorSpy).not.toHaveBeenCalled()
+    expect(wrapper.text()).not.toContain('Failed to render infographic')
+    expect(wrapper.find('svg[data-infographic="final"]').exists()).toBe(true)
+
+    wrapper.unmount()
+  })
+
+  it('keeps the previous preview when a final render fails after streaming restarts', async () => {
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+    setInfographicLoader(() => HeightChangingInfographic)
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const wrapper = mount(InfographicBlockNode as any, {
+      props: {
+        node: createNode('infographic list-row-simple-horizontal-arrow'),
+        loading: true,
+      },
+    })
+    await flushAll()
+
+    expect(wrapper.find('svg[data-infographic="1"]').exists()).toBe(true)
+
+    let resolveLoader: ((value: unknown) => void) | null = null
+    const loaderPromise = new Promise<unknown>((resolve) => {
+      resolveLoader = resolve
+    })
+    setInfographicLoader(() => loaderPromise)
+    await wrapper.setProps({
+      node: createNode('infographic list-row-simple-horizontal-arrow next'),
+      loading: false,
+    })
+    await flushAll()
+
+    await wrapper.setProps({ loading: true })
+    await flushAll()
+    resolveLoader?.(ErrorInfographic)
+    await flushAll()
+
+    expect(errorSpy).not.toHaveBeenCalled()
+    expect(wrapper.text()).not.toContain('Failed to render infographic')
+    expect(wrapper.find('svg[data-infographic="1"]').exists()).toBe(true)
+
+    wrapper.unmount()
+  })
+
+  it('does not report a stale final failure after the source changes', async () => {
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    let resolveLoader: ((value: unknown) => void) | null = null
+    const loaderPromise = new Promise<unknown>((resolve) => {
+      resolveLoader = resolve
+    })
+    let renderCount = 0
+
+    class SourceRaceInfographic {
+      private container: HTMLElement
+      private errorHandler?: (error: unknown) => void
+
+      constructor(options: { container: HTMLElement }) {
+        this.container = options.container
+      }
+
+      on(event: string, handler: (error: unknown) => void) {
+        if (event === 'error')
+          this.errorHandler = handler
+      }
+
+      render() {
+        renderCount++
+        if (renderCount === 1) {
+          this.errorHandler?.(new Error('Stale final source'))
+          return
+        }
+        this.container.innerHTML = '<svg data-infographic="latest"></svg>'
+      }
+
+      destroy() {}
+    }
+
+    setInfographicLoader(() => loaderPromise)
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const wrapper = mount(InfographicBlockNode as any, {
+      props: {
+        node: createNode('first'),
+        loading: false,
+      },
+    })
+
+    await flushAll()
+    await wrapper.setProps({ node: createNode('second') })
+    await flushAll()
+    resolveLoader?.(SourceRaceInfographic)
+    await flushAll()
+
+    expect(renderCount).toBe(2)
+    expect(errorSpy).not.toHaveBeenCalled()
+    expect(wrapper.text()).not.toContain('Failed to render infographic')
+    expect(wrapper.find('svg[data-infographic="latest"]').exists()).toBe(true)
+
+    wrapper.unmount()
+  })
+
   it('keeps lifecycle pending across a queued rerender', async () => {
     vi.stubGlobal('IntersectionObserver', undefined as any)
 

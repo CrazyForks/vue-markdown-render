@@ -433,6 +433,7 @@ async function renderInfographic(force = false) {
   if (!force && signature === lastCompletedRenderSignature && hasPreview.value)
     return
 
+  const final = props.loading === false
   const generation = ++renderGeneration
   renderInFlight = true
   markLifecyclePending()
@@ -505,7 +506,7 @@ async function renderInfographic(force = false) {
   catch (error) {
     if (!isCurrentRender(generation))
       return
-    if (props.loading === false) {
+    if (final && props.loading === false && signature === renderSignature.value) {
       console.error('Failed to render infographic:', error)
       hasPreview.value = false
       hasRenderError.value = true
