@@ -6,6 +6,7 @@ export type KatexLoader = () => Promise<unknown> | unknown
 
 let katex: any = null
 let importAttempted = false
+let pendingKatex: Promise<KatexModule | null> | null = null
 let katexLoader: KatexLoader | null = defaultKatexLoader
 
 function normalizeKatexModule(mod: any): KatexModule | null {
@@ -47,6 +48,25 @@ function defaultKatexLoader() {
 function resetCache() {
   katex = null
   importAttempted = false
+  pendingKatex = null
+}
+
+function trackAsyncKatexLoad(result: PromiseLike<unknown>) {
+  const pending: Promise<KatexModule | null> = Promise.resolve(result)
+    .then((resolved) => {
+      if (pendingKatex !== pending || !resolved)
+        return null
+      katex = normalizeKatexModule(resolved) ?? resolved
+      return katex
+    })
+    .catch(() => null)
+    .finally(() => {
+      if (pendingKatex === pending)
+        pendingKatex = null
+    })
+  pendingKatex = pending
+  importAttempted = true
+  return pending
 }
 
 export function setKatexLoader(loader: KatexLoader | null) {
@@ -84,11 +104,17 @@ export function getKatexSync(): KatexModule | null {
     katex = globalKatex
     return katex
   }
+  if (importAttempted)
+    return null
 
   try {
     const result = loader()
-    if (!result || typeof (result as PromiseLike<any>)?.then === 'function')
+    if (!result)
       return null
+    if (typeof (result as PromiseLike<any>)?.then === 'function') {
+      void trackAsyncKatexLoad(result as PromiseLike<unknown>)
+      return null
+    }
     katex = normalizeKatexModule(result) ?? result
     return katex
   }
@@ -106,6 +132,8 @@ export async function getKatex(): Promise<KatexModule | null> {
 
   if (katex)
     return katex
+  if (pendingKatex)
+    return pendingKatex
   if (importAttempted)
     return null
   const loader = katexLoader
@@ -114,9 +142,12 @@ export async function getKatex(): Promise<KatexModule | null> {
     return null
   }
   try {
-    const result = await loader()
+    const result = loader()
+    if (typeof (result as PromiseLike<any>)?.then === 'function')
+      return trackAsyncKatexLoad(result as PromiseLike<unknown>)
     if (result) {
       katex = normalizeKatexModule(result) ?? result
+      importAttempted = true
       return katex
     }
   }

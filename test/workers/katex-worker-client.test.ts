@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   clearKaTeXWorker,
+  getKaTeXWorkerLoad,
   renderKaTeXInWorker,
+  renderKaTeXWithBackpressure,
   setKaTeXWorker,
   setKaTeXWorkerMaxConcurrency,
+  waitForKaTeXWorkerSlot,
   WORKER_BUSY_CODE,
 } from '../../src/workers/katexWorkerClient'
 
@@ -80,5 +83,86 @@ describe('katexWorkerClient concurrency cap', () => {
       expect(typeof r).toBe('string')
       expect(r).toMatch(/<ok>|<span>/)
     }
+  })
+
+  it('keeps aborted posted work in the concurrency count until the worker replies', async () => {
+    const abortController = new AbortController()
+    const render = renderKaTeXInWorker('abort-in-flight', true, 2000, abortController.signal)
+
+    expect(getKaTeXWorkerLoad().inFlight).toBe(1)
+    abortController.abort()
+    await expect(render).rejects.toMatchObject({ name: 'AbortError' })
+    expect(getKaTeXWorkerLoad().inFlight).toBe(1)
+
+    worker.resolveNext()
+    expect(getKaTeXWorkerLoad().inFlight).toBe(0)
+  })
+
+  it('wakes only as many backpressure waiters as there are worker slots', async () => {
+    setKaTeXWorkerMaxConcurrency(1)
+    const first = renderKaTeXInWorker('queue-first', true, 2000)
+    const second = renderKaTeXWithBackpressure('queue-second', true, {
+      backoffMs: 0,
+      maxRetries: 1,
+      waitTimeout: 2000,
+    })
+    const third = renderKaTeXWithBackpressure('queue-third', true, {
+      backoffMs: 0,
+      maxRetries: 1,
+      waitTimeout: 2000,
+    })
+
+    await new Promise(resolve => setTimeout(resolve, 0))
+    worker.resolveNext()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(worker.resolveNext()).toBe(true)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(worker.resolveNext()).toBe(true)
+
+    await expect(Promise.all([first, second, third])).resolves.toHaveLength(3)
+  })
+
+  it('continues draining when the first waiter resolves from cache without taking the slot', async () => {
+    setKaTeXWorkerMaxConcurrency(1)
+    const first = renderKaTeXInWorker('cache-first', true, 2000)
+    const cached = renderKaTeXWithBackpressure('cache-first', true, {
+      backoffMs: 0,
+      maxRetries: 1,
+      waitTimeout: 2000,
+    })
+    const other = renderKaTeXWithBackpressure('cache-other', true, {
+      backoffMs: 0,
+      maxRetries: 1,
+      waitTimeout: 2000,
+    })
+
+    await Promise.resolve()
+    await Promise.resolve()
+    worker.resolveNext(content => `<cached>${content}</cached>`)
+
+    await expect(cached).resolves.toBe('<cached>cache-first</cached>')
+    await Promise.resolve()
+    expect(worker.inbox.map(message => message.content)).toEqual(['cache-other'])
+
+    worker.resolveNext(content => `<other>${content}</other>`)
+    await expect(Promise.all([first, other])).resolves.toEqual([
+      '<cached>cache-first</cached>',
+      '<other>cache-other</other>',
+    ])
+  })
+
+  it('releases every queued waiter when the worker is cleared', async () => {
+    setKaTeXWorkerMaxConcurrency(1)
+    const render = renderKaTeXInWorker('in-flight', true, 2000).catch(error => error)
+    const waiters = [
+      waitForKaTeXWorkerSlot(2000),
+      waitForKaTeXWorkerSlot(2000),
+      waitForKaTeXWorkerSlot(2000),
+    ]
+
+    clearKaTeXWorker()
+
+    await expect(render).resolves.toBeInstanceOf(Error)
+    await expect(Promise.all(waiters)).resolves.toEqual([undefined, undefined, undefined])
   })
 })

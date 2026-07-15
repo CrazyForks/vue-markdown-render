@@ -92,7 +92,7 @@ markstream-react 提供与 markstream-vue 相同强大的组件，但专为 Reac
 ```
 
 流式建议：
-- 保持 `viewportPriority` 开启，避免离屏 Mermaid / Monaco / D2 在文字仍在流式更新时继续做后台工作。
+- 保持 `viewportPriority` 开启，避免离屏 Mermaid / Monaco / D2 在文字仍在流式更新时继续做后台工作；如果必须立即渲染整篇文档，可以设为 `false`。
 - 抖动较大的 SSE 或 AI token 流推荐用 `content` + 内置 `smoothStreaming`。
 - 已有 worker、store 或自定义 AST 管线时才用 `nodes`。
 - Mermaid strict mode 现已默认开启。仅在需要宽松 Mermaid HTML-label 行为的可信图表中通过 `mermaidProps` 设置 `{ isStrict: false }`。

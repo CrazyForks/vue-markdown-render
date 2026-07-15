@@ -105,6 +105,7 @@ Some AI or LLM sources send content in large bursts, which can feel like the pre
 - **Tune smooth streaming options for text pacing**: adjust `smooth-streaming-options` when a backend sends large bursts. Use batching props (`initialRenderBatchSize`, `renderBatchSize`, `renderBatchDelay`) for node mounting cadence when virtualization is disabled, not as the primary text pacing control.
 - **Throttle upstream updates** if possible: instead of replacing `content` on every incoming hunk, debounce (50–100 ms) or split into smaller paragraphs so each render cycle operates on a “bite-sized” diff.
 - **Defer heavy nodes** by keeping `deferNodesUntilVisible`/`viewportPriority` turned on; expensive blocks (Mermaid/Monaco) will wait until they are near the viewport so the stream of text is never blocked.
+- Set `viewportPriority={false}` when a document must render every heavy node immediately (for example, PDF/print capture). Standalone heavy node components are immediate by default because they have no viewport-priority provider.
 - **Fall back for code blocks** when a burst happens: disable `codeBlockStream` or temporarily use `renderCodeBlocksAsPre` during streaming so that syntax-highlighting work does not stall text updates.
 
 These knobs keep DOM work under a predictable budget, so users perceive a calm, steady flow of content even when the backend sends data in erratic bursts.
@@ -122,6 +123,8 @@ const md = '# Perf test'
   <MarkdownRender :content="md" :viewport-priority="true" />
 </template>
 ```
+
+For immediate rendering of every heavy node, use `<MarkdownRender :content="md" :viewport-priority="false" />`.
 
 ## Virtualization & DOM windows
 

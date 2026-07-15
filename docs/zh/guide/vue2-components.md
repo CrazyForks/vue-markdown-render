@@ -106,7 +106,7 @@ import type { CodeBlockNode } from 'stream-markdown-parser'
 ```
 
 流式建议：
-- 保持 `viewport-priority` 开启，避免离屏 Mermaid / Monaco / D2 在文字仍在流式更新时继续做后台工作。
+- 保持 `viewport-priority` 开启，避免离屏 Mermaid / Monaco / D2 在文字仍在流式更新时继续做后台工作；如果必须立即渲染整篇文档，可以设为 `false`。
 - 抖动较大的 SSE 或 AI token 流推荐从 `content` + 内置 `smooth-streaming` 开始。
 - 当已有 worker、store 或自定义 AST 管线负责解析时，使用 `nodes` 模式。
 - Mermaid 常用调优项包括：`renderDebounceMs`、`contentStableDelayMs`、`previewPollDelayMs`、`previewPollMaxDelayMs`、`previewPollMaxAttempts`。

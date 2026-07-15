@@ -5,6 +5,13 @@ import D2BlockNode from '../src/components/D2BlockNode/D2BlockNode.vue'
 import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../src/utils/nodeLifecycle'
 
 const d2MockState = vi.hoisted(() => ({
+  compileImpl: null as null | ((code: string) => Promise<{
+    diagram: { code: string }
+    renderOptions: Record<string, unknown>
+  }> | {
+    diagram: { code: string }
+    renderOptions: Record<string, unknown>
+  }),
   renderImpl: null as null | ((
     diagram: { code: string },
     options: Record<string, unknown>,
@@ -14,6 +21,8 @@ const d2MockState = vi.hoisted(() => ({
 vi.mock('../src/components/D2BlockNode/d2', () => ({
   getD2: vi.fn(async () => class FakeD2 {
     async compile(code: string) {
+      if (d2MockState.compileImpl)
+        return await d2MockState.compileImpl(code)
       return {
         diagram: { code },
         renderOptions: {},
@@ -31,6 +40,7 @@ vi.mock('../src/components/D2BlockNode/d2', () => ({
 }))
 
 beforeEach(() => {
+  d2MockState.compileImpl = null
   d2MockState.renderImpl = null
 })
 
@@ -137,6 +147,50 @@ describe('d2 block layout', () => {
 
     wrapper.unmount()
     heightSpy.mockRestore()
+  })
+
+  it('does not continue rendering when compile resolves after unmount', async () => {
+    let releaseCompile: (() => void) | null = null
+    const compileStarted = vi.fn()
+    const renderAfterCompile = vi.fn(async () => ({
+      svg: '<svg viewBox="0 0 10 10"></svg>',
+    }))
+    d2MockState.compileImpl = async (code) => {
+      compileStarted()
+      await new Promise<void>((resolve) => {
+        releaseCompile = resolve
+      })
+      return {
+        diagram: { code },
+        renderOptions: {},
+      }
+    }
+    d2MockState.renderImpl = renderAfterCompile
+
+    const wrapper = mount(D2BlockNode as any, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'd2',
+          code: 'a -> b',
+          raw: '```d2\na -> b\n```',
+        },
+        loading: false,
+      },
+    })
+
+    const start = Date.now()
+    while (!compileStarted.mock.calls.length) {
+      if (Date.now() - start > 1000)
+        throw new Error('Timed out waiting for D2 compile')
+      await flushRender()
+    }
+
+    wrapper.unmount()
+    releaseCompile?.()
+    await flushRender()
+
+    expect(renderAfterCompile).not.toHaveBeenCalled()
   })
 
   it('keeps the preview pending while a newer D2 render replaces an existing svg', async () => {

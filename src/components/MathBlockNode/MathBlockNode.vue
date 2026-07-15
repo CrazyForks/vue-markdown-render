@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { MathBlockNodeProps } from '../../types/component-props'
-import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useViewportPriority } from '../../composables/viewportPriority'
+import { computed, getCurrentInstance, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useOffscreenHeavyNodeDeferral, useViewportPriority, useViewportPriorityOptions, waitForVisibilityOrAbort } from '../../composables/viewportPriority'
 import { resolveLifecycleIndexKey } from '../../utils/lifecycleIndexKey'
 import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import { normalizeKaTeXRenderInput } from '../../utils/normalizeKaTeXRenderInput'
@@ -14,6 +14,14 @@ const props = defineProps<MathBlockNodeProps>()
 const containerEl = ref<HTMLElement | null>(null)
 const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY, null)
 const mathContent = computed(() => normalizeKaTeXRenderInput(props.node.content))
+const isHydrating = getCurrentInstance()?.vnode.el?.nodeType === 1
+const deferOffscreenHeavyNodes = useOffscreenHeavyNodeDeferral()
+const viewportPriorityOptions = useViewportPriorityOptions()
+const viewportReady = ref(
+  typeof window === 'undefined'
+  || isHydrating
+  || !deferOffscreenHeavyNodes.value,
+)
 const lifecycleIndexKey = computed(() => {
   return resolveLifecycleIndexKey(props, {})
 })
@@ -27,9 +35,17 @@ function resolveInitialState() {
     }
   }
 
-  // Prefer a synchronous KaTeX render whenever the loader can provide one so
-  // SSR and client hydration start from the same markup.
-  const katex = getKatexSync()
+  if (props.node.loading) {
+    return {
+      html: '',
+      text: '',
+      loading: true,
+    }
+  }
+
+  const katex = typeof window === 'undefined' || isHydrating || !deferOffscreenHeavyNodes.value
+    ? getKatexSync()
+    : null
   if (!katex) {
     return {
       html: '',
@@ -39,11 +55,13 @@ function resolveInitialState() {
   }
 
   try {
+    const html = katex.renderToString(mathContent.value, {
+      throwOnError: false,
+      displayMode: true,
+    })
+    setKaTeXCache(mathContent.value, true, html)
     return {
-      html: katex.renderToString(mathContent.value, {
-        throwOnError: props.node.loading,
-        displayMode: true,
-      }),
+      html,
       text: '',
       loading: false,
     }
@@ -73,7 +91,7 @@ const renderingLoading = ref(initialState.loading)
 const renderingPending = ref(false)
 const lockedMinHeight = ref(resolveCachedMinHeight())
 
-if (initialState.html || initialState.text)
+if (initialState.html)
   hasRenderedOnce = true
 
 function markRenderPending() {
@@ -202,7 +220,7 @@ async function renderMath() {
     renderingLoading.value = false
     renderedHtml.value = ''
     renderedText.value = props.node.raw
-    hasRenderedOnce = true
+    hasRenderedOnce = false
     captureHeight()
     return
   }
@@ -215,16 +233,24 @@ async function renderMath() {
   markRenderPending()
 
   // Wait until near/in viewport to prioritize visible area
-  if (!hasRenderedOnce) {
+  if (!hasRenderedOnce && deferOffscreenHeavyNodes.value) {
     try {
       // register once per mount
       if (!visibilityHandle && containerEl.value) {
         // Observe the outer wrapper to ensure IO triggers even if inner is empty
-        visibilityHandle = registerVisibility(containerEl.value)
+        visibilityHandle = registerVisibility(containerEl.value, {
+          rootMargin: viewportPriorityOptions?.value.heavyBlockMargin,
+          allowIdle: false,
+        })
+        viewportReady.value = visibilityHandle.isVisible.value
       }
-      await visibilityHandle?.whenVisible
+      await waitForVisibilityOrAbort(visibilityHandle, abortController.signal)
+      viewportReady.value = true
     }
     catch {}
+  }
+  else if (!deferOffscreenHeavyNodes.value) {
+    viewportReady.value = true
   }
   if (isUnmounted || renderId !== currentRenderId || abortController.signal.aborted) {
     if (!isUnmounted)
@@ -236,7 +262,7 @@ async function renderMath() {
   renderKaTeXWithBackpressure(mathContent.value, true, {
     timeout: 3000,
     waitTimeout: 2000,
-    maxRetries: 1,
+    maxRetries: 8,
     signal: abortController.signal,
   })
     .then((html) => {
@@ -268,7 +294,7 @@ async function renderMath() {
 
       // For blocks, also fall back to main-thread render when the worker is busy/timeout
       // under viewport bursts to avoid showing raw text.
-      if (isWorkerInitFailure || isBusyOrTimeout) {
+      if (isWorkerInitFailure || (isBusyOrTimeout && !props.node.loading)) {
         const katex = await getKatex()
         if (isUnmounted || renderId !== currentRenderId)
           return
@@ -316,7 +342,7 @@ async function renderMath() {
 }
 
 watch(
-  () => props.node.content,
+  () => [props.node.content, props.node.loading, props.node.raw],
   () => {
     renderMath()
   },
@@ -368,6 +394,7 @@ onBeforeUnmount(() => {
     data-markstream-math="block"
     :data-markstream-mode="renderedHtml ? 'katex' : renderedText ? 'fallback' : 'loading'"
     :data-markstream-pending="renderingPending ? 'true' : undefined"
+    :data-markstream-viewport-pending="deferOffscreenHeavyNodes && !viewportReady ? 'true' : undefined"
     :style="lockedMinHeight ? { minHeight: `${lockedMinHeight}px` } : undefined"
   >
     <Transition name="math-fade">
@@ -412,6 +439,14 @@ onBeforeUnmount(() => {
   border-top-color: color-mix(in srgb, var(--loading-spinner) 80%, transparent);
   border-radius: 50%;
   animation: math-spin 0.8s linear infinite;
+}
+
+.math-block[data-markstream-viewport-pending='true'] .math-loading-overlay {
+  backdrop-filter: none;
+}
+
+.math-block[data-markstream-viewport-pending='true'] .math-loading-spinner {
+  animation: none;
 }
 
 @keyframes math-spin {

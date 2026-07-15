@@ -30,6 +30,14 @@ body {
   background: #0f172a;
 }
 
+.bench-oracle {
+  position: fixed;
+  top: 0;
+  left: -100000px;
+  visibility: hidden;
+  width: 860px;
+}
+
 .react-host,
 .vue-host {
   color: #e5e7eb;

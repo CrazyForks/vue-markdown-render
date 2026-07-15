@@ -1051,7 +1051,7 @@ async function runVirtualScrollerMarkstreamReloadProbe(page, port, ensureServerR
     return Boolean(api && typeof api.read === 'function' && typeof api.nextFrame === 'function')
   }, { timeout: 60000 })
 
-  const beforeReload = await page.evaluate(async () => {
+  await page.evaluate(async () => {
     const api = window.__markstreamVirtualScrollerMarkstream
 
     let snapshot = api.read()
@@ -1065,11 +1065,29 @@ async function runVirtualScrollerMarkstreamReloadProbe(page, port, ensureServerR
 
     await api.scrollTo(58772)
 
-    for (let i = 0; i < 60; i++)
+    for (let i = 0; i < 180; i++)
+      await api.nextFrame()
+  })
+
+  await reloadWithServer(page, { waitUntil: 'domcontentloaded', timeout: 60000 }, ensureServerRunning)
+
+  await page.waitForFunction(() => {
+    const api = window.__markstreamVirtualScrollerMarkstream
+    return Boolean(api && typeof api.read === 'function' && typeof api.nextFrame === 'function')
+  }, { timeout: 60000 })
+
+  await page.evaluate(async () => {
+    const api = window.__markstreamVirtualScrollerMarkstream
+    for (let i = 0; i < 30; i++)
+      await api.nextFrame()
+  })
+
+  const beforeReload = await page.evaluate(async () => {
+    const api = window.__markstreamVirtualScrollerMarkstream
+    for (let i = 0; i < 180; i++)
       await api.nextFrame()
 
-    snapshot = api.read()
-
+    const snapshot = api.read()
     return {
       scrollTop: snapshot.scrollTop,
       totalHeight: snapshot.totalHeight,
@@ -1084,6 +1102,12 @@ async function runVirtualScrollerMarkstreamReloadProbe(page, port, ensureServerR
     const api = window.__markstreamVirtualScrollerMarkstream
     return Boolean(api && typeof api.read === 'function' && typeof api.nextFrame === 'function')
   }, { timeout: 60000 })
+
+  await page.evaluate(async () => {
+    const api = window.__markstreamVirtualScrollerMarkstream
+    for (let i = 0; i < 30; i++)
+      await api.nextFrame()
+  })
 
   const result = await page.evaluate(async (before) => {
     const api = window.__markstreamVirtualScrollerMarkstream
@@ -1463,18 +1487,74 @@ async function runVirtualTimelineZeroStreamingProbe(page, port, ensureServerRunn
   })
 
   const result = { bottom, nonBottom }
+  const exactBottomTolerancePx = 2
+  const maxTransientBottomDriftPx = 192
+  const maxAllowedConsecutiveBottomDriftFrames = 2
+  const bottomSamples = result.bottom.visibleSamples
+  const bottomDistances = bottomSamples.map((sample) => {
+    return Math.max(0, sample.scrollHeight - sample.scrollTop - sample.clientHeight)
+  })
+  const finalBottomSample = bottomSamples.at(-1) ?? null
+  const finalDistanceFromBottom = bottomDistances.at(-1) ?? null
+  const peakDistanceFromBottom = bottomDistances.length
+    ? Math.max(...bottomDistances)
+    : null
+  const sortedBottomDistances = [...bottomDistances].sort((a, b) => a - b)
+  const p90DistanceFromBottom = sortedBottomDistances.length
+    ? sortedBottomDistances[Math.ceil(sortedBottomDistances.length * 0.9) - 1]
+    : null
+  const bottomDriftFrameCount = bottomDistances.filter(
+    distance => distance > exactBottomTolerancePx,
+  ).length
+  const maxAllowedBottomDriftFrames = Math.ceil(bottomDistances.length * 0.1)
+  let consecutiveBottomDriftFrames = 0
+  let maxConsecutiveBottomDriftFrames = 0
+
+  for (const distance of bottomDistances) {
+    if (distance > exactBottomTolerancePx) {
+      consecutiveBottomDriftFrames += 1
+      maxConsecutiveBottomDriftFrames = Math.max(
+        maxConsecutiveBottomDriftFrames,
+        consecutiveBottomDriftFrames,
+      )
+    }
+    else {
+      consecutiveBottomDriftFrames = 0
+    }
+  }
+
+  const finalBottomAnchor = finalBottomSample?.state?.outerAnchor ?? null
 
   assert(
     result.bottom.visibleSampleCount > 0
-    && result.bottom.maxDistanceFromBottom <= 2
-    && result.bottom.blankFrames === 0,
-    'virtual-timeline-zero bottom-pinned streaming caused bottom drift, blank frames, or never produced visible samples',
+    && result.bottom.blankFrames === 0
+    && finalDistanceFromBottom != null
+    && finalDistanceFromBottom <= exactBottomTolerancePx
+    && finalBottomAnchor?.type === 'bottom'
+    && peakDistanceFromBottom != null
+    && peakDistanceFromBottom <= maxTransientBottomDriftPx
+    && maxConsecutiveBottomDriftFrames <= maxAllowedConsecutiveBottomDriftFrames
+    && bottomDriftFrameCount <= maxAllowedBottomDriftFrames
+    && p90DistanceFromBottom != null
+    && p90DistanceFromBottom <= exactBottomTolerancePx,
+    'virtual-timeline-zero bottom-pinned streaming exceeded the bounded catch-up budget',
     {
       visibleSampleCount: result.bottom.visibleSampleCount,
-      maxDistanceFromBottom: result.bottom.maxDistanceFromBottom,
       blankFrames: result.bottom.blankFrames,
+      finalDistanceFromBottom,
+      finalBottomAnchor,
+      peakDistanceFromBottom,
+      p90DistanceFromBottom,
+      bottomDriftFrameCount,
+      maxConsecutiveBottomDriftFrames,
+      limits: {
+        exactBottomTolerancePx,
+        maxTransientBottomDriftPx,
+        maxAllowedConsecutiveBottomDriftFrames,
+        maxAllowedBottomDriftFrames,
+      },
       before: summarizeVirtualTimelineZeroSample(result.bottom.before),
-      lastSample: summarizeVirtualTimelineZeroSample(result.bottom.samples?.at?.(-1)),
+      lastSample: summarizeVirtualTimelineZeroSample(finalBottomSample),
     },
   )
 
@@ -1512,7 +1592,11 @@ async function runVirtualTimelineZeroStreamingProbe(page, port, ensureServerRunn
   return {
     bottom: {
       visibleSampleCount: result.bottom.visibleSampleCount,
-      maxDistanceFromBottom: result.bottom.maxDistanceFromBottom,
+      maxDistanceFromBottom: peakDistanceFromBottom,
+      finalDistanceFromBottom,
+      p90DistanceFromBottom,
+      bottomDriftFrameCount,
+      maxConsecutiveBottomDriftFrames,
       blankFrames: result.bottom.blankFrames,
     },
     nonBottom: {

@@ -129,6 +129,7 @@
     "test:e2e:virtual-scroll:ci": "pnpm run test:e2e:virtual-scroll",
     "test:e2e:virtual-scroll:ci:stress": "pnpm run test:e2e:virtual-scroll:stress",
     "benchmark:streaming-split": "node scripts/benchmark-streaming-split.mjs",
+    "benchmark:heavy-restore": "node scripts/benchmark-heavy-restore.mjs",
     "benchmark:real-corpus": "node scripts/benchmark-real-corpus-performance.mjs",
     "benchmark:1.0": "node scripts/benchmark-1-0.mjs",
     "test:e2e:angular-playground": "node scripts/e2e-angular-playground.mjs",

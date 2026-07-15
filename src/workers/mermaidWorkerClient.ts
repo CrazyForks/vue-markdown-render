@@ -11,6 +11,14 @@ interface Pending {
 }
 
 const rpcMap = new Map<string, Pending>()
+const sharedCalls = new Map<string, Promise<unknown>>()
+
+function rejectPendingCalls(error: Error) {
+  for (const p of rpcMap.values())
+    p.reject(error)
+  rpcMap.clear()
+  sharedCalls.clear()
+}
 
 // Basic concurrency cap to reduce flurries of in-flight checks during typing/polling
 const MAX_CONCURRENCY_DEFAULT = 5
@@ -38,6 +46,11 @@ export const MERMAID_DISABLED_CODE = 'MERMAID_DISABLED'
  * Allow user to inject a Worker instance, e.g. from Vite ?worker import.
  */
 export function setMermaidWorker(w: Worker) {
+  if (worker && worker !== w) {
+    const error: any = new Error('Worker replaced')
+    error.code = 'WORKER_REPLACED'
+    rejectPendingCalls(error)
+  }
   worker = w
   workerInitError = null
   const current = w
@@ -74,10 +87,7 @@ export function setMermaidWorker(w: Worker) {
     }
     catch {}
     // Reject all pending requests
-    for (const [_id, p] of rpcMap.entries()) {
-      p.reject(new Error(`Worker error: ${e.message}`))
-    }
-    rpcMap.clear()
+    rejectPendingCalls(new Error(`Worker error: ${e.message}`))
   }
 
   // Optional: messageerror indicates a data cloning issue; handle similarly but quiet when idle
@@ -95,10 +105,7 @@ export function setMermaidWorker(w: Worker) {
         console.debug?.('[mermaidWorkerClient] Worker messageerror:', ev)
     }
     catch {}
-    for (const [_id, p] of rpcMap.entries()) {
-      p.reject(new Error('Worker messageerror'))
-    }
-    rpcMap.clear()
+    rejectPendingCalls(new Error('Worker messageerror'))
   }
 }
 
@@ -109,10 +116,7 @@ export function clearMermaidWorker() {
   if (worker) {
     try {
       // Proactively reject any pending calls to avoid dangling timeouts
-      for (const [_id, p] of rpcMap.entries()) {
-        p.reject(new Error('Worker cleared'))
-      }
-      rpcMap.clear()
+      rejectPendingCalls(new Error('Worker cleared'))
       worker.terminate?.()
     }
     catch {}
@@ -131,7 +135,7 @@ function ensureWorker() {
   return worker
 }
 
-function callWorker<T>(action: 'canParse' | 'findPrefix', payload: any, timeout = 1400): Promise<T> {
+function callWorkerRaw<T>(action: 'canParse' | 'findPrefix', payload: any, timeout = 1400): Promise<T> {
   if (!isMermaidEnabled()) {
     const err: any = new Error('Mermaid rendering disabled')
     err.name = 'MermaidDisabled'
@@ -202,32 +206,84 @@ function callWorker<T>(action: 'canParse' | 'findPrefix', payload: any, timeout 
   })
 }
 
-export async function canParseOffthread(code: string, theme: Theme, timeout = 1400) {
-  try {
-    return await callWorker<boolean>('canParse', { code, theme }, timeout)
+function withAbortSignal<T>(promise: Promise<T>, signal?: AbortSignal) {
+  if (!signal)
+    return promise
+  if (signal.aborted) {
+    const error = new Error('Aborted')
+    error.name = 'AbortError'
+    return Promise.reject(error)
   }
-  catch (e) {
-    return Promise.reject(e)
-  }
+
+  return new Promise<T>((resolve, reject) => {
+    let onAbort: () => void = () => {}
+    const cleanup = () => signal.removeEventListener('abort', onAbort)
+    onAbort = () => {
+      cleanup()
+      const error = new Error('Aborted')
+      error.name = 'AbortError'
+      reject(error)
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+    promise.then(
+      (value) => {
+        cleanup()
+        resolve(value)
+      },
+      (error) => {
+        cleanup()
+        reject(error)
+      },
+    )
+  })
 }
 
-export async function findPrefixOffthread(code: string, theme: Theme, timeout = 1400) {
-  try {
-    return await callWorker<string | null>('findPrefix', { code, theme }, timeout)
+function callWorker<T>(
+  action: 'canParse' | 'findPrefix',
+  payload: { code: string, theme: Theme },
+  timeout: number,
+  signal?: AbortSignal,
+) {
+  if (!isMermaidEnabled()) {
+    const error: any = new Error('Mermaid rendering disabled')
+    error.name = 'MermaidDisabled'
+    error.code = MERMAID_DISABLED_CODE
+    return Promise.reject(error) as Promise<T>
   }
-  catch (e) {
-    return Promise.reject(e)
+
+  const key = `${action}\0${payload.theme}\0${timeout}\0${payload.code}`
+  let request = sharedCalls.get(key) as Promise<T> | undefined
+  if (!request) {
+    request = callWorkerRaw<T>(action, payload, timeout)
+    sharedCalls.set(key, request)
+    request.then(
+      () => {
+        if (sharedCalls.get(key) === request)
+          sharedCalls.delete(key)
+      },
+      () => {
+        if (sharedCalls.get(key) === request)
+          sharedCalls.delete(key)
+      },
+    )
   }
+
+  return withAbortSignal(request, signal)
+}
+
+export function canParseOffthread(code: string, theme: Theme, timeout = 1400, signal?: AbortSignal) {
+  return callWorker<boolean>('canParse', { code, theme }, timeout, signal)
+}
+
+export function findPrefixOffthread(code: string, theme: Theme, timeout = 1400, signal?: AbortSignal) {
+  return callWorker<string | null>('findPrefix', { code, theme }, timeout, signal)
 }
 
 export function terminateWorker() {
   if (worker) {
     try {
       // Reject all pending requests explicitly before termination to avoid late timeouts
-      for (const [_id, p] of rpcMap.entries()) {
-        p.reject(new Error('Worker terminated'))
-      }
-      rpcMap.clear()
+      rejectPendingCalls(new Error('Worker terminated'))
       worker.terminate()
     }
     finally {

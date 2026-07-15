@@ -107,7 +107,7 @@ The primary component for rendering markdown content in Vue 2.
 ```
 
 Streaming notes:
-- Keep `viewport-priority` enabled to prevent offscreen Mermaid / Monaco / D2 work from running while text is still streaming.
+- Keep `viewport-priority` enabled to prevent offscreen Mermaid / Monaco / D2 work from running while text is still streaming. Set it to `false` when the whole document must render immediately.
 - For jittery SSE or AI token streams, start with `content` + built-in `smooth-streaming`.
 - Use `nodes` when a worker, store, or custom AST pipeline already owns parsing.
 - Mermaid strict mode is now the default. Set `:mermaid-props="{ isStrict: false }"` only for trusted diagrams that need loose Mermaid HTML-label behavior.

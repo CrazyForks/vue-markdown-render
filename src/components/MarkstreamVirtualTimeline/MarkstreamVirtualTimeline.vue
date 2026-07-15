@@ -198,6 +198,11 @@ interface PendingMarkdownReconcile {
   threadKey?: string
 }
 
+interface PendingProgrammaticScroll {
+  target: number
+  preserveBottomPin: boolean
+}
+
 const scrollRoot = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
 const viewportHeight = ref(0)
@@ -230,6 +235,7 @@ const THREAD_STATE_REMEMBER_DELAY_MS = 80
 const ITEM_SIZE_RECONCILE_DEADBAND_PX = 1
 const SCROLL_RESTORE_DEADBAND_PX = 0.5
 let rootResizeObserver: ResizeObserver | null = null
+let pendingProgrammaticScroll: PendingProgrammaticScroll | null = null
 let threadRestoreSeq = 0
 let threadRestoreRaf: number | null = null
 let threadRestoreTimers: number[] = []
@@ -937,8 +943,19 @@ function applyScrollOffset(
   if (root) {
     viewportHeight.value = root.clientHeight || viewportHeight.value || 0
 
-    if (options.writeDom !== false && Math.abs((root.scrollTop || 0) - target) > SCROLL_RESTORE_DEADBAND_PX)
+    if (options.writeDom !== false && Math.abs((root.scrollTop || 0) - target) > SCROLL_RESTORE_DEADBAND_PX) {
+      const pending: PendingProgrammaticScroll = {
+        target,
+        preserveBottomPin: props.stickToBottom !== false
+          && Math.abs(getMaxScrollOffset() - target) <= 2,
+      }
+
+      pendingProgrammaticScroll = restorePaintReady.value
+        ? pending
+        : null
       root.scrollTop = target
+      pending.target = Math.max(0, root.scrollTop || 0)
+    }
   }
 
   updateLayoutWidthBucket()
@@ -956,6 +973,7 @@ function applyScrollOffset(
 
 function handleTimelineScroll() {
   if (!restorePaintReady.value) {
+    pendingProgrammaticScroll = null
     const root = scrollRoot.value
     const target = activeThreadRestoreScrollTop
 
@@ -966,6 +984,45 @@ function handleTimelineScroll() {
     return
   }
 
+  const root = scrollRoot.value
+  const pending = pendingProgrammaticScroll
+  const rootScrollTop = Math.max(0, root?.scrollTop || 0)
+
+  if (
+    root
+    && pending
+    && Math.abs(rootScrollTop - pending.target) <= SCROLL_RESTORE_DEADBAND_PX
+    && pending.preserveBottomPin
+    && props.stickToBottom !== false
+  ) {
+    bottomPinned.value = true
+    exactBottomPinned.value = true
+    applyScrollOffset(getMaxScrollOffset(), {
+      writeDom: true,
+      remember: false,
+    })
+    return
+  }
+
+  const rootStayedAtBottomIntent = root
+    && exactBottomPinned.value
+    && props.stickToBottom === 'auto'
+    && (
+      Math.abs(getMaxScrollOffset() - rootScrollTop) <= 2
+      || rootScrollTop >= scrollTop.value - SCROLL_RESTORE_DEADBAND_PX
+    )
+
+  if (rootStayedAtBottomIntent || props.stickToBottom === true) {
+    bottomPinned.value = true
+    exactBottomPinned.value = true
+    applyScrollOffset(getMaxScrollOffset(), {
+      writeDom: true,
+      remember: false,
+    })
+    return
+  }
+
+  pendingProgrammaticScroll = null
   updateScrollMetrics()
 }
 
@@ -1232,11 +1289,19 @@ function flushScrollReconcile() {
   pendingScrollReconcile.raf = null
   const pendingAnchor = pendingScrollReconcile.anchor
   pendingScrollReconcile.anchor = undefined
+  const preserveExactBottomPin = pendingAnchor?.type === 'bottom'
+    && pendingAnchor.distanceFromBottomPx <= 2
+    && exactBottomPinned.value
 
   if (pendingAnchor)
     restoreOuterAnchor(pendingAnchor)
 
-  updateScrollMetrics({ remember: false })
+  const root = scrollRoot.value
+  const scrollWriteCommitted = !root
+    || Math.abs((root.scrollTop || 0) - scrollTop.value) <= SCROLL_RESTORE_DEADBAND_PX
+
+  if (!preserveExactBottomPin || scrollWriteCommitted)
+    updateScrollMetrics({ remember: false })
 }
 
 function clearPendingScrollReconcile() {
@@ -2526,6 +2591,7 @@ function restoreThreadState(
   options: { threadSwitch?: boolean } = {},
 ) {
   const restoreSeq = ++threadRestoreSeq
+  pendingProgrammaticScroll = null
 
   if (state?.widthBucket && layoutWidthBucket.value === 0)
     layoutWidthBucket.value = state.widthBucket
@@ -2680,6 +2746,7 @@ function cleanupMeasuredElements() {
 }
 
 function cleanupObservers() {
+  pendingProgrammaticScroll = null
   clearThreadStateRememberSchedule()
   clearPendingScrollReconcile()
   clearPendingMarkdownReconciles()

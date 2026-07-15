@@ -30,7 +30,24 @@ describe('mathInlineNode busy worker fallback', () => {
     vi.useRealTimers()
   })
 
-  it('falls back to sync KaTeX render instead of raw when worker is busy', async () => {
+  it('falls back to sync KaTeX render for settled math when the worker is busy', async () => {
+    const wrapper = mount(MathInlineNode as any, {
+      props: {
+        node: {
+          type: 'math_inline',
+          content: 'E=mc^2',
+          raw: '$E=mc^2$',
+          loading: false,
+        },
+      },
+    })
+    await flushAll()
+    const html = wrapper.html()
+    expect(html).toContain('katex inline')
+    expect(html).not.toContain('$E=mc^2$')
+  })
+
+  it('does not move streaming KaTeX work back to the main thread when the worker is busy', async () => {
     const wrapper = mount(MathInlineNode as any, {
       props: {
         node: {
@@ -42,8 +59,21 @@ describe('mathInlineNode busy worker fallback', () => {
       },
     })
     await flushAll()
-    const html = wrapper.html()
-    expect(html).toContain('katex inline')
-    expect(html).not.toContain('$E=mc^2$')
+
+    expect(wrapper.attributes('data-markstream-mode')).toBe('loading')
+    expect(wrapper.html()).not.toContain('katex inline')
+    expect(wrapper.text()).not.toContain('$E=mc^2$')
+
+    await wrapper.setProps({
+      node: {
+        type: 'math_inline',
+        content: 'E=mc^2',
+        raw: '$E=mc^2$',
+        loading: false,
+      },
+    })
+    await flushAll()
+
+    expect(wrapper.html()).toContain('katex inline')
   })
 })

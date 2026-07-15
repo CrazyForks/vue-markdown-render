@@ -4,14 +4,14 @@ import type { MermaidBlockEvent, MermaidBlockNodeProps } from '../../types/compo
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, useAttrs, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
 import { hideTooltip, showTooltipForAnchor } from '../../composables/useSingletonTooltip'
-import { useViewportPriority } from '../../composables/viewportPriority'
+import { useOffscreenHeavyNodeDeferral, useViewportPriority, useViewportPriorityOptions } from '../../composables/viewportPriority'
 import mermaidIcon from '../../icon/mermaid.svg?raw'
 import { clampMermaidPreviewHeight, estimateMermaidPreviewHeight, getMermaidDiagramKind, parsePositiveNumber } from '../../utils/diagramHeight'
 import { resolveLifecycleIndexKey } from '../../utils/lifecycleIndexKey'
 import { escapeSequenceTextSemicolons } from '../../utils/mermaidSequenceSemicolons'
 import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import { safeRaf } from '../../utils/safeRaf'
-import { canParseOffthread as canParseOffthreadClient, findPrefixOffthread as findPrefixOffthreadClient, terminateWorker as terminateMermaidWorker } from '../../workers/mermaidWorkerClient'
+import { canParseOffthread as canParseOffthreadClient, findPrefixOffthread as findPrefixOffthreadClient } from '../../workers/mermaidWorkerClient'
 
 import { getMermaid } from './mermaid'
 import { toSafeSvgElement } from './mermaidSvgSanitizer'
@@ -59,6 +59,8 @@ const DOMPURIFY_CONFIG = {
 
 const mermaidAvailable = ref(false)
 const mermaidAvailabilityResolved = ref(typeof window === 'undefined')
+const deferOffscreenHeavyNodes = useOffscreenHeavyNodeDeferral()
+const viewportPriorityOptions = useViewportPriorityOptions()
 const mermaidSecurityLevel = computed(() => props.isStrict ? 'strict' : 'loose')
 const mermaidInitConfig = computed(() => ({
   startOnLoad: false,
@@ -154,19 +156,25 @@ function bindMermaidInteractions(element: Element | null | undefined) {
 }
 
 const { t } = useSafeI18n()
+let unmounted = false
+let lifecycleGeneration = 0
 
 async function resolveMermaidInstance() {
   try {
     const instance = await getMermaid()
+    if (unmounted)
+      return null
     mermaidAvailable.value = !!instance
     return instance
   }
   catch (err) {
-    mermaidAvailable.value = false
+    if (!unmounted)
+      mermaidAvailable.value = false
     throw err
   }
   finally {
-    mermaidAvailabilityResolved.value = true
+    if (!unmounted)
+      mermaidAvailabilityResolved.value = true
   }
 }
 
@@ -179,7 +187,7 @@ const modalContent = ref<HTMLElement>()
 const modalCloneWrapper = ref<HTMLElement | null>(null)
 const registerViewport = useViewportPriority()
 const viewportHandle = ref<ReturnType<typeof registerViewport> | null>(null)
-const viewportReady = ref(typeof window === 'undefined')
+const viewportReady = ref(typeof window === 'undefined' || !deferOffscreenHeavyNodes.value)
 const attrs = useAttrs()
 const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY, null)
 let lifecyclePendingIndexKey = ''
@@ -315,6 +323,13 @@ const showSource = ref(true)
 const userToggledShowSource = ref(false)
 const isRendering = ref(false)
 const renderQueue = ref<Promise<boolean> | null>(null)
+interface MermaidRenderRequest {
+  codeWithTheme: string
+  signature: string
+  theme: 'light' | 'dark'
+}
+let activeRenderSignature = ''
+let lastCompletedRenderSignature = ''
 const lastContentLength = ref(0)
 const isContentGenerating = ref(false)
 const renderDebounceDelay = computed(() => Math.max(0, props.renderDebounceMs ?? 300))
@@ -326,15 +341,25 @@ const usesProgressivePreview = computed(() => props.loading !== false)
 let contentStableTimer: number | null = null
 let renderRetryTimer: ReturnType<typeof setTimeout> | null = null
 let progressiveRenderDebounceTimer: number | null = null
+let progressiveRenderIdleId: number | null = null
 let consecutiveRenderTimeouts = 0
 const MAX_RENDER_TIMEOUT_RETRIES = 3
+const MAX_FINAL_WORKER_BUSY_RETRIES = 8
+const MAX_FINAL_WORKER_TIMEOUT_RETRIES = 2
+const FINAL_WORKER_PARSE_RETRY_DELAY_MS = 50
 // Schedule progressive work in idle time
 const requestIdle
   = (globalThis as any).requestIdleCallback
     ?? ((cb: any, _opts?: any) => setTimeout(() => cb({ didTimeout: true }), 16))
+const cancelIdle
+  = (globalThis as any).cancelIdleCallback ?? ((id: any) => clearTimeout(id))
+
+function isActiveGeneration(generation = lifecycleGeneration) {
+  return !unmounted && generation === lifecycleGeneration
+}
 
 function canScheduleViewportWork() {
-  return viewportReady.value && !isCollapsed.value
+  return isActiveGeneration() && viewportReady.value && !isCollapsed.value
 }
 
 function clearProgressiveRenderDebounceTimer() {
@@ -342,18 +367,25 @@ function clearProgressiveRenderDebounceTimer() {
     (globalThis as any).clearTimeout(progressiveRenderDebounceTimer)
     progressiveRenderDebounceTimer = null
   }
+  if (progressiveRenderIdleId != null) {
+    cancelIdle(progressiveRenderIdleId)
+    progressiveRenderIdleId = null
+  }
 }
 
 function debouncedProgressiveRender() {
+  if (unmounted)
+    return
   clearProgressiveRenderDebounceTimer()
   progressiveRenderDebounceTimer = (globalThis as any).setTimeout(() => {
     progressiveRenderDebounceTimer = null
     if (!canScheduleViewportWork())
       return
-    requestIdle(() => {
+    progressiveRenderIdleId = requestIdle(() => {
+      progressiveRenderIdleId = null
       if (!canScheduleViewportWork())
         return
-      progressiveRender()
+      void progressiveRender()
     }, { timeout: 500 })
   }, renderDebounceDelay.value)
 }
@@ -366,12 +398,14 @@ function clearRenderRetryTimer() {
 }
 
 function scheduleRenderRetry(delayMs = 600) {
-  if (typeof globalThis === 'undefined')
+  if (typeof globalThis === 'undefined' || unmounted)
     return
   const safeDelay = Math.max(0, delayMs)
   clearRenderRetryTimer()
   const run = () => {
     renderRetryTimer = null
+    if (unmounted)
+      return
     if (props.loading || isRendering.value || !canScheduleViewportWork()) {
       const nextDelay = Math.min(1200, Math.max(300, safeDelay * 1.2))
       scheduleRenderRetry(nextDelay)
@@ -394,22 +428,21 @@ const svgCache = ref<{
   dark?: CachedMermaidSvg
 }>({})
 
-// 新增：记录上一次渲染的 code（去除所有空白字符）
-const lastRenderedCode = ref<string>('')
 const renderToken = ref(0)
 // Abort/cancellation state for ongoing progressive work
 let currentWorkController: AbortController | null = null
+let finalWorkerParseController: AbortController | null = null
 // Track whether an error is currently rendered to avoid being overwritten
 const hasRenderError = ref(false)
 const restoreVisualPending = computed(() => {
   if (isCollapsed.value)
     return false
 
-  if (!mermaidAvailabilityResolved.value)
-    return true
-
   if (showSource.value)
     return false
+
+  if (!mermaidAvailabilityResolved.value)
+    return true
 
   if (isRendering.value || renderQueue.value)
     return true
@@ -435,8 +468,6 @@ const timeouts = computed(() => ({
   fullRender: props.fullRenderTimeoutMs ?? 4000,
 }))
 // Background polling while in Preview to upgrade prefix -> full render automatically
-const cancelIdle
-  = (globalThis as any).cancelIdleCallback ?? ((id: any) => clearTimeout(id))
 let previewPollTimeoutId: number | null = null
 let previewPollIdleId: number | null = null
 let isPreviewPolling = false
@@ -448,15 +479,22 @@ let previewPollAttempts = 0
 
 if (typeof window !== 'undefined') {
   watch(
-    () => mermaidContainer.value,
-    (el) => {
+    [() => blockContainer.value, deferOffscreenHeavyNodes],
+    ([el, shouldDefer]) => {
       viewportHandle.value?.destroy()
       viewportHandle.value = null
+      if (!shouldDefer || viewportReady.value) {
+        viewportReady.value = true
+        return
+      }
       if (!el) {
         viewportReady.value = false
         return
       }
-      const handle = registerViewport(el, { rootMargin: '400px' })
+      const handle = registerViewport(el, {
+        rootMargin: viewportPriorityOptions?.value.heavyBlockMargin,
+        allowIdle: false,
+      })
       viewportHandle.value = handle
       viewportReady.value = handle.isVisible.value
       handle.whenVisible.then(() => {
@@ -468,6 +506,9 @@ if (typeof window !== 'undefined') {
 }
 
 onBeforeUnmount(() => {
+  unmounted = true
+  lifecycleGeneration += 1
+  renderToken.value += 1
   viewportHandle.value?.destroy()
   viewportHandle.value = null
   clearLifecyclePending()
@@ -799,11 +840,15 @@ async function canParseOffthread(
   opts?: { signal?: AbortSignal, timeoutMs?: number },
 ) {
   try {
-    // client call uses timeout param; if it rejects, fallback to main thread
-    return await canParseOffthreadClient(code, theme, opts?.timeoutMs ?? timeouts.value.worker)
+    return await canParseOffthreadClient(code, theme, opts?.timeoutMs ?? timeouts.value.worker, opts?.signal)
   }
-  catch {
-    return await canParseOnMain(code, theme, opts)
+  catch (error: any) {
+    if (error?.name === 'AbortError')
+      throw error
+    const errorCode = error?.code || error?.name
+    if (errorCode === 'WORKER_INIT_ERROR' || error?.fallbackToRenderer)
+      return await canParseOnMain(code, theme, opts)
+    throw error
   }
 }
 
@@ -849,7 +894,7 @@ async function canParseOrPrefix(
     try {
       // prefer worker to refine, if supported
       try {
-        const found = await findPrefixOffthreadClient(code, theme, opts?.timeoutMs ?? timeouts.value.worker)
+        const found = await findPrefixOffthreadClient(code, theme, opts?.timeoutMs ?? timeouts.value.worker, opts?.signal)
         if (found && found.trim())
           prefix = found
       }
@@ -1353,28 +1398,60 @@ async function switchMode(target: 'source' | 'preview') {
   setTimeout(() => cleanup(), 220)
 }
 
+function createMermaidRenderRequest(
+  code = baseFixedCode.value,
+  theme: 'light' | 'dark' = props.isDark ? 'dark' : 'light',
+): MermaidRenderRequest {
+  return {
+    codeWithTheme: getCodeWithTheme(theme, code),
+    signature: `${theme}\u0000${code}`,
+    theme,
+  }
+}
+
+function isCurrentRenderRequest(request: MermaidRenderRequest) {
+  return request.signature === createMermaidRenderRequest().signature
+}
+
 // 优化的 mermaid 渲染函数
-async function initMermaid() {
+async function initMermaid(request = createMermaidRenderRequest()) {
+  const generation = lifecycleGeneration
+  if (!isActiveGeneration(generation) || !isCurrentRenderRequest(request))
+    return false
   if (isRendering.value) {
-    return renderQueue.value
+    const activeQueue = renderQueue.value
+    const activeSignature = activeRenderSignature
+    if (!activeQueue)
+      return false
+    const rendered = await activeQueue
+    if (!isActiveGeneration(generation) || !isCurrentRenderRequest(request))
+      return false
+    if (activeSignature === request.signature)
+      return rendered && lastCompletedRenderSignature === request.signature
+    return initMermaid(request)
   }
 
   if (!mermaidContent.value) {
     await nextTick()
+    if (!isActiveGeneration(generation))
+      return false
     if (!mermaidContent.value) {
       console.warn('Mermaid container not ready')
-      return
+      return false
     }
   }
+  if (!isActiveGeneration(generation) || !isCurrentRenderRequest(request))
+    return false
 
   isRendering.value = true
+  activeRenderSignature = request.signature
   markLifecyclePending()
 
   renderQueue.value = (async () => {
     try {
       const mermaidInstance = await resolveMermaidInstance()
-      if (!mermaidInstance)
-        return
+      if (!isActiveGeneration(generation) || !mermaidInstance)
+        return false
       const id = `mermaid-${Date.now()}-${Math.random()
         .toString(36)
         .substring(2, 11)}`
@@ -1385,51 +1462,57 @@ async function initMermaid() {
           dompurifyConfig: { ...DOMPURIFY_CONFIG },
         })
       }
-      const currentTheme = props.isDark ? 'dark' : 'light'
-      const codeWithTheme = getCodeWithTheme(currentTheme)
       const res: any = await renderMermaidWithSequenceRetry(
         mermaidInstance,
         id,
-        codeWithTheme,
+        request.codeWithTheme,
         timeouts.value.fullRender,
       )
-      const svg = res?.svg
 
-      if (mermaidContent.value) {
-        const rendered = renderSvgToTarget(mermaidContent.value, svg, { keepPreviousOnFailure: props.loading !== false })
-        if (!rendered) {
-          if (isThemeRendering.value)
-            isThemeRendering.value = false
-          return false
-        }
-        const bindFunctions = res?.bindFunctions ?? null
-        lastMermaidBindFunctions = bindFunctions
-        bindMermaidInteractions(rendered.bindTarget)
-        // Successful full render clears Partial preview state
-        if (!hasRenderedOnce.value && !isThemeRendering.value) {
-          safeRaf(() => updateContainerHeight())
-          hasRenderedOnce.value = true
-          savedTransformState.value = {
-            zoom: zoom.value,
-            translateX: translateX.value,
-            translateY: translateY.value,
-            containerHeight: containerHeight.value,
-          }
-        }
-        const currentTheme = props.isDark ? 'dark' : 'light'
-        if (rendered)
-          svgCache.value[currentTheme] = { svg: rendered.svg, bindFunctions }
-        if (isThemeRendering.value) {
+      if (!isActiveGeneration(generation) || !isCurrentRenderRequest(request)) {
+        if (isThemeRendering.value)
           isThemeRendering.value = false
-        }
-        // clear error state on successful render
-        hasRenderError.value = false
-        consecutiveRenderTimeouts = 0
-        clearRenderRetryTimer()
+        return false
       }
+
+      if (!mermaidContent.value)
+        return false
+      const rendered = renderSvgToTarget(mermaidContent.value, res?.svg, { keepPreviousOnFailure: props.loading !== false })
+      if (!rendered) {
+        if (isThemeRendering.value)
+          isThemeRendering.value = false
+        return false
+      }
+      const bindFunctions = res?.bindFunctions ?? null
+      lastMermaidBindFunctions = bindFunctions
+      bindMermaidInteractions(rendered.bindTarget)
+      // Successful full render clears Partial preview state
+      if (!hasRenderedOnce.value && !isThemeRendering.value) {
+        safeRaf(() => updateContainerHeight())
+        hasRenderedOnce.value = true
+        savedTransformState.value = {
+          zoom: zoom.value,
+          translateX: translateX.value,
+          translateY: translateY.value,
+          containerHeight: containerHeight.value,
+        }
+      }
+      svgCache.value[request.theme] = { svg: rendered.svg, bindFunctions }
+      if (isThemeRendering.value)
+        isThemeRendering.value = false
+      lastCompletedRenderSignature = request.signature
+      lastSvgSnapshot.value = mermaidContent.value.innerHTML
+      hasRenderError.value = false
+      consecutiveRenderTimeouts = 0
+      clearRenderRetryTimer()
       return true
     }
     catch (error) {
+      if (!isActiveGeneration(generation) || !isCurrentRenderRequest(request)) {
+        if (isThemeRendering.value)
+          isThemeRendering.value = false
+        return false
+      }
       const timedOut = isTimeoutError(error)
       const nextAttempt = consecutiveRenderTimeouts + 1
       if (timedOut && nextAttempt <= MAX_RENDER_TIMEOUT_RETRIES) {
@@ -1450,17 +1533,15 @@ async function initMermaid() {
       return false
     }
     finally {
+      activeRenderSignature = ''
       isRendering.value = false
       renderQueue.value = null
-      void markLifecycleSettled()
+      if (isActiveGeneration(generation))
+        void markLifecycleSettled()
     }
   })()
 
   return renderQueue.value
-}
-
-function normalizeMermaidSource(code: string) {
-  return code.replace(/\s+/g, '')
 }
 
 async function renderStaticDiagram() {
@@ -1471,40 +1552,39 @@ async function renderStaticDiagram() {
     if (mermaidContent.value)
       clearElement(mermaidContent.value)
     lastSvgSnapshot.value = null
-    lastRenderedCode.value = ''
+    lastCompletedRenderSignature = ''
     hasRenderError.value = false
     return
   }
   if (!mermaidAvailable.value || !canScheduleViewportWork())
     return
 
-  const normalizedBase = normalizeMermaidSource(base)
+  const request = createMermaidRenderRequest(base)
   if (
     hasRenderedOnce.value
-    && normalizedBase === lastRenderedCode.value
+    && request.signature === lastCompletedRenderSignature
     && mermaidContent.value?.querySelector('svg')
   ) {
     return
   }
 
-  const rendered = await initMermaid()
+  const rendered = await initMermaid(request)
   if (!rendered)
     return
 
-  lastRenderedCode.value = normalizedBase
-  lastSvgSnapshot.value = mermaidContent.value?.innerHTML ?? null
   hasRenderError.value = false
 }
 
 // Note: debouncedInitMermaid is no longer needed; progressive path handles debouncing
 
 // Lightweight partial render that does NOT flip hasRenderedOnce or cache
-async function renderPartial(code: string) {
-  if (!canApplyPartialPreview())
+async function renderPartial(code: string, source: string, theme: 'light' | 'dark', token: number) {
+  const generation = lifecycleGeneration
+  if (!isActiveGeneration(generation) || !canApplyPartialPreview())
     return
   if (!mermaidContent.value) {
     await nextTick()
-    if (!mermaidContent.value)
+    if (!isActiveGeneration(generation) || !mermaidContent.value)
       return
   }
   if (isRendering.value)
@@ -1512,45 +1592,66 @@ async function renderPartial(code: string) {
 
   isRendering.value = true
   markLifecyclePending()
-  try {
-    const mermaidInstance = await resolveMermaidInstance()
-    if (!mermaidInstance)
-      return
-    const id = `mermaid-partial-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-    const theme = props.isDark ? 'dark' : 'light'
-    // 如果最后一行是不完整的（如以 |、-、> 等连接符结尾），则剪裁到上一行，
-    // 提高在输入过程中可渲染出图像的概率
-    const safePrefix = getSafePrefixCandidate(code)
-    const codeForRender = safePrefix && safePrefix.trim() ? safePrefix : code
-    const codeWithTheme = applyThemeTo(codeForRender, theme)
-    const res: any = await renderMermaidWithSequenceRetry(
-      mermaidInstance,
-      id,
-      codeWithTheme,
-      timeouts.value.render,
-    )
-    const svg = res?.svg
-    if (mermaidContent.value && svg) {
-      const rendered = renderSvgToTarget(mermaidContent.value, svg, { keepPreviousOnFailure: true })
-      if (rendered) {
-        lastMermaidBindFunctions = res?.bindFunctions ?? null
-        bindMermaidInteractions(rendered.bindTarget)
-        safeRaf(() => updateContainerHeight())
+  const request = createMermaidRenderRequest(source, theme)
+  const partialQueue = (async () => {
+    try {
+      const mermaidInstance = await resolveMermaidInstance()
+      if (!isActiveGeneration(generation) || !mermaidInstance)
+        return false
+      const id = `mermaid-partial-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+      // 如果最后一行是不完整的（如以 |、-、> 等连接符结尾），则剪裁到上一行，
+      // 提高在输入过程中可渲染出图像的概率
+      const safePrefix = getSafePrefixCandidate(code)
+      const codeForRender = safePrefix && safePrefix.trim() ? safePrefix : code
+      const res: any = await renderMermaidWithSequenceRetry(
+        mermaidInstance,
+        id,
+        applyThemeTo(codeForRender, theme),
+        timeouts.value.render,
+      )
+      if (
+        !isActiveGeneration(generation)
+        || renderToken.value !== token
+        || props.loading === false
+        || !canApplyPartialPreview()
+        || !isCurrentRenderRequest(request)
+      ) {
+        return false
       }
+      const svg = res?.svg
+      if (!mermaidContent.value || !svg)
+        return false
+      const rendered = renderSvgToTarget(mermaidContent.value, svg, { keepPreviousOnFailure: true })
+      if (!rendered)
+        return false
+      lastMermaidBindFunctions = res?.bindFunctions ?? null
+      bindMermaidInteractions(rendered.bindTarget)
+      safeRaf(() => updateContainerHeight())
+      return false
     }
-  }
-  catch {
-    // swallow partial errors to keep preview resilient
-  }
-  finally {
-    isRendering.value = false
-    void markLifecycleSettled()
-  }
+    catch {
+      // swallow partial errors to keep preview resilient
+      return false
+    }
+    finally {
+      if (renderQueue.value === partialQueue) {
+        isRendering.value = false
+        renderQueue.value = null
+      }
+      if (isActiveGeneration(generation))
+        void markLifecycleSettled()
+    }
+  })()
+  renderQueue.value = partialQueue
+  return partialQueue
 }
 
 // Progressive render: if full parse passes -> run initMermaid; else restore last success (no prefix render)
 // Progressive render: if full parse passes -> run initMermaid; else try safe prefix preview; else restore last success
 async function progressiveRender() {
+  if (!canScheduleViewportWork())
+    return
+  const generation = lifecycleGeneration
   const scheduledAt = Date.now()
   const token = ++renderToken.value
 
@@ -1565,43 +1666,41 @@ async function progressiveRender() {
     const signal = currentWorkController.signal
     const theme = props.isDark ? 'dark' : 'light'
     const base = baseFixedCode.value
-    // 新增：去除所有空白字符后做比较
-    const normalizedBase = base.replace(/\s+/g, '')
     if (!base.trim()) {
       if (shouldKeepPreviewForEmptyStreamingSource())
         return
       if (mermaidContent.value)
         clearElement(mermaidContent.value)
       lastSvgSnapshot.value = null
-      lastRenderedCode.value = ''
+      lastCompletedRenderSignature = ''
       hasRenderError.value = false
       return
     }
-    // 如果和上一次渲染的 code（去除空白）一致，则跳过渲染
-    if (normalizedBase === lastRenderedCode.value) {
+    if (createMermaidRenderRequest(base, theme).signature === lastCompletedRenderSignature) {
       return
     }
 
     try {
       const res = await canParseOrPrefix(base, theme, { signal, timeoutMs: timeouts.value.worker })
+      if (!isActiveGeneration(generation))
+        return
       if (res.fullOk) {
-        const rendered = await initMermaid()
+        if (signal.aborted || renderToken.value !== token)
+          return
+        const rendered = await initMermaid(createMermaidRenderRequest(base, theme))
         if (!rendered)
           return
         // Guard against race: if a newer render started, skip flag changes
-        if (renderToken.value === token) {
-          lastSvgSnapshot.value = mermaidContent.value?.innerHTML ?? null
-          // 记录本次渲染的 code（去除空白）
-          lastRenderedCode.value = normalizedBase
+        if (isActiveGeneration(generation) && renderToken.value === token) {
           hasRenderError.value = false
         }
         return
       }
       // If stopPreviewPolling just happened after this work was queued, avoid partials
       const justStopped = lastPreviewStopAt && scheduledAt <= lastPreviewStopAt
-      if (res.prefixOk && res.prefix && canApplyPartialPreview() && !justStopped) {
+      if (res.prefixOk && res.prefix && !signal.aborted && renderToken.value === token && canApplyPartialPreview() && !justStopped) {
         // render a best-effort partial preview
-        await renderPartial(res.prefix)
+        await renderPartial(res.prefix, base, theme, token)
         return
       }
     }
@@ -1613,7 +1712,7 @@ async function progressiveRender() {
     }
 
     // Worker/main parse failed -> restore last successful full SVG (if any), do not render prefix
-    if (renderToken.value !== token)
+    if (!isActiveGeneration(generation) || renderToken.value !== token)
       return
     // 若当前处于错误显示状态，避免用缓存覆盖错误，直到下一次成功渲染
     if (hasRenderError.value)
@@ -1630,7 +1729,8 @@ async function progressiveRender() {
     // else: keep current DOM (could be empty on very first run)
   }
   finally {
-    void markLifecycleSettled()
+    if (isActiveGeneration(generation))
+      void markLifecycleSettled()
   }
 }
 
@@ -1677,10 +1777,13 @@ function cleanupAfterLoadingSettled() {
     catch {}
     previewPollController = null
   }
-  // terminate parser worker to free resources; it will be recreated on demand
-  terminateMermaidWorker()
   clearRenderRetryTimer()
   consecutiveRenderTimeouts = 0
+}
+
+function cancelFinalWorkerParse() {
+  finalWorkerParseController?.abort()
+  finalWorkerParseController = null
 }
 
 function scheduleNextPreviewPoll(delay = previewPollInitialDelay.value) {
@@ -1729,14 +1832,14 @@ function scheduleNextPreviewPoll(delay = previewPollInitialDelay.value) {
           timeoutMs: timeouts.value.worker,
         })
         if (res.fullOk) {
-          const rendered = await initMermaid()
+          const rendered = await initMermaid(createMermaidRenderRequest(base, theme))
           if (rendered && hasRenderedOnce.value) {
             stopPreviewPolling()
             return
           }
         }
         else if (res.prefixOk && res.prefix && canApplyPartialPreview()) {
-          await renderPartial(res.prefix)
+          await renderPartial(res.prefix, base, theme, renderToken.value)
         }
       }
       catch {
@@ -1795,9 +1898,6 @@ watch(
 
 // Watch for dark mode changes with smart caching
 watch(() => props.isDark, async () => {
-  if (!hasRenderedOnce.value) {
-    return
-  }
   // 如果当前是错误展示，则等待下一次有效内容渲染再切换主题，避免覆盖错误信息
   if (hasRenderError.value) {
     return
@@ -1899,21 +1999,30 @@ watch(
 watch(
   () => props.loading,
   async (loaded, prev) => {
-    if (prev === true && loaded === false) {
-      const base = baseFixedCode.value.trim()
+    if (loaded) {
+      cancelFinalWorkerParse()
+      return
+    }
+    if (prev === true) {
+      cancelFinalWorkerParse()
+      const source = baseFixedCode.value
+      const base = source.trim()
       if (!base) {
         if (mermaidContent.value)
           clearElement(mermaidContent.value)
         lastSvgSnapshot.value = null
-        lastRenderedCode.value = ''
+        lastCompletedRenderSignature = ''
         hasRenderError.value = false
         return cleanupAfterLoadingSettled()
       }
+      if (!canScheduleViewportWork()) {
+        cleanupAfterLoadingSettled()
+        return
+      }
       const theme = props.isDark ? 'dark' : 'light'
-      const normalizedBase = base.replace(/\s+/g, '')
+      const request = createMermaidRenderRequest(source, theme)
 
-      // 如果之前已完成一次完整渲染，且内容只有空格差异，避免重复渲染带来的闪烁
-      if (hasRenderedOnce.value && normalizedBase === lastRenderedCode.value) {
+      if (hasRenderedOnce.value && request.signature === lastCompletedRenderSignature) {
         await nextTick()
         // 保险：如果 DOM 被清空但有缓存，恢复一次，不触发重新渲染
         if (mermaidContent.value && !mermaidContent.value.querySelector('svg') && svgCache.value[theme]) {
@@ -1930,22 +2039,55 @@ watch(
         return
       }
 
+      const finalParseController = new AbortController()
+      finalWorkerParseController = finalParseController
+
       // 否则：进行一次最终完整解析，成功则完整渲染；失败才展示错误
       try {
-        await canParseOffthread(base, theme, { timeoutMs: timeouts.value.worker })
-        const rendered = await initMermaid()
+        let workerRetryCount = 0
+        for (;;) {
+          try {
+            await canParseOffthread(base, theme, {
+              signal: finalParseController.signal,
+              timeoutMs: timeouts.value.worker,
+            })
+            break
+          }
+          catch (error: any) {
+            const transientWorkerError = error?.code === 'WORKER_BUSY' || error?.code === 'WORKER_TIMEOUT'
+            const maxRetries = error?.code === 'WORKER_TIMEOUT'
+              ? MAX_FINAL_WORKER_TIMEOUT_RETRIES
+              : MAX_FINAL_WORKER_BUSY_RETRIES
+            if (!transientWorkerError || workerRetryCount >= maxRetries)
+              throw error
+            const retryDelay = Math.min(
+              FINAL_WORKER_PARSE_RETRY_DELAY_MS * 2 ** workerRetryCount,
+              400,
+            )
+            workerRetryCount++
+            await withTimeoutSignal(
+              () => new Promise(resolve => setTimeout(resolve, retryDelay)),
+              { signal: finalParseController.signal },
+            )
+          }
+        }
+        const rendered = await initMermaid(request)
         if (!rendered)
           return
-        // 记录本次渲染的 code（去除空白）
-        lastRenderedCode.value = normalizedBase
         hasRenderError.value = false
         // 完整渲染成功后，停止轮询并中止未完成任务
         cleanupAfterLoadingSettled()
       }
       catch (err) {
+        if (isAbortError(err))
+          return
         // 出错时也清理后台任务，避免错误被后续任务覆盖
         cleanupAfterLoadingSettled()
         renderErrorToContainer(err)
+      }
+      finally {
+        if (finalWorkerParseController === finalParseController)
+          finalWorkerParseController = null
       }
     }
   },
@@ -1975,12 +2117,21 @@ watch(
   { immediate: true },
 )
 
-onMounted(async () => {
-  void resolveMermaidInstance().catch((err) => {
+async function activateMermaid() {
+  const generation = lifecycleGeneration
+  if (!isActiveGeneration(generation))
+    return
+  await resolveMermaidInstance().catch((err) => {
+    if (!isActiveGeneration(generation))
+      return
     mermaidAvailable.value = false
     console.warn('[markstream-vue] Failed to initialize mermaid renderer. Call enableMermaid() to configure a loader.', err)
   })
+  if (!isActiveGeneration(generation))
+    return
   await nextTick()
+  if (!isActiveGeneration(generation))
+    return
   // Set initial default tab based on mermaid availability (unless user already toggled)
   if (!userToggledShowSource.value) {
     showSource.value = !mermaidAvailable.value
@@ -1994,6 +2145,12 @@ onMounted(async () => {
       void renderStaticDiagram()
     }
   }
+}
+
+onMounted(() => {
+  if (deferOffscreenHeavyNodes.value && !canScheduleViewportWork())
+    return
+  void activateMermaid()
 })
 
 // Auto-update default tab when mermaid availability changes, but don't override user actions
@@ -2027,9 +2184,13 @@ watch(
 
 watch(
   () => viewportReady.value,
-  (visible) => {
+  async (visible) => {
     if (!visible)
       return
+    if (!mermaidAvailabilityResolved.value) {
+      await activateMermaid()
+      return
+    }
     if (!hasRenderedOnce.value) {
       if (usesProgressivePreview.value) {
         debouncedProgressiveRender()
@@ -2060,7 +2221,7 @@ onUnmounted(() => {
     currentWorkController.abort()
     currentWorkController = null
   }
-  terminateMermaidWorker()
+  cancelFinalWorkerParse()
   stopPreviewPolling()
   clearRenderRetryTimer()
   clearLifecyclePending()

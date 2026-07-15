@@ -2817,6 +2817,156 @@ describe('virtual timeline API', () => {
     wrapper.unmount()
   })
 
+  it('keeps exact bottom pinning when state capture flushes before the DOM catches up', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    let markdownProps: any
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items: [
+          { kind: 'assistant-markdown', id: 'm1', content: '# Streaming', final: false, revision: 1 },
+        ],
+        threadKey: 'thread-a',
+        stickToBottom: 'auto',
+        overscan: 10,
+      },
+      slots: {
+        default(props: any) {
+          if (props.kind === 'assistant-markdown')
+            markdownProps = props.markdownProps
+
+          return h('div', { ref: props.measureRef }, props.markdownProps?.content ?? '')
+        },
+      },
+    })
+
+    await nextTick()
+    await flushAnimationFrame()
+
+    const root = wrapper.get('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+    let domScrollHeight = 600
+    let domScrollTop = 300
+
+    Object.defineProperties(root, {
+      scrollHeight: {
+        configurable: true,
+        get: () => domScrollHeight,
+      },
+      scrollTop: {
+        configurable: true,
+        get: () => domScrollTop,
+        set: (value: number) => {
+          domScrollTop = Math.max(0, Math.min(value, domScrollHeight - root.clientHeight))
+        },
+      },
+    })
+
+    ;(wrapper.vm as any).scrollToBottom()
+    const sessionKey = markdownProps.virtualScroll.sessionKey
+
+    markdownProps.onHeightChange(createMetrics(1000, sessionKey))
+    const stateWhileDomLags = (wrapper.vm as any).captureThreadState()
+
+    expect((wrapper.vm as any).getTotalHeight()).toBe(1000)
+    expect(domScrollTop).toBe(300)
+    expect(stateWhileDomLags.outerAnchor?.type).toBe('bottom')
+
+    domScrollHeight = 1100
+    markdownProps.onHeightChange(createMetrics(1100, sessionKey))
+    const stateAfterDomCatchesUp = (wrapper.vm as any).captureThreadState()
+
+    expect(domScrollTop).toBe(800)
+    expect(stateAfterDomCatchesUp.outerAnchor?.type).toBe('bottom')
+
+    domScrollHeight = 1170
+    root.dispatchEvent(new Event('scroll'))
+    await nextTick()
+
+    expect(domScrollTop).toBe(870)
+    expect((wrapper.vm as any).captureThreadState().outerAnchor?.type).toBe('bottom')
+
+    root.dispatchEvent(new Event('scroll'))
+    domScrollHeight = 1223
+    root.dispatchEvent(new Event('scroll'))
+    await nextTick()
+
+    expect(domScrollTop).toBe(923)
+    expect((wrapper.vm as any).captureThreadState().outerAnchor?.type).toBe('bottom')
+
+    domScrollTop = 700
+    root.dispatchEvent(new Event('scroll'))
+    await nextTick()
+
+    expect(domScrollTop).toBe(700)
+    expect((wrapper.vm as any).captureThreadState().outerAnchor?.type).toBe('item')
+
+    wrapper.unmount()
+  })
+
+  it('keeps bottom intent when content grows before an untracked scroll event', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+
+    const wrapper = mount(MarkstreamVirtualTimeline, {
+      attachTo: document.body,
+      props: {
+        items: [{ kind: 'user-message', id: 'u1', text: 'First' }],
+        threadKey: 'thread-a',
+        stickToBottom: 'auto',
+        estimateItemHeight: () => 600,
+      },
+    })
+
+    await nextTick()
+    await flushAnimationFrame()
+
+    const root = wrapper.get('[data-testid="markstream-virtual-timeline"]').element as HTMLElement
+    let domScrollHeight = 600
+    let domScrollTop = 300
+
+    Object.defineProperties(root, {
+      scrollHeight: {
+        configurable: true,
+        get: () => domScrollHeight,
+      },
+      scrollTop: {
+        configurable: true,
+        get: () => domScrollTop,
+        set: (value: number) => {
+          domScrollTop = Math.max(0, Math.min(value, domScrollHeight - root.clientHeight))
+        },
+      },
+    })
+
+    domScrollTop = 299
+    root.dispatchEvent(new Event('scroll'))
+    expect((wrapper.vm as any).captureThreadState().outerAnchor?.type).toBe('bottom')
+
+    domScrollTop = 300
+    domScrollHeight = 779
+    root.dispatchEvent(new Event('scroll'))
+    await nextTick()
+
+    expect(domScrollTop).toBe(479)
+    expect((wrapper.vm as any).captureThreadState().outerAnchor?.type).toBe('bottom')
+
+    wrapper.unmount()
+  })
+
   it('coalesces thread state emits during markdown streaming updates', async () => {
     vi.useFakeTimers()
     let wrapper: ReturnType<typeof mount> | undefined

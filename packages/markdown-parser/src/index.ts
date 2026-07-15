@@ -91,7 +91,13 @@ function makeSafeDomId(value: string) {
 export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: GetMarkdownOptions = {}) {
   // keep legacy behaviour but delegate to new factory and reapply project-specific rules
   const md = factory(options)
-  ;(md as unknown as Record<string, unknown>).__markstreamRegisteredPluginCount = _registeredMarkdownPlugins.length
+  const mdState = md as unknown as Record<string, unknown>
+  mdState.__markstreamRegisteredPluginCount = _registeredMarkdownPlugins.length
+  mdState.__markstreamHasCustomParserExtensions = Boolean(
+    options.plugin?.length
+    || options.apply?.length
+    || _registeredMarkdownPlugins.length,
+  )
 
   // Setup i18n translator function
   const defaultTranslations: Record<string, string> = {
@@ -306,6 +312,12 @@ export function getMarkdown(msgId: string = `editor-${Date.now()}`, options: Get
     const id = String(tokensAny[idx].content ?? '')
     return `<span class="reference-link" data-reference-id="${id}" role="button" tabindex="0" title="Click to view reference">${id}</span>`
   }
+
+  const originalUse = md.use.bind(md)
+  md.use = ((...args: Parameters<MarkdownIt['use']>) => {
+    mdState.__markstreamHasCustomParserExtensions = true
+    return originalUse(...args)
+  }) as MarkdownIt['use']
 
   return md
 }

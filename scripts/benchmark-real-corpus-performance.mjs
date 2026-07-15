@@ -599,14 +599,6 @@ async function waitFrames(count) {
     await waitFrame()
 }
 
-function percentile(values, p) {
-  const sorted = values.filter(Number.isFinite).slice().sort((a, b) => a - b)
-  if (!sorted.length)
-    return 0
-  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * p) - 1))
-  return sorted[index]
-}
-
 function createParsePerformance() {
   return {
     parseCommitCount: 0,
@@ -1709,10 +1701,10 @@ async function runBrowserCase(browser, port, mode, testCase) {
     })
     const client = await page.context().newCDPSession(page)
     await client.send('Performance.enable')
-    if (browserCpuThrottleRate > 1)
-      await client.send('Emulation.setCPUThrottlingRate', { rate: browserCpuThrottleRate })
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'load' })
     await page.waitForFunction(() => window.__ready === true)
+    if (browserCpuThrottleRate > 1)
+      await client.send('Emulation.setCPUThrottlingRate', { rate: browserCpuThrottleRate })
     const runOptions = {
       mode,
       caseId: testCase.id,

@@ -3,7 +3,7 @@ import type { HtmlPolicy } from 'stream-markdown-parser'
 import type { NodeRendererProps } from '../../types/node-renderer-props'
 import { isHtmlTagBlocked, NON_STRUCTURING_HTML_TAGS, sanitizeHtmlContent, sanitizeHtmlTokenAttrs, tokenAttrsToRecord } from 'stream-markdown-parser'
 import { computed, defineAsyncComponent, defineComponent, inject, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
-import { DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN, useViewportPriority, useViewportPriorityOptions } from '../../composables/viewportPriority'
+import { DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN, useOffscreenHeavyNodeDeferral, useViewportPriority, useViewportPriorityOptions } from '../../composables/viewportPriority'
 import { hasCustomComponents, parseHtmlToVNodes } from '../../utils/htmlRenderer'
 import { useCustomNodeComponents } from '../../utils/nodeComponents'
 import { getPlainTextContent } from '../SimpleInlineRenderer/simpleInline'
@@ -150,6 +150,7 @@ const renderMode = computed(() => {
 
 const registerVisibility = useViewportPriority()
 const viewportPriorityOptions = useViewportPriorityOptions()
+const offscreenHeavyNodeDeferral = useOffscreenHeavyNodeDeferral()
 const visibilityHandle = shallowRef<ReturnType<typeof registerVisibility> | null>(null)
 const isDeferred = !!props.node.loading
 
@@ -176,7 +177,10 @@ if (typeof window !== 'undefined') {
       const rootMargin = viewportPriorityOptions?.value.heavyBlockMargin
         ?? viewportPriorityOptions?.value.rootMargin
         ?? DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN
-      const handle = registerVisibility(el, { rootMargin })
+      const handle = registerVisibility(el, {
+        rootMargin,
+        allowIdle: !offscreenHeavyNodeDeferral.value,
+      })
       visibilityHandle.value = handle
       // Latch render readiness once visible so observer reconfiguration does not hide rendered HTML.
       shouldRender.value = shouldRender.value || handle.isVisible.value
@@ -220,6 +224,7 @@ onBeforeUnmount(() => {
     :is="isStructured ? structuredTag : 'div'"
     ref="htmlRef"
     class="html-block-node"
+    :data-markstream-viewport-pending="offscreenHeavyNodeDeferral && !shouldRender ? 'true' : undefined"
     v-bind="isStructured ? structuredBoundAttrs : undefined"
   >
     <template v-if="shouldRender">
@@ -281,15 +286,5 @@ onBeforeUnmount(() => {
   border-radius: 9999px;
   background-image: linear-gradient(90deg, var(--loading-shimmer), transparent, var(--loading-shimmer));
   background-size: 200% 100%;
-  animation: html-block-node-shimmer 1.2s ease infinite;
-}
-
-@keyframes html-block-node-shimmer {
-  0% {
-    background-position: 0% 0%;
-  }
-  100% {
-    background-position: 200% 0%;
-  }
 }
 </style>

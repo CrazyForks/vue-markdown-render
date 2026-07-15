@@ -101,6 +101,93 @@ describe('smoothMarkdownStreamController', () => {
     controller.destroy()
   })
 
+  it('keeps a grapheme intact when it spans appended chunks', async () => {
+    vi.useFakeTimers()
+    const controller = createController({
+      minCharsPerSecond: 1000,
+      maxCharsPerSecond: 1000,
+      maxCharsPerCommit: 1,
+      maxCommitFps: 60,
+      startDelayMs: 0,
+    })
+
+    controller.enqueue('👨‍')
+    controller.enqueue('👩‍👧‍')
+    controller.enqueue('👦!')
+    await vi.advanceTimersByTimeAsync(40)
+
+    expect(controller.getSnapshot().visible).toBe('👨‍👩‍👧‍👦')
+    controller.destroy()
+  })
+
+  it('does not split a grapheme that is longer than the segmentation window', async () => {
+    vi.useFakeTimers()
+    const controller = createController({
+      minCharsPerSecond: 1000,
+      maxCharsPerSecond: 1000,
+      maxCharsPerCommit: 1,
+      maxCommitFps: 60,
+      startDelayMs: 0,
+    })
+    const grapheme = `e${'\u0301'.repeat(300)}`
+
+    controller.enqueue(`${grapheme}!`)
+    await vi.advanceTimersByTimeAsync(40)
+
+    expect(controller.getSnapshot().visible).toBe(grapheme)
+    controller.destroy()
+  })
+
+  it('segments a bounded prefix instead of the entire pending source', async () => {
+    vi.useFakeTimers()
+    const segmentInputLengths: number[] = []
+    class InstrumentedSegmenter {
+      segment(input: string) {
+        segmentInputLengths.push(input.length)
+        return {
+          * [Symbol.iterator]() {
+            for (let index = 0; index < input.length; index++)
+              yield { index, segment: input[index] }
+          },
+        }
+      }
+    }
+    vi.stubGlobal('Intl', { Segmenter: InstrumentedSegmenter })
+    const controller = createController({
+      minCharsPerSecond: 100_000,
+      maxCharsPerSecond: 100_000,
+      maxCharsPerCommit: 80,
+      maxCommitFps: 60,
+      startDelayMs: 0,
+    })
+
+    controller.enqueue('a'.repeat(200_000))
+    await vi.advanceTimersByTimeAsync(40)
+
+    expect(controller.getSnapshot().visible).toHaveLength(80)
+    expect(Math.max(...segmentInputLengths)).toBeLessThanOrEqual(1024)
+    controller.destroy()
+  })
+
+  it('keeps code points intact without Intl.Segmenter', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('Intl', {})
+    const controller = createController({
+      minCharsPerSecond: 1000,
+      maxCharsPerSecond: 1000,
+      maxCharsPerCommit: 1,
+      maxCommitFps: 60,
+      startDelayMs: 0,
+    })
+
+    controller.enqueue('👋!')
+    await vi.advanceTimersByTimeAsync(40)
+
+    expect(controller.getSnapshot().visible).toBe('👋')
+    expect(hasUnpairedSurrogate(controller.getSnapshot().visible)).toBe(false)
+    controller.destroy()
+  })
+
   it('reset clears state and keeps pending at zero', async () => {
     vi.useFakeTimers()
     const controller = createController()

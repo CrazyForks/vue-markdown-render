@@ -117,6 +117,6 @@ describe('mermaid static render performance', () => {
     expect(findPrefixOffthread).not.toHaveBeenCalled()
 
     wrapper.unmount()
-    expect(terminateWorker).toHaveBeenCalled()
+    expect(terminateWorker).not.toHaveBeenCalled()
   })
 })

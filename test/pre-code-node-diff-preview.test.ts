@@ -33,7 +33,8 @@ describe('pre code node diff preview', () => {
       },
     })
 
-    expect(wrapper.findAll('.markstream-pre__line-number').map(node => node.text())).toEqual(['1'])
+    expect(wrapper.findAll('.markstream-pre__line-number')).toHaveLength(0)
+    expect(wrapper.get('.markstream-pre__line-numbers-text').element.textContent).toBe('1')
     expect(wrapper.get('.markstream-pre__code').element.textContent).toBe('const a = 1')
 
     await wrapper.setProps({
@@ -45,7 +46,8 @@ describe('pre code node diff preview', () => {
       },
     })
 
-    expect(wrapper.findAll('.markstream-pre__line-number').map(node => node.text())).toEqual(['1', '2'])
+    expect(wrapper.findAll('.markstream-pre__line-number')).toHaveLength(0)
+    expect(wrapper.get('.markstream-pre__line-numbers-text').element.textContent).toBe('1\n2')
     expect(wrapper.get('.markstream-pre__code').element.textContent).toBe('const a = 1\n')
 
     await wrapper.setProps({
@@ -58,7 +60,8 @@ describe('pre code node diff preview', () => {
       },
     })
 
-    expect(wrapper.findAll('.markstream-pre__line-number').map(node => node.text())).toEqual(['1', '2'])
+    expect(wrapper.findAll('.markstream-pre__line-number')).toHaveLength(0)
+    expect(wrapper.get('.markstream-pre__line-numbers-text').element.textContent).toBe('1\n2')
     expect(wrapper.get('.markstream-pre__code').element.textContent).toBe('const a = 1\n')
 
     wrapper.unmount()
@@ -84,8 +87,47 @@ describe('pre code node diff preview', () => {
     expect(pre.style.height).toBe('')
     expect(pre.style.minHeight).toBe('')
     expect(pre.style.maxHeight).toBe('240px')
-    expect(wrapper.findAll('.markstream-pre__line-number').map(node => node.text())).toEqual(['1', '2'])
+    expect(wrapper.findAll('.markstream-pre__line-number')).toHaveLength(0)
+    expect(wrapper.get('.markstream-pre__line-numbers-text').element.textContent).toBe('1\n2')
     expect(wrapper.get('pre').attributes('aria-busy')).toBe('true')
+
+    wrapper.unmount()
+  })
+
+  it('uses one line-number text node for a large code block before and after streaming', async () => {
+    const code = Array.from({ length: 5000 }, (_, index) => `const value${index} = ${index}`).join('\n')
+    const wrapper = mount(PreCodeNode, {
+      props: {
+        loading: true,
+        showLineNumbers: true,
+        node: {
+          type: 'code_block',
+          language: 'ts',
+          code,
+          raw: `\`\`\`ts\n${code}`,
+          loading: true,
+        },
+      },
+    })
+
+    const streamingNumbers = wrapper.get('.markstream-pre__line-numbers-text')
+    expect(streamingNumbers.element.textContent?.split('\n')).toHaveLength(5000)
+    expect(wrapper.findAll('.markstream-pre__line-number')).toHaveLength(0)
+
+    await wrapper.setProps({
+      loading: false,
+      node: {
+        type: 'code_block',
+        language: 'ts',
+        code,
+        raw: `\`\`\`ts\n${code}\n\`\`\``,
+        loading: false,
+      },
+    })
+
+    expect(wrapper.get('.markstream-pre__line-numbers-text').element).toBe(streamingNumbers.element)
+    expect(wrapper.get('.markstream-pre__line-numbers-text').element.textContent?.split('\n')).toHaveLength(5000)
+    expect(wrapper.findAll('.markstream-pre__line-number')).toHaveLength(0)
 
     wrapper.unmount()
   })
@@ -595,32 +637,41 @@ describe('pre code node diff preview', () => {
     wrapper.unmount()
   })
 
-  it('applies synced row-height style to diff lines after metrics are measured', async () => {
-    // Stub requestAnimationFrame to fire synchronously so we can control timing
-    const rafCallbacks: FrameRequestCallback[] = []
-    const rafStub = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
-      rafCallbacks.push(cb)
-      return rafCallbacks.length
+  it('starts syncing side-by-side row heights when wrap is enabled after mount', async () => {
+    const rafCallbacks = new Map<number, FrameRequestCallback>()
+    let rafId = 0
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      const id = ++rafId
+      rafCallbacks.set(id, callback)
+      return id
     })
     vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id) => {
-      rafCallbacks.splice(id - 1, 1)
+      rafCallbacks.delete(id)
     })
+    const flushRaf = () => {
+      const pending = [...rafCallbacks.values()]
+      rafCallbacks.clear()
+      for (const callback of pending)
+        callback(performance.now())
+    }
 
-    // Mock getBoundingClientRect to simulate a wrapped line (e.g. 36px instead of 18px)
     const originalGetBCR = Element.prototype.getBoundingClientRect
-    let callCount = 0
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
-      // First modified diff-content gets a taller height to simulate wrapping
       if (this.classList.contains('markstream-pre__diff-content')) {
-        callCount++
-        // Make the first modified line 36px tall (wrapped), rest 18px
-        return { height: callCount === 2 ? 36 : 18, top: 0, left: 0, right: 0, bottom: 0, width: 100, x: 0, y: 0, toJSON: () => ({}) } as DOMRect
+        const height = this.closest('.markstream-pre__diff-pane--modified') ? 36 : 18
+        return { height, top: 0, left: 0, right: 0, bottom: 0, width: 100, x: 0, y: 0, toJSON: () => ({}) } as DOMRect
       }
       return originalGetBCR.call(this)
     })
 
+    let resizeCallback: ResizeObserverCallback | undefined
+    const observe = vi.fn()
     vi.stubGlobal('ResizeObserver', class {
-      observe() {}
+      constructor(callback: ResizeObserverCallback) {
+        resizeCallback = callback
+      }
+
+      observe = observe
       unobserve() {}
       disconnect() {}
     })
@@ -642,36 +693,28 @@ describe('pre code node diff preview', () => {
     })
 
     await nextTick()
-    // Fire all pending rAF callbacks (triggers syncDiffLineMetrics)
-    const pending = [...rafCallbacks]
-    rafCallbacks.length = 0
-    for (const cb of pending) cb(performance.now())
+    const pre = wrapper.get('pre')
+    expect(pre.classes()).not.toContain('is-wrap')
+    expect(observe).toHaveBeenCalledWith(pre.element)
 
+    flushRaf()
+    await nextTick()
+    expect(wrapper.find('.markstream-pre__diff-line').attributes('style')).toBeUndefined()
+
+    pre.element.classList.add('is-wrap')
+    resizeCallback?.([], {} as ResizeObserver)
+    flushRaf()
     await nextTick()
 
     const originalLine1 = wrapper.find('.markstream-pre__diff-pane--original .markstream-pre__diff-line')
     const modifiedLine1 = wrapper.find('.markstream-pre__diff-pane--modified .markstream-pre__diff-line')
-
-    // Both first lines must share the same synced row-height variable (max of the two)
     const originalStyle = originalLine1.attributes('style') ?? ''
     const modifiedStyle = modifiedLine1.attributes('style') ?? ''
 
-    if (originalStyle || modifiedStyle) {
-      // When styles are applied, both sides must report the same synced row height
-      const extractSyncedHeight = (s: string) => {
-        const m = s.match(/--markstream-pre-diff-synced-row-height:\s*([\d.]+px)/)
-        return m?.[1] ?? null
-      }
-      const origH = extractSyncedHeight(originalStyle)
-      const modH = extractSyncedHeight(modifiedStyle)
-      if (origH && modH) {
-        expect(origH).toBe(modH)
-      }
-    }
+    expect(originalStyle).toContain('--markstream-pre-diff-synced-row-height: 36px')
+    expect(modifiedStyle).toContain('--markstream-pre-diff-synced-row-height: 36px')
 
     wrapper.unmount()
-
-    rafStub.mockRestore()
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
   })

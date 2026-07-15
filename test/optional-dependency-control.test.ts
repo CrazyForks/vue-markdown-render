@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { disableD2, enableD2, getD2, isD2Enabled, setD2Loader } from '../src/components/D2BlockNode/d2'
 import { disableInfographic, enableInfographic, getInfographic, isInfographicEnabled, setInfographicLoader } from '../src/components/InfographicBlockNode/infographic'
-import { disableKatex, enableKatex, getKatex, isKatexEnabled, setKatexLoader } from '../src/components/MathInlineNode/katex'
+import { disableKatex, enableKatex, getKatex, getKatexSync, isKatexEnabled, setKatexLoader } from '../src/components/MathInlineNode/katex'
 import { disableMermaid, enableMermaid, getMermaid, isMermaidEnabled, setMermaidLoader } from '../src/components/MermaidBlockNode/mermaid'
 import { renderKaTeXWithBackpressure } from '../src/workers/katexWorkerClient'
 import { canParseOffthread } from '../src/workers/mermaidWorkerClient'
@@ -25,6 +25,34 @@ describe('optional dependency controllers', () => {
       const disabledLoad = await getKatex()
       expect(disabledLoad).toBeNull()
       await expect(renderKaTeXWithBackpressure('x+y', false)).rejects.toMatchObject({ code: 'KATEX_DISABLED' })
+    })
+
+    it('shares an async KaTeX loader started by the sync probe', async () => {
+      const customRenderer = { renderToString: vi.fn() }
+      let resolveLoader: (value: object) => void = () => {}
+      const loader = vi.fn(() => new Promise<object>((resolve) => {
+        resolveLoader = resolve
+      }))
+      setKatexLoader(loader)
+
+      expect(getKatexSync()).toBeNull()
+      const pending = getKatex()
+      resolveLoader(customRenderer)
+
+      await expect(pending).resolves.toBe(customRenderer)
+      expect(loader).toHaveBeenCalledTimes(1)
+      expect(getKatexSync()).toBe(customRenderer)
+    })
+
+    it('consumes a rejected async KaTeX sync probe without invoking it twice', async () => {
+      const loader = vi.fn(async () => {
+        throw new Error('KaTeX unavailable')
+      })
+      setKatexLoader(loader)
+
+      expect(getKatexSync()).toBeNull()
+      await expect(getKatex()).resolves.toBeNull()
+      expect(loader).toHaveBeenCalledTimes(1)
     })
   })
 

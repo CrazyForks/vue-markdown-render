@@ -1,16 +1,32 @@
 import type { ComputedRef, InjectionKey, Ref } from 'vue'
 import type { MarkstreamViewportPriorityOptions } from '../types/node-renderer-props'
-import { inject, provide, ref, watch } from 'vue'
+import { computed, inject, provide, ref, watch } from 'vue'
 
 // Injection key for viewport-priority registration
 const ViewportPriorityKey = Symbol('ViewportPriority') as InjectionKey<RegisterFn>
 const ViewportPriorityOptionsKey = Symbol('ViewportPriorityOptions') as InjectionKey<ComputedRef<MarkstreamViewportPriorityOptions>>
+const OffscreenHeavyNodeDeferralKey = Symbol('OffscreenHeavyNodeDeferral') as InjectionKey<ComputedRef<boolean>>
+const disabledOffscreenHeavyNodeDeferral = computed(() => false)
 export const DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN = '400px'
 
 export interface VisibilityHandle {
   isVisible: Ref<boolean>
   whenVisible: Promise<void>
   destroy: () => void
+}
+
+export function waitForVisibilityOrAbort(handle: VisibilityHandle | null | undefined, signal: AbortSignal) {
+  if (!handle || signal.aborted)
+    return Promise.resolve()
+
+  return new Promise<void>((resolve) => {
+    const settle = () => {
+      signal.removeEventListener('abort', settle)
+      resolve()
+    }
+    signal.addEventListener('abort', settle, { once: true })
+    void handle.whenVisible.then(settle)
+  })
 }
 
 export interface ViewportPriorityRegisterOptions {
@@ -40,6 +56,15 @@ export function provideViewportPriorityOptions(options: ComputedRef<MarkstreamVi
 
 export function useViewportPriorityOptions() {
   return inject(ViewportPriorityOptionsKey, undefined)
+}
+
+export function provideOffscreenHeavyNodeDeferral(enabled: ComputedRef<boolean>) {
+  provide(OffscreenHeavyNodeDeferralKey, enabled)
+  return enabled
+}
+
+export function useOffscreenHeavyNodeDeferral() {
+  return inject(OffscreenHeavyNodeDeferralKey, disabledOffscreenHeavyNodeDeferral)
 }
 
 /**
@@ -86,6 +111,7 @@ export function provideViewportPriority(
   const targets = new Map<Element, TargetState>()
   const idleQueue = new Set<Element>()
   let idleJob: number | null = null
+  let refreshFrame: number | null = null
 
   function normalizeConfig(target?: HTMLElement, opts?: ViewportPriorityRegisterOptions): ObserverConfig {
     return {
@@ -257,6 +283,16 @@ export function provideViewportPriority(
     }
   }
 
+  function scheduleTargetRefresh() {
+    if (!isBrowser || refreshFrame != null)
+      return
+
+    refreshFrame = window.requestAnimationFrame(() => {
+      refreshFrame = null
+      refreshTargets()
+    })
+  }
+
   const register: RegisterFn = (el, opts) => {
     const visible = ref(false)
     let settled = false
@@ -306,6 +342,7 @@ export function provideViewportPriority(
     targets.set(el, data)
     observer.bucket.targets.set(el, data)
     observer.bucket.io.observe(el)
+    scheduleTargetRefresh()
     if (opts?.allowIdle !== false) {
       idleQueue.add(el)
       scheduleIdleDrain()

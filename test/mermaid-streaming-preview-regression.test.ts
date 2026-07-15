@@ -29,6 +29,53 @@ afterEach(() => {
 })
 
 describe('mermaid streaming preview regression', () => {
+  it('does not retry a busy worker parse on the main thread', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    const busyError: any = new Error('Worker busy')
+    busyError.code = 'WORKER_BUSY'
+    const canParseOffthread = vi.fn(async () => Promise.reject(busyError))
+    const fakeMermaid = {
+      initialize: vi.fn(),
+      parse: vi.fn(async () => true),
+      render: vi.fn(async () => ({
+        svg: '<svg viewBox="0 0 10 10"><rect width="1" height="1" /></svg>',
+      })),
+    }
+
+    vi.doMock('../src/workers/mermaidWorkerClient', () => ({
+      canParseOffthread,
+      findPrefixOffthread: vi.fn(async () => null),
+      terminateWorker: vi.fn(),
+    }))
+    vi.doMock('../src/components/MermaidBlockNode/mermaid', () => ({
+      getMermaid: vi.fn(async () => fakeMermaid),
+      isMermaidEnabled: vi.fn(() => true),
+    }))
+
+    const MermaidBlockNode = (await import('../src/components/MermaidBlockNode/MermaidBlockNode.vue')).default
+    const wrapper = mount(MermaidBlockNode as any, {
+      props: {
+        node: createNode('graph LR\nA-->B\n'),
+        loading: true,
+      },
+    })
+
+    await flushVueUpdates()
+    ;(wrapper.vm as any).mermaidAvailable = true
+    ;(wrapper.vm as any).viewportReady = true
+    ;(wrapper.vm as any).showSource = false
+    await settleStreamingRender()
+    await vi.advanceTimersByTimeAsync(400)
+    await settleStreamingRender()
+
+    expect(canParseOffthread).toHaveBeenCalled()
+    expect(fakeMermaid.parse).not.toHaveBeenCalled()
+    expect(fakeMermaid.render).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
   it('does not render gantt preview before the first complete task line', async () => {
     vi.useFakeTimers()
     vi.stubGlobal('IntersectionObserver', undefined as any)
@@ -417,5 +464,315 @@ describe('mermaid streaming preview regression', () => {
     await flushVueUpdates()
 
     expect(wrapper.find('div._mermaid svg').exists()).toBe(false)
+  })
+
+  it('renders the latest source when loading settles during an in-flight render', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    let resolveFirstRender!: (value: { svg: string }) => void
+    const firstRender = new Promise<{ svg: string }>((resolve) => {
+      resolveFirstRender = resolve
+    })
+    const canParseOffthread = vi.fn(async () => true)
+    const fakeMermaid = {
+      initialize: vi.fn(),
+      render: vi.fn((_id: string, code: string) => {
+        if (!code.includes('B-->C'))
+          return firstRender
+        return Promise.resolve({
+          svg: '<svg data-rendered="latest" viewBox="0 0 10 10"><text>B</text></svg>',
+        })
+      }),
+    }
+
+    vi.doMock('../src/workers/mermaidWorkerClient', () => ({
+      canParseOffthread,
+      findPrefixOffthread: vi.fn(async () => null),
+      terminateWorker: vi.fn(),
+    }))
+    vi.doMock('../src/components/MermaidBlockNode/mermaid', () => ({
+      getMermaid: vi.fn(async () => fakeMermaid),
+      isMermaidEnabled: vi.fn(() => true),
+    }))
+
+    const MermaidBlockNode = (await import('../src/components/MermaidBlockNode/MermaidBlockNode.vue')).default
+    const wrapper = mount(MermaidBlockNode as any, {
+      props: {
+        node: createNode('graph LR\nA-->B\n'),
+        loading: true,
+        renderDebounceMs: 10000,
+      },
+    })
+
+    ;(wrapper.vm as any).userToggledShowSource = true
+    await settleStreamingRender()
+    ;(wrapper.vm as any).mermaidAvailable = true
+    ;(wrapper.vm as any).viewportReady = true
+    ;(wrapper.vm as any).showSource = false
+    await settleStreamingRender()
+
+    expect(fakeMermaid.render).toHaveBeenCalledTimes(1)
+
+    await wrapper.setProps({
+      node: createNode('graph LR\nA-->B\nB-->C\n'),
+    })
+    await settleStreamingRender()
+    await wrapper.setProps({ loading: false })
+    await settleStreamingRender()
+
+    expect(canParseOffthread.mock.calls.some(([code]) => code.includes('B-->C'))).toBe(true)
+    expect(fakeMermaid.render).toHaveBeenCalledTimes(1)
+
+    resolveFirstRender({
+      svg: '<svg data-rendered="stale" viewBox="0 0 10 10"><text>A</text></svg>',
+    })
+    await settleStreamingRender(10)
+
+    expect(fakeMermaid.render).toHaveBeenCalledTimes(2)
+    expect(fakeMermaid.render.mock.calls[1]?.[1]).toContain('B-->C')
+    expect(wrapper.find('svg[data-rendered="latest"]').exists()).toBe(true)
+    expect(wrapper.find('svg[data-rendered="stale"]').exists()).toBe(false)
+    expect((wrapper.vm as any).lastCompletedRenderSignature).toBe('light\u0000graph LR\nA-->B\nB-->C\n')
+    wrapper.unmount()
+  })
+
+  it('keeps retrying a transient worker busy result beyond 150ms without using the main thread parser', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    const busyError: any = new Error('Worker busy')
+    busyError.code = 'WORKER_BUSY'
+    const canParseOffthread = vi.fn()
+      .mockRejectedValueOnce(busyError)
+      .mockRejectedValueOnce(busyError)
+      .mockRejectedValueOnce(busyError)
+      .mockResolvedValueOnce(true)
+    const fakeMermaid = {
+      initialize: vi.fn(),
+      parse: vi.fn(async () => true),
+      render: vi.fn(async () => ({
+        svg: '<svg data-rendered="final" viewBox="0 0 10 10"><rect width="1" height="1" /></svg>',
+      })),
+    }
+
+    vi.doMock('../src/workers/mermaidWorkerClient', () => ({
+      canParseOffthread,
+      findPrefixOffthread: vi.fn(async () => null),
+      terminateWorker: vi.fn(),
+    }))
+    vi.doMock('../src/components/MermaidBlockNode/mermaid', () => ({
+      getMermaid: vi.fn(async () => fakeMermaid),
+      isMermaidEnabled: vi.fn(() => true),
+    }))
+
+    const MermaidBlockNode = (await import('../src/components/MermaidBlockNode/MermaidBlockNode.vue')).default
+    const wrapper = mount(MermaidBlockNode as any, {
+      props: {
+        node: createNode('graph LR\nA-->B\n'),
+        loading: true,
+        renderDebounceMs: 10000,
+      },
+    })
+
+    ;(wrapper.vm as any).userToggledShowSource = true
+    await settleStreamingRender()
+    ;(wrapper.vm as any).mermaidAvailable = false
+    ;(wrapper.vm as any).showSource = false
+    await settleStreamingRender()
+
+    const loadingUpdate = wrapper.setProps({ loading: false })
+    ;(wrapper.vm as any).mermaidAvailable = true
+    await loadingUpdate
+    await vi.advanceTimersByTimeAsync(350)
+    await settleStreamingRender()
+
+    expect(canParseOffthread).toHaveBeenCalledTimes(4)
+    expect(fakeMermaid.parse).not.toHaveBeenCalled()
+    expect(fakeMermaid.render).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('svg[data-rendered="final"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('Failed to render diagram')
+  })
+
+  it('bounds retries when the final worker remains busy', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    const busyError: any = new Error('Worker busy')
+    busyError.code = 'WORKER_BUSY'
+    const canParseOffthread = vi.fn(async () => Promise.reject(busyError))
+    const fakeMermaid = {
+      initialize: vi.fn(),
+      parse: vi.fn(async () => true),
+      render: vi.fn(async () => ({
+        svg: '<svg data-rendered="unexpected" viewBox="0 0 10 10"><rect width="1" height="1" /></svg>',
+      })),
+    }
+
+    vi.doMock('../src/workers/mermaidWorkerClient', () => ({
+      canParseOffthread,
+      findPrefixOffthread: vi.fn(async () => null),
+      terminateWorker: vi.fn(),
+    }))
+    vi.doMock('../src/components/MermaidBlockNode/mermaid', () => ({
+      getMermaid: vi.fn(async () => fakeMermaid),
+      isMermaidEnabled: vi.fn(() => true),
+    }))
+
+    const MermaidBlockNode = (await import('../src/components/MermaidBlockNode/MermaidBlockNode.vue')).default
+    const wrapper = mount(MermaidBlockNode as any, {
+      props: {
+        node: createNode('graph LR\nA-->B\n'),
+        loading: true,
+        renderDebounceMs: 10000,
+      },
+    })
+
+    ;(wrapper.vm as any).userToggledShowSource = true
+    await settleStreamingRender()
+    ;(wrapper.vm as any).mermaidAvailable = false
+    ;(wrapper.vm as any).showSource = false
+    await settleStreamingRender()
+
+    const loadingUpdate = wrapper.setProps({ loading: false })
+    ;(wrapper.vm as any).mermaidAvailable = true
+    await loadingUpdate
+    await vi.advanceTimersByTimeAsync(5000)
+    await settleStreamingRender()
+
+    expect(canParseOffthread).toHaveBeenCalledTimes(9)
+    expect(fakeMermaid.parse).not.toHaveBeenCalled()
+    expect(fakeMermaid.render).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Failed to render diagram')
+    wrapper.unmount()
+  })
+
+  it('cancels a final worker busy backoff when the component unmounts', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    const busyError: any = new Error('Worker busy')
+    busyError.code = 'WORKER_BUSY'
+    const canParseOffthread = vi.fn(async () => Promise.reject(busyError))
+    const fakeMermaid = {
+      initialize: vi.fn(),
+      parse: vi.fn(async () => true),
+      render: vi.fn(async () => ({
+        svg: '<svg data-rendered="unexpected" viewBox="0 0 10 10"><rect width="1" height="1" /></svg>',
+      })),
+    }
+
+    vi.doMock('../src/workers/mermaidWorkerClient', () => ({
+      canParseOffthread,
+      findPrefixOffthread: vi.fn(async () => null),
+      terminateWorker: vi.fn(),
+    }))
+    vi.doMock('../src/components/MermaidBlockNode/mermaid', () => ({
+      getMermaid: vi.fn(async () => fakeMermaid),
+      isMermaidEnabled: vi.fn(() => true),
+    }))
+
+    const MermaidBlockNode = (await import('../src/components/MermaidBlockNode/MermaidBlockNode.vue')).default
+    const wrapper = mount(MermaidBlockNode as any, {
+      props: {
+        node: createNode('graph LR\nA-->B\n'),
+        loading: true,
+        renderDebounceMs: 10000,
+      },
+    })
+
+    ;(wrapper.vm as any).userToggledShowSource = true
+    await settleStreamingRender()
+    ;(wrapper.vm as any).mermaidAvailable = false
+    ;(wrapper.vm as any).showSource = false
+    await settleStreamingRender()
+
+    const loadingUpdate = wrapper.setProps({ loading: false })
+    ;(wrapper.vm as any).mermaidAvailable = true
+    await loadingUpdate
+    await settleStreamingRender()
+    expect(canParseOffthread).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+    await vi.advanceTimersByTimeAsync(5000)
+
+    expect(canParseOffthread).toHaveBeenCalledTimes(1)
+    expect(fakeMermaid.parse).not.toHaveBeenCalled()
+    expect(fakeMermaid.render).not.toHaveBeenCalled()
+  })
+
+  it('does not terminate the shared parser worker when one instance settles and unmounts', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    let resolveSecondParse: (value: boolean) => void = () => {}
+    const canParseOffthread = vi.fn((code: string) => {
+      if (code.includes('C-->D')) {
+        return new Promise<boolean>((resolve) => {
+          resolveSecondParse = resolve
+        })
+      }
+      return Promise.resolve(true)
+    })
+    const terminateWorker = vi.fn()
+    const fakeMermaid = {
+      initialize: vi.fn(),
+      parse: vi.fn(async () => true),
+      render: vi.fn(async (_id: string, code: string) => ({
+        svg: `<svg data-rendered="${code.includes('C-->D') ? 'second' : 'first'}" viewBox="0 0 10 10"><rect width="1" height="1" /></svg>`,
+      })),
+    }
+
+    vi.doMock('../src/workers/mermaidWorkerClient', () => ({
+      canParseOffthread,
+      findPrefixOffthread: vi.fn(async () => null),
+      terminateWorker,
+    }))
+    vi.doMock('../src/components/MermaidBlockNode/mermaid', () => ({
+      getMermaid: vi.fn(async () => fakeMermaid),
+      isMermaidEnabled: vi.fn(() => true),
+    }))
+
+    const MermaidBlockNode = (await import('../src/components/MermaidBlockNode/MermaidBlockNode.vue')).default
+    const first = mount(MermaidBlockNode as any, {
+      props: {
+        node: createNode('graph LR\nA-->B\n'),
+        loading: true,
+        renderDebounceMs: 10000,
+      },
+    })
+    const second = mount(MermaidBlockNode as any, {
+      props: {
+        node: createNode('graph LR\nC-->D\n'),
+        loading: true,
+        renderDebounceMs: 10000,
+      },
+    })
+
+    for (const wrapper of [first, second]) {
+      ;(wrapper.vm as any).userToggledShowSource = true
+      await settleStreamingRender()
+      ;(wrapper.vm as any).mermaidAvailable = true
+      ;(wrapper.vm as any).showSource = false
+    }
+    await settleStreamingRender()
+
+    await Promise.all([
+      first.setProps({ loading: false }),
+      second.setProps({ loading: false }),
+    ])
+    await settleStreamingRender()
+
+    expect(first.find('svg[data-rendered="first"]').exists()).toBe(true)
+    first.unmount()
+    expect(terminateWorker).not.toHaveBeenCalled()
+
+    resolveSecondParse(true)
+    await settleStreamingRender()
+
+    expect(second.find('svg[data-rendered="second"]').exists()).toBe(true)
+    expect(terminateWorker).not.toHaveBeenCalled()
+    second.unmount()
+    expect(terminateWorker).not.toHaveBeenCalled()
   })
 })

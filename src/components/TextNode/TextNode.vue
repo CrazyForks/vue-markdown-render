@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { resolveStreamingTextUpdate } from 'markstream-core'
 import { computed, inject, ref, useAttrs, watch } from 'vue'
-import { useKatexReady } from '../../composables/useKatexReady'
 
 const props = defineProps<{
   node: {
@@ -12,7 +11,6 @@ const props = defineProps<{
   }
 }>()
 defineEmits(['copy'])
-const katexReady = useKatexReady()
 const attrs = useAttrs()
 const inheritedFade = inject<{ value?: boolean } | undefined>('markstreamFade', undefined)
 const inheritedTextStreamState = inject<Map<string, string> | undefined>('markstreamTextStreamState', undefined)
@@ -104,7 +102,7 @@ const streamedDeltaClass = computed(() => (
 
 <template>
   <span
-    :class="[katexReady && node.center ? 'text-node-center' : '']"
+    :class="[node.center ? 'text-node-center' : '']"
     class="text-node"
   >
     <span v-if="settledContent">{{ settledContent }}</span>

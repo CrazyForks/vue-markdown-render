@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { ImageNodeProps } from '../../types/component-props'
 import { sanitizeImageSrc } from 'stream-markdown-parser'
-import { computed, inject, nextTick, onBeforeUnmount, ref, useAttrs, watch } from 'vue'
+import { computed, getCurrentInstance, inject, nextTick, onBeforeUnmount, ref, shallowRef, useAttrs, watch } from 'vue'
 import { useSafeI18n } from '../../composables/useSafeI18n'
+import { DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN, useOffscreenHeavyNodeDeferral, useViewportPriority, useViewportPriorityOptions } from '../../composables/viewportPriority'
 import { resolveLifecycleIndexKey } from '../../utils/lifecycleIndexKey'
 import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 
@@ -23,19 +24,44 @@ const imageStage = ref<'primary' | 'fallback' | 'failed'>('primary')
 const rootRef = ref<HTMLElement | null>(null)
 const attrs = useAttrs()
 const lifecycle = inject(MARKSTREAM_NODE_LIFECYCLE_KEY, null)
+const registerViewport = useViewportPriority()
+const viewportPriorityOptions = useViewportPriorityOptions()
+const offscreenHeavyNodeDeferral = useOffscreenHeavyNodeDeferral()
+const safeNodeSrc = computed(() => sanitizeImageSrc(props.node.src))
+const safeFallbackSrc = computed(() => sanitizeImageSrc(props.fallbackSrc))
+const existingImage = getCurrentInstance()?.vnode.el?.querySelector?.('img')
+const hydratedFromServer = typeof window !== 'undefined'
+  && existingImage?.getAttribute('src') === (safeNodeSrc.value || safeFallbackSrc.value)
+const viewportReady = ref(
+  typeof window === 'undefined'
+  || hydratedFromServer
+  || !offscreenHeavyNodeDeferral.value,
+)
+const viewportHandle = shallowRef<ReturnType<typeof registerViewport> | null>(null)
 let lifecyclePendingIndexKey = ''
 let lifecyclePendingTimer: ReturnType<typeof setTimeout> | null = null
 
-const safeNodeSrc = computed(() => sanitizeImageSrc(props.node.src))
-const safeFallbackSrc = computed(() => sanitizeImageSrc(props.fallbackSrc))
 const displaySrc = computed(() => activeSrc.value)
 const useEagerImagePath = computed(() => !props.lazy)
+const shouldDeferImageRequest = computed(() =>
+  typeof window !== 'undefined'
+  && offscreenHeavyNodeDeferral.value
+  && !hydratedFromServer,
+)
+const imageRequestActive = computed(() => !shouldDeferImageRequest.value || viewportReady.value)
+const requestedSrc = computed(() => imageRequestActive.value ? displaySrc.value : '')
+const viewportRootMargin = computed(() => viewportPriorityOptions?.value.heavyBlockMargin
+  ?? viewportPriorityOptions?.value.rootMargin
+  ?? DEFAULT_VIEWPORT_PRIORITY_ROOT_MARGIN)
 
 const showImage = computed(() => !props.node.loading && imageStage.value !== 'failed' && activeSrc.value.length > 0)
 const showError = computed(() => imageStage.value === 'failed')
 
-// Shimmer overlay only for lazy images while a renderable image is downloading.
-const showShimmer = computed(() => !useEagerImagePath.value && !imageLoaded.value && !hasError.value && imageStage.value !== 'failed' && activeSrc.value.length > 0)
+// Shimmer overlay while waiting to enter viewport or finish downloading.
+const showShimmer = computed(() => (
+  !useEagerImagePath.value
+  || (shouldDeferImageRequest.value && !viewportReady.value)
+) && !imageLoaded.value && !hasError.value && imageStage.value !== 'failed' && activeSrc.value.length > 0)
 const lifecycleIndexKey = computed(() => {
   return resolveLifecycleIndexKey(props, attrs)
 })
@@ -177,10 +203,50 @@ watch(
   { immediate: true },
 )
 
+if (typeof window !== 'undefined') {
+  watch(
+    [rootRef, shouldDeferImageRequest],
+    ([el, shouldDefer], _previous, onCleanup) => {
+      viewportHandle.value?.destroy()
+      viewportHandle.value = null
+
+      if (!shouldDefer || viewportReady.value) {
+        viewportReady.value = true
+        return
+      }
+
+      if (!el) {
+        viewportReady.value = false
+        return
+      }
+
+      let active = true
+      const handle = registerViewport(el, {
+        rootMargin: viewportRootMargin.value,
+        allowIdle: false,
+      })
+      viewportHandle.value = handle
+      viewportReady.value = handle.isVisible.value
+      handle.whenVisible.then(() => {
+        if (active && viewportHandle.value === handle)
+          viewportReady.value = true
+      })
+
+      onCleanup(() => {
+        active = false
+        handle.destroy()
+        if (viewportHandle.value === handle)
+          viewportHandle.value = null
+      })
+    },
+    { immediate: true },
+  )
+}
+
 watch(
-  [showImage, imageLoaded, hasError, displaySrc, () => props.lazy],
-  ([visible, loaded, error, src, lazy]) => {
-    if (!visible || !src || error) {
+  [showImage, imageLoaded, hasError, displaySrc, () => props.lazy, imageRequestActive],
+  ([visible, loaded, error, src, lazy, requestActive]) => {
+    if (!visible || !src || error || !requestActive) {
       void markLifecycleSettled()
       scheduleLifecycleHeightReport()
       return
@@ -205,15 +271,21 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  viewportHandle.value?.destroy()
+  viewportHandle.value = null
   clearLifecyclePending()
 })
 </script>
 
 <template>
-  <span ref="rootRef" class="image-node-container">
+  <span
+    ref="rootRef"
+    class="image-node-container"
+    :data-markstream-viewport-pending="shouldDeferImageRequest && !viewportReady ? 'true' : undefined"
+  >
     <img
       v-if="showImage"
-      :src="displaySrc"
+      :src="requestedSrc || undefined"
       :alt="String(props.node.alt ?? props.node.title ?? '')"
       :title="String(props.node.title ?? props.node.alt ?? '')"
       class="image-node__img"
@@ -247,21 +319,19 @@ onBeforeUnmount(() => {
       </template>
     </span>
 
-    <transition name="shimmer-fade">
-      <span
-        v-if="showShimmer && !node.loading"
-        class="image-shimmer-overlay"
-      >
-        <template v-if="props.usePlaceholder">
-          <slot name="placeholder" :node="props.node" :display-src="displaySrc" :image-loaded="imageLoaded" :has-error="hasError" :fallback-src="props.fallbackSrc" :lazy="props.lazy">
-            <span class="image-shimmer" />
-          </slot>
-        </template>
-        <template v-else>
-          <span class="image-node__raw-text">{{ node.raw }}</span>
-        </template>
-      </span>
-    </transition>
+    <span
+      v-if="showShimmer && !node.loading"
+      class="image-shimmer-overlay"
+    >
+      <template v-if="props.usePlaceholder">
+        <slot name="placeholder" :node="props.node" :display-src="displaySrc" :image-loaded="imageLoaded" :has-error="hasError" :fallback-src="props.fallbackSrc" :lazy="props.lazy">
+          <span class="image-shimmer" />
+        </slot>
+      </template>
+      <template v-else>
+        <span class="image-node__raw-text">{{ node.raw }}</span>
+      </template>
+    </span>
 
     <span v-if="showError" class="image-error">
       <slot name="error" :node="props.node" :display-src="displaySrc" :image-loaded="imageLoaded" :has-error="hasError" :fallback-src="props.fallbackSrc" :lazy="props.lazy">
@@ -346,6 +416,10 @@ onBeforeUnmount(() => {
   animation: image-shimmer 1.5s ease-in-out infinite;
 }
 
+.image-node-container[data-markstream-viewport-pending='true'] .image-shimmer {
+  animation: none;
+}
+
 @keyframes image-shimmer {
   0% { background-position: 100% 0; }
   100% { background-position: -100% 0; }
@@ -370,15 +444,7 @@ onBeforeUnmount(() => {
   color: hsl(var(--ms-muted-foreground));
 }
 
-.shimmer-fade-leave-active {
-  transition: opacity var(--ms-duration-emphasis) var(--ms-ease-standard);
-}
-.shimmer-fade-leave-to {
-  opacity: 0;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .image-shimmer { animation: none !important; }
-  .shimmer-fade-leave-active { transition: none !important; }
 }
 </style>
