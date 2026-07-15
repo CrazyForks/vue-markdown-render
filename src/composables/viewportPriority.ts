@@ -15,6 +15,20 @@ export interface VisibilityHandle {
   destroy: () => void
 }
 
+export function waitForVisibilityOrAbort(handle: VisibilityHandle | null | undefined, signal: AbortSignal) {
+  if (!handle || signal.aborted)
+    return Promise.resolve()
+
+  return new Promise<void>((resolve) => {
+    const settle = () => {
+      signal.removeEventListener('abort', settle)
+      resolve()
+    }
+    signal.addEventListener('abort', settle, { once: true })
+    void handle.whenVisible.then(settle)
+  })
+}
+
 export interface ViewportPriorityRegisterOptions {
   rootMargin?: string
   threshold?: number

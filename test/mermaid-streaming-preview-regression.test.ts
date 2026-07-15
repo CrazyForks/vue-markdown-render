@@ -533,7 +533,7 @@ describe('mermaid streaming preview regression', () => {
     expect(fakeMermaid.render.mock.calls[1]?.[1]).toContain('B-->C')
     expect(wrapper.find('svg[data-rendered="latest"]').exists()).toBe(true)
     expect(wrapper.find('svg[data-rendered="stale"]').exists()).toBe(false)
-    expect((wrapper.vm as any).lastRenderedCode).toBe('graphLRA-->BB-->C')
+    expect((wrapper.vm as any).lastCompletedRenderSignature).toBe('light\u0000graph LR\nA-->B\nB-->C\n')
     wrapper.unmount()
   })
 

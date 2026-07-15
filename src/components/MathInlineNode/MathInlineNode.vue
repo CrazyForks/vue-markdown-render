@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { MathInlineNodeProps } from '../../types/component-props'
 import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useOffscreenHeavyNodeDeferral, useViewportPriority, useViewportPriorityOptions } from '../../composables/viewportPriority'
+import { useOffscreenHeavyNodeDeferral, useViewportPriority, useViewportPriorityOptions, waitForVisibilityOrAbort } from '../../composables/viewportPriority'
 import { normalizeKaTeXRenderInput } from '../../utils/normalizeKaTeXRenderInput'
 import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from '../../workers/katexWorkerClient'
 
@@ -134,7 +134,7 @@ async function renderMath() {
         })
         viewportReady.value = visibilityHandle.isVisible.value
       }
-      await visibilityHandle?.whenVisible
+      await waitForVisibilityOrAbort(visibilityHandle, abortController.signal)
       viewportReady.value = true
     }
     catch {}

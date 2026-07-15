@@ -325,7 +325,6 @@ const isRendering = ref(false)
 const renderQueue = ref<Promise<boolean> | null>(null)
 interface MermaidRenderRequest {
   codeWithTheme: string
-  normalizedCode: string
   signature: string
   theme: 'light' | 'dark'
 }
@@ -429,8 +428,6 @@ const svgCache = ref<{
   dark?: CachedMermaidSvg
 }>({})
 
-// 新增：记录上一次渲染的 code（去除所有空白字符）
-const lastRenderedCode = ref<string>('')
 const renderToken = ref(0)
 // Abort/cancellation state for ongoing progressive work
 let currentWorkController: AbortController | null = null
@@ -1401,25 +1398,19 @@ async function switchMode(target: 'source' | 'preview') {
   setTimeout(() => cleanup(), 220)
 }
 
-function normalizeMermaidSource(code: string) {
-  return code.replace(/\s+/g, '')
-}
-
 function createMermaidRenderRequest(
   code = baseFixedCode.value,
   theme: 'light' | 'dark' = props.isDark ? 'dark' : 'light',
 ): MermaidRenderRequest {
-  const normalizedCode = normalizeMermaidSource(code)
   return {
     codeWithTheme: getCodeWithTheme(theme, code),
-    normalizedCode,
-    signature: normalizedCode,
+    signature: `${theme}\u0000${code}`,
     theme,
   }
 }
 
 function isCurrentRenderRequest(request: MermaidRenderRequest) {
-  return request.signature === normalizeMermaidSource(baseFixedCode.value)
+  return request.signature === createMermaidRenderRequest().signature
 }
 
 // 优化的 mermaid 渲染函数
@@ -1509,7 +1500,6 @@ async function initMermaid(request = createMermaidRenderRequest()) {
       svgCache.value[request.theme] = { svg: rendered.svg, bindFunctions }
       if (isThemeRendering.value)
         isThemeRendering.value = false
-      lastRenderedCode.value = request.normalizedCode
       lastCompletedRenderSignature = request.signature
       lastSvgSnapshot.value = mermaidContent.value.innerHTML
       hasRenderError.value = false
@@ -1562,23 +1552,23 @@ async function renderStaticDiagram() {
     if (mermaidContent.value)
       clearElement(mermaidContent.value)
     lastSvgSnapshot.value = null
-    lastRenderedCode.value = ''
+    lastCompletedRenderSignature = ''
     hasRenderError.value = false
     return
   }
   if (!mermaidAvailable.value || !canScheduleViewportWork())
     return
 
-  const normalizedBase = normalizeMermaidSource(base)
+  const request = createMermaidRenderRequest(base)
   if (
     hasRenderedOnce.value
-    && normalizedBase === lastRenderedCode.value
+    && request.signature === lastCompletedRenderSignature
     && mermaidContent.value?.querySelector('svg')
   ) {
     return
   }
 
-  const rendered = await initMermaid(createMermaidRenderRequest(base))
+  const rendered = await initMermaid(request)
   if (!rendered)
     return
 
@@ -1661,20 +1651,17 @@ async function progressiveRender() {
     const signal = currentWorkController.signal
     const theme = props.isDark ? 'dark' : 'light'
     const base = baseFixedCode.value
-    // 新增：去除所有空白字符后做比较
-    const normalizedBase = base.replace(/\s+/g, '')
     if (!base.trim()) {
       if (shouldKeepPreviewForEmptyStreamingSource())
         return
       if (mermaidContent.value)
         clearElement(mermaidContent.value)
       lastSvgSnapshot.value = null
-      lastRenderedCode.value = ''
+      lastCompletedRenderSignature = ''
       hasRenderError.value = false
       return
     }
-    // 如果和上一次渲染的 code（去除空白）一致，则跳过渲染
-    if (normalizedBase === lastRenderedCode.value) {
+    if (createMermaidRenderRequest(base, theme).signature === lastCompletedRenderSignature) {
       return
     }
 
@@ -1896,9 +1883,6 @@ watch(
 
 // Watch for dark mode changes with smart caching
 watch(() => props.isDark, async () => {
-  if (!hasRenderedOnce.value) {
-    return
-  }
   // 如果当前是错误展示，则等待下一次有效内容渲染再切换主题，避免覆盖错误信息
   if (hasRenderError.value) {
     return
@@ -2006,12 +1990,13 @@ watch(
     }
     if (prev === true) {
       cancelFinalWorkerParse()
-      const base = baseFixedCode.value.trim()
+      const source = baseFixedCode.value
+      const base = source.trim()
       if (!base) {
         if (mermaidContent.value)
           clearElement(mermaidContent.value)
         lastSvgSnapshot.value = null
-        lastRenderedCode.value = ''
+        lastCompletedRenderSignature = ''
         hasRenderError.value = false
         return cleanupAfterLoadingSettled()
       }
@@ -2020,10 +2005,9 @@ watch(
         return
       }
       const theme = props.isDark ? 'dark' : 'light'
-      const normalizedBase = base.replace(/\s+/g, '')
+      const request = createMermaidRenderRequest(source, theme)
 
-      // 如果之前已完成一次完整渲染，且内容只有空格差异，避免重复渲染带来的闪烁
-      if (hasRenderedOnce.value && normalizedBase === lastRenderedCode.value) {
+      if (hasRenderedOnce.value && request.signature === lastCompletedRenderSignature) {
         await nextTick()
         // 保险：如果 DOM 被清空但有缓存，恢复一次，不触发重新渲染
         if (mermaidContent.value && !mermaidContent.value.querySelector('svg') && svgCache.value[theme]) {
@@ -2072,7 +2056,7 @@ watch(
             )
           }
         }
-        const rendered = await initMermaid(createMermaidRenderRequest(base, theme))
+        const rendered = await initMermaid(request)
         if (!rendered)
           return
         hasRenderError.value = false

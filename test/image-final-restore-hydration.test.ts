@@ -32,7 +32,7 @@ async function withServerGlobals<T>(run: () => Promise<T>) {
   }
 }
 
-async function createHistoryImageApp() {
+async function createHistoryImageApp(node = imageNode, fallbackSrc = '') {
   const vue = await import('vue')
   const viewportPriority = await import('../src/composables/viewportPriority')
   const ImageNode = (await import('../src/components/ImageNode/ImageNode.vue')).default
@@ -40,7 +40,7 @@ async function createHistoryImageApp() {
     setup() {
       viewportPriority.provideOffscreenHeavyNodeDeferral(vue.computed(() => true))
       viewportPriority.provideViewportPriority(() => null, true)
-      return () => vue.h(ImageNode, { node: imageNode })
+      return () => vue.h(ImageNode, { node, fallbackSrc })
     },
   })
   return { Host, vue }
@@ -87,6 +87,37 @@ describe('history image hydration', () => {
     expect(repeatedRequestWrites).toHaveLength(0)
     expect(diagnostics).not.toMatch(/Hydration/i)
     expect(diagnostics).not.toMatch(/mismatch/i)
+    app.unmount()
+  })
+
+  it('preserves an SSR fallback image request while hydrating the deferred client path', async () => {
+    const fallbackSrc = 'https://example.com/history-fallback.png'
+    const node = { ...imageNode, src: '' }
+    const serverHtml = await withServerGlobals(async () => {
+      vi.resetModules()
+      const { Host, vue } = await createHistoryImageApp(node, fallbackSrc)
+      const { renderToString } = await import('vue/server-renderer')
+      return renderToString(vue.createSSRApp(Host))
+    })
+
+    expect(serverHtml).toContain(`src="${fallbackSrc}"`)
+    document.body.innerHTML = `<div id="app">${serverHtml}</div>`
+
+    const setImageSrc = vi.spyOn(HTMLImageElement.prototype, 'src', 'set')
+
+    vi.resetModules()
+    const { Host, vue } = await createHistoryImageApp(node, fallbackSrc)
+    const app = vue.createSSRApp(Host)
+    const container = document.querySelector('#app') as HTMLElement
+    app.mount(container)
+    await vue.nextTick()
+
+    const repeatedRequestWrites = setImageSrc.mock.calls.filter(
+      ([src]) => src === fallbackSrc,
+    )
+
+    expect(container.querySelector('img')?.getAttribute('src')).toBe(fallbackSrc)
+    expect(repeatedRequestWrites).toHaveLength(0)
     app.unmount()
   })
 })

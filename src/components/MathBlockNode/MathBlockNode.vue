@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { MathBlockNodeProps } from '../../types/component-props'
 import { computed, getCurrentInstance, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useOffscreenHeavyNodeDeferral, useViewportPriority, useViewportPriorityOptions } from '../../composables/viewportPriority'
+import { useOffscreenHeavyNodeDeferral, useViewportPriority, useViewportPriorityOptions, waitForVisibilityOrAbort } from '../../composables/viewportPriority'
 import { resolveLifecycleIndexKey } from '../../utils/lifecycleIndexKey'
 import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import { normalizeKaTeXRenderInput } from '../../utils/normalizeKaTeXRenderInput'
@@ -244,7 +244,7 @@ async function renderMath() {
         })
         viewportReady.value = visibilityHandle.isVisible.value
       }
-      await visibilityHandle?.whenVisible
+      await waitForVisibilityOrAbort(visibilityHandle, abortController.signal)
       viewportReady.value = true
     }
     catch {}

@@ -28,9 +28,10 @@ const registerViewport = useViewportPriority()
 const viewportPriorityOptions = useViewportPriorityOptions()
 const offscreenHeavyNodeDeferral = useOffscreenHeavyNodeDeferral()
 const safeNodeSrc = computed(() => sanitizeImageSrc(props.node.src))
+const safeFallbackSrc = computed(() => sanitizeImageSrc(props.fallbackSrc))
 const existingImage = getCurrentInstance()?.vnode.el?.querySelector?.('img')
 const hydratedFromServer = typeof window !== 'undefined'
-  && existingImage?.getAttribute('src') === safeNodeSrc.value
+  && existingImage?.getAttribute('src') === (safeNodeSrc.value || safeFallbackSrc.value)
 const viewportReady = ref(
   typeof window === 'undefined'
   || hydratedFromServer
@@ -40,7 +41,6 @@ const viewportHandle = shallowRef<ReturnType<typeof registerViewport> | null>(nu
 let lifecyclePendingIndexKey = ''
 let lifecyclePendingTimer: ReturnType<typeof setTimeout> | null = null
 
-const safeFallbackSrc = computed(() => sanitizeImageSrc(props.fallbackSrc))
 const displaySrc = computed(() => activeSrc.value)
 const useEagerImagePath = computed(() => !props.lazy)
 const shouldDeferImageRequest = computed(() =>
