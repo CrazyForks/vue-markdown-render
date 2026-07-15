@@ -506,7 +506,7 @@ async function renderInfographic(force = false) {
   catch (error) {
     if (!isCurrentRender(generation))
       return
-    if (final) {
+    if (final && props.loading === false && signature === renderSignature.value) {
       console.error('Failed to render infographic:', error)
       hasPreview.value = false
       hasRenderError.value = true

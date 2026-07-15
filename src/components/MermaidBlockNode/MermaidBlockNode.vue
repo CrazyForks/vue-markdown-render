@@ -1434,7 +1434,7 @@ async function initMermaid(request = createMermaidRenderRequest()) {
     if (activeSignature === request.signature) {
       if (rendered && lastCompletedRenderSignature === request.signature)
         return true
-      if (request.final && !activeIsFinal)
+      if (request.final && props.loading === false && !activeIsFinal)
         return initMermaid(request)
       return false
     }
@@ -1488,7 +1488,9 @@ async function initMermaid(request = createMermaidRenderRequest()) {
 
       if (!mermaidContent.value)
         return false
-      const rendered = renderSvgToTarget(mermaidContent.value, res?.svg, { keepPreviousOnFailure: !request.final })
+      const rendered = renderSvgToTarget(mermaidContent.value, res?.svg, {
+        keepPreviousOnFailure: !request.final || props.loading !== false,
+      })
       if (!rendered) {
         if (isThemeRendering.value)
           isThemeRendering.value = false
@@ -1536,9 +1538,9 @@ async function initMermaid(request = createMermaidRenderRequest()) {
       else {
         consecutiveRenderTimeouts = 0
         clearRenderRetryTimer()
-        if (request.final)
+        if (request.final && props.loading === false)
           console.error('Failed to render mermaid diagram:', error)
-        if (request.final)
+        if (request.final && props.loading === false)
           renderErrorToContainer(error)
       }
       return false

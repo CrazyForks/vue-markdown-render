@@ -623,6 +623,74 @@ describe('mermaid streaming preview regression', () => {
     wrapper.unmount()
   })
 
+  it('keeps the previous preview when a final render fails after streaming restarts', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    let rejectFinalRender!: (reason?: unknown) => void
+    const finalRender = new Promise<{ svg: string }>((_resolve, reject) => {
+      rejectFinalRender = reject
+    })
+    const fakeMermaid = {
+      initialize: vi.fn(),
+      render: vi.fn((_id: string, code: string) => {
+        if (code.includes('B-->C'))
+          return finalRender
+        return Promise.resolve({
+          svg: '<svg data-rendered="previous" viewBox="0 0 10 10"><text>A</text></svg>',
+        })
+      }),
+    }
+
+    vi.doMock('../src/workers/mermaidWorkerClient', () => ({
+      canParseOffthread: vi.fn(async () => true),
+      findPrefixOffthread: vi.fn(async () => null),
+      terminateWorker: vi.fn(),
+    }))
+    vi.doMock('../src/components/MermaidBlockNode/mermaid', () => ({
+      getMermaid: vi.fn(async () => fakeMermaid),
+      isMermaidEnabled: vi.fn(() => true),
+    }))
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const MermaidBlockNode = (await import('../src/components/MermaidBlockNode/MermaidBlockNode.vue')).default
+    const wrapper = mount(MermaidBlockNode as any, {
+      props: {
+        node: createNode('graph LR\nA-->B\n'),
+        loading: true,
+        renderDebounceMs: 10000,
+      },
+    })
+
+    ;(wrapper.vm as any).userToggledShowSource = true
+    await settleStreamingRender()
+    ;(wrapper.vm as any).mermaidAvailable = true
+    ;(wrapper.vm as any).viewportReady = true
+    ;(wrapper.vm as any).showSource = false
+    await settleStreamingRender()
+
+    expect(wrapper.find('svg[data-rendered="previous"]').exists()).toBe(true)
+
+    await wrapper.setProps({
+      node: createNode('graph LR\nA-->B\nB-->C\n'),
+    })
+    await settleStreamingRender()
+    await wrapper.setProps({ loading: false })
+    await settleStreamingRender()
+
+    expect(fakeMermaid.render).toHaveBeenCalledTimes(2)
+
+    await wrapper.setProps({ loading: true })
+    rejectFinalRender(new Error('Stale final render failure'))
+    await settleStreamingRender(10)
+
+    expect(errorSpy).not.toHaveBeenCalled()
+    expect(fakeMermaid.render).toHaveBeenCalledTimes(2)
+    expect(wrapper.find('svg[data-rendered="previous"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('Failed to render diagram')
+    wrapper.unmount()
+  })
+
   it('keeps retrying a transient worker busy result beyond 150ms without using the main thread parser', async () => {
     vi.useFakeTimers()
     vi.stubGlobal('IntersectionObserver', undefined as any)
