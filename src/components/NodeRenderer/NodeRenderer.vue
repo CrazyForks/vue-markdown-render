@@ -1913,12 +1913,8 @@ function getVirtualThreadKey() {
   return key == null || key === '' ? undefined : String(key)
 }
 
-const rendererSessionIdentity = computed(() => {
-  if (virtualScrollRequested.value)
-    return `${getVirtualThreadKey() ?? ''}\u0000${getVirtualSessionKey()}`
-
-  return String(props.indexKey ?? rendererProps.customId ?? instanceMsgId)
-})
+const rendererSessionIdentity = computed(() => getVirtualThreadKey()
+  ?? String(props.indexKey ?? rendererProps.customId ?? instanceMsgId))
 
 function isSameVirtualThreadKey(threadKey: string | undefined) {
   return (threadKey ?? '') === (getVirtualThreadKey() ?? '')
