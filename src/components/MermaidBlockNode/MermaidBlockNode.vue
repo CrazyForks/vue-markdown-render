@@ -325,10 +325,12 @@ const isRendering = ref(false)
 const renderQueue = ref<Promise<boolean> | null>(null)
 interface MermaidRenderRequest {
   codeWithTheme: string
+  final: boolean
   signature: string
   theme: 'light' | 'dark'
 }
 let activeRenderSignature = ''
+let activeRenderIsFinal = false
 let lastCompletedRenderSignature = ''
 const lastContentLength = ref(0)
 const isContentGenerating = ref(false)
@@ -579,7 +581,7 @@ function withTimeoutSignal<T>(
   })
 }
 
-// Unified error renderer (only used when props.loading === false)
+// Unified error renderer (only used for final render requests)
 function renderErrorToContainer(error: unknown) {
   if (typeof document === 'undefined')
     return
@@ -1401,9 +1403,11 @@ async function switchMode(target: 'source' | 'preview') {
 function createMermaidRenderRequest(
   code = baseFixedCode.value,
   theme: 'light' | 'dark' = props.isDark ? 'dark' : 'light',
+  final = props.loading === false,
 ): MermaidRenderRequest {
   return {
     codeWithTheme: getCodeWithTheme(theme, code),
+    final,
     signature: `${theme}\u0000${code}`,
     theme,
   }
@@ -1420,14 +1424,20 @@ async function initMermaid(request = createMermaidRenderRequest()) {
     return false
   if (isRendering.value) {
     const activeQueue = renderQueue.value
+    const activeIsFinal = activeRenderIsFinal
     const activeSignature = activeRenderSignature
     if (!activeQueue)
       return false
     const rendered = await activeQueue
     if (!isActiveGeneration(generation) || !isCurrentRenderRequest(request))
       return false
-    if (activeSignature === request.signature)
-      return rendered && lastCompletedRenderSignature === request.signature
+    if (activeSignature === request.signature) {
+      if (rendered && lastCompletedRenderSignature === request.signature)
+        return true
+      if (request.final && !activeIsFinal)
+        return initMermaid(request)
+      return false
+    }
     return initMermaid(request)
   }
 
@@ -1444,6 +1454,7 @@ async function initMermaid(request = createMermaidRenderRequest()) {
     return false
 
   isRendering.value = true
+  activeRenderIsFinal = request.final
   activeRenderSignature = request.signature
   markLifecyclePending()
 
@@ -1477,7 +1488,7 @@ async function initMermaid(request = createMermaidRenderRequest()) {
 
       if (!mermaidContent.value)
         return false
-      const rendered = renderSvgToTarget(mermaidContent.value, res?.svg, { keepPreviousOnFailure: props.loading !== false })
+      const rendered = renderSvgToTarget(mermaidContent.value, res?.svg, { keepPreviousOnFailure: !request.final })
       if (!rendered) {
         if (isThemeRendering.value)
           isThemeRendering.value = false
@@ -1525,14 +1536,15 @@ async function initMermaid(request = createMermaidRenderRequest()) {
       else {
         consecutiveRenderTimeouts = 0
         clearRenderRetryTimer()
-        if (props.loading === false)
+        if (request.final)
           console.error('Failed to render mermaid diagram:', error)
-        if (props.loading === false)
+        if (request.final)
           renderErrorToContainer(error)
       }
       return false
     }
     finally {
+      activeRenderIsFinal = false
       activeRenderSignature = ''
       isRendering.value = false
       renderQueue.value = null
