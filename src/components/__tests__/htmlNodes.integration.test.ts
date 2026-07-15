@@ -758,6 +758,35 @@ describe('component Behavior', () => {
     expect(wrapper.text()).toContain('前端重构')
   })
 
+  it('renders safe picture html with indented source elements', async () => {
+    const markdown = `<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/public/brand/vue-tui-logo-on-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="./docs/public/brand/vue-tui-logo-on-light.svg">
+    <img alt="Vue TUI" src="./docs/public/brand/vue-tui-logo-on-light.svg" width="360">
+  </picture>
+</p>`
+
+    const wrapper = mount(MarkdownRender, {
+      props: {
+        content: markdown,
+        final: true,
+        batchRendering: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    await flushAll()
+    await nextTick()
+
+    expect(wrapper.findAll('picture')).toHaveLength(1)
+    expect(wrapper.findAll('picture > source')).toHaveLength(2)
+    expect(wrapper.find('picture > img').attributes('alt')).toBe('Vue TUI')
+    expect(wrapper.findAll('pre')).toHaveLength(0)
+    expect(wrapper.text()).not.toContain('<picture>')
+    expect(wrapper.text()).not.toContain('<source')
+  })
+
   it('renders trusted video and iframe html while preserving text after video close', async () => {
     const markdown = `<video controls width="250">
   <source src="/shared-assets/videos/flower.webm" type="video/webm" />

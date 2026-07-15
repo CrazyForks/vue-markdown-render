@@ -183,6 +183,7 @@ export const BLOCKED_HTML_TAG_NAMES = [
 export const NON_STRUCTURING_HTML_TAG_NAMES = [
   'pre',
   'iframe',
+  'picture',
   'script',
   'style',
   'table',
