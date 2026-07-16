@@ -354,8 +354,11 @@ export function applyContainers(md: MarkdownIt) {
         s.tokens.push(...(innerTokens as unknown as MarkdownToken[]))
       }
 
-      if (found)
-        s.push('vmr_container_close', 'div', -1)
+      const tokenClose = s.push('vmr_container_close', 'div', -1)
+      if (!found) {
+        tokenClose.hidden = true
+        tokenClose.map = [endLine, endLine]
+      }
 
       s.line = found ? (nextLine + 1) : nextLine
       return true

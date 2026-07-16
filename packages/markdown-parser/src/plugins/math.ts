@@ -1499,6 +1499,21 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
       // 这里其实不应该只匹配 startWith的情况因为很可能前面还有 text
       if (lineText.startsWith(open)) {
         if (open.includes('[')) {
+          const sameLineContent = open === '\\[' ? lineText.slice(open.length) : ''
+          if (
+            open === '\\['
+            && allowLoading
+            && !strict
+            && findUnescapedDelimiter(sameLineContent, close) === -1
+            && !/^\s*!\[/.test(sameLineContent)
+            && !sameLineContent.includes('`')
+            && isMathLike(sameLineContent)
+          ) {
+            matched = true
+            openDelim = open
+            closeDelim = close
+            break
+          }
           if (mathOpts?.strictDelimiters) {
             if (lineText.replace('\\', '') === '[') {
               if (startLine + 1 < endLine) {

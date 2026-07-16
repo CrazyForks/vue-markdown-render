@@ -22,6 +22,36 @@ function collect(nodes: any, type: string): any[] {
 }
 
 describe('math block streaming close handling', () => {
+  it('promotes same-line explicit bracket math before the closing delimiter arrives', () => {
+    const md = getMarkdown('math-block-streaming-same-line-open')
+    const chunks = [
+      '- **自然对数**（在 x = 0 附近）：\n\n\\[',
+      '\\ln(1+x)',
+      ' = x - \\frac{x^2}{2}',
+      '\\]',
+    ]
+    let markdown = ''
+
+    for (const [index, chunk] of chunks.entries()) {
+      markdown += chunk
+      const nodes = parseMarkdownToStructure(markdown, md, {
+        final: false,
+        streamParse: true,
+        __reuseStableTopLevelNodes: true,
+      } as any) as any[]
+      const mathBlocks = collect(nodes, 'math_block')
+
+      if (index === 0) {
+        expect(mathBlocks).toHaveLength(0)
+        continue
+      }
+
+      expect(mathBlocks).toHaveLength(1)
+      expect(mathBlocks[0].content).toBe(markdown.slice(markdown.indexOf('\\[') + 2, markdown.endsWith('\\]') ? -2 : undefined))
+      expect(mathBlocks[0].loading).toBe(index < chunks.length - 1)
+    }
+  })
+
   it('does not keep a standalone plain ] close line inside \\[ math content', () => {
     const md = getMarkdown('math-block-streaming-plain-close')
     const markdown = String.raw`- **矩阵：**

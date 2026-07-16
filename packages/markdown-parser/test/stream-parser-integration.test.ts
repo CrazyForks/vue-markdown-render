@@ -178,6 +178,45 @@ describe('parseMarkdownToStructure stream parser integration', () => {
     expect(timing.processTokensReusedTopLevelNodes).toBeGreaterThan(0)
   })
 
+  it.each([
+    ['unordered list', '- item', 'list'],
+    ['ordered list', '1. item', 'list'],
+    ['table header', '| A | B |\n', 'table'],
+  ])('keeps an early %s prediction equivalent to a cold parse', (_, tail, expectedType) => {
+    const md = getMarkdown(`stream-parser-early-${expectedType}`)
+    const coldMd = getMarkdown(`stream-parser-early-${expectedType}-cold`)
+    const base = buildLargeAppendFriendlyDoc(40)
+    let source = base
+
+    parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+      __reuseStableTopLevelNodes: true,
+    } as any)
+
+    for (const char of tail) {
+      source += char
+      const streamed = parseMarkdownToStructure(source, md, {
+        final: false,
+        streamParse: true,
+        __reuseStableTopLevelNodes: true,
+      } as any)
+      const cold = parseMarkdownToStructure(source, coldMd, {
+        final: false,
+        streamParse: false,
+      })
+
+      expect(streamed).toEqual(cold)
+    }
+
+    const nodes = parseMarkdownToStructure(source, md, {
+      final: false,
+      streamParse: true,
+      __reuseStableTopLevelNodes: true,
+    } as any)
+    expect(nodes.at(-1)?.type).toBe(expectedType)
+  })
+
   it('reprocesses the previous last group when content becomes mixed', () => {
     const md = getMarkdown('stream-parser-mixed-last-group-overlap')
     const base = 'alpha\n\nbeta\n\n'
