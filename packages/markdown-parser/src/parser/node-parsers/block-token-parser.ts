@@ -150,7 +150,7 @@ function parseVmrContainer(
   }
 
   const hasCloseToken = j < tokens.length && tokens[j].type === 'vmr_container_close'
-  const closed = hasCloseToken || !!options?.final
+  const closed = (hasCloseToken && openToken.meta?.unclosed !== true) || !!options?.final
 
   // Build raw content
   let raw = `::: ${name}`

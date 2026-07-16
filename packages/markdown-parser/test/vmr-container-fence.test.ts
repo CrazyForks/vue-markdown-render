@@ -201,6 +201,34 @@ describe('vmr_container fallback', () => {
     expect(nodes[0]?.loading).toBe(false)
   })
 
+  it('keeps an unclosed container current across streaming appends', () => {
+    const md = getMarkdown('vmr_container_loading_progressive')
+    const chunks = ['::: viewcode:stream\n', 'con', 'tent\n', ':', ':', ':']
+    let markdown = ''
+
+    for (const [index, chunk] of chunks.entries()) {
+      markdown += chunk
+      const nodes = parseMarkdownToStructure(markdown, md, {
+        final: false,
+        streamParse: true,
+        __reuseStableTopLevelNodes: true,
+      } as any) as any[]
+      const container = nodes[0]
+
+      expect(container?.type).toBe('vmr_container')
+      expect(container?.loading).toBe(index < chunks.length - 1)
+      if (index >= 1)
+        expect(container?.raw).toContain(index === 1 ? 'con' : 'content')
+    }
+
+    const nodes = parseMarkdownToStructure(markdown, md, {
+      final: false,
+      streamParse: true,
+      __reuseStableTopLevelNodes: true,
+    } as any) as any[]
+    expect(nodes[0]?.children?.[0]?.raw).toBe('content')
+  })
+
   it('forces loading=false when final=true even if closing ::: is missing', () => {
     const md = getMarkdown('vmr_container_loading_final')
     const markdown = [
