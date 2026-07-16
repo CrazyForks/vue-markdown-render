@@ -1507,6 +1507,22 @@ describe('virtual timeline API', () => {
     await waitForTimelineRestoreSettled(root)
 
     const markdownProps = slotProps.find(props => props.kind === 'assistant-markdown').markdownProps
+    markdownProps.onHeightChange({
+      ...createMetrics(1400, 'thread-a:a1:1'),
+      stable: false,
+      confidence: 'mixed',
+      nodeCount: 90,
+      liveRange: { start: 0, end: 50 },
+      renderedCount: 66,
+      measuredCount: 50,
+      estimatedCount: 29,
+    })
+
+    await flushAnimationFrame()
+    await nextTick()
+
+    expect((wrapper.vm as any).getItemSize('a1')).toBe(1060)
+
     markdownProps.onHeightChange(createMetrics(1400, 'thread-a:a1:1'))
 
     await flushAnimationFrame()

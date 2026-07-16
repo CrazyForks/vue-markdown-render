@@ -2,6 +2,7 @@ import type { PreparedText } from '@chenglou/pretext'
 import type { ParsedNode } from 'stream-markdown-parser'
 import { layout, prepare } from '@chenglou/pretext'
 import { shallowRef } from 'vue'
+import { resolveDiffInlineLayout } from '../components/CodeBlockNode/codeBlockHeader'
 
 type WhiteSpaceMode = 'normal' | 'pre-wrap'
 type EstimateKind = 'simple-text' | 'code-block'
@@ -75,12 +76,14 @@ export interface EstimatedNodeHeight {
   height: number
   contentHeight?: number
   rendererKind?: CodeRendererKind
+  diffInline?: boolean
 }
 
 export interface CodeBlockEstimateOptions {
   rendererKind: CodeRendererKind
   monacoOptions?: Record<string, any> | null | undefined
   showHeader?: boolean
+  width?: number
 }
 
 const GLOBAL_STORE_KEY = '__MARKSTREAM_VUE_HEIGHT_ESTIMATION_EXPERIMENT__'
@@ -91,6 +94,7 @@ const CODE_BLOCK_DEFAULT_CAP = 500
 const MARKDOWN_CODE_LINE_HEIGHT = 21
 const MARKDOWN_CODE_VERTICAL_PADDING = 32
 const PRE_CODE_LINE_HEIGHT = 28
+const DIFF_METADATA_PREFIXES = ['diff ', 'index ', '--- ', '+++ ', '@@ ']
 
 interface PreparedCacheEntry {
   prepared: PreparedText
@@ -351,31 +355,74 @@ function getDisplayCode(source: unknown, loading?: boolean) {
   return loading ? value : value.replace(/\r\n$|\n$|\r$/, '')
 }
 
-function getCodeBlockVisibleLineCount(node: ParsedNode) {
-  if ((node as any).diff) {
+function getSplitDiffLineCount(node: ParsedNode) {
+  const originalCode = (node as any).originalCode
+  const updatedCode = (node as any).updatedCode
+  if (originalCode != null || updatedCode != null) {
     return Math.max(
-      countCodeLines(String((node as any).originalCode ?? '')),
-      countCodeLines(String((node as any).updatedCode ?? '')),
-      countCodeLines(String((node as any).code ?? '')),
+      countCodeLines(getDisplayCode(originalCode)),
+      countCodeLines(getDisplayCode(updatedCode)),
     )
+  }
+
+  const lines = getDisplayCode((node as any).code).split(/\r?\n/)
+  let originalLines = 0
+  let updatedLines = 0
+  for (const line of lines) {
+    if (line.startsWith('+') && !line.startsWith('+++')) {
+      updatedLines++
+    }
+    else if (line.startsWith('-') && !line.startsWith('---')) {
+      originalLines++
+    }
+    else {
+      originalLines++
+      updatedLines++
+    }
+  }
+  return Math.max(1, originalLines, updatedLines)
+}
+
+function getInlineDiffLineCount(node: ParsedNode) {
+  const raw = getDisplayCode((node as any).raw)
+  if (raw) {
+    const lines = raw.split(/\r?\n/)
+    if ((node as any).originalCode != null || (node as any).updatedCode != null) {
+      return Math.max(1, lines.filter(line =>
+        !DIFF_METADATA_PREFIXES.some(prefix => line.startsWith(prefix)),
+      ).length)
+    }
+    return Math.max(1, lines.length)
+  }
+  return countCodeLines(getDisplayCode((node as any).originalCode))
+    + countCodeLines(getDisplayCode((node as any).updatedCode))
+}
+
+function getCodeBlockVisibleLineCount(
+  node: ParsedNode,
+  monacoOptions?: Record<string, any> | null,
+  width = 0,
+) {
+  if ((node as any).diff) {
+    if (!resolveDiffInlineLayout(monacoOptions ?? {}, width))
+      return getSplitDiffLineCount(node)
+    return getInlineDiffLineCount(node)
   }
   return countCodeLines(getDisplayCode((node as any).code, (node as any).loading === true))
 }
 
-function resolveMonacoLineHeight(monacoOptions: Record<string, any> | null | undefined, isDiff: boolean) {
+function resolveMonacoLineHeight(monacoOptions: Record<string, any> | null | undefined) {
   const fontSize = typeof monacoOptions?.fontSize === 'number' && monacoOptions.fontSize > 0
     ? monacoOptions.fontSize
-    : (isDiff ? 13 : 12)
+    : 12
   if (typeof monacoOptions?.lineHeight === 'number' && monacoOptions.lineHeight > 0)
     return monacoOptions.lineHeight
-  return isDiff ? 30 : Math.round(fontSize * 1.5)
+  return Math.round(fontSize * 1.5)
 }
 
 function resolveMonacoVerticalPadding(monacoOptions: Record<string, any> | null | undefined, isDiff: boolean) {
-  if (!isDiff)
-    return 0
-  const top = typeof monacoOptions?.padding?.top === 'number' ? monacoOptions.padding.top : 10
-  const bottom = typeof monacoOptions?.padding?.bottom === 'number' ? monacoOptions.padding.bottom : 22
+  const top = typeof monacoOptions?.padding?.top === 'number' ? monacoOptions.padding.top : (isDiff ? 0 : 8)
+  const bottom = typeof monacoOptions?.padding?.bottom === 'number' ? monacoOptions.padding.bottom : (isDiff ? 0 : 8)
   return Math.max(0, top) + Math.max(0, bottom)
 }
 
@@ -388,26 +435,26 @@ export function estimateCodeBlockHeight(
 
   const rendererKind = options.rendererKind
   const showHeader = rendererKind !== 'pre' && options.showHeader !== false
-  const lineCount = getCodeBlockVisibleLineCount(node)
   const isDiff = Boolean((node as any).diff)
   let contentHeight = 0
   let cap = CODE_BLOCK_DEFAULT_CAP
 
   if (rendererKind === 'monaco') {
     const monacoOptions = options.monacoOptions ?? {}
-    const lineHeight = resolveMonacoLineHeight(monacoOptions, isDiff)
+    const lineCount = getCodeBlockVisibleLineCount(node, monacoOptions, options.width)
+    const lineHeight = resolveMonacoLineHeight(monacoOptions)
     const verticalPadding = resolveMonacoVerticalPadding(monacoOptions, isDiff)
     cap = typeof monacoOptions.MAX_HEIGHT === 'number' && monacoOptions.MAX_HEIGHT > 0
       ? monacoOptions.MAX_HEIGHT
       : CODE_BLOCK_DEFAULT_CAP
-    contentHeight = isDiff
-      ? Math.round(lineCount * lineHeight + verticalPadding)
-      : Math.round(lineCount * lineHeight)
+    contentHeight = Math.round(lineCount * lineHeight + verticalPadding)
   }
   else if (rendererKind === 'markdown') {
+    const lineCount = getCodeBlockVisibleLineCount(node)
     contentHeight = Math.round(lineCount * MARKDOWN_CODE_LINE_HEIGHT + MARKDOWN_CODE_VERTICAL_PADDING)
   }
   else {
+    const lineCount = getCodeBlockVisibleLineCount(node)
     contentHeight = Math.round(lineCount * PRE_CODE_LINE_HEIGHT)
     cap = Number.POSITIVE_INFINITY
   }
@@ -418,6 +465,9 @@ export function estimateCodeBlockHeight(
     height: Math.round(visibleContentHeight + (showHeader ? CODE_BLOCK_HEADER_HEIGHT : 0)),
     contentHeight: visibleContentHeight,
     rendererKind,
+    ...(isDiff && rendererKind === 'monaco'
+      ? { diffInline: resolveDiffInlineLayout(options.monacoOptions ?? {}, options.width ?? 0) }
+      : {}),
   }
 }
 

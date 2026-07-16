@@ -86,6 +86,7 @@ function resetHelpers() {
   runtime.safeClean.mockReset()
   runtime.refreshDiffPresentation.mockReset()
   runtime.setTheme.mockReset()
+  runtime.whenVisualReady = undefined
 }
 
 async function flush() {
@@ -188,6 +189,187 @@ describe('codeBlockNode final Diffs gate', () => {
     await flush()
     expect(runtime.createEditor).toHaveBeenCalledTimes(1)
     expect(runtime.updateCode).toHaveBeenCalledWith('const updated = true', 'typescript')
+    wrapper.unmount()
+  })
+
+  it('keeps the fallback until stream-diffs commits its first visual frame', async () => {
+    const runtime = helpers()
+    let resolveVisualReady!: (ready: boolean) => void
+    const visualReady = new Promise<boolean>((resolve) => {
+      resolveVisualReady = resolve
+    })
+    runtime.whenVisualReady = vi.fn(() => visualReady)
+    const wrapper = mount(DeferredCodeBlockNode, {
+      props: {
+        node: makeNode('const ready = true', false),
+        loading: false,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flush()
+    observers.at(-1)?.emit()
+    await vi.waitFor(() => expect(runtime.createEditor).toHaveBeenCalledTimes(1))
+    expect(wrapper.find('diffs-container').exists()).toBe(true)
+    expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(true)
+    expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhanced')).toBe('false')
+
+    resolveVisualReady(true)
+    await vi.waitFor(() => {
+      expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(false)
+      expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhanced')).toBe('true')
+    })
+    wrapper.unmount()
+  })
+
+  it('waits for the current visual revision when the first render is superseded', async () => {
+    const runtime = helpers()
+    let resolveFirst!: (ready: boolean) => void
+    let resolveCurrent!: (ready: boolean) => void
+    const firstReady = new Promise<boolean>((resolve) => {
+      resolveFirst = resolve
+    })
+    const currentReady = new Promise<boolean>((resolve) => {
+      resolveCurrent = resolve
+    })
+    runtime.whenVisualReady = vi.fn()
+      .mockReturnValueOnce(firstReady)
+      .mockReturnValue(currentReady)
+    const wrapper = mount(DeferredCodeBlockNode, {
+      props: {
+        node: makeNode('const ready = true', false),
+        loading: false,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flush()
+    observers.at(-1)?.emit()
+    await vi.waitFor(() => expect(runtime.whenVisualReady).toHaveBeenCalledTimes(1))
+
+    resolveFirst(false)
+    await vi.waitFor(() => expect(runtime.whenVisualReady).toHaveBeenCalledTimes(2))
+    expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(true)
+
+    resolveCurrent(true)
+    await vi.waitFor(() => {
+      expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(false)
+      expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhanced')).toBe('true')
+    })
+    wrapper.unmount()
+  })
+
+  it('rechecks the visual revision after the reveal frame', async () => {
+    const runtime = helpers()
+    let resolveFirst!: (ready: boolean) => void
+    let resolveCurrent!: (ready: boolean) => void
+    const firstReady = new Promise<boolean>((resolve) => {
+      resolveFirst = resolve
+    })
+    const currentReady = new Promise<boolean>((resolve) => {
+      resolveCurrent = resolve
+    })
+    runtime.whenVisualReady = vi.fn()
+      .mockReturnValueOnce(firstReady)
+      .mockReturnValue(currentReady)
+
+    const wrapper = mount(DeferredCodeBlockNode, {
+      props: {
+        node: makeNode('const ready = true', false),
+        loading: false,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flush()
+    observers.at(-1)?.emit()
+    await vi.waitFor(() => expect(runtime.whenVisualReady).toHaveBeenCalledTimes(1))
+
+    resolveFirst(true)
+    await vi.waitFor(() => expect(runtime.whenVisualReady).toHaveBeenCalledTimes(2))
+    expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(true)
+
+    resolveCurrent(true)
+    await vi.waitFor(() => {
+      expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(false)
+      expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhanced')).toBe('true')
+    })
+    wrapper.unmount()
+  })
+
+  it('preserves runtime-owned font styles when the reserved height is released', async () => {
+    const runtime = helpers()
+    runtime.getEditorView.mockReturnValue({
+      getModel: () => ({ getValue: () => '', getLineCount: () => 1 }),
+      getOption: () => 14,
+      updateOptions: vi.fn(),
+      layout: vi.fn(),
+      getContentHeight: () => 36,
+    })
+    let resolveVisualReady!: (ready: boolean) => void
+    const visualReady = new Promise<boolean>((resolve) => {
+      resolveVisualReady = resolve
+    })
+    runtime.whenVisualReady = vi.fn(() => visualReady)
+    runtime.createEditor.mockImplementation(async (container: HTMLElement) => {
+      container.style.fontSize = '13px'
+      container.style.lineHeight = '20px'
+      container.style.fontFamily = 'monospace'
+      installFinalDiffsDom(container)
+    })
+    const wrapper = mount(DeferredCodeBlockNode, {
+      props: {
+        node: makeNode('const ready = true', false),
+        loading: false,
+        stream: true,
+        showHeader: false,
+        estimatedHeightPx: 36,
+        estimatedContentHeightPx: 36,
+        monacoOptions: { fontSize: 13, lineHeight: 20 },
+      },
+    })
+
+    await flush()
+    observers.at(-1)?.emit()
+    await vi.waitFor(() => expect(runtime.createEditor).toHaveBeenCalledTimes(1))
+
+    resolveVisualReady(true)
+    await vi.waitFor(() => expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(false))
+
+    const editorHost = wrapper.get('.code-editor-container').element as HTMLElement
+    expect(editorHost.style.fontSize).toBe('13px')
+    expect(editorHost.style.lineHeight).toBe('20px')
+    expect(editorHost.style.fontFamily).toBe('monospace')
+    expect(editorHost.style.height).toBe('36px')
+    wrapper.unmount()
+  })
+
+  it('keeps the final editor height equal to its measured content height', async () => {
+    const runtime = helpers()
+    let resolveVisualReady!: (ready: boolean) => void
+    const visualReady = new Promise<boolean>((resolve) => {
+      resolveVisualReady = resolve
+    })
+    runtime.whenVisualReady = vi.fn(() => visualReady)
+    const wrapper = mount(DeferredCodeBlockNode, {
+      props: {
+        node: makeNode('const ready = true', false),
+        loading: false,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flush()
+    observers.at(-1)?.emit()
+    await vi.waitFor(() => expect(runtime.createEditor).toHaveBeenCalledTimes(1))
+    resolveVisualReady(true)
+    await vi.waitFor(() => expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(false))
+
+    expect((wrapper.get('.code-editor-container').element as HTMLElement).style.height).toBe('18px')
     wrapper.unmount()
   })
 
