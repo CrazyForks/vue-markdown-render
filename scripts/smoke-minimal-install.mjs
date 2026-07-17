@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { basename, join, relative, resolve } from 'node:path'
 import process from 'node:process'
@@ -281,7 +280,6 @@ function ensureBuiltArtifacts() {
 }
 
 function ensureOptionalPeersAbsent() {
-  const fixtureRequire = createRequire(join(tmp, 'package.json'))
   for (const pkg of [
     'stream-monaco',
     'mermaid',
@@ -291,13 +289,8 @@ function ensureOptionalPeersAbsent() {
     'vue-i18n',
     'stream-markdown',
   ]) {
-    try {
-      fixtureRequire.resolve(pkg)
-    }
-    catch {
-      continue
-    }
-    throw new Error(`${pkg} should not be installed in minimal smoke`)
+    if (existsSync(join(tmp, 'node_modules', pkg)))
+      throw new Error(`${pkg} should not be installed in minimal smoke`)
   }
 }
 
