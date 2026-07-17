@@ -4026,8 +4026,19 @@ function bumpNodeSlotVersion() {
 function shouldRenderNode(index: number) {
   // Respect incremental rendering budget only when incremental batching
   // is active (virtualization disabled). Otherwise render immediately.
-  if (incrementalRenderingActive.value && index >= renderedCount.value)
-    return false
+  if (incrementalRenderingActive.value && index >= renderedCount.value) {
+    const node = parsedNodes.value[index]
+    // A heading or paragraph can be immediately followed by the active heavy node.
+    const isFinalCatchUpTail = requestedFinal.value === true
+      && effectiveFinal.value !== true
+      && index >= parsedNodes.value.length - 2
+    const canDefer = node?.type === 'code_block'
+      || node?.type === 'image'
+      || node?.type === 'mermaid'
+      || node?.type === 'infographic'
+    if (!isFinalCatchUpTail || canDefer)
+      return false
+  }
   if (!deferNodes.value)
     return true
   if (index < resolvedInitialBatch.value)

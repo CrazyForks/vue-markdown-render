@@ -123,6 +123,71 @@ describe('node renderer smooth streaming', () => {
     }
   })
 
+  it('keeps completed transport content continuous while smooth streaming catches up', async () => {
+    const originalNodeEnv = process.env.NODE_ENV
+    process.env.NODE_ENV = 'development'
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        final: false,
+        smoothStreaming: true,
+        batchRendering: true,
+        initialRenderBatchSize: 1,
+        renderBatchSize: 1,
+        renderBatchDelay: 100000,
+        maxLiveNodes: 0,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    try {
+      await nextTick()
+      queuedFrames.length = 0
+      await wrapper.setProps({
+        content: [
+          '5. Create a native module example (C++):',
+          '',
+          '```cpp',
+          '#include <bits/stdc++.h>',
+          'int main() { return 0; }',
+          '```',
+          '',
+          '6. Add the native module to the application:',
+          '',
+          '```ts',
+          'console.log("ready")',
+          '```',
+        ].join('\n'),
+        final: true,
+      })
+
+      const baseline = performance.now()
+      for (let step = 1; step <= 160 && queuedFrames.length > 0; step++) {
+        queuedFrames.shift()?.(baseline + step * 80)
+        await nextTick()
+        const visibleContent = wrapper.vm.$?.setupState?.renderContent as string | undefined
+        if (visibleContent?.includes('6. Add the native module'))
+          expect(wrapper.text()).toContain('Add')
+        if (wrapper.text().includes('console.log'))
+          break
+      }
+
+      expect(wrapper.text()).toContain('console.log')
+    }
+    finally {
+      wrapper.unmount()
+      process.env.NODE_ENV = originalNodeEnv
+    }
+  })
+
   it('does not smooth initial static content before mounted appends', async () => {
     const wrapper = mount(NodeRenderer, {
       props: {
