@@ -1,3 +1,4 @@
+export * from './diff-preview';
 export * from './shiki-language';
 export { resolveStreamingTextState, resolveStreamingTextUpdate } from './resolve-streaming-text-state';
 export { createSmoothMarkdownStream } from './smooth-stream-controller';
