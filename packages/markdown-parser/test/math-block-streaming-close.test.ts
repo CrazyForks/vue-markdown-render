@@ -22,6 +22,107 @@ function collect(nodes: any, type: string): any[] {
 }
 
 describe('math block streaming close handling', () => {
+  it('hides an ambiguous explicit bracket math tail until it becomes math-like', () => {
+    const md = getMarkdown('math-block-streaming-ambiguous-open')
+    const prefix = 'Before the formula.\n\n'
+    const partialFormula = '\\[\nf(x)'
+
+    for (let end = 2; end < partialFormula.length; end++) {
+      const pending = parseMarkdownToStructure(`${prefix}${partialFormula.slice(0, end)}`, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+      expect(JSON.stringify(pending)).toContain('Before the formula.')
+      expect(collect(pending, 'text').map(node => node.content).join('')).toBe('Before the formula.')
+      expect(collect(pending, 'math_block')).toHaveLength(0)
+    }
+
+    const mathLike = parseMarkdownToStructure(`${prefix}${partialFormula}`, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+    expect(collect(mathLike, 'math_block')).toMatchObject([{
+      content: 'f(x)',
+      loading: true,
+    }])
+  })
+
+  it('hides an ambiguous dollar math tail until it becomes math-like', () => {
+    const md = getMarkdown('math-block-streaming-ambiguous-dollar-open')
+    const prefix = 'Before the formula.\n\n'
+    const partialFormula = '$$\nf(x)'
+
+    for (let end = 1; end < partialFormula.length; end++) {
+      const nodes = parseMarkdownToStructure(`${prefix}${partialFormula.slice(0, end)}`, md, {
+        final: false,
+        streamParse: true,
+      }) as any[]
+      const serialized = JSON.stringify(nodes)
+      expect(serialized).toContain('Before the formula.')
+      expect(collect(nodes, 'text').map(node => node.content).join('')).toBe('Before the formula.')
+      expect(collect(nodes, 'math_block')).toHaveLength(0)
+    }
+
+    const mathLike = parseMarkdownToStructure(`${prefix}${partialFormula}`, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+    expect(collect(mathLike, 'math_block')).toMatchObject([{
+      content: 'f(x)',
+      loading: true,
+    }])
+  })
+
+  it('restores an unclosed non-math explicit bracket tail when the stream is final', () => {
+    const md = getMarkdown('math-block-streaming-final-non-math-open')
+    const markdown = '\\[\nf('
+
+    const streaming = parseMarkdownToStructure(markdown, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+    expect(streaming).toHaveLength(0)
+
+    const final = parseMarkdownToStructure(markdown, md, {
+      final: true,
+      streamParse: true,
+    }) as any[]
+    expect(final.length).toBeGreaterThan(0)
+    expect(JSON.stringify(final)).toContain('f(')
+    expect(collect(final, 'math_block')).toHaveLength(0)
+  })
+
+  it('restores an unclosed non-math dollar tail when the stream is final', () => {
+    const md = getMarkdown('math-block-streaming-final-non-math-dollar-open')
+    const markdown = '$$\nf('
+
+    const streaming = parseMarkdownToStructure(markdown, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+    expect(streaming).toHaveLength(0)
+
+    const final = parseMarkdownToStructure(markdown, md, {
+      final: true,
+      streamParse: true,
+    }) as any[]
+    expect(final.length).toBeGreaterThan(0)
+    expect(JSON.stringify(final)).toContain('f(')
+  })
+
+  it('does not hide explicit bracket text inside code while streaming', () => {
+    const md = getMarkdown('math-block-streaming-code-open')
+    const markdown = '```text\n\\[\n$$\nf('
+
+    const nodes = parseMarkdownToStructure(markdown, md, {
+      final: false,
+      streamParse: true,
+    }) as any[]
+
+    expect(JSON.stringify(nodes)).toContain('f(')
+    expect(collect(nodes, 'math_block')).toHaveLength(0)
+  })
+
   it('promotes same-line explicit bracket math before the closing delimiter arrives', () => {
     const md = getMarkdown('math-block-streaming-same-line-open')
     const chunks = [

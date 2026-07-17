@@ -677,11 +677,9 @@ describe('parseMarkdownToStructure - incremental/mid-typing states', () => {
     })
 
     describe('math block mid-states', () => {
-      it('"$$" mid-state: accept math_block or paragraph fallback', () => {
+      it('"$$" mid-state: waits for enough block math content', () => {
         const nodes = parseMarkdownToStructure('$$', md)
-        const math = collect(nodes, 'math_block').length > 0 || collect(nodes, 'math').length > 0
-        const para = hasParagraph(nodes)
-        expect(math || para).toBe(true)
+        expect(nodes).toHaveLength(0)
       })
 
       it('"$$\na+b\n$$" closed: should be math_block or paragraph fallback (depending on plugin)', () => {
