@@ -1747,6 +1747,45 @@ describe('virtual timeline restore visual readiness', () => {
     diff.unmount()
   })
 
+  it('keeps async loading container state aligned with the final shell', async () => {
+    const { CodeBlockNodeLoading } = await import('../src/components/NodeRenderer/asyncComponent')
+    const wrapper = mount(CodeBlockNodeLoading as any, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '-const before = true\n+const ready = true',
+          raw: '```diff\n-const before = true\n+const ready = true\n```',
+          diff: true,
+          originalCode: 'const before = true',
+          updatedCode: 'const ready = true',
+          loading: true,
+        },
+        loading: true,
+        stream: false,
+        isDark: true,
+        minWidth: 120,
+        maxWidth: '80%',
+        monacoOptions: { lineHeight: 20 },
+      },
+    })
+
+    const root = wrapper.get('.code-block-container')
+    expect(root.classes()).toContain('dark')
+    expect(root.classes()).toContain('is-dark')
+    expect(root.classes()).toContain('is-rendering')
+    expect(root.attributes('style')).toContain('min-width: 120px')
+    expect(root.attributes('style')).toContain('max-width: 80%')
+    expect(wrapper.get('pre.code-pre-fallback').attributes('style')).toContain('--markstream-pre-diff-line-height: 20px')
+    expect(wrapper.get('.code-block-shell-content').attributes('style')).toContain('display: none')
+    expect(wrapper.get('.code-loading-placeholder').attributes('style') ?? '').not.toContain('display: none')
+
+    await wrapper.setProps({ loading: false })
+    expect(wrapper.get('.code-block-shell-content').attributes('style') ?? '').not.toContain('display: none')
+    expect(wrapper.get('.code-loading-placeholder').attributes('style')).toContain('display: none')
+    wrapper.unmount()
+  })
+
   it('keeps configured item overscan mounted during restore', async () => {
     const itemHeight = 88
 

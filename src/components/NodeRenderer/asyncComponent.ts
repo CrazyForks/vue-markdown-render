@@ -162,6 +162,9 @@ export const CodeBlockNodeLoading = defineComponent({
       const monacoOptions = props.monacoOptions
       const diffInline = isDiff && (props.estimatedDiffInline
         ?? resolveDiffInlineLayout(monacoOptions ?? {}, typeof window === 'undefined' ? 0 : window.innerWidth))
+      const diffAppearance = monacoOptions?.diffAppearance
+      const isSurfaceDark = diffAppearance === 'dark'
+        || (diffAppearance !== 'light' && props.isDark === true)
       const fontSize = typeof monacoOptions?.fontSize === 'number' && Number.isFinite(monacoOptions.fontSize) && monacoOptions.fontSize > 0
         ? monacoOptions.fontSize
         : 12
@@ -186,6 +189,7 @@ export const CodeBlockNodeLoading = defineComponent({
         'paddingTop': `${paddingTop}px`,
         'paddingBottom': `${paddingBottom}px`,
         '--markstream-pre-line-number-top': `${paddingTop}px`,
+        ...(isDiff ? { '--markstream-pre-diff-line-height': `${lineHeight}px` } : {}),
         ...(fontFamily ? { '--markstream-code-font-family': fontFamily } : {}),
       }
       const actionPlaceholder = () => h('button', {
@@ -199,10 +203,39 @@ export const CodeBlockNodeLoading = defineComponent({
       const showOverflowPlaceholder = (props.showFontSizeButtons !== false && props.enableFontSizeControl !== false)
         || props.showExpandButton !== false
         || (isPreviewable && props.showPreviewButton !== false)
-
+      const formatSize = (value: unknown) => {
+        if (value == null)
+          return undefined
+        return typeof value === 'number' ? `${value}px` : String(value)
+      }
+      const containerStyle = {
+        '--markstream-code-layout-character-width': '1ch',
+        ...(formatSize(props.minWidth) ? { minWidth: formatSize(props.minWidth) } : {}),
+        ...(formatSize(props.maxWidth) ? { maxWidth: formatSize(props.maxWidth) } : {}),
+        ...(!isDiff
+          ? {
+              color: 'var(--vscode-editor-foreground, var(--markstream-code-fallback-fg))',
+              backgroundColor: 'var(--vscode-editor-background, var(--markstream-code-fallback-bg))',
+              borderColor: 'var(--markstream-code-border-color)',
+            }
+          : {}),
+      }
       return h('div', {
         ...attrs,
-        'class': ['code-block-container', 'rounded-lg', 'border', { 'is-diff': isDiff }, attrs.class],
+        'class': [
+          'code-block-container',
+          'rounded-lg',
+          'border',
+          {
+            'dark': props.isDark === true,
+            'is-rendering': props.loading !== false,
+            'is-dark': isSurfaceDark,
+            'is-diff': isDiff,
+            'is-plain-text': language === '' || language === 'plaintext' || language === 'text',
+          },
+          attrs.class,
+        ],
+        'style': [containerStyle, attrs.style],
         'data-markstream-code-block': '1',
         'data-markstream-enhanced': 'false',
         'data-markstream-code-block-state': props.loading ? 'streaming' : 'settled',
@@ -239,7 +272,10 @@ export const CodeBlockNodeLoading = defineComponent({
                   : null,
               ]),
             ]),
-        h('div', { class: 'code-block-shell-content' }, [
+        h('div', {
+          class: 'code-block-shell-content',
+          style: props.stream !== false || props.loading === false ? undefined : { display: 'none' },
+        }, [
           h(PreCodeNode, {
             'node': props.node,
             'loading': props.loading,
@@ -254,6 +290,17 @@ export const CodeBlockNodeLoading = defineComponent({
             'data-markstream-code-loading': '1',
           }),
         ]),
+        h('div', {
+          class: 'code-loading-placeholder',
+          style: props.stream === false && props.loading !== false ? undefined : { display: 'none' },
+        }, [
+          h('div', { class: 'loading-skeleton' }, [
+            h('div', { class: 'skeleton-line' }),
+            h('div', { class: 'skeleton-line' }),
+            h('div', { class: 'skeleton-line short' }),
+          ]),
+        ]),
+        h('span', { 'class': 'sr-only', 'aria-live': 'polite', 'role': 'status' }),
       ])
     }
   },

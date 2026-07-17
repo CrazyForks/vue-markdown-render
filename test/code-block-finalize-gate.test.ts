@@ -223,7 +223,7 @@ describe('codeBlockNode final Diffs gate', () => {
     wrapper.unmount()
   })
 
-  it('waits for the current visual revision when the first render is superseded', async () => {
+  it('rechecks visual readiness immediately before removing the fallback', async () => {
     const runtime = helpers()
     let resolveFirst!: (ready: boolean) => void
     let resolveCurrent!: (ready: boolean) => void
@@ -236,45 +236,6 @@ describe('codeBlockNode final Diffs gate', () => {
     runtime.whenVisualReady = vi.fn()
       .mockReturnValueOnce(firstReady)
       .mockReturnValue(currentReady)
-    const wrapper = mount(DeferredCodeBlockNode, {
-      props: {
-        node: makeNode('const ready = true', false),
-        loading: false,
-        stream: true,
-        showHeader: false,
-      },
-    })
-
-    await flush()
-    observers.at(-1)?.emit()
-    await vi.waitFor(() => expect(runtime.whenVisualReady).toHaveBeenCalledTimes(1))
-
-    resolveFirst(false)
-    await vi.waitFor(() => expect(runtime.whenVisualReady).toHaveBeenCalledTimes(2))
-    expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(true)
-
-    resolveCurrent(true)
-    await vi.waitFor(() => {
-      expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(false)
-      expect(wrapper.get('[data-markstream-code-block="1"]').attributes('data-markstream-enhanced')).toBe('true')
-    })
-    wrapper.unmount()
-  })
-
-  it('rechecks the visual revision after the reveal frame', async () => {
-    const runtime = helpers()
-    let resolveFirst!: (ready: boolean) => void
-    let resolveCurrent!: (ready: boolean) => void
-    const firstReady = new Promise<boolean>((resolve) => {
-      resolveFirst = resolve
-    })
-    const currentReady = new Promise<boolean>((resolve) => {
-      resolveCurrent = resolve
-    })
-    runtime.whenVisualReady = vi.fn()
-      .mockReturnValueOnce(firstReady)
-      .mockReturnValue(currentReady)
-
     const wrapper = mount(DeferredCodeBlockNode, {
       props: {
         node: makeNode('const ready = true', false),
@@ -370,6 +331,32 @@ describe('codeBlockNode final Diffs gate', () => {
     await vi.waitFor(() => expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(false))
 
     expect((wrapper.get('.code-editor-container').element as HTMLElement).style.height).toBe('18px')
+    wrapper.unmount()
+  })
+
+  it('does not add an extra pixel in the generic editor height fallback', async () => {
+    const runtime = helpers()
+    runtime.getEditorView.mockReturnValue({
+      getModel: () => ({ getValue: () => '', getLineCount: () => 1 }),
+      getOption: () => 18,
+      updateOptions: vi.fn(),
+      layout: vi.fn(),
+    })
+    runtime.whenVisualReady = vi.fn(() => Promise.resolve(true))
+    const wrapper = mount(DeferredCodeBlockNode, {
+      props: {
+        node: makeNode('const ready = true', false),
+        loading: false,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flush()
+    observers.at(-1)?.emit()
+    await vi.waitFor(() => expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(false))
+
+    expect((wrapper.get('.code-editor-container').element as HTMLElement).style.height).toBe('19px')
     wrapper.unmount()
   })
 

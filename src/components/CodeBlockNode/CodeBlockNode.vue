@@ -333,7 +333,7 @@ let getDiffEditorView: () => MonacoDiffEditorViewLike | null = () => ({ getModel
 let cleanupEditor: () => void = () => {}
 let safeClean = () => {}
 let refreshDiffPresentation: () => Promise<unknown> | unknown = () => {}
-let whenRuntimeVisualReady: (() => Promise<boolean> | boolean) | null = null
+let whenRuntimeVisualReady: (() => Promise<boolean>) | null = null
 let createEditorPromise: Promise<void> | null = null
 let editorRuntimeCreationPromise: Promise<void> | null = null
 let monacoRuntimePromise: Promise<void> | null = null
@@ -1050,11 +1050,13 @@ function syncDiffScrollFromFallback() {
 
 async function revealEditorDisplay() {
   if (!isDiff.value) {
+    if (whenRuntimeVisualReady && !await whenRuntimeVisualReady())
+      return false
     editorDisplayReady.value = true
     await nextTick()
     syncEditorHostHeight(false)
     layoutEditorToHost()
-    return
+    return true
   }
 
   // The editor is fully prepared while hidden. Flip the two layers in one Vue
@@ -1071,6 +1073,11 @@ async function revealEditorDisplay() {
   layoutEditorToHost(true)
   await waitForAnimationFrame()
   layoutEditorToHost(true)
+  if (whenRuntimeVisualReady && !await whenRuntimeVisualReady())
+    return false
+  syncFallbackFontMetricsFromEditor()
+  syncDiffRevealHostHeight()
+  layoutEditorToHost(true)
   editorDisplayReady.value = true
   await nextTick()
   syncDiffRevealHostHeight()
@@ -1078,6 +1085,7 @@ async function revealEditorDisplay() {
   syncFallbackFontMetricsFromEditor()
   syncInlineFoldProxies()
   scheduleEditorHeightSync()
+  return true
 }
 
 function syncDiffRevealHostHeight() {
@@ -1774,7 +1782,7 @@ function computeContentHeight(): number | null {
       lineCount = model.getLineCount()
     }
     const lh = getLineHeightSafe(editor)
-    return Math.ceil(lineCount * (lh + LINE_EXTRA_PER_LINE) + CONTENT_PADDING + PIXEL_EPSILON)
+    return Math.ceil(lineCount * (lh + LINE_EXTRA_PER_LINE) + CONTENT_PADDING)
   }
   catch {
     return null
@@ -3709,21 +3717,10 @@ async function runEditorCreation(el: HTMLElement) {
   // visible until that runtime confirms the first visual frame is complete.
   let runtimeVisualReady: boolean | null = null
   if (whenRuntimeVisualReady) {
-    let pendingVisualReady = whenRuntimeVisualReady()
-    for (;;) {
-      const visualReady = await pendingVisualReady
-      if (isUnmounted)
-        break
-      if (visualReady) {
-        await nextTick()
-        await waitForAnimationFrame()
-      }
-      const currentVisualReady = whenRuntimeVisualReady()
-      if (currentVisualReady === pendingVisualReady) {
-        runtimeVisualReady = visualReady
-        break
-      }
-      pendingVisualReady = currentVisualReady
+    runtimeVisualReady = await whenRuntimeVisualReady()
+    if (runtimeVisualReady) {
+      await nextTick()
+      await waitForAnimationFrame()
     }
   }
   const diffVisualReady = runtimeVisualReady == null
@@ -3739,7 +3736,8 @@ async function runEditorCreation(el: HTMLElement) {
   }
   syncFallbackFontMetricsFromEditor()
   syncDiffRevealHostHeight()
-  await revealEditorDisplay()
+  if (!await revealEditorDisplay())
+    markEditorCreationFailed()
 }
 
 function ensureEditorCreation(el: HTMLElement, options: { allowStaleContentRetry?: boolean } = {}) {
