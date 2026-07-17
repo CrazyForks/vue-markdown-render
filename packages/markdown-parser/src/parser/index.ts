@@ -3,6 +3,7 @@ import type { HtmlBlockNode, InternalParseOptions, MarkdownToken, ParsedNode, Pa
 import { normalizeCustomHtmlTags } from '../customHtmlTags'
 import { NON_STRUCTURING_HTML_TAGS, STANDARD_BLOCK_HTML_TAGS, STANDARD_HTML_TAGS, VOID_HTML_TAGS } from '../htmlTags'
 import { escapeTagForRegExp, findTagCloseIndexOutsideQuotes, parseTagAttrs } from '../htmlTagUtils'
+import { isMathLike } from '../plugins/isMathLike'
 import {
   getTolerantMathBlockBoundaryStreamKey,
   hasMarkstreamMathPlugin,
@@ -34,9 +35,12 @@ interface ExplicitBracketMathContext {
   fenceInList: boolean
   fenceLen: number
   fenceListIndent: number
+  inDollarMath: boolean
   inFence: boolean
   inMath: boolean
   listContentIndent: number | null
+  dollarMathOpenOffset: number | null
+  mathOpenOffset: number | null
 }
 
 interface ExplicitBracketMathStreamState {
@@ -50,6 +54,10 @@ const tolerantMathBoundaryStreamCache = new WeakMap<object, {
   source: string
   key: string | null
   pendingCandidate: boolean
+}>()
+const pendingExplicitMathTailCache = new WeakMap<object, {
+  source: string
+  state: ExplicitBracketMathStreamState
 }>()
 
 const TOLERANT_BOUNDARY_SPLIT_OPENERS = ['$$', '\\[']
@@ -614,9 +622,12 @@ function createExplicitBracketMathContext(): ExplicitBracketMathContext {
     fenceInList: false,
     fenceLen: 0,
     fenceListIndent: 0,
+    inDollarMath: false,
     inFence: false,
     inMath: false,
     listContentIndent: null,
+    dollarMathOpenOffset: null,
+    mathOpenOffset: null,
   }
 }
 
@@ -1217,6 +1228,21 @@ function scanLineForExplicitBracketMathState(
         if (appendStart != null && openAtAppendStart && lineStart + index + 2 > appendStart)
           closedOpenMath = true
         context.inMath = false
+        context.mathOpenOffset = null
+        index += 2
+        continue
+      }
+
+      index++
+      continue
+    }
+
+    if (context.inDollarMath) {
+      if (line.startsWith('$$', index) && !isEscapedDelimiterAt(line, sourceIndex)) {
+        if (appendStart != null && openAtAppendStart && lineStart + index + 2 > appendStart)
+          closedOpenMath = true
+        context.inDollarMath = false
+        context.dollarMathOpenOffset = null
         index += 2
         continue
       }
@@ -1236,6 +1262,14 @@ function scanLineForExplicitBracketMathState(
 
     if (line.startsWith('\\[', index) && !isEscapedDelimiterAt(line, sourceIndex)) {
       context.inMath = true
+      context.mathOpenOffset = lineStart + index
+      index += 2
+      continue
+    }
+
+    if (line.startsWith('$$', index) && !isEscapedDelimiterAt(line, sourceIndex)) {
+      context.inDollarMath = true
+      context.dollarMathOpenOffset = lineStart + index
       index += 2
       continue
     }
@@ -1244,6 +1278,46 @@ function scanLineForExplicitBracketMathState(
   }
 
   return closedOpenMath
+}
+
+function stripPendingExplicitMathTail(markdown: string, md: MarkdownIt) {
+  if (!hasMarkstreamMathPlugin(md))
+    return markdown
+
+  const owner = md as unknown as object
+  const previous = pendingExplicitMathTailCache.get(owner)
+  const state = previous?.source === markdown
+    ? previous.state
+    : previous && markdown.startsWith(previous.source)
+      ? updateExplicitBracketMathStreamState(
+        previous.state,
+        markdown.slice(previous.source.length),
+        previous.source.length - previous.state.lineBuffer.length,
+      ).state
+      : scanExplicitBracketMathStreamState(markdown).state
+  pendingExplicitMathTailCache.set(owner, { source: markdown, state })
+
+  const { context } = state
+  const openOffset = context.inMath
+    ? context.mathOpenOffset
+    : context.inDollarMath ? context.dollarMathOpenOffset : null
+  if (openOffset == null)
+    return markdown
+
+  const content = markdown.slice(openOffset + 2)
+  const lineStart = markdown.lastIndexOf('\n', openOffset - 1) + 1
+  const startsBlockLine = markdown.slice(lineStart, openOffset).trim() === ''
+  if (!startsBlockLine && !/^\r?\n/.test(content))
+    return markdown
+  if (/^\s*!\[/.test(content))
+    return markdown
+
+  const stripped = content.trim()
+  const weakSingleVariable = /^(?:[a-z]|pi)$/i.test(stripped)
+  if (isMathLike(content) && !weakSingleVariable)
+    return markdown
+
+  return markdown.slice(0, openOffset)
 }
 
 function scanExplicitBracketMathLine(
@@ -1281,7 +1355,7 @@ function scanExplicitBracketMathLine(
     context.listContentIndent = null
   }
 
-  if (!context.inMath) {
+  if (!context.inMath && !context.inDollarMath) {
     const fenceMatch = matchMarkdownFenceMarker(line)
     if (fenceMatch) {
       if (context.inFence) {
@@ -1323,6 +1397,7 @@ function scanExplicitBracketMathStreamState(
   initialContext: ExplicitBracketMathContext = createExplicitBracketMathContext(),
   appendStart: number | null = null,
   openAtAppendStart = false,
+  sourceOffset = 0,
 ) {
   const context = cloneExplicitBracketMathContext(initialContext)
   let committedContext = cloneExplicitBracketMathContext(initialContext)
@@ -1338,7 +1413,7 @@ function scanExplicitBracketMathStreamState(
       : hasNewline ? newlineIndex : source.length
     const line = source.slice(index, lineEnd)
 
-    if (scanExplicitBracketMathLine(line, context, index, appendStart, openAtAppendStart))
+    if (scanExplicitBracketMathLine(line, context, sourceOffset + index, appendStart, openAtAppendStart))
       closedOpenMath = true
 
     if (hasNewline) {
@@ -1362,13 +1437,18 @@ function scanExplicitBracketMathStreamState(
   }
 }
 
-function updateExplicitBracketMathStreamState(previous: ExplicitBracketMathStreamState, appended: string) {
+function updateExplicitBracketMathStreamState(
+  previous: ExplicitBracketMathStreamState,
+  appended: string,
+  lineBufferStartOffset = 0,
+) {
   if (
     appended
     && !previous.context.inMath
+    && !previous.context.inDollarMath
     && !previous.context.inFence
     && !previous.committedContext.inFence
-    && !/[\\`~\r\n]/.test(appended)
+    && !/[\\$`~\r\n]/.test(appended)
     && !(previous.lineBuffer.endsWith('\\') && (appended[0] === '[' || appended[0] === ']'))
   ) {
     return {
@@ -1384,8 +1464,9 @@ function updateExplicitBracketMathStreamState(previous: ExplicitBracketMathStrea
   return scanExplicitBracketMathStreamState(
     previous.lineBuffer + appended,
     previous.committedContext,
-    previous.lineBuffer.length,
-    previous.context.inMath,
+    lineBufferStartOffset + previous.lineBuffer.length,
+    previous.context.inMath || previous.context.inDollarMath,
+    lineBufferStartOffset,
   )
 }
 
@@ -1406,7 +1487,11 @@ function syncTolerantMathBoundaryStreamCache(md: MarkdownIt, source: string) {
   const sourceExtendsPrevious = previous ? source.startsWith(previous.source) : false
   const appended = sourceExtendsPrevious && previous ? source.slice(previous.source.length) : ''
   const explicitBracketMathUpdate = sourceExtendsPrevious && previous
-    ? updateExplicitBracketMathStreamState(previous.explicitBracketMath, appended)
+    ? updateExplicitBracketMathStreamState(
+        previous.explicitBracketMath,
+        appended,
+        previous.source.length - previous.explicitBracketMath.lineBuffer.length,
+      )
     : scanExplicitBracketMathStreamState(source)
   const nextExplicitBracketMath = explicitBracketMathUpdate.state
   const completesExplicitBracketMathClose = sourceExtendsPrevious && previous
@@ -3596,6 +3681,7 @@ export function parseMarkdownToStructure(
       safeMarkdown = safeMarkdown.replace(/(\n\[|\n\()+\n*$/g, '\n')
     }
 
+    safeMarkdown = stripPendingExplicitMathTail(safeMarkdown, md)
     safeMarkdown = getStreamingAdmonitionOpenTailReplacement(safeMarkdown, options.customHtmlTags) ?? safeMarkdown
   }
 

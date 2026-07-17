@@ -324,6 +324,7 @@ const userToggledShowSource = ref(false)
 const isRendering = ref(false)
 const renderQueue = ref<Promise<boolean> | null>(null)
 interface MermaidRenderRequest {
+  code: string
   codeWithTheme: string
   final: boolean
   signature: string
@@ -378,7 +379,8 @@ function clearProgressiveRenderDebounceTimer() {
 function debouncedProgressiveRender() {
   if (unmounted)
     return
-  clearProgressiveRenderDebounceTimer()
+  if (progressiveRenderDebounceTimer != null || progressiveRenderIdleId != null)
+    return
   progressiveRenderDebounceTimer = (globalThis as any).setTimeout(() => {
     progressiveRenderDebounceTimer = null
     if (!canScheduleViewportWork())
@@ -630,6 +632,13 @@ function isAbortError(error: unknown) {
   return (error as any)?.name === 'AbortError'
 }
 
+function requiresMainThreadMermaid(error: unknown) {
+  const message = typeof (error as any)?.message === 'string'
+    ? (error as any).message
+    : String(error ?? '')
+  return /(?:DOM)?purify\.(?:sanitize|addHook) is not a function/i.test(message)
+}
+
 function shouldRetrySequenceSemicolonEscape(error: unknown) {
   return !isTimeoutError(error) && !isAbortError(error)
 }
@@ -848,7 +857,7 @@ async function canParseOffthread(
     if (error?.name === 'AbortError')
       throw error
     const errorCode = error?.code || error?.name
-    if (errorCode === 'WORKER_INIT_ERROR' || error?.fallbackToRenderer)
+    if (errorCode === 'WORKER_INIT_ERROR' || error?.fallbackToRenderer || requiresMainThreadMermaid(error))
       return await canParseOnMain(code, theme, opts)
     throw error
   }
@@ -1406,6 +1415,7 @@ function createMermaidRenderRequest(
   final = props.loading === false,
 ): MermaidRenderRequest {
   return {
+    code,
     codeWithTheme: getCodeWithTheme(theme, code),
     final,
     signature: `${theme}\u0000${code}`,
@@ -1415,6 +1425,11 @@ function createMermaidRenderRequest(
 
 function isCurrentRenderRequest(request: MermaidRenderRequest) {
   return request.signature === createMermaidRenderRequest().signature
+}
+
+function canCommitRenderRequest(request: MermaidRenderRequest) {
+  return isCurrentRenderRequest(request)
+    || (!request.final && props.loading !== false && baseFixedCode.value.startsWith(request.code))
 }
 
 // 优化的 mermaid 渲染函数
@@ -1480,7 +1495,7 @@ async function initMermaid(request = createMermaidRenderRequest()) {
         timeouts.value.fullRender,
       )
 
-      if (!isActiveGeneration(generation) || !isCurrentRenderRequest(request)) {
+      if (!isActiveGeneration(generation) || !canCommitRenderRequest(request)) {
         if (isThemeRendering.value)
           isThemeRendering.value = false
         return false

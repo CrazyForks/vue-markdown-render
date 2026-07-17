@@ -16,6 +16,24 @@ function codeBlocks(nodes: any[]) {
   return result
 }
 
+function textContent(nodes: any[]) {
+  const result: string[] = []
+  const walk = (value: any) => {
+    if (!value)
+      return
+    if (Array.isArray(value)) {
+      value.forEach(walk)
+      return
+    }
+    if (value.type === 'text')
+      result.push(String(value.content ?? ''))
+    for (const key of ['children', 'items'])
+      walk(value[key])
+  }
+  walk(nodes)
+  return result.join('')
+}
+
 describe('playground stream content', () => {
   it('does not contain accidental template-literal control characters', () => {
     const controls = Array.from(streamContent)
@@ -62,6 +80,24 @@ describe('playground stream content', () => {
         expect(block.code, `prefix length ${end}`).not.toContain('正交补空间')
         expect(block.code, `prefix length ${end}`).not.toContain('boldsymbol')
       }
+    }
+  })
+
+  it('keeps matrix heading text visible while the following math block is still ambiguous', () => {
+    const headingStart = streamContent.indexOf('矩阵', streamContent.indexOf('二项式展开'))
+    const mathLikeEnd = streamContent.indexOf('\\begin{bmatrix}', headingStart) + '\\begin{bmatrix}'.length
+    expect(headingStart).toBeGreaterThan(0)
+    expect(mathLikeEnd).toBeGreaterThan(headingStart)
+
+    const md = getMarkdown('playground-matrix-heading-stream-regression')
+    for (let end = headingStart + 1; end <= mathLikeEnd; end++) {
+      const nodes = parseMarkdownToStructure(streamContent.slice(0, end), md, {
+        final: false,
+        streamParse: true,
+        __reuseStableTopLevelNodes: true,
+      } as any)
+      const arrivedHeading = streamContent.slice(headingStart, Math.min(end, headingStart + '矩阵'.length))
+      expect(textContent(nodes), `prefix length ${end}`).toContain(arrivedHeading)
     }
   })
 })

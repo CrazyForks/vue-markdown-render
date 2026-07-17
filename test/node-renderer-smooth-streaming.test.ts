@@ -76,6 +76,192 @@ describe('node renderer smooth streaming', () => {
     rawWrapper.unmount()
   })
 
+  it('keeps smooth streaming appends continuous without node placeholders', async () => {
+    const originalNodeEnv = process.env.NODE_ENV
+    process.env.NODE_ENV = 'development'
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        final: false,
+        smoothStreaming: true,
+        batchRendering: true,
+        initialRenderBatchSize: 1,
+        renderBatchSize: 1,
+        renderBatchDelay: 100000,
+        maxLiveNodes: 0,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    try {
+      await nextTick()
+      queuedFrames.length = 0
+      await wrapper.setProps({ content: 'Paragraph 1\n\nParagraph 2\n\nParagraph 3' })
+
+      const baseline = performance.now()
+      for (let step = 1; step <= 80 && queuedFrames.length > 0; step++) {
+        queuedFrames.shift()?.(baseline + step * 80)
+        await nextTick()
+        expect(wrapper.findAll('.node-placeholder')).toHaveLength(0)
+        if (wrapper.text().includes('Paragraph 3'))
+          break
+      }
+
+      expect(wrapper.text()).toContain('Paragraph 3')
+    }
+    finally {
+      wrapper.unmount()
+      process.env.NODE_ENV = originalNodeEnv
+    }
+  })
+
+  it('does not batch an upstream one-character stream behind a second pacing queue', async () => {
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        final: false,
+        smoothStreaming: true,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    try {
+      let content = ''
+      for (const character of '矩阵：\n\\[\n\\begin{bmatrix}') {
+        content += character
+        await wrapper.setProps({ content })
+        await nextTick()
+
+        if (content.length >= 2) {
+          const renderContent = wrapper.vm.$?.setupState?.renderContent as string | undefined
+          expect(renderContent).toBe(content)
+        }
+      }
+
+      expect(queuedFrames.length).toBeLessThanOrEqual(1)
+    }
+    finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('does not flush a large paced backlog when small chunks follow it', async () => {
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        final: false,
+        smoothStreaming: true,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    try {
+      const largeChunk = 'a'.repeat(200)
+      await wrapper.setProps({ content: largeChunk })
+      await wrapper.setProps({ content: `${largeChunk}b` })
+      await wrapper.setProps({ content: `${largeChunk}bc` })
+      await nextTick()
+
+      const renderContent = wrapper.vm.$?.setupState?.renderContent as string | undefined
+      expect(renderContent).toBe('')
+      expect(queuedFrames.length).toBeGreaterThan(0)
+    }
+    finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('keeps completed transport content continuous while smooth streaming catches up', async () => {
+    const originalNodeEnv = process.env.NODE_ENV
+    process.env.NODE_ENV = 'development'
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        final: false,
+        smoothStreaming: true,
+        batchRendering: true,
+        initialRenderBatchSize: 1,
+        renderBatchSize: 1,
+        renderBatchDelay: 100000,
+        maxLiveNodes: 0,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    try {
+      await nextTick()
+      queuedFrames.length = 0
+      await wrapper.setProps({
+        content: [
+          '5. Create a native module example (C++):',
+          '',
+          '```cpp',
+          '#include <bits/stdc++.h>',
+          'int main() { return 0; }',
+          '```',
+          '',
+          '6. Add the native module to the application:',
+          '',
+          '```ts',
+          'console.log("ready")',
+          '```',
+        ].join('\n'),
+        final: true,
+      })
+
+      const baseline = performance.now()
+      for (let step = 1; step <= 160 && queuedFrames.length > 0; step++) {
+        queuedFrames.shift()?.(baseline + step * 80)
+        await nextTick()
+        const visibleContent = wrapper.vm.$?.setupState?.renderContent as string | undefined
+        if (visibleContent?.includes('6. Add the native module'))
+          expect(wrapper.text()).toContain('Add')
+        if (wrapper.text().includes('console.log'))
+          break
+      }
+
+      expect(wrapper.text()).toContain('console.log')
+    }
+    finally {
+      wrapper.unmount()
+      process.env.NODE_ENV = originalNodeEnv
+    }
+  })
+
   it('does not smooth initial static content before mounted appends', async () => {
     const wrapper = mount(NodeRenderer, {
       props: {
@@ -309,15 +495,15 @@ describe('node renderer smooth streaming', () => {
     const initialVersion = readStreamRenderVersion(wrapper)
 
     // Initial append — visible is still empty (rAF not ticked)
-    await wrapper.setProps({ content: 'hello' })
+    await wrapper.setProps({ content: 'hello smooth streaming chunk one' })
     await nextTick()
 
     // More raw chunk appends without advancing rAF
-    await wrapper.setProps({ content: 'hello world 1' })
+    await wrapper.setProps({ content: 'hello smooth streaming chunk one and chunk two' })
     await nextTick()
-    await wrapper.setProps({ content: 'hello world 12' })
+    await wrapper.setProps({ content: 'hello smooth streaming chunk one and chunk two and chunk three' })
     await nextTick()
-    await wrapper.setProps({ content: 'hello world 123' })
+    await wrapper.setProps({ content: 'hello smooth streaming chunk one and chunk two and chunk three and chunk four' })
     await nextTick()
 
     // DOM should still show nothing (visible hasn't advanced)
@@ -325,7 +511,7 @@ describe('node renderer smooth streaming', () => {
     // streamRenderVersion increments from raw content changes.
     // Before the fix, each props.content change bumped streamRenderVersion,
     // which could trigger TextNode watchers even though visible was unchanged.
-    expect(wrapper.text()).not.toContain('hello world')
+    expect(wrapper.text()).not.toContain('hello smooth')
     expect(readStreamRenderVersion(wrapper)).toBe(initialVersion)
     wrapper.unmount()
   })

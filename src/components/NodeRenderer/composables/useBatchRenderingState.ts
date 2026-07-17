@@ -3,6 +3,7 @@ import type { NodeRendererProps } from '../../../types/node-renderer-props'
 import { computed, ref } from 'vue'
 
 export interface BatchRenderingStateOptions {
+  continuousStreaming?: ComputedRef<boolean>
   isClient: boolean
   isTestEnv: boolean
   renderAsFragment: ComputedRef<boolean>
@@ -72,6 +73,7 @@ export function useBatchRenderingState(
 
   const incrementalRenderingActive = computed(() => {
     return batchingEnabled.value
+      && !options.continuousStreaming?.value
       && !options.forceFullRenderFinalContent?.value
       && (props.maxLiveNodes ?? 0) <= 0
   })

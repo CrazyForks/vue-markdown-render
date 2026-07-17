@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { MathInlineNodeProps } from '../../types/component-props'
 import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useOffscreenHeavyNodeDeferral, useViewportPriority, useViewportPriorityOptions, waitForVisibilityOrAbort } from '../../composables/viewportPriority'
 import { normalizeKaTeXRenderInput } from '../../utils/normalizeKaTeXRenderInput'
 import { renderKaTeXWithBackpressure, setKaTeXCache, WORKER_BUSY_CODE } from '../../workers/katexWorkerClient'
 
@@ -13,13 +12,6 @@ const containerEl = ref<HTMLElement | null>(null)
 const displayMode = computed(() => props.node.markup === '$$')
 const mathContent = computed(() => normalizeKaTeXRenderInput(props.node.content))
 const isHydrating = getCurrentInstance()?.vnode.el?.nodeType === 1
-const deferOffscreenHeavyNodes = useOffscreenHeavyNodeDeferral()
-const viewportPriorityOptions = useViewportPriorityOptions()
-const viewportReady = ref(
-  typeof window === 'undefined'
-  || isHydrating
-  || !deferOffscreenHeavyNodes.value,
-)
 
 function resolveInitialState() {
   if (!props.node.content) {
@@ -38,14 +30,13 @@ function resolveInitialState() {
     }
   }
 
-  const katex = typeof window === 'undefined' || isHydrating || !deferOffscreenHeavyNodes.value
-    ? getKatexSync()
-    : null
+  const katex = getKatexSync()
   if (!katex) {
+    const keepHydrationFallback = typeof window === 'undefined' || isHydrating
     return {
       html: '',
-      text: props.node.loading ? '' : props.node.raw,
-      loading: props.node.loading,
+      text: keepHydrationFallback ? props.node.raw : '',
+      loading: !keepHydrationFallback,
     }
   }
 
@@ -79,8 +70,6 @@ let isUnmounted = false
 let currentAbortController: AbortController | null = null
 const renderingLoading = ref(initialState.loading)
 const renderingPending = ref(false)
-const registerVisibility = useViewportPriority()
-let visibilityHandle: ReturnType<typeof registerVisibility> | null = null
 
 if (initialState.html)
   hasRenderedOnce = true
@@ -119,29 +108,7 @@ async function renderMath() {
   const abortController = new AbortController()
   currentAbortController = abortController
 
-  // Mark pending before visibility wait. During restore, the element may be in
-  // layout but visually hidden; readiness must not reveal raw fallback as final.
   markRenderPending()
-
-  // Defer heavy work until visible on first render
-  if (!hasRenderedOnce && deferOffscreenHeavyNodes.value) {
-    try {
-      if (!visibilityHandle && containerEl.value) {
-        // Observe the always-visible wrapper, not the v-show hidden math span
-        visibilityHandle = registerVisibility(containerEl.value, {
-          rootMargin: viewportPriorityOptions?.value.rootMargin,
-          allowIdle: false,
-        })
-        viewportReady.value = visibilityHandle.isVisible.value
-      }
-      await waitForVisibilityOrAbort(visibilityHandle, abortController.signal)
-      viewportReady.value = true
-    }
-    catch {}
-  }
-  else if (!deferOffscreenHeavyNodes.value) {
-    viewportReady.value = true
-  }
 
   if (isUnmounted || renderId !== currentRenderId || abortController.signal.aborted) {
     clearRenderPending(renderId)
@@ -234,8 +201,6 @@ onBeforeUnmount(() => {
     currentAbortController.abort()
     currentAbortController = null
   }
-  visibilityHandle?.destroy?.()
-  visibilityHandle = null
 })
 </script>
 
@@ -246,7 +211,6 @@ onBeforeUnmount(() => {
     data-markstream-math="inline"
     :data-markstream-mode="renderedHtml ? 'katex' : renderedText ? 'fallback' : 'loading'"
     :data-markstream-pending="renderingPending ? 'true' : undefined"
-    :data-markstream-viewport-pending="deferOffscreenHeavyNodes && !viewportReady ? 'true' : undefined"
   >
     <span v-if="renderedHtml" class="math-inline" v-html="renderedHtml" />
     <span v-else-if="renderedText" class="math-inline math-inline--fallback">{{ renderedText }}</span>
@@ -294,11 +258,6 @@ onBeforeUnmount(() => {
   border: 2px solid color-mix(in srgb, var(--loading-spinner) 25%, transparent);
   border-top-color: color-mix(in srgb, var(--loading-spinner) 80%, transparent);
   will-change: transform;
-}
-
-.math-inline-wrapper[data-markstream-viewport-pending='true'] .math-inline__spinner {
-  animation: none !important;
-  will-change: auto;
 }
 
 .table-node-fade-enter-active,

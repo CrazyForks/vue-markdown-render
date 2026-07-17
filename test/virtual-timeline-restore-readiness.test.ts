@@ -1688,6 +1688,9 @@ describe('virtual timeline restore visual readiness', () => {
     expect(wrapper.get('.code-header-caption').text()).toBe('Typescript')
     expect(wrapper.get('.icon-slot').exists()).toBe(true)
     expect(wrapper.get('.code-block-container').classes()).toContain('border')
+    expect((root.element as HTMLElement).style.color).toBe('var(--vscode-editor-foreground, var(--markstream-code-fallback-fg, var(--code-fg)))')
+    expect((root.element as HTMLElement).style.backgroundColor).toBe('var(--vscode-editor-background, var(--markstream-code-fallback-bg, var(--code-bg)))')
+    expect((root.element as HTMLElement).style.borderColor).toBe('var(--markstream-code-border-color, var(--code-border))')
     expect(pre.classes()).not.toContain('border')
 
     wrapper.unmount()
