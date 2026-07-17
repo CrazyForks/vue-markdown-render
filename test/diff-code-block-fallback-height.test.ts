@@ -131,6 +131,37 @@ describe('diff CodeBlockNode fallback height stability', () => {
     wrapper.unmount()
   })
 
+  it('keeps the default diff fallback padding aligned with the final surface', async () => {
+    const helpers = getStreamMonacoHelpers()
+    helpers.createDiffEditor.mockImplementation(() => new Promise<void>(() => {}))
+
+    const wrapper = mount(CodeBlockNode, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '',
+          raw: '',
+          diff: true,
+          originalCode: 'const a = 1',
+          updatedCode: 'const a = 2',
+        },
+        loading: false,
+        stream: true,
+        showHeader: false,
+      },
+    })
+
+    await flushPendingMicrotasks()
+
+    const pre = wrapper.get('pre.code-pre-fallback').element as HTMLElement
+    expect(pre.style.paddingTop).toBe('0px')
+    expect(pre.style.paddingBottom).toBe('0px')
+    expect(helpers.useMonaco.mock.calls[0]?.[0]?.padding).toEqual({ top: 0, bottom: 0 })
+
+    wrapper.unmount()
+  })
+
   it('does not reserve the full source height for a folded diff fallback', async () => {
     const helpers = getStreamMonacoHelpers()
     helpers.createDiffEditor.mockImplementation(() => new Promise<void>(() => {}))

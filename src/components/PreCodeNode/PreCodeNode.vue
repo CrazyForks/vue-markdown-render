@@ -872,8 +872,8 @@ function getDiffLineStyle(index: number, side: 'original' | 'modified') {
   padding: var(--markstream-code-padding-y, 8px) var(--markstream-code-padding-x, 12px);
   padding-left: var(--markstream-code-padding-left);
   overflow: auto;
-  border: 1px solid var(--code-border);
-  border-radius: var(--ms-radius);
+  border: 0;
+  border-radius: 0;
   background: var(--code-bg);
   color: var(--code-fg);
   font-family: var(

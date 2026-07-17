@@ -1674,6 +1674,7 @@ function estimateNodeHeight(node: ParsedNode, index: number, width: number) {
         rendererKind,
         monacoOptions: rendererProps.codeBlockMonacoOptions,
         showHeader: resolveCodeBlockShowHeader(),
+        width,
       })
     }
   }
@@ -5460,6 +5461,7 @@ const renderedItems = computed(() => {
           ...bindings,
           estimatedHeightPx: estimatedHeight.height,
           estimatedContentHeightPx: estimatedHeight.contentHeight,
+          estimatedDiffInline: estimatedHeight.diffInline,
         }
       }
     }

@@ -64,6 +64,7 @@ export interface MonacoHelpers {
   safeClean?: () => void
   refreshDiffPresentation?: () => Promise<unknown> | unknown
   setTheme?: (theme: CodeBlockMonacoTheme | undefined) => Promise<void> | void
+  whenVisualReady?: () => Promise<boolean>
 }
 
 export interface MonacoModule {

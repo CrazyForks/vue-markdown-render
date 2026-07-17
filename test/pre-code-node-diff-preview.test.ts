@@ -6,7 +6,7 @@ import { nextTick } from 'vue'
 import PreCodeNode from '../src/components/PreCodeNode'
 
 describe('pre code node diff preview', () => {
-  it('styles async code block loading fallback as a code surface', () => {
+  it('styles async code block loading content inside the bordered shell', () => {
     const source = readFileSync('src/components/PreCodeNode/PreCodeNode.vue', 'utf8')
     const selector = '.markstream-vue pre.code-pre-fallback[data-markstream-code-loading=\'1\']'
     const start = source.indexOf(selector)
@@ -16,7 +16,8 @@ describe('pre code node diff preview', () => {
 
     expect(rule).toContain('background: var(--code-bg)')
     expect(rule).toContain('color: var(--code-fg)')
-    expect(rule).toContain('border: 1px solid var(--code-border)')
+    expect(rule).toContain('border: 0')
+    expect(rule).toContain('border-radius: 0')
     expect(rule).toContain('font-family: var(')
   })
 

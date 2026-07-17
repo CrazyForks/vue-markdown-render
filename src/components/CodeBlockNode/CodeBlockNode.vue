@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CodeBlockDiffHideUnchangedRegions, CodeBlockDiffHideUnchangedRegionsOptions, CodeBlockMonacoTheme, CodeBlockNodeProps, CodeBlockPreviewPayload } from '../../types/component-props'
+import type { CodeBlockMonacoTheme, CodeBlockNodeProps, CodeBlockPreviewPayload } from '../../types/component-props'
 import type { MonacoDiffEditorViewLike, MonacoDisposableLike, MonacoEditorViewLike, MonacoNamespaceLike, MonacoRuntimeOptions } from './monaco'
 // Avoid static import of `stream-monaco` for types so the runtime bundle
 // doesn't get a reference. Define minimal local types we need here.
@@ -15,6 +15,13 @@ import { MARKSTREAM_NODE_LIFECYCLE_KEY } from '../../utils/nodeLifecycle'
 import { resolveLanguageIcon } from '../../utils/resolveLanguageIcon'
 import { safeCancelRaf, safeRaf } from '../../utils/safeRaf'
 import PreCodeNode from '../PreCodeNode'
+import {
+  defaultDiffHideUnchangedRegions,
+  isDiffCodeBlock,
+  resolveCodeBlockHeader,
+  resolveDiffHideUnchangedRegionsOption,
+  resolveDiffInlineLayout,
+} from './codeBlockHeader'
 import CodeBlockShell from './CodeBlockShell.vue'
 import HtmlPreviewFrame from './HtmlPreviewFrame.vue'
 import {
@@ -25,6 +32,7 @@ const props = withDefaults(
   defineProps<CodeBlockNodeProps & {
     estimatedHeightPx?: number
     estimatedContentHeightPx?: number
+    estimatedDiffInline?: boolean
   }>(),
   {
     isShowPreview: true,
@@ -325,6 +333,7 @@ let getDiffEditorView: () => MonacoDiffEditorViewLike | null = () => ({ getModel
 let cleanupEditor: () => void = () => {}
 let safeClean = () => {}
 let refreshDiffPresentation: () => Promise<unknown> | unknown = () => {}
+let whenRuntimeVisualReady: (() => Promise<boolean>) | null = null
 let createEditorPromise: Promise<void> | null = null
 let editorRuntimeCreationPromise: Promise<void> | null = null
 let monacoRuntimePromise: Promise<void> | null = null
@@ -335,43 +344,14 @@ let pendingDiffResultErrorFilterCleanup: (() => void) | null = null
 const editorHeightSyncDisposables: MonacoDisposableLike[] = []
 const inlineFoldProxyCleanups: Array<() => void> = []
 let runtimeMonacoOptions: MonacoRuntimeOptions | null = null
-function isDiffFenceInfo(value: unknown) {
-  const firstToken = String(value ?? '').trim().split(/\s+/, 1)[0] ?? ''
-  return firstToken === 'diff'
-}
-
-const isDiff = computed(() => {
-  return props.node.diff === true
-    || isDiffFenceInfo(props.node.language)
-    || isDiffFenceInfo(parseCodeFenceInfo(String(props.node.raw ?? '')))
-})
+const isDiff = computed(() => isDiffCodeBlock(props.node))
 const diffStats = ref({ removed: 0, added: 0 })
 const diffStatsAriaLabel = computed(() => `-${diffStats.value.removed} +${diffStats.value.added}`)
-const defaultDiffHideUnchangedRegions = Object.freeze({
-  enabled: true,
-  contextLineCount: 2,
-  minimumLineCount: 4,
-  revealLineCount: 5,
-})
 const disabledDiffHideUnchangedRegions = Object.freeze({
   ...defaultDiffHideUnchangedRegions,
   enabled: false,
   revealLineCount: 0,
 })
-function resolveDiffHideUnchangedRegionsOption(value: unknown): CodeBlockDiffHideUnchangedRegions {
-  if (typeof value === 'boolean')
-    return value
-  if (value && typeof value === 'object') {
-    const raw = value as Record<string, unknown>
-    return {
-      ...defaultDiffHideUnchangedRegions,
-      ...raw,
-      enabled: raw.enabled ?? true,
-    } as CodeBlockDiffHideUnchangedRegionsOptions
-  }
-  return { ...defaultDiffHideUnchangedRegions }
-}
-
 function resolveDiffWordWrapOption(raw: Record<string, unknown>) {
   if (raw.diffWordWrap !== undefined)
     return raw.diffWordWrap
@@ -380,20 +360,10 @@ function resolveDiffWordWrapOption(raw: Record<string, unknown>) {
 }
 
 function shouldUseInlineDiffLayout(options: Record<string, unknown>) {
-  if (options.renderSideBySide === false)
-    return true
-
-  if (options.useInlineViewWhenSpaceIsLimited !== true)
-    return false
-
-  const rawBreakpoint = options.renderSideBySideInlineBreakpoint
-  const breakpoint = typeof rawBreakpoint === 'number' && Number.isFinite(rawBreakpoint)
-    ? rawBreakpoint
-    : 900
   const width = container.value?.getBoundingClientRect?.().width
     || container.value?.clientWidth
     || (typeof window === 'undefined' ? 0 : window.innerWidth)
-  return width > 0 && width <= breakpoint
+  return resolveDiffInlineLayout(options, width)
 }
 
 function resolveDiffScrollbar(raw: Record<string, unknown>) {
@@ -735,6 +705,7 @@ async function ensureMonacoRuntime() {
       safeClean = helpers.safeClean || helpers.cleanupEditor || safeClean
       refreshDiffPresentation = helpers.refreshDiffPresentation || refreshDiffPresentation
       setTheme = helpers.setTheme || setTheme
+      whenRuntimeVisualReady = helpers.whenVisualReady || null
       monacoReady.value = true
     }
     catch (err) {
@@ -813,12 +784,13 @@ const preFallbackTabSize = computed(() => {
 })
 const preFallbackVerticalPadding = computed(() => {
   const padding = props.monacoOptions?.padding
-  const top = typeof padding?.top === 'number' && Number.isFinite(padding.top) && padding.top > 0
+  const defaultPadding = isDiff.value ? 0 : 8
+  const top = typeof padding?.top === 'number' && Number.isFinite(padding.top) && padding.top >= 0
     ? padding.top
-    : 0
-  const bottom = typeof padding?.bottom === 'number' && Number.isFinite(padding.bottom) && padding.bottom > 0
+    : defaultPadding
+  const bottom = typeof padding?.bottom === 'number' && Number.isFinite(padding.bottom) && padding.bottom >= 0
     ? padding.bottom
-    : 0
+    : defaultPadding
   return { top, bottom }
 })
 // Keep computed height tight to content. Extra padding caused visible bottom gap.
@@ -1046,11 +1018,11 @@ const codeEditorContainerStyle = computed(() => {
   // While the diff fallback pre is visible, the hidden Monaco host must not
   // participate in layout. The fallback pre owns the row height.
   if (isDiff.value && showPreWhileMonacoLoads.value)
-    return undefined
+    return {}
 
   const reserved = reservedEditorContentHeight.value
   if (!shouldReserveEstimatedEditorHeight.value || reserved == null)
-    return undefined
+    return {}
   return {
     minHeight: `${reserved}px`,
   }
@@ -1078,11 +1050,13 @@ function syncDiffScrollFromFallback() {
 
 async function revealEditorDisplay() {
   if (!isDiff.value) {
+    if (whenRuntimeVisualReady && !await whenRuntimeVisualReady())
+      return false
     editorDisplayReady.value = true
     await nextTick()
     syncEditorHostHeight(false)
     layoutEditorToHost()
-    return
+    return true
   }
 
   // The editor is fully prepared while hidden. Flip the two layers in one Vue
@@ -1099,6 +1073,11 @@ async function revealEditorDisplay() {
   layoutEditorToHost(true)
   await waitForAnimationFrame()
   layoutEditorToHost(true)
+  if (whenRuntimeVisualReady && !await whenRuntimeVisualReady())
+    return false
+  syncFallbackFontMetricsFromEditor()
+  syncDiffRevealHostHeight()
+  layoutEditorToHost(true)
   editorDisplayReady.value = true
   await nextTick()
   syncDiffRevealHostHeight()
@@ -1106,6 +1085,7 @@ async function revealEditorDisplay() {
   syncFallbackFontMetricsFromEditor()
   syncInlineFoldProxies()
   scheduleEditorHeightSync()
+  return true
 }
 
 function syncDiffRevealHostHeight() {
@@ -1792,7 +1772,7 @@ function computeContentHeight(): number | null {
       if (h > 0) {
         if (!isDiff.value)
           plainEditorContentMeasured.value = true
-        return Math.ceil(h + PIXEL_EPSILON)
+        return Math.ceil(h)
       }
     }
     // generic fallback
@@ -1802,7 +1782,7 @@ function computeContentHeight(): number | null {
       lineCount = model.getLineCount()
     }
     const lh = getLineHeightSafe(editor)
-    return Math.ceil(lineCount * (lh + LINE_EXTRA_PER_LINE) + CONTENT_PADDING + PIXEL_EPSILON)
+    return Math.ceil(lineCount * (lh + LINE_EXTRA_PER_LINE) + CONTENT_PADDING)
   }
   catch {
     return null
@@ -3448,51 +3428,13 @@ const displayLanguage = computed(() => {
   return languageMap[lang] || lang.charAt(0).toUpperCase() + lang.slice(1)
 })
 
-function parseCodeFenceInfo(raw: string) {
-  const firstLine = String(raw ?? '').split(/\r?\n/, 1)[0]?.trim() ?? ''
-  if (firstLine.length < 3)
-    return ''
-  const marker = firstLine[0]
-  if ((marker !== '`' && marker !== '~') || firstLine[1] !== marker || firstLine[2] !== marker)
-    return ''
-
-  let index = 3
-  while (firstLine[index] === marker)
-    index += 1
-
-  return firstLine.slice(index).trim()
-}
-
-function extractCodeBlockFileLabel(raw: string) {
-  const info = parseCodeFenceInfo(raw)
-  if (!info)
-    return ''
-
-  const tokens = info.split(/\s+/).filter(Boolean)
-  if (!tokens.length)
-    return ''
-
-  const candidates = tokens[0] === 'diff' ? tokens.slice(1) : tokens
-  for (const token of candidates) {
-    const value = token.includes(':')
-      ? token.slice(token.indexOf(':') + 1)
-      : token
-    if (!value)
-      continue
-    if (/[./\\-]/.test(value))
-      return value
-  }
-
-  return ''
-}
-
-const codeFileLabel = computed(() => extractCodeBlockFileLabel(String(props.node.raw ?? '')))
-const headerTitle = computed(() => codeFileLabel.value || displayLanguage.value)
-const headerCaption = computed(() => {
-  if (!codeFileLabel.value)
-    return ''
-  return isDiff.value ? `Diff / ${displayLanguage.value}` : displayLanguage.value
-})
+const codeBlockHeader = computed(() => resolveCodeBlockHeader(
+  String(props.node.raw ?? ''),
+  displayLanguage.value,
+  isDiff.value,
+))
+const headerTitle = computed(() => codeBlockHeader.value.title)
+const headerCaption = computed(() => codeBlockHeader.value.caption)
 
 // Computed property for language icon
 const languageIcon = computed(() => {
@@ -3771,10 +3713,21 @@ async function runEditorCreation(el: HTMLElement) {
   refreshDiffStats()
   scheduleEditorHeightSync()
   await nextTick()
-  // Geometry, diff decorations, and syntax tokens must be ready before handoff.
-  const diffVisualReady = creationKind === 'diff'
-    ? await waitForDiffEditorVisualReady({ requireHighlight: true })
-    : await waitForSingleEditorVisualReady()
+  // stream-diffs owns its asynchronous highlight commit. Keep the fallback
+  // visible until that runtime confirms the first visual frame is complete.
+  let runtimeVisualReady: boolean | null = null
+  if (whenRuntimeVisualReady) {
+    runtimeVisualReady = await whenRuntimeVisualReady()
+    if (runtimeVisualReady) {
+      await nextTick()
+      await waitForAnimationFrame()
+    }
+  }
+  const diffVisualReady = runtimeVisualReady == null
+    ? creationKind === 'diff'
+      ? await waitForDiffEditorVisualReady({ requireHighlight: true })
+      : await waitForSingleEditorVisualReady()
+    : runtimeVisualReady
   if (isUnmounted)
     return
   if (!diffVisualReady) {
@@ -3783,7 +3736,8 @@ async function runEditorCreation(el: HTMLElement) {
   }
   syncFallbackFontMetricsFromEditor()
   syncDiffRevealHostHeight()
-  await revealEditorDisplay()
+  if (!await revealEditorDisplay())
+    markEditorCreationFailed()
 }
 
 function ensureEditorCreation(el: HTMLElement, options: { allowStaleContentRetry?: boolean } = {}) {

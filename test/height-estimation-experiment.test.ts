@@ -145,7 +145,7 @@ describe('height estimation experiment internals', () => {
     expect(loadingWithTerminalNewline?.contentHeight).toBe(withBlankLine?.contentHeight)
   })
 
-  it('estimates ordinary monaco code blocks from visible line height only', () => {
+  it('includes the native surface padding in ordinary monaco code block estimates', () => {
     const code = Array.from({ length: 24 }, (_, index) => `line ${index + 1}`).join('\n')
     const estimated = estimateCodeBlockHeight(
       {
@@ -164,8 +164,104 @@ describe('height estimation experiment internals', () => {
       },
     )
 
-    expect(estimated?.contentHeight).toBe(432)
-    expect(estimated?.height).toBe(432)
+    expect(estimated?.contentHeight).toBe(448)
+    expect(estimated?.height).toBe(448)
+  })
+
+  it('estimates split and inline diff rows independently', () => {
+    const node = {
+      type: 'code_block',
+      language: 'diff',
+      code: 'same\nnew\ntail',
+      raw: [
+        'diff --git a/value.ts b/value.ts',
+        'index 1234567..7654321 100644',
+        '--- a/value.ts',
+        '+++ b/value.ts',
+        '@@ -1,3 +1,3 @@',
+        ' same',
+        '-old',
+        '+new',
+        ' tail',
+        '',
+      ].join('\n'),
+      diff: true,
+      originalCode: 'same\nold\ntail\n',
+      updatedCode: 'same\nnew\ntail\n',
+    } as any
+    const split = estimateCodeBlockHeight(
+      node,
+      {
+        rendererKind: 'monaco',
+        monacoOptions: {
+          lineHeight: 18,
+          padding: { top: 0, bottom: 0 },
+        },
+        showHeader: false,
+      },
+    )
+    const inline = estimateCodeBlockHeight(
+      node,
+      {
+        rendererKind: 'monaco',
+        monacoOptions: {
+          lineHeight: 18,
+          padding: { top: 0, bottom: 0 },
+          renderSideBySide: false,
+        },
+        showHeader: false,
+      },
+    )
+
+    expect(split?.contentHeight).toBe(54)
+    expect(inline?.contentHeight).toBe(72)
+  })
+
+  it('uses the responsive inline layout below the configured breakpoint', () => {
+    const node = {
+      type: 'code_block',
+      language: 'diff',
+      code: 'new',
+      raw: '-old\n+new\n',
+      diff: true,
+      originalCode: 'old\n',
+      updatedCode: 'new\n',
+    } as any
+    const options = {
+      rendererKind: 'monaco' as const,
+      monacoOptions: {
+        lineHeight: 18,
+        padding: { top: 0, bottom: 0 },
+        useInlineViewWhenSpaceIsLimited: true,
+        renderSideBySideInlineBreakpoint: 600,
+      },
+      showHeader: false,
+    }
+
+    expect(estimateCodeBlockHeight(node, { ...options, width: 500 })?.contentHeight).toBe(36)
+    expect(estimateCodeBlockHeight(node, { ...options, width: 700 })?.contentHeight).toBe(18)
+  })
+
+  it('estimates split patch rows without source pairs', () => {
+    const estimated = estimateCodeBlockHeight(
+      {
+        type: 'code_block',
+        language: 'diff',
+        code: '-old\n+new',
+        raw: '-old\n+new\n',
+        diff: true,
+      } as any,
+      {
+        rendererKind: 'monaco',
+        monacoOptions: {
+          lineHeight: 18,
+          padding: { top: 0, bottom: 0 },
+        },
+        showHeader: false,
+      },
+    )
+
+    expect(estimated?.contentHeight).toBe(18)
   })
 
   it('caps monaco estimate by max height', () => {

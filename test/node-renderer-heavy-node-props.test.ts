@@ -424,10 +424,11 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
       },
     })
 
-    for (let attempt = 0; attempt < 10 && !wrapper.find('.code-block-container').exists(); attempt++)
-      await flushAll()
+    await vi.waitFor(() => {
+      expect(wrapper.find('.code-block-container[data-has-monaco-options]').exists()).toBe(true)
+    })
 
-    const shiki = wrapper.get('.code-block-container')
+    const shiki = wrapper.get('.code-block-container[data-has-monaco-options]')
     expect(wrapper.find('[data-markstream-code-block="1"]').exists()).toBe(false)
     expect(shiki.attributes('data-has-monaco-options')).toBe('false')
   })
@@ -448,8 +449,9 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
       },
     })
 
-    for (let attempt = 0; attempt < 10 && !wrapper.find('.code-block-container').exists(); attempt++)
-      await flushAll()
+    await vi.waitFor(() => {
+      expect(wrapper.find('.code-block-container[data-langs]').exists()).toBe(true)
+    })
 
     expect(wrapper.get('.code-block-container').attributes('data-langs')).toBe('["typescript"]')
 
@@ -487,8 +489,9 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
       },
     })
 
-    for (let attempt = 0; attempt < 10 && !wrapper.find('.code-block-container').exists(); attempt++)
-      await flushAll()
+    await vi.waitFor(() => {
+      expect(wrapper.find('.answer-box .code-block-container[data-langs]').exists()).toBe(true)
+    })
 
     expect(wrapper.get('.answer-box .code-block-container').attributes('data-langs')).toBe('["typescript"]')
   })
@@ -516,8 +519,9 @@ describe('nodeRenderer heavy-node prop forwarding', () => {
       },
     })
 
-    for (let attempt = 0; attempt < 10 && !wrapper.find('li .code-block-container').exists(); attempt++)
-      await flushAll()
+    await vi.waitFor(() => {
+      expect(wrapper.find('li .code-block-container[data-langs]').exists()).toBe(true)
+    })
 
     const nestedCodeBlock = wrapper.get('li .code-block-container')
     expect(nestedCodeBlock.attributes('data-langs')).toBe('["tsx"]')

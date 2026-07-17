@@ -1419,6 +1419,10 @@ function reconcileRecordSize(
     const restoredFloor = getRestoredItemHeightFloor(record.key, itemSizeSource)
     const growsPastRestoredFloor = restoredFloor > 0
       && next > restoredFloor + ITEM_SIZE_RECONCILE_DEADBAND_PX
+      && (
+        !getMarkstreamTimelineItemFinal(getRecordLiveItem(record), record.index, props)
+        || options.allowRestoredFloorShrink === true
+      )
     const readyToReleaseRestoredFloor = record.markdown
       && restoredFloor > 0
       && (options.allowRestoredFloorShrink === true || growsPastRestoredFloor)

@@ -1645,25 +1645,144 @@ describe('virtual timeline restore visual readiness', () => {
 
     const wrapper = mount(CodeBlockNodeLoading as any, {
       attrs: {
-        node: {
+        'node': {
           type: 'code_block',
           language: 'ts',
           code: 'const x = 1',
-          raw: '```ts\nconst x = 1\n```',
+          raw: '```ts src/example.ts\nconst x = 1\n```',
           loading: true,
         },
-        estimatedHeightPx: 240,
-        estimatedContentHeightPx: 123.2,
+        'estimatedHeightPx': 240,
+        'estimatedContentHeightPx': 123.2,
+        'monacoOptions': {
+          fontSize: 13,
+          lineHeight: 20,
+          fontFamily: 'Test Mono',
+          tabSize: 3,
+          padding: { top: 5, bottom: 7 },
+        },
+        'style': { width: '73%' },
+        'data-root-probe': 'outer',
       },
     })
 
     const pre = wrapper.get('pre.code-pre-fallback')
+    const root = wrapper.get('.code-block-container')
     expect(pre.attributes('data-markstream-code-loading')).toBe('1')
-    expect(pre.attributes('style')).not.toMatch(/(?:^|;\s*)height: 240px/)
-    expect(pre.attributes('style')).not.toMatch(/(?:^|;\s*)min-height: 240px/)
-    expect(pre.attributes('style')).toContain('max-height: 240px')
+    expect(root.attributes('data-markstream-code-loading')).toBe('1')
+    expect(root.attributes('data-root-probe')).toBe('outer')
+    expect(root.attributes('style')).toContain('width: 73%')
+    expect(pre.attributes('data-root-probe')).toBeUndefined()
+    expect(pre.attributes('style')).not.toMatch(/(?:^|;\s*)height: 123px/)
+    expect(pre.attributes('style')).not.toMatch(/(?:^|;\s*)min-height: 123px/)
+    expect(pre.attributes('style')).toContain('max-height: 124px')
     expect(pre.attributes('style')).toContain('overflow: auto')
+    expect((pre.element as HTMLElement).style.fontSize).toBe('13px')
+    expect((pre.element as HTMLElement).style.lineHeight).toBe('20px')
+    expect((pre.element as HTMLElement).style.fontFamily).toBe('')
+    expect((pre.element as HTMLElement).style.getPropertyValue('--markstream-code-font-family')).toBe('Test Mono')
+    expect((pre.element as HTMLElement).style.tabSize).toBe('3')
+    expect((pre.element as HTMLElement).style.paddingTop).toBe('5px')
+    expect((pre.element as HTMLElement).style.paddingBottom).toBe('7px')
+    expect(wrapper.get('.code-header-title').text()).toBe('src/example.ts')
+    expect(wrapper.get('.code-header-caption').text()).toBe('Typescript')
+    expect(wrapper.get('.icon-slot').exists()).toBe(true)
+    expect(wrapper.get('.code-block-container').classes()).toContain('border')
+    expect(pre.classes()).not.toContain('border')
 
+    wrapper.unmount()
+  })
+
+  it('reserves preview-only and diff-only header chrome while loading', async () => {
+    const { CodeBlockNodeLoading } = await import('../src/components/NodeRenderer/asyncComponent')
+    const disabledActions = {
+      showCopyButton: false,
+      showCollapseButton: false,
+      showFontSizeButtons: false,
+      enableFontSizeControl: false,
+      showExpandButton: false,
+    }
+
+    const preview = mount(CodeBlockNodeLoading as any, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'html',
+          code: '<p>preview</p>',
+          raw: '```html\n<p>preview</p>\n```',
+          loading: true,
+        },
+        ...disabledActions,
+        isShowPreview: true,
+        showPreviewButton: true,
+      },
+    })
+    expect(preview.findAll('.code-action-btn')).toHaveLength(1)
+    preview.unmount()
+
+    const diff = mount(CodeBlockNodeLoading as any, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '',
+          raw: '```diff\n-old\n+new\n```',
+          diff: true,
+          originalCode: 'old',
+          updatedCode: 'new',
+          loading: true,
+        },
+        estimatedContentHeightPx: 36,
+        ...disabledActions,
+        showPreviewButton: false,
+      },
+    })
+    expect(diff.findAll('.code-action-btn')).toHaveLength(0)
+    expect(diff.findAll('.code-diff-stat')).toHaveLength(2)
+    expect(diff.get('.code-block-container').classes()).toContain('is-diff')
+    expect(diff.get('pre.code-pre-fallback').attributes('style')).not.toContain('36px')
+    expect(diff.get('pre.code-pre-fallback').classes()).not.toContain('markstream-pre--diff-inline')
+    await diff.setProps({ monacoOptions: { renderSideBySide: false } })
+    expect(diff.get('pre.code-pre-fallback').classes()).toContain('markstream-pre--diff-inline')
+    diff.unmount()
+  })
+
+  it('keeps async loading container state aligned with the final shell', async () => {
+    const { CodeBlockNodeLoading } = await import('../src/components/NodeRenderer/asyncComponent')
+    const wrapper = mount(CodeBlockNodeLoading as any, {
+      props: {
+        node: {
+          type: 'code_block',
+          language: 'diff',
+          code: '-const before = true\n+const ready = true',
+          raw: '```diff\n-const before = true\n+const ready = true\n```',
+          diff: true,
+          originalCode: 'const before = true',
+          updatedCode: 'const ready = true',
+          loading: true,
+        },
+        loading: true,
+        stream: false,
+        isDark: true,
+        minWidth: 120,
+        maxWidth: '80%',
+        monacoOptions: { lineHeight: 20 },
+      },
+    })
+
+    const root = wrapper.get('.code-block-container')
+    expect(root.classes()).toContain('dark')
+    expect(root.classes()).toContain('is-dark')
+    expect(root.classes()).toContain('is-rendering')
+    expect(root.attributes('style')).toContain('min-width: 120px')
+    expect(root.attributes('style')).toContain('max-width: 80%')
+    expect(wrapper.get('pre.code-pre-fallback').attributes('style')).toContain('--markstream-pre-diff-line-height: 20px')
+    expect(wrapper.get('.code-block-shell-content').attributes('style')).toContain('display: none')
+    expect(wrapper.get('.code-loading-placeholder').attributes('style') ?? '').not.toContain('display: none')
+
+    await wrapper.setProps({ loading: false })
+    expect(wrapper.get('.code-block-shell-content').attributes('style') ?? '').not.toContain('display: none')
+    expect(wrapper.get('.code-loading-placeholder').attributes('style')).toContain('display: none')
     wrapper.unmount()
   })
 
