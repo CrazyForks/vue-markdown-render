@@ -123,6 +123,80 @@ describe('node renderer smooth streaming', () => {
     }
   })
 
+  it('does not batch an upstream one-character stream behind a second pacing queue', async () => {
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        final: false,
+        smoothStreaming: true,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    try {
+      let content = ''
+      for (const character of '矩阵：\n\\[\n\\begin{bmatrix}') {
+        content += character
+        await wrapper.setProps({ content })
+        await nextTick()
+
+        if (content.length >= 2) {
+          const renderContent = wrapper.vm.$?.setupState?.renderContent as string | undefined
+          expect(renderContent).toBe(content)
+        }
+      }
+
+      expect(queuedFrames.length).toBeLessThanOrEqual(1)
+    }
+    finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('does not flush a large paced backlog when small chunks follow it', async () => {
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        final: false,
+        smoothStreaming: true,
+        batchRendering: false,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    try {
+      const largeChunk = 'a'.repeat(200)
+      await wrapper.setProps({ content: largeChunk })
+      await wrapper.setProps({ content: `${largeChunk}b` })
+      await wrapper.setProps({ content: `${largeChunk}bc` })
+      await nextTick()
+
+      const renderContent = wrapper.vm.$?.setupState?.renderContent as string | undefined
+      expect(renderContent).toBe('')
+      expect(queuedFrames.length).toBeGreaterThan(0)
+    }
+    finally {
+      wrapper.unmount()
+    }
+  })
+
   it('keeps completed transport content continuous while smooth streaming catches up', async () => {
     const originalNodeEnv = process.env.NODE_ENV
     process.env.NODE_ENV = 'development'
@@ -421,15 +495,15 @@ describe('node renderer smooth streaming', () => {
     const initialVersion = readStreamRenderVersion(wrapper)
 
     // Initial append — visible is still empty (rAF not ticked)
-    await wrapper.setProps({ content: 'hello' })
+    await wrapper.setProps({ content: 'hello smooth streaming chunk one' })
     await nextTick()
 
     // More raw chunk appends without advancing rAF
-    await wrapper.setProps({ content: 'hello world 1' })
+    await wrapper.setProps({ content: 'hello smooth streaming chunk one and chunk two' })
     await nextTick()
-    await wrapper.setProps({ content: 'hello world 12' })
+    await wrapper.setProps({ content: 'hello smooth streaming chunk one and chunk two and chunk three' })
     await nextTick()
-    await wrapper.setProps({ content: 'hello world 123' })
+    await wrapper.setProps({ content: 'hello smooth streaming chunk one and chunk two and chunk three and chunk four' })
     await nextTick()
 
     // DOM should still show nothing (visible hasn't advanced)
@@ -437,7 +511,7 @@ describe('node renderer smooth streaming', () => {
     // streamRenderVersion increments from raw content changes.
     // Before the fix, each props.content change bumped streamRenderVersion,
     // which could trigger TextNode watchers even though visible was unchanged.
-    expect(wrapper.text()).not.toContain('hello world')
+    expect(wrapper.text()).not.toContain('hello smooth')
     expect(readStreamRenderVersion(wrapper)).toBe(initialVersion)
     wrapper.unmount()
   })

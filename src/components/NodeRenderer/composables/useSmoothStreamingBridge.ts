@@ -14,6 +14,8 @@ const DEFAULT_RENDERER_SMOOTH_STREAMING_OPTIONS = {
   catchUpThreshold: 400,
 }
 
+const CONTINUOUS_STREAM_CHUNK_MAX_LENGTH = 8
+
 export interface SmoothStreamingBridgeOptions {
   isClient: boolean
   inheritedSmoothStreaming?: { value?: boolean }
@@ -90,10 +92,19 @@ export function useSmoothStreamingBridge(
     return finalRequested
   })
 
+  let consecutiveSmallAppends = 0
+  let continuousSmallStream = false
+
+  function resetContinuousStreamDetection() {
+    consecutiveSmallAppends = 0
+    continuousSmallStream = false
+  }
+
   watch(
     [() => props.content, () => props.nodes, smoothStreamingEnabled, requestedFinal],
     ([content, nodes, enabled, finalRequested]) => {
       if (nodes?.length) {
+        resetContinuousStreamDetection()
         smoothStream.reset('')
         return
       }
@@ -101,6 +112,7 @@ export function useSmoothStreamingBridge(
       const nextContent = content ?? ''
 
       if (!enabled) {
+        resetContinuousStreamDetection()
         smoothStream.reset(nextContent)
 
         if (finalRequested)
@@ -112,15 +124,35 @@ export function useSmoothStreamingBridge(
       const source = smoothStream.source.value
 
       if (!nextContent) {
+        resetContinuousStreamDetection()
         smoothStream.reset('')
       }
       else if (nextContent === source) {
         // no-op
       }
       else if (nextContent.startsWith(source)) {
-        smoothStream.enqueue(nextContent.slice(source.length))
+        const appended = nextContent.slice(source.length)
+        const pendingBeforeAppend = smoothStream.pendingChars.value
+        if (appended.length <= CONTINUOUS_STREAM_CHUNK_MAX_LENGTH) {
+          consecutiveSmallAppends++
+          if (continuousSmallStream || (
+            consecutiveSmallAppends >= 2
+            && pendingBeforeAppend <= CONTINUOUS_STREAM_CHUNK_MAX_LENGTH
+          )) {
+            continuousSmallStream = true
+            smoothStream.reset(nextContent)
+          }
+          else {
+            smoothStream.enqueue(appended)
+          }
+        }
+        else {
+          resetContinuousStreamDetection()
+          smoothStream.enqueue(appended)
+        }
       }
       else {
+        resetContinuousStreamDetection()
         smoothStream.reset(nextContent)
       }
 
