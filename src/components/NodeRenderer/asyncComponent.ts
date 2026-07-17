@@ -32,11 +32,6 @@ function getProcessEnv() {
   return processValue?.env
 }
 
-function shouldAwaitKatexLoader() {
-  return typeof window === 'undefined'
-    || document.querySelector('[data-markstream-math][data-markstream-mode="katex"]') !== null
-}
-
 export function withViewportDeferredLoading(name: string, component: Component, loadingComponent: Component) {
   return defineComponent({
     name,
@@ -331,20 +326,7 @@ export const CodeBlockNodeAsync = withViewportDeferredLoading(
   CodeBlockNodeLoading,
 )
 
-const MathInlineNodeLoading = defineComponent({
-  name: 'MathInlineNodeLoading',
-  inheritAttrs: false,
-  setup(_props, { attrs }) {
-    const props = attrs as MathInlineFallbackProps
-    return () => h('span', {
-      'class': 'math-inline math-inline--fallback',
-      'data-markstream-math': 'inline',
-      'data-markstream-mode': 'fallback',
-    }, props.node.raw ?? `$${props.node.content ?? ''}$`)
-  },
-})
-
-const MathInlineNodeInnerAsync = defineAsyncComponent(async () => {
+export const MathInlineNodeAsync = defineAsyncComponent(async () => {
   // In test environment prefer the simple text fallback to avoid
   // race conditions with workers/KaTeX rendering.
   const isTestEnv = getProcessEnv()?.NODE_ENV === 'test'
@@ -363,8 +345,7 @@ const MathInlineNodeInnerAsync = defineAsyncComponent(async () => {
   }
 
   try {
-    if (shouldAwaitKatexLoader())
-      await getKatex()
+    await getKatex()
     const mod = await import('../../components/MathInlineNode')
     return mod.default
   }
@@ -386,29 +367,9 @@ const MathInlineNodeInnerAsync = defineAsyncComponent(async () => {
   }
 })
 
-export const MathInlineNodeAsync = withViewportDeferredLoading(
-  'ViewportDeferredMathInlineNode',
-  MathInlineNodeInnerAsync,
-  MathInlineNodeLoading,
-)
-
-const MathBlockNodeLoading = defineComponent({
-  name: 'MathBlockNodeLoading',
-  inheritAttrs: false,
-  setup(_props, { attrs }) {
-    const props = attrs as MathBlockFallbackProps
-    return () => h('pre', {
-      'class': 'math-block__fallback text-left',
-      'data-markstream-math': 'block',
-      'data-markstream-mode': 'fallback',
-    }, props.node.raw ?? `$$${props.node.content ?? ''}$$`)
-  },
-})
-
-const MathBlockNodeInnerAsync = defineAsyncComponent(async () => {
+export const MathBlockNodeAsync = defineAsyncComponent(async () => {
   try {
-    if (shouldAwaitKatexLoader())
-      await getKatex()
+    await getKatex()
     const mod = await import('../../components/MathBlockNode')
     return mod.default
   }
@@ -429,9 +390,3 @@ const MathBlockNodeInnerAsync = defineAsyncComponent(async () => {
     })
   }
 })
-
-export const MathBlockNodeAsync = withViewportDeferredLoading(
-  'ViewportDeferredMathBlockNode',
-  MathBlockNodeInnerAsync,
-  MathBlockNodeLoading,
-)

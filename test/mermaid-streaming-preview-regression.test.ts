@@ -29,6 +29,59 @@ afterEach(() => {
 })
 
 describe('mermaid streaming preview regression', () => {
+  it('falls back to the main thread when DOMPurify is unavailable in the worker', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    const canParseOffthread = vi.fn(async () => Promise.reject(new Error('purify.sanitize is not a function')))
+    const fakeMermaid = {
+      initialize: vi.fn(),
+      parse: vi.fn(async () => true),
+      render: vi.fn(async () => ({
+        svg: '<svg data-rendered="final" viewBox="0 0 10 10"><rect width="1" height="1" /></svg>',
+      })),
+    }
+
+    vi.doMock('../src/workers/mermaidWorkerClient', () => ({
+      canParseOffthread,
+      findPrefixOffthread: vi.fn(async () => null),
+      terminateWorker: vi.fn(),
+    }))
+    vi.doMock('../src/components/MermaidBlockNode/mermaid', () => ({
+      getMermaid: vi.fn(async () => fakeMermaid),
+      isMermaidEnabled: vi.fn(() => true),
+    }))
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const MermaidBlockNode = (await import('../src/components/MermaidBlockNode/MermaidBlockNode.vue')).default
+    const wrapper = mount(MermaidBlockNode as any, {
+      props: {
+        node: createNode('graph LR\nA[Label]-->B\n'),
+        loading: true,
+        renderDebounceMs: 10000,
+      },
+    })
+
+    ;(wrapper.vm as any).userToggledShowSource = true
+    await settleStreamingRender()
+    ;(wrapper.vm as any).mermaidAvailable = false
+    ;(wrapper.vm as any).showSource = false
+    await settleStreamingRender()
+
+    const loadingUpdate = wrapper.setProps({ loading: false })
+    ;(wrapper.vm as any).mermaidAvailable = true
+    await loadingUpdate
+    await settleStreamingRender(10)
+
+    expect(canParseOffthread).toHaveBeenCalled()
+    expect(fakeMermaid.parse).toHaveBeenCalledTimes(1)
+    expect(fakeMermaid.render).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('svg[data-rendered="final"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('Failed to render diagram')
+    expect(errorSpy).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
   it('does not retry a busy worker parse on the main thread', async () => {
     vi.useFakeTimers()
     vi.stubGlobal('IntersectionObserver', undefined as any)

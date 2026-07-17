@@ -144,8 +144,18 @@ function cleanupRuntime() {
 }
 
 function setupCommonRendererRuntime(rendererModule: Record<string, any>) {
-  rendererModule.enableKatex?.()
-  rendererModule.enableMermaid?.()
+  const katexUrl = createEsmPackageUrl('katex', TEST_SANDBOX_KATEX_VERSION)
+  const mermaidUrl = `https://cdn.jsdelivr.net/npm/mermaid@${TEST_SANDBOX_MERMAID_VERSION}/dist/mermaid.esm.min.mjs`
+
+  if (rendererModule.setKatexLoader)
+    rendererModule.setKatexLoader(() => importRemote(katexUrl))
+  else
+    rendererModule.enableKatex?.()
+
+  if (rendererModule.setMermaidLoader)
+    rendererModule.setMermaidLoader(() => importRemote(mermaidUrl))
+  else
+    rendererModule.enableMermaid?.()
 
   const katexHandle = rendererModule.createKaTeXWorkerFromCDN?.({
     mode: 'classic',
@@ -158,7 +168,7 @@ function setupCommonRendererRuntime(rendererModule: Record<string, any>) {
   const mermaidHandle = rendererModule.createMermaidWorkerFromCDN?.({
     mode: 'module',
     workerOptions: { type: 'module' },
-    mermaidUrl: `https://cdn.jsdelivr.net/npm/mermaid@${TEST_SANDBOX_MERMAID_VERSION}/dist/mermaid.esm.min.mjs`,
+    mermaidUrl,
   })
   if (mermaidHandle?.worker)
     rendererModule.setMermaidWorker?.(mermaidHandle.worker)
@@ -252,6 +262,7 @@ async function mountVue3Sandbox(current: SandboxSelection, content: string, moun
     render() {
       return h(MarkdownRender, {
         content,
+        final: true,
         isDark: sandboxIsDark.value,
         batchRendering: false,
         typewriter: false,
@@ -300,6 +311,7 @@ async function mountVue2Sandbox(current: SandboxSelection, content: string, moun
       return createElement(MarkdownRender, {
         props: {
           content,
+          final: true,
           isDark: sandboxIsDark.value,
           batchRendering: false,
           typewriter: false,
@@ -353,6 +365,7 @@ async function mountReactSandbox(current: SandboxSelection, content: string, mou
   root.render(
     React.createElement(MarkdownRender, {
       content,
+      final: true,
       isDark: sandboxIsDark.value,
       batchRendering: false,
       typewriter: false,

@@ -549,14 +549,16 @@ describe('final restore heavy-node deferral', () => {
         expect(wrapper.text()).toContain('History semantic start')
         expect(image.attributes('alt')).toBe('History integration image')
         expect(codeTarget.text()).toContain('code-semantic')
-        expect(mathTarget.text()).toContain('$x^2 + y^2$')
+        expect(mathTarget.attributes('data-markstream-mode')).toBe('katex')
+        expect(mathTarget.text()).toContain('x^2 + y^2')
         expect(mermaidTarget.text()).toContain('HistoryStart --> HistoryEnd')
         expect(infographicTarget.text()).toContain('title: Integration history')
       }, { timeout: 3000 })
 
       expect(countHistoryImageRequests()).toBe(0)
       expect(monacoLoader).toHaveBeenCalledTimes(0)
-      expect(katexLoader).toHaveBeenCalledTimes(0)
+      expect(katexLoader).toHaveBeenCalledTimes(1)
+      expect(katexRender).toHaveBeenCalledTimes(1)
       expect(mermaidLoader).toHaveBeenCalledTimes(0)
       expect(infographicLoader).toHaveBeenCalledTimes(0)
 
@@ -564,14 +566,14 @@ describe('final restore heavy-node deferral', () => {
 
       expect(countHistoryImageRequests()).toBe(0)
       expect(monacoLoader).toHaveBeenCalledTimes(0)
-      expect(katexLoader).toHaveBeenCalledTimes(0)
+      expect(katexLoader).toHaveBeenCalledTimes(1)
       expect(mermaidLoader).toHaveBeenCalledTimes(0)
       expect(infographicLoader).toHaveBeenCalledTimes(0)
+      expect(findObserver(mathTarget.element)).toBeUndefined()
 
       const viewportTargets = [
         imageTarget.element,
         codeTarget.element,
-        mathTarget.element,
         mermaidTarget.element,
         infographicTarget.element,
       ]
@@ -583,7 +585,6 @@ describe('final restore heavy-node deferral', () => {
 
       const deferredComponentTargets = [
         ['[data-markstream-code-block="1"]', codeTarget.element],
-        ['[data-markstream-math="inline"]', mathTarget.element],
         ['[data-markstream-mermaid="1"]', mermaidTarget.element],
         ['[data-markstream-infographic="1"]', infographicTarget.element],
       ] as const

@@ -77,6 +77,53 @@ describe('math block streaming close handling', () => {
     expect(textNodes.map(node => node.content)).not.toContain(']')
   })
 
+  it('keeps multiple completed formulas after a streamed list', () => {
+    const md = getMarkdown('math-block-streaming-list-formulas')
+    const markdown = String.raw`- **矩阵：**
+
+\[\begin{bmatrix}
+2x_2 - 8x_3 = 8 \\
+5x_1 - 5x_3 = 10
+\end{bmatrix}\]
+
+- **公式**
+
+- **代入数据**
+
+\[\frac{363}{15,\!135} \times 100\% = 2.398\%\]
+
+- **差异说明**
+
+$$E=mc^2$$`
+
+    let streamed: any[] = []
+    for (let end = 1; end <= markdown.length; end++) {
+      streamed = parseMarkdownToStructure(markdown.slice(0, end), md, {
+        final: false,
+        streamParse: true,
+        __reuseStableTopLevelNodes: true,
+      } as any) as any[]
+    }
+
+    const final = parseMarkdownToStructure(markdown, md, {
+      final: true,
+      streamParse: true,
+      __reuseStableTopLevelNodes: true,
+    } as any) as any[]
+    const cold = parseMarkdownToStructure(markdown, getMarkdown('math-block-streaming-list-formulas-cold'), {
+      final: true,
+      streamParse: false,
+    }) as any[]
+
+    expect(collect(streamed, 'math_block')).toHaveLength(3)
+    expect(final).toEqual(cold)
+    expect(collect(final, 'math_block').map(node => node.content)).toEqual([
+      '\\begin{bmatrix}\n2x_2 - 8x_3 = 8 \\\\\n5x_1 - 5x_3 = 10\n\\end{bmatrix}',
+      '\\frac{363}{15,\\!135} \\times 100\\% = 2.398\\%',
+      'E=mc^2',
+    ])
+  })
+
   it('closes bracket math after lines that should not keep a markdown fence open', () => {
     const prefix = `${Array.from(
       { length: 40 },

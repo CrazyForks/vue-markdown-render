@@ -407,6 +407,7 @@ const {
 const stableLayoutInitiallyFinal = requestedFinal.value === true
 provide('markstreamSmoothStreaming', smoothStreamingEnabled)
 const contentStreamingTailActive = ref(false)
+const continuousStreamingObserved = ref(false)
 const hasObservedNonFinalContent = ref(false)
 let previousContentStreamValue = ''
 let hasSeenContentStreamValue = false
@@ -421,6 +422,7 @@ function clearContentStreamingTailIdleTimer() {
 
 function markContentStreamingTailActive() {
   contentStreamingTailActive.value = true
+  continuousStreamingObserved.value = true
   if (!isClient)
     return
 
@@ -444,6 +446,7 @@ watch(
   [() => rendererProps.indexKey, () => rendererProps.customId],
   () => {
     clearContentStreamingTailActive()
+    continuousStreamingObserved.value = false
     hasObservedNonFinalContent.value = !props.nodes?.length
       && requestedFinal.value !== true
       && Boolean(props.content)
@@ -469,6 +472,7 @@ watch(
 
     if (nodes?.length || finalRequested === true) {
       clearContentStreamingTailActive()
+      continuousStreamingObserved.value = false
       previousContentStreamValue = nextContent
       hasSeenContentStreamValue = true
       return
@@ -488,6 +492,7 @@ watch(
     }
     else if (nextContent.length < previousContentStreamValue.length || !nextContent.startsWith(previousContentStreamValue)) {
       clearContentStreamingTailActive()
+      continuousStreamingObserved.value = false
     }
 
     previousContentStreamValue = nextContent
@@ -864,6 +869,7 @@ const {
   isTestEnv,
   renderAsFragment,
   forceFullRenderFinalContent,
+  continuousStreaming: computed(() => continuousStreamingObserved.value && effectiveFinal.value !== true),
 })
 const incrementalRenderingDomRequired = computed(() => {
   return !renderAsFragment.value
@@ -6427,8 +6433,6 @@ onBeforeUnmount(() => {
   width: 100%;
   min-height: 1rem;
   margin: 0.25rem 0;
-  border-radius: var(--ms-radius);
-  background-image: linear-gradient(90deg, var(--loading-shimmer), transparent, var(--loading-shimmer));
 }
 
 .node-placeholder:first-child {

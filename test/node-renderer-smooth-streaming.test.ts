@@ -76,6 +76,53 @@ describe('node renderer smooth streaming', () => {
     rawWrapper.unmount()
   })
 
+  it('keeps smooth streaming appends continuous without node placeholders', async () => {
+    const originalNodeEnv = process.env.NODE_ENV
+    process.env.NODE_ENV = 'development'
+    const queuedFrames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
+      queuedFrames.push(cb)
+      return queuedFrames.length
+    }) as typeof requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', (() => {}) as typeof cancelAnimationFrame)
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: '',
+        final: false,
+        smoothStreaming: true,
+        batchRendering: true,
+        initialRenderBatchSize: 1,
+        renderBatchSize: 1,
+        renderBatchDelay: 100000,
+        maxLiveNodes: 0,
+        viewportPriority: false,
+        deferNodesUntilVisible: false,
+      },
+    })
+
+    try {
+      await nextTick()
+      queuedFrames.length = 0
+      await wrapper.setProps({ content: 'Paragraph 1\n\nParagraph 2\n\nParagraph 3' })
+
+      const baseline = performance.now()
+      for (let step = 1; step <= 80 && queuedFrames.length > 0; step++) {
+        queuedFrames.shift()?.(baseline + step * 80)
+        await nextTick()
+        expect(wrapper.findAll('.node-placeholder')).toHaveLength(0)
+        if (wrapper.text().includes('Paragraph 3'))
+          break
+      }
+
+      expect(wrapper.text()).toContain('Paragraph 3')
+    }
+    finally {
+      wrapper.unmount()
+      process.env.NODE_ENV = originalNodeEnv
+    }
+  })
+
   it('does not smooth initial static content before mounted appends', async () => {
     const wrapper = mount(NodeRenderer, {
       props: {

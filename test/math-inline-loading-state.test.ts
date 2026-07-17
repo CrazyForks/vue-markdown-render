@@ -26,7 +26,7 @@ describe('mathInlineNode pending state', () => {
     mocks.renderKaTeXWithBackpressure.mockImplementation(() => new Promise<string>(() => {}))
   })
 
-  it('exposes pending state while async KaTeX render is in flight', async () => {
+  it('does not flash settled raw math while async KaTeX render is in flight', async () => {
     const wrapper = mount(MathInlineNode as any, {
       props: {
         node: {
@@ -42,8 +42,10 @@ describe('mathInlineNode pending state', () => {
     await flushAll()
 
     expect(mocks.renderKaTeXWithBackpressure).toHaveBeenCalled()
-    expect(wrapper.attributes('data-markstream-mode')).toBe('fallback')
+    expect(wrapper.attributes('data-markstream-mode')).toBe('loading')
     expect(wrapper.attributes('data-markstream-pending')).toBe('true')
+    expect(wrapper.find('.math-inline--fallback').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('$x$')
 
     wrapper.unmount()
   })

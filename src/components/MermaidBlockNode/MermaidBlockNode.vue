@@ -630,6 +630,13 @@ function isAbortError(error: unknown) {
   return (error as any)?.name === 'AbortError'
 }
 
+function requiresMainThreadMermaid(error: unknown) {
+  const message = typeof (error as any)?.message === 'string'
+    ? (error as any).message
+    : String(error ?? '')
+  return /(?:DOM)?purify\.(?:sanitize|addHook) is not a function/i.test(message)
+}
+
 function shouldRetrySequenceSemicolonEscape(error: unknown) {
   return !isTimeoutError(error) && !isAbortError(error)
 }
@@ -848,7 +855,7 @@ async function canParseOffthread(
     if (error?.name === 'AbortError')
       throw error
     const errorCode = error?.code || error?.name
-    if (errorCode === 'WORKER_INIT_ERROR' || error?.fallbackToRenderer)
+    if (errorCode === 'WORKER_INIT_ERROR' || error?.fallbackToRenderer || requiresMainThreadMermaid(error))
       return await canParseOnMain(code, theme, opts)
     throw error
   }

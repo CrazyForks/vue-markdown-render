@@ -184,6 +184,45 @@ describe('node renderer domMode', () => {
     }
   })
 
+  it('does not leave transparent placeholders for a small streaming append', async () => {
+    const originalNodeEnv = process.env.NODE_ENV
+    process.env.NODE_ENV = 'development'
+
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        content: 'Paragraph 1',
+        batchRendering: true,
+        deferNodesUntilVisible: false,
+        fade: false,
+        final: false,
+        initialRenderBatchSize: 1,
+        maxLiveNodes: 0,
+        nodeVirtual: false,
+        renderBatchDelay: 100000,
+        renderBatchSize: 1,
+        smoothStreaming: false,
+        typewriter: false,
+        viewportPriority: false,
+      },
+    })
+
+    try {
+      await flushAll()
+      expect(wrapper.findAll('.node-placeholder')).toHaveLength(0)
+
+      await wrapper.setProps({ content: 'Paragraph 1\n\nParagraph 2' })
+      await flushAll()
+
+      expect(wrapper.findAll('.node-slot')).toHaveLength(2)
+      expect(wrapper.findAll('.node-placeholder')).toHaveLength(0)
+      expect(wrapper.text()).toContain('Paragraph 2')
+    }
+    finally {
+      wrapper.unmount()
+      process.env.NODE_ENV = originalNodeEnv
+    }
+  })
+
   it('renders final non-virtual content without incremental placeholders', async () => {
     const originalNodeEnv = process.env.NODE_ENV
     process.env.NODE_ENV = 'development'

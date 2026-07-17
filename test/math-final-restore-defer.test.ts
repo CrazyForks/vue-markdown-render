@@ -55,7 +55,7 @@ class FakeIntersectionObserver {
   }
 }
 
-describe('final restore math deferral', () => {
+describe('math rendering priority', () => {
   beforeEach(() => {
     mocks.renderSync.mockClear()
     mocks.renderWorker.mockClear()
@@ -73,7 +73,7 @@ describe('final restore math deferral', () => {
   it.each([
     ['inline', MathInlineNode, { type: 'math_inline', content: 'x^2', raw: '$x^2$', markup: '$', loading: false }],
     ['block', MathBlockNode, { type: 'math_block', content: 'x^2', raw: '$$x^2$$', markup: '$$', loading: false }],
-  ])('keeps settled %s KaTeX offscreen until it enters the preload viewport', async (_kind, component, node) => {
+  ])('renders settled %s KaTeX immediately when heavy-node deferral is enabled', async (_kind, component, node) => {
     const Probe = defineComponent({
       setup() {
         provideOffscreenHeavyNodeDeferral(computed(() => true))
@@ -86,17 +86,11 @@ describe('final restore math deferral', () => {
     await flushAll()
 
     const target = wrapper.get('[data-markstream-math]')
-    expect(target.attributes('data-markstream-mode')).toBe('fallback')
-    expect(mocks.renderSync).not.toHaveBeenCalled()
+    expect(target.attributes('data-markstream-mode')).toBe('katex')
+    expect(mocks.renderSync).toHaveBeenCalledTimes(1)
     expect(mocks.renderWorker).not.toHaveBeenCalled()
     expect(requestIdleCallback).not.toHaveBeenCalled()
-
-    const observer = FakeIntersectionObserver.instances.find(instance => instance.elements.has(target.element))
-    expect(observer).toBeTruthy()
-    observer?.trigger(target.element)
-    await flushAll()
-
-    expect(mocks.renderWorker).toHaveBeenCalledTimes(1)
+    expect(FakeIntersectionObserver.instances).toHaveLength(0)
     wrapper.unmount()
   })
 

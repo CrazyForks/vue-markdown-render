@@ -1502,8 +1502,6 @@ export function applyMath(md: MarkdownIt, mathOpts?: MathOptions) {
           const sameLineContent = open === '\\[' ? lineText.slice(open.length) : ''
           if (
             open === '\\['
-            && allowLoading
-            && !strict
             && findUnescapedDelimiter(sameLineContent, close) === -1
             && !/^\s*!\[/.test(sameLineContent)
             && !sameLineContent.includes('`')

@@ -27,6 +27,28 @@ describe('mathBlockNode loading state', () => {
     mocks.renderKaTeXWithBackpressure.mockImplementation(() => new Promise<string>(() => {}))
   })
 
+  it('does not flash settled raw math while async KaTeX render is in flight', async () => {
+    const wrapper = mount(MathBlockNode as any, {
+      props: {
+        node: {
+          type: 'math_block',
+          content: '\\ln(1+x) = x - \\frac{x^2}{2}',
+          raw: '\\[\\ln(1+x) = x - \\frac{x^2}{2}\\]',
+          loading: false,
+        },
+      },
+    })
+
+    await flushAll()
+
+    expect(mocks.renderKaTeXWithBackpressure).toHaveBeenCalled()
+    expect(wrapper.attributes('data-markstream-mode')).toBe('loading')
+    expect(wrapper.find('.math-block__fallback').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('\\ln(1+x)')
+
+    wrapper.unmount()
+  })
+
   it('keeps loading math blocks in loading mode instead of flashing raw fallback', async () => {
     const wrapper = mount(MathBlockNode as any, {
       props: {
