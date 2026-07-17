@@ -5523,7 +5523,7 @@ const renderedItems = computed(() => {
       slotContent: String((node as any).content ?? ''),
       isCodeBlock: node.type === 'code_block',
       indexKey: `${indexPrefix.value}-${item.index}`,
-      vnodeKey: `${rendererSessionIdentity.value}\u0000${item.index}`,
+      vnodeKey: `${rendererSessionIdentity.value}\u0000${item.index}\u0000${node.type}`,
     }
   })
 })

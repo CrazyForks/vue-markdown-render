@@ -41,6 +41,39 @@ describe('node renderer domMode', () => {
     catch {}
   })
 
+  it('replaces a code renderer when the streamed node at that index becomes markdown', async () => {
+    const wrapper = mount(NodeRenderer, {
+      props: {
+        nodes: [codeBlockNode(2)],
+        batchRendering: false,
+        deferNodesUntilVisible: false,
+        fade: false,
+        nodeVirtual: false,
+        viewportPriority: false,
+      },
+    })
+    await flushAll()
+
+    const firstKey = (wrapper.vm.$.setupState.renderedItems as any[])[0].vnodeKey
+    expect(wrapper.find('[data-markstream-code-block="1"]').exists()).toBe(true)
+
+    await wrapper.setProps({
+      nodes: [{
+        type: 'heading',
+        level: 1,
+        raw: '# 复杂数学公式',
+        children: [{ type: 'text', content: '复杂数学公式', raw: '复杂数学公式' }],
+      }],
+    })
+    await flushAll()
+
+    const nextKey = (wrapper.vm.$.setupState.renderedItems as any[])[0].vnodeKey
+    expect(nextKey).not.toBe(firstKey)
+    expect(wrapper.find('[data-markstream-code-block="1"]').exists()).toBe(false)
+    expect(wrapper.get('h1').text()).toBe('复杂数学公式')
+    wrapper.unmount()
+  })
+
   it('renders simple content without per-node wrappers in minimal DOM mode', async () => {
     const nodes = [paragraphNode(1), paragraphNode(2), paragraphNode(3)]
     const commonProps = {

@@ -29,6 +29,122 @@ afterEach(() => {
 })
 
 describe('mermaid streaming preview regression', () => {
+  it('checks the latest source at a bounded interval while chunks keep arriving', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    const canParseOffthread = vi.fn(async () => true)
+    const fakeMermaid = {
+      initialize: vi.fn(),
+      render: vi.fn(async (_id: string, code: string) => ({
+        svg: `<svg data-code="${code.includes('D') ? 'latest' : 'older'}" viewBox="0 0 10 10" />`,
+      })),
+    }
+
+    vi.doMock('../src/workers/mermaidWorkerClient', () => ({
+      canParseOffthread,
+      findPrefixOffthread: vi.fn(async () => null),
+      terminateWorker: vi.fn(),
+    }))
+    vi.doMock('../src/components/MermaidBlockNode/mermaid', () => ({
+      getMermaid: vi.fn(async () => fakeMermaid),
+      isMermaidEnabled: vi.fn(() => true),
+    }))
+
+    const MermaidBlockNode = (await import('../src/components/MermaidBlockNode/MermaidBlockNode.vue')).default
+    const wrapper = mount(MermaidBlockNode as any, {
+      props: {
+        node: createNode('graph LR\nA-->B\n'),
+        loading: true,
+        renderDebounceMs: 300,
+      },
+    })
+
+    ;(wrapper.vm as any).userToggledShowSource = true
+    ;(wrapper.vm as any).mermaidAvailable = true
+    ;(wrapper.vm as any).viewportReady = true
+    ;(wrapper.vm as any).showSource = false
+    await settleStreamingRender()
+    canParseOffthread.mockClear()
+    fakeMermaid.render.mockClear()
+
+    await wrapper.setProps({ node: createNode('graph LR\nA-->B\nB-->C\n') })
+    await vi.advanceTimersByTimeAsync(120)
+    await wrapper.setProps({ node: createNode('graph LR\nA-->B\nB-->C\nC-->D\n') })
+    await vi.advanceTimersByTimeAsync(120)
+    await wrapper.setProps({ node: createNode('graph LR\nA-->B\nB-->C\nC-->D\nD-->E\n') })
+    await vi.advanceTimersByTimeAsync(120)
+    await settleStreamingRender()
+
+    expect(canParseOffthread).toHaveBeenCalled()
+    expect(canParseOffthread.mock.calls.at(-1)?.[0]).toContain('D-->E')
+    wrapper.unmount()
+  })
+
+  it('shows a successfully rendered streaming snapshot while newer source is still arriving', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('IntersectionObserver', undefined as any)
+
+    let resolveSnapshot!: (value: { svg: string }) => void
+    const snapshotRender = new Promise<{ svg: string }>((resolve) => {
+      resolveSnapshot = resolve
+    })
+    const canParseOffthread = vi.fn(async () => true)
+    const fakeMermaid = {
+      initialize: vi.fn(),
+      render: vi.fn((_id: string, code: string) => {
+        if (code.includes('B-->C') && !code.includes('C-->D'))
+          return snapshotRender
+        return Promise.resolve({
+          svg: `<svg data-rendered="${code.includes('C-->D') ? 'latest' : 'initial'}" viewBox="0 0 10 10"><rect width="1" height="1" /></svg>`,
+        })
+      }),
+    }
+
+    vi.doMock('../src/workers/mermaidWorkerClient', () => ({
+      canParseOffthread,
+      findPrefixOffthread: vi.fn(async () => null),
+      terminateWorker: vi.fn(),
+    }))
+    vi.doMock('../src/components/MermaidBlockNode/mermaid', () => ({
+      getMermaid: vi.fn(async () => fakeMermaid),
+      isMermaidEnabled: vi.fn(() => true),
+    }))
+
+    const MermaidBlockNode = (await import('../src/components/MermaidBlockNode/MermaidBlockNode.vue')).default
+    const wrapper = mount(MermaidBlockNode as any, {
+      props: {
+        node: createNode('graph LR\nA-->B\n'),
+        loading: true,
+        renderDebounceMs: 100,
+      },
+    })
+
+    ;(wrapper.vm as any).userToggledShowSource = true
+    ;(wrapper.vm as any).mermaidAvailable = true
+    ;(wrapper.vm as any).viewportReady = true
+    ;(wrapper.vm as any).showSource = false
+    await settleStreamingRender()
+
+    await wrapper.setProps({ node: createNode('graph LR\nA-->B\nB-->C\n') })
+    await vi.advanceTimersByTimeAsync(120)
+    await settleStreamingRender()
+    expect(fakeMermaid.render.mock.calls.some(([, code]) => code.includes('B-->C') && !code.includes('C-->D'))).toBe(true)
+    await wrapper.setProps({ node: createNode('graph LR\nA-->B\nB-->C\nC-->D\n') })
+
+    resolveSnapshot({
+      svg: '<svg data-rendered="snapshot" viewBox="0 0 10 10"><rect width="1" height="1" /></svg>',
+    })
+    await settleStreamingRender(10)
+
+    expect(wrapper.find('svg[data-rendered="snapshot"]').exists()).toBe(true)
+
+    await vi.advanceTimersByTimeAsync(120)
+    await settleStreamingRender(10)
+    expect(wrapper.find('svg[data-rendered="latest"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
   it('falls back to the main thread when DOMPurify is unavailable in the worker', async () => {
     vi.useFakeTimers()
     vi.stubGlobal('IntersectionObserver', undefined as any)

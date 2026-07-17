@@ -3,6 +3,7 @@ import type { NodeRendererProps } from '../src/types/node-renderer-props'
 import { clearRegisteredMarkdownPlugins, getMarkdown, parseMarkdownToStructure, registerMarkdownPlugin } from 'stream-markdown-parser'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { computed, effectScope, reactive, ref, watch } from 'vue'
+import { streamContent } from '../playground/src/const/markdown'
 import { useMarkdownParsing } from '../src/components/NodeRenderer/composables/useMarkdownParsing'
 
 function createParsingState(
@@ -74,6 +75,20 @@ function findNode(nodes: any[], type: string) {
   return nodes.find(node => node?.type === type)
 }
 
+function findCodeBlocks(nodes: any[]) {
+  const result: any[] = []
+  const visit = (items: any[]) => {
+    for (const node of items) {
+      if (node?.type === 'code_block')
+        result.push(node)
+      if (Array.isArray(node?.children))
+        visit(node.children)
+    }
+  }
+  visit(nodes)
+  return result
+}
+
 function createDefinitionListTokens(definition: string) {
   return [
     { type: 'dl_open' },
@@ -110,6 +125,60 @@ describe('useMarkdownParsing performance behavior', () => {
     clearRegisteredMarkdownPlugins()
     vi.useRealTimers()
     vi.restoreAllMocks()
+  })
+
+  it('never reclassifies markdown after a streamed diagram fence as plain code', () => {
+    const markdown = [
+      '```mermaid',
+      'graph LR',
+      '  A --> B',
+      '```',
+      '',
+      '```infographic',
+      'infographic list-row-simple-horizontal-arrow',
+      'data',
+      '  items',
+      '    - label 步骤 3',
+      '      desc 完成',
+      '```',
+      '',
+      '---',
+      '# 复杂数学公式',
+      '',
+      '### 1. **理解 \\(\\boldsymbol{\\alpha}^T \\boldsymbol{\\beta} = 0\\) 的含义**',
+      '普通正文。',
+      '',
+    ].join('\n')
+    const content = ref('')
+    const { scope, state } = createParsingState(content)
+
+    for (let end = 1; end <= markdown.length; end++) {
+      content.value = markdown.slice(0, end)
+      for (const block of findCodeBlocks(state.parsedNodes.value)) {
+        expect(block.code, `prefix length ${end}`).not.toContain('复杂数学公式')
+        expect(block.code, `prefix length ${end}`).not.toContain('boldsymbol')
+      }
+    }
+
+    scope.stop()
+  })
+
+  it('keeps the real playground diagram chain closed while its math section streams', () => {
+    const diagramStart = streamContent.indexOf('```mermaid\ngraph TD')
+    const mathEnd = streamContent.indexOf('### 2.', streamContent.indexOf('# 复杂数学公式'))
+    const streamedSection = streamContent.slice(diagramStart, mathEnd)
+    const content = ref(streamContent.slice(0, diagramStart))
+    const { scope, state } = createParsingState(content)
+
+    for (let end = 1; end <= streamedSection.length; end++) {
+      content.value = streamContent.slice(0, diagramStart + end)
+      for (const block of findCodeBlocks(state.parsedNodes.value)) {
+        expect(block.code, `playground prefix length ${diagramStart + end}`).not.toContain('复杂数学公式')
+        expect(block.code, `playground prefix length ${diagramStart + end}`).not.toContain('boldsymbol')
+      }
+    }
+
+    scope.stop()
   })
 
   it('coalesces smooth streaming character updates until the parse interval elapses', async () => {

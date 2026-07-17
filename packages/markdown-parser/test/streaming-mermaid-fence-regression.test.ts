@@ -16,7 +16,7 @@ function codeBlocks(nodes: any[]) {
 }
 
 describe('streaming mermaid fence boundaries', () => {
-  it('does not absorb following math markdown after the mermaid closing fence has streamed', () => {
+  it('keeps every closed diagram fence separate from following markdown at every stream boundary', () => {
     const markdown = [
       '```mermaid',
       'xychart',
@@ -24,6 +24,18 @@ describe('streaming mermaid fence boundaries', () => {
       '  x-axis ["一月", "二月"]',
       '  y-axis "收入" 4000 --> 11000',
       '  line [5000, 6000]',
+      '```',
+      '',
+      '```infographic',
+      'infographic list-row-simple-horizontal-arrow',
+      'data',
+      '  items',
+      '    - label 步骤 1',
+      '      desc 开始',
+      '    - label 步骤 2',
+      '      desc 进行中',
+      '    - label 步骤 3',
+      '      desc 完成',
       '```',
       '',
       '---',
@@ -37,12 +49,17 @@ describe('streaming mermaid fence boundaries', () => {
 
     for (let end = 1; end <= markdown.length; end++) {
       const chunk = markdown.slice(0, end)
-      const nodes = parseMarkdownToStructure(chunk, md, { final: false, streamParse: true })
-      const mermaidBlocks = codeBlocks(nodes).filter(node => node.language === 'mermaid')
+      const nodes = parseMarkdownToStructure(chunk, md, {
+        final: false,
+        streamParse: true,
+        __reuseStableTopLevelNodes: true,
+      } as any)
+      const blocks = codeBlocks(nodes)
 
-      for (const block of mermaidBlocks) {
+      for (const block of blocks) {
         expect(block.code, `prefix length ${end}`).not.toContain('正交补空间')
         expect(block.code, `prefix length ${end}`).not.toContain('boldsymbol')
+        expect(block.code, `prefix length ${end}`).not.toContain('复杂数学公式')
       }
     }
   })
