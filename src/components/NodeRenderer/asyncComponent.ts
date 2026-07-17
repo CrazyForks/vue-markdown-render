@@ -209,9 +209,9 @@ export const CodeBlockNodeLoading = defineComponent({
         ...(formatSize(props.maxWidth) ? { maxWidth: formatSize(props.maxWidth) } : {}),
         ...(!isDiff
           ? {
-              color: 'var(--vscode-editor-foreground, var(--markstream-code-fallback-fg))',
-              backgroundColor: 'var(--vscode-editor-background, var(--markstream-code-fallback-bg))',
-              borderColor: 'var(--markstream-code-border-color)',
+              color: 'var(--vscode-editor-foreground, var(--markstream-code-fallback-fg, var(--code-fg)))',
+              backgroundColor: 'var(--vscode-editor-background, var(--markstream-code-fallback-bg, var(--code-bg)))',
+              borderColor: 'var(--markstream-code-border-color, var(--code-border))',
             }
           : {}),
       }
