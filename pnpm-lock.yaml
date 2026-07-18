@@ -134,7 +134,7 @@ importers:
         version: 6.0.11(rolldown@1.0.0-beta.45)(rollup@3.30.0)
       stream-diffs:
         specifier: latest
-        version: 0.0.1(@shikijs/themes@4.3.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vue@3.5.25(typescript@5.9.3))
+        version: 0.0.2(@shikijs/themes@4.3.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vue@3.5.25(typescript@5.9.3))
       stream-markdown:
         specifier: latest
         version: 0.0.15(react@19.2.7)(shiki@4.3.1)(vue@3.5.25(typescript@5.9.3))
@@ -12341,8 +12341,8 @@ packages:
   stream-browserify@2.0.2:
     resolution: {integrity: sha512-nX6hmklHs/gr2FuxYDltq8fJA1GDlxKQCz8O/IM4atRqBH8OORmBNgfvW5gG10GT/qQ9u0CzIvr2X5Pkt6ntqg==}
 
-  stream-diffs@0.0.1:
-    resolution: {integrity: sha512-ljw+IPcxj3dj9zyKtv9QOxloByi72fVuprHahO8pIhqk787sLmNvygMONSs07NNjUvknLZN9sePKh+LYGDuoQQ==}
+  stream-diffs@0.0.2:
+    resolution: {integrity: sha512-mYH+kBCmrN2ebVPNkvQIFUSPemFxUPPPk+NT4H/wEzZ9NCt5Eaa8OE05f/1MA5HofZ64LYbTOliQTU6VghHeVA==}
     peerDependencies:
       vue: 3.5.25
     peerDependenciesMeta:
@@ -27585,7 +27585,7 @@ snapshots:
       inherits: 2.0.4
       readable-stream: 2.3.8
 
-  stream-diffs@0.0.1(@shikijs/themes@4.3.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vue@3.5.25(typescript@5.9.3)):
+  stream-diffs@0.0.2(@shikijs/themes@4.3.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vue@3.5.25(typescript@5.9.3)):
     dependencies:
       '@pierre/diffs': 1.2.12(@shikijs/themes@4.3.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
     optionalDependencies:
