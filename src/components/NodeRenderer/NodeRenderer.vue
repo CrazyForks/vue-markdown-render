@@ -657,7 +657,7 @@ const instanceMsgId = rendererProps.customId
   ? `renderer-${rendererProps.customId}`
   : `renderer-${Date.now()}-${Math.random().toString(36).slice(2)}`
 const mathBlockMinHeightCache = createMathBlockMinHeightCache(instanceMsgId)
-const mathBlockCacheScope = computed(() => `${instanceMsgId}:${streamRenderVersion.value}`)
+const mathBlockCacheScope = instanceMsgId
 provideMathBlockMinHeightCache(mathBlockMinHeightCache)
 const customComponentsMap = useCustomNodeComponents(() => rendererProps.customId)
 const {
@@ -5511,7 +5511,7 @@ const renderedItems = computed(() => {
     if (node.type === 'math_block') {
       bindings = {
         ...bindings,
-        cacheScope: mathBlockCacheScope.value,
+        cacheScope: mathBlockCacheScope,
       }
     }
 
