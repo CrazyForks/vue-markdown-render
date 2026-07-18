@@ -688,10 +688,6 @@ async function ensureMonacoRuntime() {
       if (typeof useMonaco !== 'function')
         return
 
-      const theme = resolveRequestedTheme()
-      if (theme && props.themes && Array.isArray(props.themes) && !props.themes.includes(theme))
-        throw new Error('Preferred theme not in provided themes array')
-
       runtimeMonacoOptions = buildRuntimeMonacoOptions()
       const helpers = useMonaco(runtimeMonacoOptions)
       createEditor = helpers.createEditor || createEditor
@@ -4373,9 +4369,6 @@ watch(
       if (isUnmounted || !codeEditor.value)
         return
     }
-    if (currentEditorKind.value === desiredEditorKind.value && editorCreated.value && editorMounted.value)
-      return
-
     try {
       editorMounted.value = false
       editorDisplayReady.value = false

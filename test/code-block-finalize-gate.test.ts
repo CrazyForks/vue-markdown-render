@@ -432,4 +432,72 @@ describe('codeBlockNode final Diffs gate', () => {
     })
     wrapper.unmount()
   })
+
+  it('recreates a mounted FileDiff surface when its layout changes', async () => {
+    const runtime = helpers()
+    const diffNode = {
+      type: 'code_block' as const,
+      language: 'typescript',
+      code: '',
+      raw: '```diff\n-const before = 1\n+const after = 2\n```',
+      diff: true,
+      originalCode: 'const before = 1',
+      updatedCode: 'const after = 2',
+      loading: false,
+    }
+    const wrapper = mount(DeferredCodeBlockNode, {
+      props: {
+        node: diffNode,
+        loading: false,
+        stream: true,
+        showHeader: false,
+        monacoOptions: { renderSideBySide: true },
+      },
+    })
+
+    await flush()
+    observers.at(-1)?.emit()
+    await vi.waitFor(() => expect(runtime.createDiffEditor).toHaveBeenCalledTimes(1))
+    expect(runtime.useMonaco.mock.calls[0]?.[0]?.renderSideBySide).toBe(true)
+    runtime.safeClean.mockClear()
+
+    await wrapper.setProps({ monacoOptions: { renderSideBySide: false } })
+    await vi.waitFor(() => {
+      expect(runtime.safeClean).toHaveBeenCalled()
+      expect(runtime.createDiffEditor).toHaveBeenCalledTimes(2)
+    })
+    expect(runtime.useMonaco.mock.calls[0]?.[0]?.renderSideBySide).toBe(false)
+
+    await wrapper.setProps({ monacoOptions: { renderSideBySide: true } })
+    await vi.waitFor(() => {
+      expect(runtime.createDiffEditor).toHaveBeenCalledTimes(3)
+    })
+    expect(runtime.useMonaco.mock.calls[0]?.[0]?.renderSideBySide).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('accepts a theme name that matches an object in the theme pool', async () => {
+    const runtime = helpers()
+    const wrapper = mount(DeferredCodeBlockNode, {
+      props: {
+        node: makeNode('const themed = true', false),
+        loading: false,
+        stream: true,
+        showHeader: false,
+        theme: 'github-dark',
+        themes: [{ name: 'github-dark' }],
+      },
+    })
+
+    await flush()
+    observers.at(-1)?.emit()
+    await vi.waitFor(() => {
+      expect(runtime.useMonaco).toHaveBeenCalledTimes(1)
+      expect(runtime.createEditor).toHaveBeenCalledTimes(1)
+      expect(wrapper.find('diffs-container').exists()).toBe(true)
+      expect(wrapper.find('pre.code-pre-fallback').exists()).toBe(false)
+    })
+    expect(runtime.useMonaco.mock.calls[0]?.[0]?.theme).toBe('github-dark')
+    wrapper.unmount()
+  })
 })
