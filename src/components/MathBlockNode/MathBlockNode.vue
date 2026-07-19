@@ -307,9 +307,45 @@ async function renderMath() {
     })
 }
 
+// Distinguish streaming appends (keep lockedMinHeight to avoid flicker) from
+// content replacements (clear stale lockedMinHeight so a shorter block doesn't
+// inherit the previous block's height).
+//
+// We compare the inner content (between delimiters) rather than `raw` directly,
+// because `raw` includes the closing delimiter, so a streaming append like
+// `$x$` -> `$x^2$` is NOT a string prefix of the next raw (the `^2` is
+// inserted before the closing `$`). Comparing the inner content correctly
+// identifies this as an append.
+//
+// We also accept the case where the normalized `content` changes shape
+// (e.g. `alpha` -> `\alpha` via normalizeStandaloneBackslashT) as long as
+// the un-normalized inner source extracted from `raw` is a prefix extension.
+function getInnerContent(raw: unknown, content: unknown) {
+  const rawText = String(raw ?? '')
+  // Strip a leading+trailing delimiter pair: $...$, $...$, \[...\], \(...\)
+  const stripped = rawText
+    .replace(/^(\${1,2}|\\\[|\\\()/, '')
+    .replace(/(\${1,2}|\\\]|\\\))$/, '')
+  // Only trust the strip if it actually removed something from both ends.
+  if (stripped !== rawText && stripped.length < rawText.length)
+    return stripped
+  return String(content ?? '')
+}
+
+function isAppendUpdate(previousInner: string, nextInner: string) {
+  return previousInner === '' || nextInner.startsWith(previousInner)
+}
+
 watch(
-  () => [props.node.content, props.node.loading, props.node.raw],
-  () => {
+  () => [props.node.content, props.node.loading, props.node.raw] as const,
+  ([content, , raw], [previousContent, , previousRaw]) => {
+    const previousInner = getInnerContent(previousRaw, previousContent)
+    const nextInner = getInnerContent(raw, content)
+    const appendOnly = isAppendUpdate(previousInner, nextInner)
+
+    if (!appendOnly)
+      clearLockedMinHeight()
+
     renderMath()
   },
   { flush: 'post' },
