@@ -657,7 +657,7 @@ const instanceMsgId = rendererProps.customId
   ? `renderer-${rendererProps.customId}`
   : `renderer-${Date.now()}-${Math.random().toString(36).slice(2)}`
 const mathBlockMinHeightCache = createMathBlockMinHeightCache(instanceMsgId)
-const mathBlockCacheScope = computed(() => `${instanceMsgId}:${streamRenderVersion.value}`)
+const mathBlockCacheScope = instanceMsgId
 provideMathBlockMinHeightCache(mathBlockMinHeightCache)
 const customComponentsMap = useCustomNodeComponents(() => rendererProps.customId)
 const {
@@ -679,7 +679,13 @@ const {
 watch(
   parsedNodes,
   () => {
-    mathBlockMinHeightCache.clear()
+    // Only clear the shared math minHeight cache on non-streaming content
+    // changes (dataset replacement, content rewrite, etc.). During streaming
+    // appends (contentStreamingTailActive=true), the cache is preserved so
+    // that virtualization remount of stable-prefix math blocks can restore
+    // their previously measured heights without re-reading offsetHeight.
+    if (!contentStreamingTailActive.value)
+      mathBlockMinHeightCache.clear()
     streamRenderVersion.value += 1
   },
   { immediate: true },
@@ -5511,7 +5517,7 @@ const renderedItems = computed(() => {
     if (node.type === 'math_block') {
       bindings = {
         ...bindings,
-        cacheScope: mathBlockCacheScope.value,
+        cacheScope: mathBlockCacheScope,
       }
     }
 
