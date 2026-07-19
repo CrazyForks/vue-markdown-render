@@ -325,3 +325,170 @@ describe('mathBlockNode locked min-height on content replacement', () => {
     wrapper.unmount()
   })
 })
+
+describe('mathBlockNode delimiter pair matrix', () => {
+  beforeEach(() => {
+    mocks.renderKaTeXWithBackpressure.mockReset()
+    mocks.renderKaTeXWithBackpressure.mockImplementation(() => new Promise<string>(() => {}))
+  })
+
+  afterEach(() => {
+    if (originalOffsetHeightDescriptor) {
+      Object.defineProperty(HTMLElement.prototype, 'offsetHeight', originalOffsetHeightDescriptor)
+    }
+  })
+
+  const cases: Array<[string, string, string, boolean]> = [
+    ['$$x$$', '$$x^2$$', 'double-dollar', true],
+    ['\\[x\\]', '\\[x^2\\]', 'escaped-bracket', true],
+    ['\\[x]', '\\[x^2]', 'fallback-close', true],
+    ['[x]', '[x^2]', 'plain-bracket', true],
+    ['[x\\]', '[x^2\\]', 'plain-bracket-backslash', true],
+    ['$x$', '$x^2$', 'inline-dollar', true],
+    ['$$alph$$', '$$alpha$$', 'normalize', true],
+    ['$$x^2$$', '$$x^3$$', 'replace', false],
+    ['$$x$$', '\\[x^2\\]', 'family-change', false],
+  ]
+
+  for (const [previousRaw, nextRaw, label, shouldPreserve] of cases) {
+    it(`${shouldPreserve ? 'preserves' : 'clears'} lockedMinHeight for ${label}: ${previousRaw} -> ${nextRaw}`, async () => {
+      mockOffsetHeight(150)
+      const rendererCache = createMathBlockMinHeightCache(`renderer-${label}`)
+
+      const wrapper = mount(MathBlockNode as any, {
+        props: {
+          node: {
+            type: 'math_block',
+            content: previousRaw,
+            raw: previousRaw,
+            loading: true,
+          },
+          indexKey: `delim-${label}`,
+          cacheScope: `renderer-${label}`,
+        },
+        global: {
+          provide: { [MATH_BLOCK_MIN_HEIGHT_CACHE as symbol]: rendererCache },
+        },
+      })
+
+      await flushAll()
+      expect(wrapper.attributes('style')).toContain('min-height: 150px;')
+
+      await wrapper.setProps({
+        node: {
+          type: 'math_block',
+          content: nextRaw,
+          raw: nextRaw,
+          loading: true,
+        },
+      })
+      await flushAll()
+
+      const style = wrapper.attributes('style') ?? ''
+      if (shouldPreserve)
+        expect(style, `expected preserved for ${previousRaw} -> ${nextRaw}`).toContain('min-height: 150px;')
+      else
+        expect(style, `expected cleared for ${previousRaw} -> ${nextRaw}`).not.toContain('min-height: 150px;')
+
+      wrapper.unmount()
+    })
+  }
+})
+
+describe('mathBlockNode virtualization remount cache behavior', () => {
+  beforeEach(() => {
+    mocks.renderKaTeXWithBackpressure.mockReset()
+    mocks.renderKaTeXWithBackpressure.mockImplementation(() => new Promise<string>(() => {}))
+  })
+
+  afterEach(() => {
+    if (originalOffsetHeightDescriptor) {
+      Object.defineProperty(HTMLElement.prototype, 'offsetHeight', originalOffsetHeightDescriptor)
+    }
+  })
+
+  it('restores cached height on remount when cache was preserved', async () => {
+    mockOffsetHeight(200)
+    const rendererCache = createMathBlockMinHeightCache('renderer-remount')
+
+    const first = mount(MathBlockNode as any, {
+      props: {
+        node: { type: 'math_block', content: 'x', raw: '$$x$$', loading: true },
+        indexKey: 'remount-0',
+        cacheScope: 'renderer-remount',
+      },
+      global: {
+        provide: { [MATH_BLOCK_MIN_HEIGHT_CACHE as symbol]: rendererCache },
+      },
+    })
+
+    await flushAll()
+    expect(first.attributes('style')).toContain('min-height: 200px;')
+    expect(rendererCache.cache.get('renderer-remount:math-block:remount-0')).toBe(200)
+    first.unmount()
+
+    const second = mount(MathBlockNode as any, {
+      props: {
+        node: { type: 'math_block', content: 'x', raw: '$$x$$', loading: true },
+        indexKey: 'remount-0',
+        cacheScope: 'renderer-remount',
+      },
+      global: {
+        provide: { [MATH_BLOCK_MIN_HEIGHT_CACHE as symbol]: rendererCache },
+      },
+    })
+
+    await flushAll()
+    expect(second.attributes('style')).toContain('min-height: 200px;')
+
+    second.unmount()
+  })
+
+  it('does not restore stale height when remounted with different content after cache clear', async () => {
+    let naturalHeight = 392
+    mockOffsetHeight((el) => {
+      const locked = Number.parseFloat(el.style.minHeight)
+      if (Number.isFinite(locked) && locked > 0)
+        return locked
+      return naturalHeight
+    })
+
+    const rendererCache = createMathBlockMinHeightCache('renderer-replace')
+
+    const first = mount(MathBlockNode as any, {
+      props: {
+        node: { type: 'math_block', content: 'x^2 + y^2', raw: '$$x^2 + y^2$$', loading: false },
+        indexKey: 'replace-0',
+        cacheScope: 'renderer-replace',
+      },
+      global: {
+        provide: { [MATH_BLOCK_MIN_HEIGHT_CACHE as symbol]: rendererCache },
+      },
+    })
+
+    await flushAll()
+    expect(first.attributes('style')).toContain('min-height: 392px;')
+    expect(rendererCache.cache.get('renderer-replace:math-block:replace-0')).toBe(392)
+    first.unmount()
+
+    rendererCache.clear()
+    naturalHeight = 40
+
+    const second = mount(MathBlockNode as any, {
+      props: {
+        node: { type: 'math_block', content: 'y', raw: '$$y$$', loading: false },
+        indexKey: 'replace-0',
+        cacheScope: 'renderer-replace',
+      },
+      global: {
+        provide: { [MATH_BLOCK_MIN_HEIGHT_CACHE as symbol]: rendererCache },
+      },
+    })
+
+    await flushAll()
+    const style = second.attributes('style') ?? ''
+    expect(style).not.toContain('min-height: 392px;')
+
+    second.unmount()
+  })
+})

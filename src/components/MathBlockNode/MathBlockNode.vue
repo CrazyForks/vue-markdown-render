@@ -311,37 +311,85 @@ async function renderMath() {
 // content replacements (clear stale lockedMinHeight so a shorter block doesn't
 // inherit the previous block's height).
 //
-// We compare the inner content (between delimiters) rather than `raw` directly,
-// because `raw` includes the closing delimiter, so a streaming append like
-// `$x$` -> `$x^2$` is NOT a string prefix of the next raw (the `^2` is
-// inserted before the closing `$`). Comparing the inner content correctly
-// identifies this as an append.
+// We extract the inner content (between delimiters) from `raw` and compare for
+// prefix extension. This correctly identifies streaming appends like
+// `$$x$$` -> `$$x^2$$` (inner: `x` -> `x^2`, prefix extension) even though
+// the full raw strings are NOT prefix-related (the `^2` is inserted before
+// the closing `$$`).
 //
-// We also accept the case where the normalized `content` changes shape
-// (e.g. `alpha` -> `\alpha` via normalizeStandaloneBackslashT) as long as
-// the un-normalized inner source extracted from `raw` is a prefix extension.
-function getInnerContent(raw: unknown, content: unknown) {
+// We require a complete delimiter PAIR match (both open and close) before
+// trusting the stripped inner content. This avoids false positives from
+// one-sided strips (e.g. `\[x]` where `]` is a fallback close for `\[`).
+// When no pair matches, we fall back to `content` and only allow exact
+// equality (no prefix inference), which is conservative but safe.
+const DELIMITER_PAIRS = [
+  // Order matters: longer/more specific pairs first.
+  { family: '$$', open: '$$', close: '$$' },
+  { family: '\\[]', open: '\\\[', close: '\\\]' },
+  // Parser-tolerated fallback close for `\[` in non-strict mode.
+  { family: '\\[]', open: '\\\[', close: ']' },
+  // Non-strict plain-bracket forms.
+  { family: '[]', open: '[', close: '\\\]' },
+  { family: '[]', open: '[', close: ']' },
+  // Inline math forms (kept for tolerance when MathBlockNode is used directly).
+  { family: '\\()', open: '\\\(', close: '\\\)' },
+  { family: '$', open: '$', close: '$' },
+] as const
+
+function resolveTrustedInner(raw: unknown): { family: string, inner: string, trusted: boolean } | null {
   const rawText = String(raw ?? '')
-  // Strip a leading+trailing delimiter pair: $...$, $...$, \[...\], \(...\)
-  const stripped = rawText
-    .replace(/^(\${1,2}|\\\[|\\\()/, '')
-    .replace(/(\${1,2}|\\\]|\\\))$/, '')
-  // Only trust the strip if it actually removed something from both ends.
-  if (stripped !== rawText && stripped.length < rawText.length)
-    return stripped
-  return String(content ?? '')
+  for (const { family, open, close } of DELIMITER_PAIRS) {
+    // Guard against a malformed `$$...$` being parsed as single-dollar math.
+    if (open === '$' && (rawText.startsWith('$$') || rawText.endsWith('$$')))
+      continue
+
+    if (
+      rawText.length >= open.length + close.length
+      && rawText.startsWith(open)
+      && rawText.endsWith(close)
+    ) {
+      return {
+        family,
+        inner: rawText.slice(open.length, rawText.length - close.length),
+        trusted: true,
+      }
+    }
+  }
+  return null
 }
 
-function isAppendUpdate(previousInner: string, nextInner: string) {
-  return previousInner === '' || nextInner.startsWith(previousInner)
+function getInnerContent(raw: unknown, content: unknown): { family: string, inner: string, trusted: boolean } {
+  const trusted = resolveTrustedInner(raw)
+  if (trusted)
+    return trusted
+  // No trusted delimiter pair: fall back to `content` (may be normalized).
+  // Prefix-extension is not safe here, callers must require exact equality.
+  return { family: 'content', inner: String(content ?? ''), trusted: false }
+}
+
+function isAppendUpdate(
+  previous: { family: string, inner: string, trusted: boolean },
+  next: { family: string, inner: string, trusted: boolean },
+) {
+  if (previous.inner === '')
+    return true
+  // Different delimiter families: always treat as replacement.
+  if (previous.family !== next.family)
+    return false
+  // Prefix reuse is only allowed when both sides came from a complete,
+  // recognized delimiter pair. Otherwise require exact equality to avoid
+  // false positives from normalization (e.g. `alpha` -> `\alpha`).
+  if (previous.trusted && next.trusted)
+    return next.inner.startsWith(previous.inner)
+  return next.inner === previous.inner
 }
 
 watch(
   () => [props.node.content, props.node.loading, props.node.raw] as const,
   ([content, , raw], [previousContent, , previousRaw]) => {
-    const previousInner = getInnerContent(previousRaw, previousContent)
-    const nextInner = getInnerContent(raw, content)
-    const appendOnly = isAppendUpdate(previousInner, nextInner)
+    const previous = getInnerContent(previousRaw, previousContent)
+    const next = getInnerContent(raw, content)
+    const appendOnly = isAppendUpdate(previous, next)
 
     if (!appendOnly)
       clearLockedMinHeight()

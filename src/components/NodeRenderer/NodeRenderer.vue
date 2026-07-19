@@ -679,7 +679,13 @@ const {
 watch(
   parsedNodes,
   () => {
-    mathBlockMinHeightCache.clear()
+    // Only clear the shared math minHeight cache on non-streaming content
+    // changes (dataset replacement, content rewrite, etc.). During streaming
+    // appends (contentStreamingTailActive=true), the cache is preserved so
+    // that virtualization remount of stable-prefix math blocks can restore
+    // their previously measured heights without re-reading offsetHeight.
+    if (!contentStreamingTailActive.value)
+      mathBlockMinHeightCache.clear()
     streamRenderVersion.value += 1
   },
   { immediate: true },
