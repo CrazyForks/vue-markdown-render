@@ -20,7 +20,7 @@ Markstream is a family of streaming Markdown renderers for AI applications. This
 
 ### markstream-react
 - Package name: markstream-react
-- Version: 0.0.53
+- Version: 0.0.54
 - Maturity label: beta
 - Framework/runtime: React 18/19, Next.js App Router, Next.js Pages Router, Remix
 - Description: React/Next.js streaming Markdown renderer for AI chat, LLM token streams, SSE/WebSocket output, incomplete Markdown, long documents, Mermaid, KaTeX, Shiki, Monaco, and custom React components.
