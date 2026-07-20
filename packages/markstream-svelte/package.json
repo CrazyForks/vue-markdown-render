@@ -74,7 +74,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "pnpm --dir ../markstream-core build && svelte-package -i src -o dist && postcss src/index.css -o dist/index.css && cp dist/index.css dist/index.tailwind.css && node ../../scripts/generate-px-css.mjs",
+    "build": "pnpm --dir ../markdown-parser build && pnpm --dir ../markstream-core build && svelte-package -i src -o dist --tsconfig tsconfig.build.json && postcss src/index.css -o dist/index.css && cp dist/index.css dist/index.tailwind.css && node ../../scripts/generate-px-css.mjs",
     "dev": "vite dev",
     "preview": "vite preview",
     "typecheck": "svelte-check --tsconfig ./tsconfig.json",

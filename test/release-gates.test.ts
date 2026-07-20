@@ -326,6 +326,17 @@ describe('release dependency gates', () => {
     }
   })
 
+  it('builds Svelte declarations from dependency dist files', () => {
+    const sveltePackageJson = readPackageJson('packages/markstream-svelte/package.json')
+    const svelteBuildTsconfig = JSON.parse(readFileSync(resolve(process.cwd(), 'packages/markstream-svelte/tsconfig.build.json'), 'utf8'))
+
+    expect(sveltePackageJson.scripts.build).toContain('pnpm --dir ../markdown-parser build')
+    expect(sveltePackageJson.scripts.build).toContain('pnpm --dir ../markstream-core build')
+    expect(sveltePackageJson.scripts.build).toContain('svelte-package -i src -o dist --tsconfig tsconfig.build.json')
+    expect(svelteBuildTsconfig.compilerOptions.paths['stream-markdown-parser']).toEqual(['../markdown-parser/dist/index.d.ts'])
+    expect(svelteBuildTsconfig.compilerOptions.paths['markstream-core']).toEqual(['../markstream-core/dist/index.d.ts'])
+  })
+
   it('keeps dry-run workspace dependency checks local', () => {
     const script = readFileSync(resolve(process.cwd(), 'scripts/check-workspace-deps-local.mjs'), 'utf8')
 
