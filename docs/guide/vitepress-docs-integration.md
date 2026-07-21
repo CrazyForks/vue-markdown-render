@@ -44,7 +44,7 @@ Add more peers only if your docs actually need them:
 
 - `mermaid` for Mermaid fences
 - `katex` for math
-- `stream-monaco` for Monaco-powered code blocks
+- `stream-diffs` for enhanced File/FileDiff code blocks
 
 ## 3. Register renderer and custom nodes in `enhanceApp`
 
@@ -141,7 +141,7 @@ Go deeper: [Custom Tags & Advanced Components](/guide/custom-components), [API R
 - The component never appears: it was not registered in `enhanceApp`, or the mapping key does not match the tag name
 - Styles look broken: CSS import order is wrong, or utility layers override the renderer
 - Overrides leak into other pages: use a scoped `custom-id` instead of a global mapping
-- Mermaid or Monaco fails in SSR-like environments: check the relevant feature page and client-only boundaries
+- Mermaid or the enhanced code runtime fails in SSR-like environments: check the relevant feature page and client-only boundaries
 
 Start here when layout or CSS still looks off: [Troubleshooting](/guide/troubleshooting#css-looks-wrong-start-here)
 

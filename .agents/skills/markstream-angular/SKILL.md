@@ -1,6 +1,6 @@
 ---
 name: markstream-angular
-description: Integrate markstream-angular into an Angular app. Use when Codex needs standalone component imports, signal-based examples, CSS wiring, custom HTML tags or customComponents setup, or optional peer integration in an Angular repository.
+description: Integrate the alpha markstream-angular package into an Angular 20+ app. Use when Codex needs standalone component imports, signal-based examples, CSS wiring, custom HTML tags or customComponents setup, or optional peer integration in an Angular repository.
 ---
 
 # Markstream Angular
@@ -9,7 +9,7 @@ Use this skill when the host app is Angular and the task is to adopt the Angular
 
 ## Workflow
 
-1. Confirm the repo is Angular.
+1. Confirm the repo is Angular 20 or newer and accepts an alpha renderer API.
 2. Install `markstream-angular` plus only the requested optional peers.
 3. Import `markstream-angular/index.css` from the app shell.
    - Add `katex/dist/katex.min.css` when math is enabled.

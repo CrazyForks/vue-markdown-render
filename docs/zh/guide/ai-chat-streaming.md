@@ -13,8 +13,8 @@ description: 使用 content 与内置 smooth streaming 构建 AI 聊天与流式
 | 需求 | 安装包 | 适合场景 |
 | --- | --- | --- |
 | 纯文本或轻量聊天界面 | `markstream-vue` | 基础 Markdown、列表、链接、引用 |
-| 不用 Monaco 的代码高亮 | `markstream-vue stream-markdown` | SSR 友好的聊天记录、较小 bundle |
-| 更强的代码交互 | `markstream-vue stream-monaco` | 复制、预览、diff、Monaco 代码块 |
+| 轻量代码高亮 | `markstream-vue stream-markdown` | SSR 友好的聊天记录、较小 bundle |
+| 更强的代码交互 | `markstream-vue stream-diffs` | 复制、预览、语法高亮和 File/Diff surface |
 | 聊天内容里有图表或公式 | `markstream-vue mermaid katex` | Mermaid 图表和 KaTeX 公式 |
 
 只安装你预期回复里真的会出现的能力，对聊天界面的收益通常很大。
@@ -61,8 +61,8 @@ const final = ref(false)
 ## 3. 这几个渲染配置通常最稳
 
 - 长聊天记录优先保留默认虚拟化；只有在你有明确性能测量时再去调 `maxLiveNodes`。
-- 如果代码块很多，但 Monaco 对当前聊天界面太重，可以先用 `renderCodeBlocksAsPre` 降级。
-- 重型 peers 先别全装。聊天类页面最容易从“不默认带 Mermaid、KaTeX、Monaco”里拿到体积收益。
+- 如果代码块很多，但增强代码 surface 对当前聊天界面太重，可以先用 `renderCodeBlocksAsPre` 降级。
+- 重型 peers 先别全装。聊天类页面最容易从“不默认带 Mermaid、KaTeX、`stream-diffs`”里拿到体积收益。
 - 如果你关闭虚拟化（`:max-live-nodes="0"`），那 [Props 与选项](/zh/guide/props) 里的 batching 相关配置就会更重要。
 
 ## 4. 常见升级路径
@@ -237,7 +237,7 @@ onBeforeUnmount(() => {
 ### 更好的代码块
 
 - 想要更轻的文档风格：用 `MarkdownCodeBlockNode`，配 `stream-markdown`
-- 想要更强的预览 / diff / 交互：用 `CodeBlockNode`，配 `stream-monaco`
+- 想要更强的预览 / diff / 交互：用 `CodeBlockNode`，配 `stream-diffs`
 
 具体差异看 [渲染器与节点组件](/zh/guide/components)。
 
@@ -257,7 +257,7 @@ onBeforeUnmount(() => {
 
 - 先引入 reset，再使用 `@import 'markstream-vue/index.css' layer(components);`
 - 只有启用数学公式时，才额外导入 `katex/dist/katex.min.css`
-- SSR 场景下，把 Mermaid、D2、Monaco 这类浏览器专属依赖放到 client-only 边界之后
+- SSR 场景下，把 Mermaid、D2、增强代码 runtime 这类浏览器专属依赖放到 client-only 边界之后
 - 如果样式串到别的区域，所有聊天界面的定制都收口到 `[data-custom-id="chat"]`
 
 页面效果不对时，先从这里开始排： [故障排除](/zh/guide/troubleshooting#css-looks-wrong-start-here)

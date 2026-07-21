@@ -26,5 +26,5 @@
 
 - swap the renderer package first
 - keep CSS order correct before debugging visual differences
-- move to scoped `setCustomComponents` instead of global mutations
+- move to scoped or renderer-local component mappings instead of global mutations
 - only adopt `nodes` if the app is streaming or frequently re-parsing

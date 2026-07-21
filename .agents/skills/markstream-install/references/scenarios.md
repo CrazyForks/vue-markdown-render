@@ -12,13 +12,17 @@
 
 ## Peer selection
 
-| Feature | Peers |
-|---------|-------|
-| Lightweight highlighted code blocks | `stream-markdown` |
-| Monaco-powered code blocks | `stream-monaco` |
-| Mermaid | `mermaid` |
-| D2 | `@terrastruct/d2` |
-| KaTeX math | `katex` |
+Peer sets are package-specific. Confirm the selected package's current `peerDependencies` before installing anything.
+
+| Feature | Peers | Package notes |
+|---------|-------|---------------|
+| Enhanced File/Diff code blocks | `stream-diffs` | Vue 3; selected by the compatibility-named `codeRenderer="monaco"` |
+| Lightweight highlighted code blocks | `stream-markdown` | Vue 3, React, and Vue 2 |
+| Monaco-powered code blocks | `stream-monaco` | React, Svelte, Angular, and Vue 2; legacy compatibility peer in Vue 3, not its current default enhanced surface |
+| Mermaid | `mermaid` | All renderer packages |
+| D2 | `@terrastruct/d2` | All renderer packages |
+| KaTeX math | `katex` | All renderer packages |
+| Infographic blocks | `@antv/infographic` | All renderer packages; Vue 3 also requires `setInfographicLoader(...)` |
 
 ## CSS checklist
 

@@ -64,7 +64,7 @@ Before you ask for code changes, include:
 - framework and version, for example Vue 3, Nuxt 3, React 18, Angular 20, or Svelte 5
 - CSS stack, for example Tailwind, UnoCSS, reset libraries, or a design system
 - rendering mode: static article, docs site, SSR, or streaming chat
-- required peers: Monaco, Mermaid, D2, KaTeX, or Shiki
+- required capabilities: enhanced File/Diff code blocks, lightweight Shiki highlighting, Mermaid, D2, KaTeX, or Infographic
 - whether overrides must stay scoped to one area of the app
 
 Without that context, assistants often install the wrong peers or place CSS in the wrong order.
@@ -75,7 +75,7 @@ Without that context, assistants often install the wrong peers or place CSS in t
 
 ```text
 Install markstream-vue into this Vue 3 app.
-Use the smallest peer-dependency set that matches these needs: [fill in Monaco / Mermaid / D2 / KaTeX / Shiki].
+Use the smallest peer-dependency set that matches these needs: [fill in stream-diffs File/Diff code blocks / Shiki / Mermaid / D2 / KaTeX / Infographic].
 Keep CSS order safe with my existing stack: [fill in Tailwind / UnoCSS / reset library].
 Add one minimal render example, and explain whether I should use `content` or `nodes`.
 If you replace or override anything, keep it scoped with `custom-id`.
@@ -86,7 +86,7 @@ If you replace or override anything, keep it scoped with `custom-id`.
 ```text
 Migrate this React codebase from react-markdown to markstream-react.
 Audit which remark/rehype behaviors have no direct 1:1 equivalent.
-Replace simple renderer overrides first, then call out anything that needs custom nodes, customHtmlTags, or parser/node post-processing.
+Replace simple renderer overrides first. Prefer renderer-local `streamingComponents` / `htmlComponents` for React custom tags, then call out anything that still needs built-in node overrides or parser/node post-processing.
 Preserve existing user-visible behavior where practical.
 ```
 
@@ -94,7 +94,7 @@ Preserve existing user-visible behavior where practical.
 
 ```text
 Add support for a trusted custom Markdown tag named `thinking`.
-Use `customHtmlTags` plus a scoped `setCustomComponents` mapping.
+Choose the framework-native local/scoped mapping: React `streamingComponents` / `htmlComponents`, Svelte or Angular `customComponents`, or scoped `setCustomComponents` where a shared node registry is intended.
 Render nested Markdown inside the custom component, and keep the implementation streaming-friendly.
 Do not use global overrides unless there is a clear reason.
 ```
@@ -115,7 +115,7 @@ If you are building a reusable prompt, template, or coding skill around markstre
 - install only the required peers for the requested features
 - place CSS after resets and use `@import '...' layer(components)` when utility frameworks are involved
 - choose `content` for simple rendering and most streaming chat; use built-in smooth streaming for jittery token streams; choose `nodes` plus `final` only for worker-preparsed/custom AST flows
-- use `custom-id` for overrides by default
+- use renderer-local component maps when the framework exposes them; otherwise use `custom-id` for scoped registry overrides
 - point the user to the right docs page after making changes
 
 Good follow-up links for a skill to cite:

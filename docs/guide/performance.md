@@ -1,6 +1,6 @@
 ---
 title: Streaming Markdown performance tuning
-description: Improve markstream-vue performance for streaming chat UIs, large documents, Monaco code blocks, and heavy Mermaid or KaTeX content.
+description: Improve markstream-vue performance for streaming chat UIs, large documents, enhanced code blocks, and heavy Mermaid or KaTeX content.
 ogImage: /og/performance.svg
 ogImageAlt: Streaming Markdown performance tuning for Markstream
 keywords:
@@ -18,7 +18,7 @@ The renderer is optimized for streaming and large docs. Key features:
 
 - Incremental parsing for code blocks
 - Efficient DOM updates and memory optimizations
-- Monaco streaming updates
+- enhanced code-block streaming updates
 - Progressive Mermaid rendering
 
 Performance tips:
@@ -104,7 +104,7 @@ Some AI or LLM sources send content in large bursts, which can feel like the pre
 - **Enable `typewriter` when you want a cursor, and keep `fade` disabled during smooth streaming**. `smooth-streaming="auto"` already paces the content layer; combining it with `fade` can replay opacity animation on every small commit and cause flicker. Use `fade=true` for completed history/static content that arrives all at once.
 - **Tune smooth streaming options for text pacing**: adjust `smooth-streaming-options` when a backend sends large bursts. Use batching props (`initialRenderBatchSize`, `renderBatchSize`, `renderBatchDelay`) for node mounting cadence when virtualization is disabled, not as the primary text pacing control.
 - **Throttle upstream updates** if possible: instead of replacing `content` on every incoming hunk, debounce (50–100 ms) or split into smaller paragraphs so each render cycle operates on a “bite-sized” diff.
-- **Defer heavy nodes** by keeping `deferNodesUntilVisible`/`viewportPriority` turned on; expensive blocks (Mermaid/Monaco) will wait until they are near the viewport so the stream of text is never blocked.
+- **Defer heavy nodes** by keeping `deferNodesUntilVisible`/`viewportPriority` turned on; expensive blocks (Mermaid/enhanced code surfaces) will wait until they are near the viewport so the stream of text is never blocked.
 - Set `viewportPriority={false}` when a document must render every heavy node immediately (for example, PDF/print capture). Standalone heavy node components are immediate by default because they have no viewport-priority provider.
 - **Fall back for code blocks** when a burst happens: disable `codeBlockStream` or temporarily use `renderCodeBlocksAsPre` during streaming so that syntax-highlighting work does not stall text updates.
 
@@ -132,7 +132,7 @@ For immediate rendering of every heavy node, use `<MarkdownRender :content="md" 
 
 - `maxLiveNodes` (default `220`) caps how many fully rendered nodes remain in the DOM. Tune this based on your layout — lower values reduce memory but require slightly more placeholder churn; higher values prioritise scrollback.
 - `liveNodeBuffer` controls overscan on both sides of the focus window (default `60`). Increase it when nodes vary wildly in height to avoid visible pop-in while scrolling fast.
-- `deferNodesUntilVisible` together with `viewportPriority` defers mounting heavy nodes (Mermaid, Monaco, KaTeX) until an observer reports they are close to the viewport.
+- `deferNodesUntilVisible` together with `viewportPriority` defers mounting heavy nodes (Mermaid, enhanced code surfaces, KaTeX) until an observer reports they are close to the viewport.
 - `batchRendering`, `initialRenderBatchSize`, `renderBatchSize`, `renderBatchDelay`, and `renderBatchBudgetMs` govern how many nodes switch from placeholders to full components per frame. This incremental mode only runs when virtualization is disabled (`:max-live-nodes="0"`); otherwise the virtual window already limits DOM work, so nodes are rendered immediately without placeholders.
 
 Example: Give the user a lighter DOM footprint while keeping scrollback smooth.
@@ -235,7 +235,7 @@ The playground includes a real runnable page: `playground/src/pages/virtual-scro
 Install the dependencies:
 
 ```bash
-pnpm add vue-virtual-scroller markstream-vue mermaid katex stream-monaco
+pnpm add vue-virtual-scroller markstream-vue mermaid katex stream-diffs
 ```
 
 Entry imports:

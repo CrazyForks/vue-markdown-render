@@ -1,6 +1,6 @@
 ---
 name: markstream-svelte
-description: Integrate markstream-svelte in Svelte 5 apps. Svelte 4 unsupported.
+description: Integrate the beta markstream-svelte package in Svelte 5 or SvelteKit apps. Use when Codex needs Svelte 5 runes, CSS and optional peers, smooth streaming, worker setup, renderer-local or scoped custom components, or SSR-safe boundaries. Svelte 4 is unsupported.
 ---
 
 # Markstream Svelte
@@ -8,6 +8,7 @@ description: Integrate markstream-svelte in Svelte 5 apps. Svelte 4 unsupported.
 - Confirm Svelte 5; ask Svelte 4 users to upgrade.
 - Add package and only requested peers.
 - Import CSS after resets; KaTeX CSS for math.
+- Treat the package as beta and confirm the app accepts that API maturity.
 - Default to `<MarkdownRender {content} />`.
   - For streaming AI chat, keep `content` and use built-in smooth streaming first.
     - `smoothStreaming="auto"` is the default and activates when `typewriter={true}` or `maxLiveNodes <= 0`.
@@ -20,5 +21,11 @@ description: Integrate markstream-svelte in Svelte 5 apps. Svelte 4 unsupported.
   - Use `nodes` + `final` for worker-preparsed content, shared AST stores, or custom AST control.
 - Use `$props()` and callbacks.
 - Workers: `setKaTeXWorker`, `setMermaidWorker`, `workers/*?worker`.
-- Custom UI: scoped `setCustomComponents`, `customId`, `customHtmlTags`.
+- Custom UI: prefer the renderer-local `customComponents` prop for one surface; use scoped `setCustomComponents`, `customId`, and `customHtmlTags` when shared registration is intentional.
+- Keep browser-only workers and heavy peers behind SvelteKit client boundaries.
 - Verify with `svelte-check`, build, or e2e.
+
+## Useful Doc Targets
+
+- `docs/guide/svelte.md`
+- `docs/frameworks/svelte.md`

@@ -21,8 +21,8 @@ If you only render static articles or docs pages, go back to [Usage & Streaming]
 | Need | Packages | Best for |
 | --- | --- | --- |
 | Text-only or lightweight chat UI | `markstream-vue` | Basic Markdown, lists, links, blockquotes |
-| Syntax-highlighted code without Monaco | `markstream-vue stream-markdown` | SSR-friendly transcripts, lower bundle budgets |
-| Rich code interactions | `markstream-vue stream-monaco` | Copy, preview, diff, and Monaco-powered code blocks |
+| Lightweight syntax-highlighted code | `markstream-vue stream-markdown` | SSR-friendly transcripts, lower bundle budgets |
+| Rich code interactions | `markstream-vue stream-diffs` | Copy, preview, syntax highlighting, and File/Diff surfaces |
 | Diagrams or math in chat output | `markstream-vue mermaid katex` | Mermaid fences and KaTeX formulas |
 
 Install only the peers you actually expect to show up in responses.
@@ -69,8 +69,8 @@ Turn it off per surface with `:smooth-streaming="false"` if you want raw chunk c
 ## 3. Renderer settings that usually work well
 
 - Keep the default virtualization behavior for long transcripts. Only tune `maxLiveNodes` if you have a measured reason.
-- Use `renderCodeBlocksAsPre` when code fences appear often but Monaco is too heavy for your chat surface.
-- Leave heavy peers off until you need them. Chat UIs get a large win from not shipping Mermaid, KaTeX, or Monaco by default.
+- Use `renderCodeBlocksAsPre` when code fences appear often but the enhanced code surface is too heavy for your chat UI.
+- Leave heavy peers off until you need them. Chat UIs get a large win from not shipping Mermaid, KaTeX, or `stream-diffs` by default.
 - If you disable virtualization (`:max-live-nodes="0"`), then the batching props in [Props & Options](/guide/props) become more important.
 
 ## 4. Common upgrade paths
@@ -245,7 +245,7 @@ For long mixed timelines, prefer the built-in virtual timeline. Its default `sti
 ### Better code blocks
 
 - Want a lighter docs-style look: use `MarkdownCodeBlockNode` with `stream-markdown`
-- Want richer preview/diff controls: use `CodeBlockNode` with `stream-monaco`
+- Want richer preview/diff controls: use `CodeBlockNode` with `stream-diffs`
 
 See [Renderer & Node Components](/guide/components) for the trade-offs.
 
@@ -265,7 +265,7 @@ See [Override Built-in Components](/guide/component-overrides).
 
 - Load your reset first, then use `@import 'markstream-vue/index.css' layer(components);`.
 - Import `katex/dist/katex.min.css` only if math is enabled.
-- Gate browser-only peers such as Mermaid, D2, or Monaco behind client-only boundaries in SSR setups.
+- Gate browser-only peers such as Mermaid, D2, or the enhanced code runtime behind client-only boundaries in SSR setups.
 - If styles leak, scope your chat tweaks under `[data-custom-id="chat"]`.
 
 Start here when visuals look wrong: [Troubleshooting](/guide/troubleshooting#css-looks-wrong-start-here)

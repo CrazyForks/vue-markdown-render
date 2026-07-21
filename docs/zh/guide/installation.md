@@ -27,6 +27,7 @@ yarn add markstream-vue
 | Mermaid 图表 | `mermaid` | 渲染 `mermaid` fenced code block |
 | D2 图表 | `@terrastruct/d2` | 渲染 `d2` / `d2lang` fenced code block |
 | KaTeX 数学公式 | `katex` | 行内或块级公式 |
+| Infographic 图表 | `@antv/infographic` | 渲染 `infographic` fenced code block；还需要配置 `setInfographicLoader` |
 
 ## 3. 常见安装配方
 
@@ -55,8 +56,10 @@ pnpm add markstream-vue mermaid @terrastruct/d2 katex
 ### 一次性全开
 
 ```bash
-pnpm add markstream-vue stream-markdown stream-diffs mermaid @terrastruct/d2 katex
+pnpm add markstream-vue stream-markdown stream-diffs mermaid @terrastruct/d2 katex @antv/infographic
 ```
+
+Infographic 是显式 opt-in 能力。安装 `@antv/infographic` 后，按 [AntV Infographic](/zh/guide/infographic) 配置 `setInfographicLoader`。
 
 ## 4. CSS 顺序和安装同样重要
 

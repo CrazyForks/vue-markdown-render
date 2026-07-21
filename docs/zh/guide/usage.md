@@ -136,7 +136,7 @@ const final = false
 
 完整说明参考 [组件与节点渲染器](/zh/guide/components)：
 
-- `CodeBlockNode` — Monaco 代码块（需要安装 `stream-monaco`）。
+- `CodeBlockNode` — 增强的 File/FileDiff 代码块（需要安装 `stream-diffs`；公开的 `'monaco'` renderer 名称为兼容性保留）。
 - `MarkdownCodeBlockNode` — 基于 Shiki，适合轻量场景。
 - `MermaidBlockNode` — 需要 `mermaid` ≥ 11（无需额外 CSS）。
 - `D2BlockNode` — 需要 `@terrastruct/d2`（无需额外 CSS）。
@@ -147,7 +147,7 @@ const final = false
 1. **先 reset** —— `modern-css-reset`、`@tailwind base` 或 `@unocss/reset`，之后再导入库的 CSS。
 2. **使用 CSS layer** —— Tailwind/UnoCSS 项目请使用 `@import 'markstream-vue/index.css' layer(components);`。
 3. **处理 Uno/Tailwind 冲突** —— 参见 [Tailwind 指南](/zh/guide/tailwind)（包含 UnoCSS 示例）。
-4. **同伴 CSS** —— KaTeX 需要对应的 CSS；Mermaid/D2 不需要。Monaco 不需要额外导入 CSS。
+4. **同伴 CSS** —— KaTeX 需要对应的 CSS；Mermaid、D2 和 `stream-diffs` 不需要额外导入 CSS。
 
 ## CSS 作用域（重要）
 

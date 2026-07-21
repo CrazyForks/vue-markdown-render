@@ -64,7 +64,7 @@ npx skills add git@github.com:Simon-He95/markstream-vue.git
 - 框架和版本，例如 Vue 3、Nuxt 3、React 18、Angular 20、Svelte 5
 - CSS 技术栈，例如 Tailwind、UnoCSS、reset 库、设计系统
 - 渲染模式：静态文章、文档站、SSR，还是流式聊天
-- 需要哪些可选能力：Monaco、Mermaid、D2、KaTeX、Shiki
+- 需要哪些可选能力：增强 File/Diff 代码块、轻量 Shiki 高亮、Mermaid、D2、KaTeX、Infographic
 - 组件覆盖是否必须限制在某个业务区域内
 
 少了这些上下文，AI 很容易装错 peer，或者把 CSS 放到错误的顺序里。
@@ -75,7 +75,7 @@ npx skills add git@github.com:Simon-He95/markstream-vue.git
 
 ```text
 把 markstream-vue 接入到这个 Vue 3 项目里。
-只安装满足这些能力所需的最小 peer 依赖：[在这里填写 Monaco / Mermaid / D2 / KaTeX / Shiki]。
+只安装满足这些能力所需的最小 peer 依赖：[在这里填写 stream-diffs File/Diff 代码块 / Shiki / Mermaid / D2 / KaTeX / Infographic]。
 结合我现有的 CSS 技术栈处理样式顺序：[在这里填写 Tailwind / UnoCSS / reset 库]。
 补一个最小可运行示例，并说明我应该用 `content` 还是 `nodes`。
 如果需要覆盖组件，请默认使用带 `custom-id` 的 scoped 方式。
@@ -86,7 +86,7 @@ npx skills add git@github.com:Simon-He95/markstream-vue.git
 ```text
 把这个 React 项目从 react-markdown 迁移到 markstream-react。
 先审计哪些 remark/rehype 行为没有直接 1:1 对应项。
-优先迁移简单的渲染器替换，再标出哪些地方需要 custom nodes、customHtmlTags，或者解析后处理。
+优先迁移简单的渲染器替换。React 自定义标签优先使用 renderer-local `streamingComponents` / `htmlComponents`，再标出哪些地方仍需要内置节点覆盖或解析后处理。
 尽量保持现有用户可见行为不变。
 ```
 
@@ -94,7 +94,7 @@ npx skills add git@github.com:Simon-He95/markstream-vue.git
 
 ```text
 为这个项目增加一个可信的 Markdown 标签 `thinking`。
-请使用 `customHtmlTags` + scoped `setCustomComponents`。
+按框架选择本地或 scoped 映射：React 用 `streamingComponents` / `htmlComponents`，Svelte 或 Angular 用 `customComponents`，需要共享节点 registry 时再用 scoped `setCustomComponents`。
 自定义组件内部需要继续渲染嵌套 Markdown，并保持流式输出友好。
 除非有充分理由，否则不要使用全局覆盖。
 ```
@@ -115,7 +115,7 @@ npx skills add git@github.com:Simon-He95/markstream-vue.git
 - 按需求只安装必要的 peers
 - 遇到 Tailwind / UnoCSS 时，把 CSS 放在 reset 之后，并使用 `@import '...' layer(components)`
 - 普通渲染和大多数流式聊天优先用 `content`；token 抖动场景使用内置 smooth streaming；只有 worker 预解析、自定义 AST 或独立状态层接管解析时，才优先用 `nodes` + `final`
-- 组件覆盖默认走 `custom-id` 作用域
+- 框架提供 renderer-local component map 时优先使用；否则默认用 `custom-id` 限定 registry 覆盖作用域
 - 改完后告诉用户下一步应该看哪一页文档
 
 一个好的 skill 可以顺手引用这些页面：

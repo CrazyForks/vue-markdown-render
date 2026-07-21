@@ -1,6 +1,6 @@
 ---
 name: markstream-custom-components
-description: Override built-in Markstream node renderers and add trusted custom tags. Use when Codex needs to apply `setCustomComponents`, install `VueRendererMarkdown` with scoped Vue app components, keep overrides scoped with `customId`, map override keys like `image`, `code_block`, `mermaid`, or `link`, or wire `customHtmlTags` and nested renderers for tags such as `thinking`.
+description: Override built-in Markstream node renderers and add trusted custom tags across Vue, React, Svelte, and Angular. Use when Codex needs scoped `setCustomComponents`, renderer-local React `streamingComponents` or `htmlComponents`, Angular/Svelte `customComponents`, Vue app-scoped components, node override keys such as `image`, `code_block`, `mermaid`, or `link`, or nested renderers for tags such as `thinking`.
 ---
 
 # Markstream Custom Components
@@ -16,8 +16,9 @@ Read [references/patterns.md](references/patterns.md) before choosing an overrid
    - `custom tag`: support trusted HTML-like tags such as `thinking`.
    - `parser-level`: requires token transforms or AST reshaping. Only then should you leave this skill and use low-level parser hooks.
 2. Prefer scoped mappings.
-   - Use `setCustomComponents(customId, mapping)` instead of global mappings whenever practical.
-   - Pass the same `customId` or `custom-id` to the renderer instance.
+   - Vue, Vue 2, Svelte, and shared Angular registration: use `setCustomComponents(customId, mapping)` instead of global mappings whenever practical, and pass the same `customId` / `custom-id`.
+   - React custom tags: prefer renderer-local `streamingComponents` for parser-backed nodes or `htmlComponents` for sanitized HTML props plus `children`. Use `defineStreamingComponents(...)` / `defineHtmlComponents(...)` for typed maps. Keep `setCustomComponents` for built-in node overrides or shared legacy registration.
+   - Svelte and Angular can also pass a renderer-local `customComponents` map when the override should not enter the shared registry.
    - In Vue 3 app/plugin setup, import `{ VueRendererMarkdown }` from `markstream-vue` and install it with `{ components }` when the override should be scoped to the Vue app instance.
 3. Start with the smallest safe override.
    - Leaf-like nodes (`image`, `link`, `inline_code`, `mermaid`) are easier than container nodes (`heading`, `paragraph`, `list_item`).
@@ -26,6 +27,7 @@ Read [references/patterns.md](references/patterns.md) before choosing an overrid
    - For trusted custom tags with inner Markdown, render `node.content` with a nested renderer.
    - Pass the same custom-tag allowlist to nested renderers.
    - Nested renderers inside a smooth-streaming parent are automatically suppressed from double pacing — do not add `smooth-streaming` to child renderers.
+   - In React, `streamingComponents` automatically contributes its keys to the effective custom-tag list; do not duplicate those keys in `customHtmlTags` unless another parser path needs them.
 5. Keep props and cleanup intact.
    - Preserve `node`, `loading`, `indexKey`, `customId`, and `isDark`.
    - For `mermaid` and `infographic` overrides, preserve `estimatedPreviewHeightPx` so async preview shells keep stable height during remounts.
@@ -39,11 +41,13 @@ Read [references/patterns.md](references/patterns.md) before choosing an overrid
 - Scoped overrides first, global overrides only when the whole app truly needs them.
 - Leaf-node overrides before container-node overrides.
 - `customHtmlTags` plus scoped custom components before parser hooks.
+- In React, renderer-local component maps before registry mutation.
 - Nested renderers for tag bodies that contain Markdown.
 
 ## Useful Doc Targets
 
 - `docs/guide/component-overrides.md`
 - `docs/guide/custom-components.md`
+- `docs/guide/react-components.md`
 - `docs/guide/components.md`
 - `docs/guide/advanced.md`

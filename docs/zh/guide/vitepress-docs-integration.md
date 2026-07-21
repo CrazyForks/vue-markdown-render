@@ -36,7 +36,7 @@ pnpm add markstream-vue stream-markdown
 
 - `mermaid`：Mermaid 图表
 - `katex`：数学公式
-- `stream-monaco`：Monaco 代码块
+- `stream-diffs`：增强的 File/FileDiff 代码块
 
 ## 3. 在 `enhanceApp` 中注册渲染器和自定义节点
 
@@ -133,7 +133,7 @@ const source = `
 - 组件一直没生效：没有在 `enhanceApp` 注册，或映射 key 和标签名不一致
 - 样式错乱：CSS 导入顺序不对，或者被 utility layer 覆盖
 - 覆盖影响到别的页面：用了全局映射，没有通过 `custom-id` 限定作用域
-- Mermaid 或 Monaco 在 SSR 类环境里异常：继续看对应专题页和客户端边界说明
+- Mermaid 或增强代码 runtime 在 SSR 类环境里异常：继续看对应专题页和客户端边界说明
 
 如果页面布局或样式还是不对，先从这里排： [故障排除](/zh/guide/troubleshooting#css-looks-wrong-start-here)
 

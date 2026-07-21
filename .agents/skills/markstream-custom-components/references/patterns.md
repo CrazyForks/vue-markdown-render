@@ -15,10 +15,21 @@
 
 ## Trusted custom-tag pattern
 
+### Vue, Vue 2, Svelte, and Angular shared registry
+
 1. register the tag in `customHtmlTags`
 2. map the same tag name with `setCustomComponents(customId, { tagName: Component })`
 3. if the tag body contains Markdown, render `node.content` with a nested renderer
 4. pass the same `customHtmlTags` list to the nested renderer
+
+Svelte and Angular can pass `customComponents` directly to one renderer instead when shared registration is unnecessary.
+
+### React renderer-local maps
+
+1. use `streamingComponents` for parser-backed tags that need `node.loading` and incomplete-tag handling
+2. use `htmlComponents` for sanitized HTML attributes plus `children`
+3. define typed maps with `defineStreamingComponents(...)` or `defineHtmlComponents(...)`
+4. only add `customHtmlTags` separately when another parser path needs it; `streamingComponents` contributes its own keys automatically
 
 ## Nested renderer defaults
 

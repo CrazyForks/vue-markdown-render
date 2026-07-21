@@ -144,7 +144,7 @@ For a full end-to-end rollout order, peer selection, and chat-specific tuning, c
 
 For a full list of components and props, visit [Components & node renderers](/guide/components). Highlights:
 
-- `CodeBlockNode` — Monaco-powered blocks (requires `stream-monaco`).
+- `CodeBlockNode` — enhanced File/FileDiff blocks (requires `stream-diffs`; the public `'monaco'` renderer name remains for compatibility).
 - `MarkdownCodeBlockNode` — Shiki-based lightweight highlighting.
 - `MermaidBlockNode` — requires `mermaid` ≥ 11 (no extra CSS).
 - `D2BlockNode` — requires `@terrastruct/d2` (no extra CSS).
@@ -155,7 +155,7 @@ For a full list of components and props, visit [Components & node renderers](/gu
 1. **Reset first** (`modern-css-reset`, `@tailwind base`, `@unocss/reset`), then import `markstream-vue` styles.
 2. **Use CSS layers** when Tailwind/UnoCSS is active (`@import 'markstream-vue/index.css' layer(components);`).
 3. **UNO/Tailwind conflicts** — follow the [Tailwind guide](/guide/tailwind) (includes UnoCSS examples) to prevent utilities from overriding renderer styles.
-4. **Peer CSS** — KaTeX needs its own CSS; Mermaid/D2 do not. Monaco does not require extra CSS.
+4. **Peer CSS** — KaTeX needs its own CSS; Mermaid, D2, and `stream-diffs` do not.
 
 ## CSS scoping (important)
 

@@ -41,7 +41,7 @@ faq:
 | 需求 | 推荐做法 |
 | --- | --- |
 | AI 聊天或 SSE 输出 | `mode="chat"`、传 `content` 和 `final`、关闭 `fade` |
-| 文档站或稳定长文 | `mode="docs"`，按需启用 Monaco、Mermaid、KaTeX |
+| 文档站或稳定长文 | `mode="docs"`，按需启用 `stream-diffs`、Mermaid、KaTeX |
 | 移动端 WebView | 导入 `markstream-vue/index.px.css` |
 | 50KB 以上长回答 | 使用 `node-virtual="auto"` 和 live node 限制 |
 
@@ -65,6 +65,6 @@ import 'markstream-vue/index.css'
 </template>
 ```
 
-如果输出来自外部用户或模型，优先使用 `htmlPolicy="escape"` 或默认安全策略，不要把原始 HTML 当成可信内容。只在需要 Mermaid、KaTeX、Monaco、D2 或 Infographic 时安装对应 peer 依赖。
+如果输出来自外部用户或模型，优先使用 `htmlPolicy="escape"` 或默认安全策略，不要把原始 HTML 当成可信内容。只在需要 Mermaid、KaTeX、`stream-diffs`、D2 或 Infographic 时安装对应 peer 依赖。
 
 不适合的情况：只渲染很短的静态 Markdown、只需要 HTML 字符串、或者项目已经有完整 sanitizer/plugin 体系且没有流式体验要求。

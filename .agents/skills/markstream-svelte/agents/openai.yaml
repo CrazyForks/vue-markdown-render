@@ -1,4 +1,4 @@
 interface:
   display_name: Markstream Svelte
-  short_description: Svelte 5 setup
-  default_prompt: Use $markstream-svelte.
+  short_description: Wire beta markstream-svelte in Svelte 5
+  default_prompt: Use $markstream-svelte to integrate the beta markstream-svelte package into this Svelte 5 or SvelteKit repository with the right CSS, optional peers, workers, and custom component scope.

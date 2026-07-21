@@ -25,8 +25,11 @@ Read [references/adoption-checklist.md](references/adoption-checklist.md) before
     - Preserve user-visible behavior before adding richer Markstream-only features.
     - Audit whether the old renderer allowed broad raw HTML or Mermaid loose-mode HTML labels before claiming parity.
 4. Migrate custom renderers.
-   - Convert tag-based renderers into node-type overrides with scoped `setCustomComponents`.
+   - Convert built-in node renderers into scoped node-type overrides.
+   - In React, prefer renderer-local `streamingComponents` for parser-backed tags and `htmlComponents` for sanitized HTML-prop components; use `setCustomComponents` for built-in node overrides or shared compatibility registration.
+   - In Svelte or Angular, prefer the renderer-local `customComponents` input when the mapping does not need shared registration.
    - For trusted tag-like content, prefer `customHtmlTags`.
+   - Use `parseOptions.preTransformTokens`, `postTransformTokens`, or `postTransformNodes` only when the old pipeline truly requires token or AST transforms.
 5. Review gaps honestly.
    - Do not claim 1:1 parity where none exists.
    - Call out parser, plugin, security, or HTML behavior that still needs manual review.
@@ -46,6 +49,7 @@ Read [references/adoption-checklist.md](references/adoption-checklist.md) before
 - Smooth streaming is an intermediate option between "just content" and "full nodes migration": it paces visible output without requiring AST control.
 - Preserve safety over feature parity when HTML or security rules are involved.
 - Prefer explicit TODOs over vague claims.
+- Prefer renderer-local component maps where the target framework exposes them.
 - Recommend against migration when the current stack depends heavily on transforms that Markstream does not mirror directly.
 - When preserving trusted legacy behavior is necessary, use scoped `htmlPolicy` / `html-policy="trusted"` and `mermaidProps.isStrict = false` instead of weakening defaults everywhere.
 

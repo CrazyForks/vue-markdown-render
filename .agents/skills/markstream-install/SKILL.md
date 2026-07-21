@@ -1,6 +1,6 @@
 ---
 name: markstream-install
-description: Install and wire markstream-vue, markstream-react, markstream-vue2, markstream-angular, or markstream-svelte into an existing repository. Use when Codex needs to choose the right package, install the smallest peer-dependency set, fix CSS/reset order, choose Vue 3 renderer mode, decide between `content`, `nodes`, and Vue 3 virtual-scroll coordination, or add a minimal working renderer example.
+description: Install and wire markstream-vue, markstream-react, markstream-vue2, markstream-angular, or markstream-svelte into an existing repository. Use when Codex needs to choose the right package, install the smallest framework-specific peer-dependency set, fix CSS/reset order, choose Vue 3 renderer and code-block modes, decide between `content`, `nodes`, and Vue 3 virtual-scroll coordination, or add a minimal working renderer example.
 ---
 
 # Markstream Install
@@ -16,9 +16,11 @@ Read [references/scenarios.md](references/scenarios.md) before making dependency
    - Choose the package that matches the host app: `markstream-vue`, `markstream-vue2`, `markstream-react`, `markstream-angular`, or `markstream-svelte`.
    - Use `markstream-svelte` only for Svelte 5 apps.
 2. Install the smallest peer set that matches the requested features.
-   - Add peers only for features the user actually needs: Monaco, Mermaid, D2, KaTeX, or lightweight highlighting via `stream-markdown`.
+   - Add peers only for features the user actually needs. Check the chosen package's `peerDependencies`; peer availability differs by renderer.
+   - For Vue 3 code blocks, use `stream-diffs` for the enhanced File/Diff surface or `stream-markdown` with `code-renderer="shiki"` for lightweight highlighting. The public `code-renderer="monaco"` name is retained for compatibility but loads `stream-diffs`.
+   - Add `@antv/infographic` plus `setInfographicLoader(...)` only when infographic fences are needed.
    - Do not install every optional peer by default.
-   - For Vue 3 Monaco preloading, use `preloadCodeBlockRuntime` from `markstream-vue` so the renderer runtime knows Monaco is warm. Existing `getUseMonaco()` calls are still compatible.
+   - For Vue 3 enhanced code-block preloading, use `preloadCodeBlockRuntime` from `markstream-vue`. Existing `getUseMonaco()` calls remain compatible despite the historical name.
 3. Fix CSS order.
    - Put reset styles before Markstream styles.
    - In Tailwind or UnoCSS projects, use `@import 'markstream-*/index.css' layer(components);`.
@@ -29,9 +31,9 @@ Read [references/scenarios.md](references/scenarios.md) before making dependency
     - In Vue 3 apps with long AI conversations, thread restore, or an existing message virtualizer such as `vue-virtual-scroller`, do not stop at a trivial renderer. Use `MarkstreamVirtualTimeline` or `useMarkstreamVirtualAdapter()` and follow `docs/guide/performance.md`.
     - For Vue 3, choose renderer `mode` by surface before tuning lower-level props.
       - `mode="chat"`: AI chat or SSE output; lightweight batches, `<pre>` code rendering by default, `fade=false`, `max-live-nodes=0`, and `smooth-streaming="auto"`.
-      - `mode="docs"`: rich document surfaces; default mode, larger batches, tooltips, fade, and Monaco-backed code blocks when the peer is installed.
+      - `mode="docs"`: rich document surfaces; default mode, larger batches, tooltips, fade, and enhanced `stream-diffs` code blocks when the peer is installed.
       - `mode="minimal"`: lightweight non-chat surfaces.
-      - If a docs page does not need Monaco-backed code blocks, set `:render-code-blocks-as-pre="true"`.
+      - Choose regular fenced-code rendering with `code-renderer="monaco" | "shiki" | "pre"`; `render-code-blocks-as-pre` is the legacy boolean override and takes precedence when true.
     - For streaming AI chat in other Markstream packages, start with `content` and built-in smooth streaming.
       - Auto mode is the default: `smoothStreaming="auto"` / `smooth-streaming="auto"`.
       - Auto pacing activates when `typewriter=true` or `maxLiveNodes <= 0` / `max-live-nodes <= 0`.
@@ -46,6 +48,7 @@ Read [references/scenarios.md](references/scenarios.md) before making dependency
       - Other packages recovering history: `smoothStreaming=false` / `smooth-streaming=false`, `fade=true`, `typewriter=false`.
       - Dynamic switch: `smoothStreaming={isStreaming ? 'auto' : false}`, `fade={!isStreaming}`.
     - Use `nodes` + `final` only for worker preparsing, shared AST stores, or custom AST control.
+    - In Vue 3, use `typewriter="simple"` for a lightweight cursor on high-frequency streams; use precise mode only when the cursor must follow complex inline layout.
     - For manual pacing with `nodes`, use `useSmoothMarkdownStream`: `enqueue()` chunks, `finish()` when done, render from `visible`, wait for `caughtUp` before final parsing.
     - Preserve the default hardening: HTML policies now default to `safe`, and Mermaid runs in strict mode by default.
 5. Keep customization scoped.
@@ -66,6 +69,7 @@ Read [references/scenarios.md](references/scenarios.md) before making dependency
 - Treat CSS order as a first-class part of installation, not a later cleanup.
 - When the request includes SSR, explicitly gate browser-only peers behind client-only boundaries.
 - Do not widen HTML or Mermaid security defaults unless the user explicitly needs trusted legacy compatibility.
+- Do not recommend Vue 3's compatibility-named `code-renderer="monaco"` as a reason to install `stream-monaco`; install `stream-diffs` for the current enhanced surface.
 - If compatibility requires it, scope the opt-out to the trusted surface with `htmlPolicy` / `html-policy="trusted"` and `mermaidProps.isStrict = false` instead of changing app-wide defaults blindly.
 
 ## Useful Doc Targets

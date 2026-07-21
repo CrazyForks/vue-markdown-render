@@ -83,9 +83,9 @@ import 'markstream-vue/index.css'
 - **Two input paths**: `content` for raw Markdown strings and `nodes` for pre-parsed AST
 - **Safe HTML policy**: `safe` by default, `escape` for literal text, `trusted` for trusted content only — no `v-html` required
 - **Progressive Mermaid**: diagrams render incrementally during streaming
-- **Streaming code blocks**: Monaco/Shiki with diff tracking
+- **Streaming code blocks**: `stream-diffs` File/Diff surfaces or lightweight Shiki rendering
 - **Virtualized long documents**: bounded live nodes for 1MB+ content
-- **Optional peers**: Mermaid, KaTeX, Monaco, D2, Infographic — install only what you need
+- **Optional peers**: `stream-diffs`, `stream-markdown`, Mermaid, KaTeX, D2, Infographic — install only what you need
 - **Mobile-ready**: `index.px.css` for apps that scale root font size
 - **SSR-safe**: worker imports and client-only guards for Nuxt/VitePress
 
@@ -102,7 +102,7 @@ import 'markstream-vue/index.css'
 
 ```bash
 pnpm add mermaid katex   # diagrams and math
-pnpm add stream-monaco    # Monaco code blocks
+pnpm add stream-diffs     # enhanced File/Diff code blocks
 pnpm add @antv/infographic @terrastruct/d2  # additional diagram types
 ```
 

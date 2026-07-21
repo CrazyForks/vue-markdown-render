@@ -35,6 +35,7 @@ Then continue with [Quick Start](/guide/quick-start) if you only need basic Mark
 | Mermaid diagrams | `mermaid` | Fenced `mermaid` blocks |
 | D2 diagrams | `@terrastruct/d2` | Fenced `d2` or `d2lang` blocks |
 | KaTeX math | `katex` | Inline or block math rendering |
+| Infographic blocks | `@antv/infographic` | Fenced `infographic` blocks; also configure `setInfographicLoader` |
 
 ## 3. Common install recipes
 
@@ -63,8 +64,10 @@ pnpm add markstream-vue mermaid @terrastruct/d2 katex
 ### Everything enabled
 
 ```bash
-pnpm add markstream-vue stream-markdown stream-diffs mermaid @terrastruct/d2 katex
+pnpm add markstream-vue stream-markdown stream-diffs mermaid @terrastruct/d2 katex @antv/infographic
 ```
+
+Infographic rendering is explicit opt-in. After installing `@antv/infographic`, follow [AntV Infographic](/guide/infographic) to configure `setInfographicLoader`.
 
 ## 4. CSS order matters as much as installation
 

@@ -1,5 +1,5 @@
 ---
-description: 优化 markstream-vue 在流式聊天、大文档、Monaco 代码块以及 Mermaid 和 KaTeX 重内容场景下的性能表现。
+description: 优化 markstream-vue 在流式聊天、大文档、增强代码块以及 Mermaid 和 KaTeX 重内容场景下的性能表现。
 ogImage: /og/performance.svg
 ogImageAlt: Markstream 流式 Markdown 性能调优
 ---
@@ -12,7 +12,7 @@ ogImageAlt: Markstream 流式 Markdown 性能调优
 
 - 针对代码块的增量解析
 - 最小化的 DOM 更新与内存优化
-- Monaco 的流式更新
+- 增强代码块的流式更新
 - 渐进式 Mermaid 渲染
 
 性能建议：
@@ -49,7 +49,7 @@ pnpm benchmark:1.0
 - **需要光标时显式开启 `typewriter`，并在 smooth streaming 期间关闭 `fade`**。`smooth-streaming="auto"` 已经在内容层完成 pacing；再叠加 `fade` 会让每个小提交都重新触发 opacity 动画，容易产生闪烁。`fade=true` 更适合完整历史消息或静态内容一次性进入的场景。
 - **用 smooth streaming options 调整文本 pacing**：后端一次推送大段文本时，优先调整 `smooth-streaming-options`。`initialRenderBatchSize` / `renderBatchSize` / `renderBatchDelay` 这类 batching props 主要控制关闭虚拟化时的节点挂载节奏，不是主要的文本 pacing 控制。
 - **在上游做节流或拆包**：把后端一次性推送的大段文本按段落拆分，或用 50–100 ms 的防抖再更新 `content`，减少一次性 diff。
-- **保留延迟可见渲染**：继续启用 `deferNodesUntilVisible` / `viewportPriority`，避免 Mermaid、Monaco 这类重型节点阻塞文字流。
+- **保留延迟可见渲染**：继续启用 `deferNodesUntilVisible` / `viewportPriority`，避免 Mermaid、增强代码 surface 这类重型节点阻塞文字流。
 - 如果 PDF、打印或截图必须立即得到所有重节点，可以设置 `:viewport-priority="false"`；单独导入并挂载重节点组件时默认也是立即渲染，因为不存在 viewport-priority provider。
 - **必要时降级代码块**：在突发大块传输时暂时关闭 `codeBlockStream` 或启用 `renderCodeBlocksAsPre`，避免语法高亮抢占时间片。
 
@@ -61,7 +61,7 @@ pnpm benchmark:1.0
 
 - `maxLiveNodes`（默认 `220`）定义了 DOM 中最多保留多少个已完全渲染的节点。减小可以省内存、增大可以保留更多回溯内容。
 - `liveNodeBuffer` 控制窗口前后的超前/超后范围（默认 `60`）。如果节点高度差异巨大，可增大该值以避免快速滚动时闪烁。
-- `deferNodesUntilVisible` 搭配 `viewportPriority` 使用，可以让 Mermaid、Monaco、KaTeX 等重型节点在进入视口之前保持占位骨架。
+- `deferNodesUntilVisible` 搭配 `viewportPriority` 使用，可以让 Mermaid、增强代码 surface、KaTeX 等重型节点在进入视口之前保持占位骨架。
 - `batchRendering` 以及 `initialRenderBatchSize`、`renderBatchSize`、`renderBatchDelay`、`renderBatchBudgetMs` 控制每一帧有多少节点从占位态切换为真实组件。该增量模式仅在关闭虚拟化（`:max-live-nodes="0"`）时生效；默认开启虚拟化时，所有节点会立即渲染，依靠窗口裁剪来限制 DOM 工作量。
 
 示例：在保持可滚动回溯的同时降低 DOM 开销。
@@ -164,7 +164,7 @@ playground 里有一个真实可运行的完整页面：`playground/src/pages/vi
 安装依赖：
 
 ```bash
-pnpm add vue-virtual-scroller markstream-vue mermaid katex stream-monaco
+pnpm add vue-virtual-scroller markstream-vue mermaid katex stream-diffs
 ```
 
 入口导入：
