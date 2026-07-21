@@ -1,8 +1,13 @@
 import type { NodeComponentProps } from '../../types/node-component'
 import clsx from 'clsx'
-import { resolveStreamingTextUpdate } from 'markstream-core'
 import React, { useEffect, useRef, useState } from 'react'
 import { useStreamStateRef } from '../../context/streamState'
+
+interface StreamSegment {
+  id: number
+  content: string
+  fading: boolean
+}
 
 export function TextNode(props: NodeComponentProps<{ type: 'text', content: string, center?: boolean }>) {
   const { node, children, ctx, indexKey, fade } = props
@@ -11,76 +16,93 @@ export function TextNode(props: NodeComponentProps<{ type: 'text', content: stri
   const streamStateKey = indexKey == null || indexKey === ''
     ? ''
     : String(indexKey)
-  const [settledContent, setSettledContent] = useState(content)
-  const [streamedDelta, setStreamedDelta] = useState('')
-  const [streamFadeVersion, setStreamFadeVersion] = useState(0)
+  const [segments, setSegments] = useState<StreamSegment[]>(content
+    ? [{ id: 0, content, fading: false }]
+    : [])
   const streamStateRef = useStreamStateRef()
+  const renderedContentRef = useRef(content)
+  const nextSegmentIdRef = useRef(1)
   const lastStreamRenderVersionRef = useRef<number | undefined>(undefined)
-  const renderedContentRef = useRef({
-    settledContent: content,
-    streamedDelta: '',
-  })
-
-  const setRenderedContent = (nextSettledContent: string, nextStreamedDelta: string) => {
-    renderedContentRef.current = {
-      settledContent: nextSettledContent,
-      streamedDelta: nextStreamedDelta,
-    }
-    setSettledContent(nextSettledContent)
-    setStreamedDelta(nextStreamedDelta)
-  }
-
-  const getRenderedContent = () => {
-    const { settledContent, streamedDelta } = renderedContentRef.current
-    return settledContent + streamedDelta
-  }
 
   useEffect(() => {
-    // Read the latest stream version from the ref-based context (stable
-    // across renders) so this effect only re-runs when the node's own
-    // content changes, not on every streaming chunk.
     const streamRenderVersion = streamStateRef?.getStreamRenderVersion() ?? ctx?.streamRenderVersion
     const streamRenderVersionChanged = streamRenderVersion !== lastStreamRenderVersionRef.current
 
     if (children != null) {
-      setRenderedContent('', '')
+      renderedContentRef.current = ''
+      setSegments([])
       lastStreamRenderVersionRef.current = streamRenderVersion
       return
     }
 
     const textStreamState = streamStateRef?.textStreamState ?? ctx?.textStreamState
-    const currentState = renderedContentRef.current
     const persistedContent = streamStateKey
       ? textStreamState?.get(streamStateKey)
       : undefined
-    const nextState = resolveStreamingTextUpdate({
-      nextContent: content,
-      persistedContent,
-      currentState,
-      typewriterEnabled: fadeEnabled,
-      streamRenderVersionChanged,
-    })
+    let previousContent = renderedContentRef.current
 
-    setRenderedContent(nextState.settledContent, nextState.streamedDelta)
-    if (nextState.appended)
-      setStreamFadeVersion(version => version + 1)
+    const resumeFromPersistedContent = Boolean(
+      previousContent === content
+      && persistedContent
+      && content.startsWith(persistedContent)
+      && content.length > persistedContent.length,
+    )
+    if (resumeFromPersistedContent) {
+      previousContent = persistedContent
+    }
+
+    if (!fadeEnabled) {
+      setSegments(current => current.length === 1 && !current[0]?.fading && current[0].content === content
+        ? current
+        : content
+          ? [{ id: nextSegmentIdRef.current++, content, fading: false }]
+          : [])
+    }
+    else if (content !== previousContent) {
+      if (previousContent && content.startsWith(previousContent)) {
+        const appendedContent = content.slice(previousContent.length)
+        setSegments((current) => {
+          if (resumeFromPersistedContent) {
+            return [
+              { id: nextSegmentIdRef.current++, content: previousContent, fading: false },
+              { id: nextSegmentIdRef.current++, content: appendedContent, fading: true },
+            ]
+          }
+          const lastSegment = current.at(-1)
+          if (lastSegment?.fading) {
+            return [
+              ...current.slice(0, -1),
+              { ...lastSegment, content: lastSegment.content + appendedContent },
+            ]
+          }
+          return [
+            ...current,
+            { id: nextSegmentIdRef.current++, content: appendedContent, fading: true },
+          ]
+        })
+      }
+      else {
+        setSegments(content
+          ? [{ id: nextSegmentIdRef.current++, content, fading: false }]
+          : [])
+      }
+    }
+    else if (streamRenderVersionChanged) {
+      setSegments(current => current.some(segment => segment.fading)
+        ? current.map(segment => segment.fading ? { ...segment, fading: false } : segment)
+        : current)
+    }
+
+    renderedContentRef.current = content
+    lastStreamRenderVersionRef.current = streamRenderVersion
     if (streamStateKey)
       textStreamState?.set(streamStateKey, content)
-    lastStreamRenderVersionRef.current = streamRenderVersion
   }, [children, content, streamStateRef, ctx?.textStreamState, ctx?.streamRenderVersion, streamStateKey, fadeEnabled])
 
-  // Immediately settle when fade animations are disabled
-  useEffect(() => {
-    if (fadeEnabled)
-      return
-    const full = getRenderedContent()
-    setRenderedContent(full, '')
-  }, [fadeEnabled])
-
-  const handleStreamedDeltaAnimationEnd = () => {
-    if (!renderedContentRef.current.streamedDelta)
-      return
-    setRenderedContent(getRenderedContent(), '')
+  const settleSegment = (segmentId: number) => {
+    setSegments(current => current.map(segment => segment.id === segmentId
+      ? { ...segment, fading: false }
+      : segment))
   }
 
   if (children != null) {
@@ -103,22 +125,22 @@ export function TextNode(props: NodeComponentProps<{ type: 'text', content: stri
         node.center && 'text-node-center',
       )}
     >
-      {settledContent ? <span>{settledContent}</span> : null}
-      {streamedDelta
-        ? (
-            <span
-              className={clsx(
+      {segments.map(segment => (
+        <span
+          key={segment.id}
+          className={segment.fading
+            ? clsx(
                 'text-node-stream-delta',
-                streamFadeVersion % 2 === 0
+                segment.id % 2 === 0
                   ? 'text-node-stream-delta--a'
                   : 'text-node-stream-delta--b',
-              )}
-              onAnimationEnd={handleStreamedDeltaAnimationEnd}
-            >
-              {streamedDelta}
-            </span>
-          )
-        : null}
+              )
+            : undefined}
+          onAnimationEnd={segment.fading ? () => settleSegment(segment.id) : undefined}
+        >
+          {segment.content}
+        </span>
+      ))}
     </span>
   )
 }
