@@ -16,6 +16,10 @@ describe('markstream-vue2 text node streaming consistency', () => {
       resolve(process.cwd(), 'packages/markstream-vue2/src/components/TextNode/TextNode.vue'),
       'utf8',
     )
+    const inlineCodeNodeSource = readFileSync(
+      resolve(process.cwd(), 'packages/markstream-vue2/src/components/InlineCodeNode/InlineCodeNode.vue'),
+      'utf8',
+    )
 
     expect(nodeRendererSource).toContain('const streamRenderVersion = ref(0)')
     expect(nodeRendererSource).toContain('provide(\'markstreamStreamVersion\', streamRenderVersion)')
@@ -26,8 +30,11 @@ describe('markstream-vue2 text node streaming consistency', () => {
     expect(textNodeSource).toContain('inject<{ value?: number } | undefined>(\'markstreamStreamVersion\', undefined)')
     expect(textNodeSource).toContain('[() => props.node.content, streamStateKey, fadeEnabled, () => inheritedStreamVersion?.value]')
     expect(textNodeSource).toContain('if (normalized === previousContent)')
-    expect(textNodeSource).toContain('if (streamedDelta.value)')
-    expect(textNodeSource).toContain('settleStreamedDelta()')
+    expect(textNodeSource).toContain('settleFadingSegments()')
+    expect(textNodeSource).toContain('{ ...lastSegment, content: lastSegment.content + appendedContent }')
+    expect(textNodeSource).toContain(':key="segment.id"')
+    expect(inlineCodeNodeSource).toContain('{ ...lastSegment, content: lastSegment.content + appendedContent }')
+    expect(inlineCodeNodeSource).toContain(':key="segment.id"')
   })
 
   it('keeps explanatory list text visible while an inline code span is still streaming', async () => {

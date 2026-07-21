@@ -2,8 +2,13 @@ import type { OnChanges } from '@angular/core'
 import type { AngularRenderableNode, AngularRenderContext } from '../shared/node-helpers'
 import { CommonModule } from '@angular/common'
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core'
-import { resolveStreamingTextState } from 'markstream-core'
 import { getString } from '../shared/node-helpers'
+
+interface StreamSegment {
+  id: number
+  content: string
+  fading: boolean
+}
 
 @Component({
   selector: 'markstream-angular-text-node',
@@ -12,22 +17,20 @@ import { getString } from '../shared/node-helpers'
   template: `
     <ng-container *ngIf="!centered; else centeredText">
       <span class="markstream-angular-text-node">
-        <span *ngIf="settledText">{{ settledText }}</span>
         <span
-          *ngIf="streamedDelta"
-          [class]="'markstream-angular-text__stream-delta ' + streamedDeltaClass"
-          (animationend)="settleStreamedDelta()"
-        >{{ streamedDelta }}</span>
+          *ngFor="let segment of segments; trackBy: trackSegment"
+          [class]="segment.fading ? 'markstream-angular-text__stream-delta ' + streamedDeltaClass(segment) : ''"
+          (animationend)="segment.fading && settleSegment(segment.id)"
+        >{{ segment.content }}</span>
       </span>
     </ng-container>
     <ng-template #centeredText>
       <span class="markstream-angular-text-node markstream-angular-text--centered">
-        <span *ngIf="settledText">{{ settledText }}</span>
         <span
-          *ngIf="streamedDelta"
-          [class]="'markstream-angular-text__stream-delta ' + streamedDeltaClass"
-          (animationend)="settleStreamedDelta()"
-        >{{ streamedDelta }}</span>
+          *ngFor="let segment of segments; trackBy: trackSegment"
+          [class]="segment.fading ? 'markstream-angular-text__stream-delta ' + streamedDeltaClass(segment) : ''"
+          (animationend)="segment.fading && settleSegment(segment.id)"
+        >{{ segment.content }}</span>
       </span>
     </ng-template>
   `,
@@ -40,9 +43,9 @@ export class TextNodeComponent implements OnChanges {
   @Input() typewriter?: boolean
   @Input() fade?: boolean
 
-  settledText = ''
-  streamedDelta = ''
-  private streamFadeVersion = 0
+  segments: StreamSegment[] = []
+  private renderedText = ''
+  private nextSegmentId = 0
   private lastStreamRenderVersion?: number
 
   ngOnChanges() {
@@ -51,15 +54,16 @@ export class TextNodeComponent implements OnChanges {
     const textStreamState = this.context?.textStreamState
     const streamRenderVersion = this.context?.streamRenderVersion
     const streamRenderVersionChanged = streamRenderVersion !== this.lastStreamRenderVersion
-    const rendered = `${this.settledText}${this.streamedDelta}`
     const previousPersisted = streamStateKey
       ? textStreamState?.get(streamStateKey)
       : undefined
-    const previousText = previousPersisted ?? rendered
+    const previousText = previousPersisted ?? this.renderedText
+    const resumeFromPersistedText = previousPersisted !== undefined
+      && previousPersisted !== this.renderedText
 
     if (!this.fadeEnabled) {
-      this.settledText = nextText
-      this.streamedDelta = ''
+      this.setFullText(nextText)
+      this.renderedText = nextText
       if (streamStateKey)
         textStreamState?.set(streamStateKey, nextText)
       this.lastStreamRenderVersion = streamRenderVersion
@@ -67,29 +71,46 @@ export class TextNodeComponent implements OnChanges {
     }
 
     if (nextText === previousText) {
-      if (this.streamedDelta && streamRenderVersionChanged) {
-        this.settleStreamedDelta()
+      if (this.segments.some(segment => segment.fading) && streamRenderVersionChanged) {
+        this.settleFadingSegments()
       }
-      else if (rendered !== nextText) {
-        this.settledText = nextText
-        this.streamedDelta = ''
+      else if (this.renderedText !== nextText) {
+        this.setFullText(nextText)
       }
+      this.renderedText = nextText
       if (streamStateKey)
         textStreamState?.set(streamStateKey, nextText)
       this.lastStreamRenderVersion = streamRenderVersion
       return
     }
 
-    const nextState = resolveStreamingTextState({
-      nextContent: nextText,
-      previousContent: previousText,
-      typewriterEnabled: this.fadeEnabled,
-    })
+    if (previousText && nextText.startsWith(previousText)) {
+      const appendedText = nextText.slice(previousText.length)
+      const lastSegment = this.segments.at(-1)
+      if (resumeFromPersistedText) {
+        this.segments = [
+          { id: this.nextSegmentId++, content: previousText, fading: false },
+          { id: this.nextSegmentId++, content: appendedText, fading: true },
+        ]
+      }
+      else if (lastSegment?.fading) {
+        this.segments = [
+          ...this.segments.slice(0, -1),
+          { ...lastSegment, content: lastSegment.content + appendedText },
+        ]
+      }
+      else {
+        this.segments = [
+          ...this.segments,
+          { id: this.nextSegmentId++, content: appendedText, fading: true },
+        ]
+      }
+    }
+    else {
+      this.setFullText(nextText)
+    }
 
-    this.settledText = nextState.settledContent
-    this.streamedDelta = nextState.streamedDelta
-    if (nextState.appended)
-      this.streamFadeVersion += 1
+    this.renderedText = nextText
     if (streamStateKey)
       textStreamState?.set(streamStateKey, nextText)
     this.lastStreamRenderVersion = streamRenderVersion
@@ -99,8 +120,16 @@ export class TextNodeComponent implements OnChanges {
     return !!(this.node as any)?.center
   }
 
-  get streamedDeltaClass() {
-    return this.streamFadeVersion % 2 === 0
+  get settledText() {
+    return this.segments.filter(segment => !segment.fading).map(segment => segment.content).join('')
+  }
+
+  get streamedDelta() {
+    return this.segments.filter(segment => segment.fading).map(segment => segment.content).join('')
+  }
+
+  streamedDeltaClass(segment: StreamSegment) {
+    return segment.id % 2 === 0
       ? 'markstream-angular-text__stream-delta--a'
       : 'markstream-angular-text__stream-delta--b'
   }
@@ -121,10 +150,27 @@ export class TextNodeComponent implements OnChanges {
     return false
   }
 
-  settleStreamedDelta() {
-    if (!this.streamedDelta)
+  trackSegment(_index: number, segment: StreamSegment) {
+    return segment.id
+  }
+
+  settleSegment(segmentId: number) {
+    this.segments = this.segments.map(segment => segment.id === segmentId
+      ? { ...segment, fading: false }
+      : segment)
+  }
+
+  private setFullText(content: string) {
+    if (this.segments.length === 1 && !this.segments[0]?.fading && this.segments[0].content === content)
       return
-    this.settledText = `${this.settledText}${this.streamedDelta}`
-    this.streamedDelta = ''
+    this.segments = content
+      ? [{ id: this.nextSegmentId++, content, fading: false }]
+      : []
+  }
+
+  private settleFadingSegments() {
+    this.segments = this.segments.map(segment => segment.fading
+      ? { ...segment, fading: false }
+      : segment)
   }
 }
