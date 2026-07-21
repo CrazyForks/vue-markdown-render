@@ -3781,8 +3781,20 @@ export function parseMarkdownToStructure(
   // Respect link validation from the md instance so customMarkdownIt(md) with
   // md.set({ validateLink }) is applied when we emit link nodes (tokens may
   // bypass the tokenizer's link rule, e.g. synthetic links from fixLinkTokens).
-  const mdAny = md as { options?: { validateLink?: (url: string) => boolean }, validateLink?: (url: string) => boolean }
-  const validateLink = options.validateLink ?? mdAny.options?.validateLink ?? (typeof mdAny.validateLink === 'function' ? mdAny.validateLink : undefined)
+  const mdAny = md as {
+    options?: { validateLink?: (url: string) => boolean }
+    validateLink?: (url: string) => boolean
+    __markstreamOriginalValidateLink?: (url: string) => boolean
+  }
+  const directValidateLink = typeof mdAny.validateLink === 'function'
+    && mdAny.__markstreamOriginalValidateLink
+    && mdAny.validateLink !== mdAny.__markstreamOriginalValidateLink
+    ? mdAny.validateLink
+    : undefined
+  const validateLink = options.validateLink
+    ?? directValidateLink
+    ?? mdAny.options?.validateLink
+    ?? (typeof mdAny.validateLink === 'function' ? mdAny.validateLink : undefined)
   const internalOptions: InternalParseOptions = {
     ...options,
     validateLink,
