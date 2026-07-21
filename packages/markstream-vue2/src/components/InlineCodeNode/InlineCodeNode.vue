@@ -1,6 +1,11 @@
 <script setup lang="ts">
-import { resolveStreamingTextState } from 'markstream-core'
 import { computed, getCurrentInstance, inject, ref, watch } from 'vue-demi'
+
+interface StreamSegment {
+  id: number
+  content: string
+  fading: boolean
+}
 
 const props = defineProps<{
   node: {
@@ -9,6 +14,25 @@ const props = defineProps<{
     raw: string
   }
 }>()
+
+function settleAndMergeSegments(current: StreamSegment[], segmentId: number) {
+  return current.reduce<StreamSegment[]>((result, segment) => {
+    const nextSegment = segment.id === segmentId
+      ? { ...segment, fading: false }
+      : segment
+    const previousSegment = result[result.length - 1]
+    if (previousSegment && !previousSegment.fading && !nextSegment.fading) {
+      result[result.length - 1] = {
+        ...previousSegment,
+        content: previousSegment.content + nextSegment.content,
+      }
+    }
+    else {
+      result.push(nextSegment)
+    }
+    return result
+  }, [])
+}
 
 const instance = getCurrentInstance()
 const attrs = computed<Record<string, unknown>>(() => ((instance?.proxy as any)?.$attrs ?? {}) as Record<string, unknown>)
@@ -35,47 +59,76 @@ const streamStateKey = computed(() => {
     return ''
   return String(raw)
 })
-const settledCode = ref(props.node.code)
-const streamedDelta = ref('')
-const streamFadeVersion = ref(0)
-
-function getRenderedContent() {
-  return settledCode.value + streamedDelta.value
-}
+const segments = ref<StreamSegment[]>(props.node.code
+  ? [{ id: 0, content: props.node.code, fading: false }]
+  : [])
+const renderedCode = ref(props.node.code)
+let nextSegmentId = 1
 
 function setFullContent(next: string) {
-  settledCode.value = next
-  streamedDelta.value = ''
+  if (segments.value.length === 1 && !segments.value[0]?.fading && segments.value[0].content === next)
+    return
+  segments.value = next
+    ? [{ id: nextSegmentId++, content: next, fading: false }]
+    : []
 }
 
-function settleStreamedDelta() {
-  if (!streamedDelta.value)
+function settleSegment(segmentId: number) {
+  if (!segments.value.some(segment => segment.id === segmentId && segment.fading))
     return
-  settledCode.value = getRenderedContent()
-  streamedDelta.value = ''
+  segments.value = settleAndMergeSegments(segments.value, segmentId)
+}
+
+function streamedDeltaClass(segment: StreamSegment) {
+  return segment.id % 2 === 0
+    ? 'inline-code-stream-delta--a'
+    : 'inline-code-stream-delta--b'
 }
 
 watch(
   [() => props.node.code, streamStateKey, fadeEnabled],
   ([next]) => {
     const normalized = String(next ?? '')
-    const rendered = getRenderedContent()
     const key = streamStateKey.value
     const previousPersisted = key
       ? inheritedTextStreamState?.get(key)
       : undefined
-    const previousContent = previousPersisted ?? rendered
+    const previousContent = previousPersisted ?? renderedCode.value
+    const resumeFromPersistedContent = previousPersisted !== undefined
+      && previousPersisted !== renderedCode.value
 
-    const nextState = resolveStreamingTextState({
-      nextContent: normalized,
-      previousContent,
-      typewriterEnabled: fadeEnabled.value,
-    })
+    if (!fadeEnabled.value) {
+      setFullContent(normalized)
+    }
+    else if (normalized !== previousContent) {
+      if (previousContent && normalized.startsWith(previousContent)) {
+        const appendedContent = normalized.slice(previousContent.length)
+        const lastSegment = segments.value[segments.value.length - 1]
+        if (resumeFromPersistedContent) {
+          segments.value = [
+            { id: nextSegmentId++, content: previousContent, fading: false },
+            { id: nextSegmentId++, content: appendedContent, fading: true },
+          ]
+        }
+        else if (lastSegment?.fading) {
+          segments.value = [
+            ...segments.value.slice(0, -1),
+            { ...lastSegment, content: lastSegment.content + appendedContent },
+          ]
+        }
+        else {
+          segments.value = [
+            ...segments.value,
+            { id: nextSegmentId++, content: appendedContent, fading: true },
+          ]
+        }
+      }
+      else {
+        setFullContent(normalized)
+      }
+    }
 
-    settledCode.value = nextState.settledContent
-    streamedDelta.value = nextState.streamedDelta
-    if (nextState.appended)
-      streamFadeVersion.value += 1
+    renderedCode.value = normalized
     if (key)
       inheritedTextStreamState?.set(key, normalized)
   },
@@ -87,28 +140,22 @@ watch(
   (enabled) => {
     if (enabled)
       return
-    setFullContent(getRenderedContent())
+    setFullContent(renderedCode.value)
   },
 )
-
-const streamedDeltaClass = computed(() => (
-  streamFadeVersion.value % 2 === 0
-    ? 'inline-code-stream-delta--a'
-    : 'inline-code-stream-delta--b'
-))
 </script>
 
 <template>
   <code
     class="inline text-[85%] px-1 py-0.5 rounded font-mono bg-[hsl(var(--secondary))] whitespace-normal break-words max-w-full before:content-[''] after:content-['']"
   >
-    <span v-if="settledCode">{{ settledCode }}</span>
     <span
-      v-if="streamedDelta"
-      class="inline-code-stream-delta" :class="[streamedDeltaClass]"
-      @animationend="settleStreamedDelta"
+      v-for="segment in segments"
+      :key="segment.id"
+      :class="segment.fading ? ['inline-code-stream-delta', streamedDeltaClass(segment)] : undefined"
+      @animationend="segment.fading && settleSegment(segment.id)"
     >
-      {{ streamedDelta }}
+      {{ segment.content }}
     </span>
   </code>
 </template>

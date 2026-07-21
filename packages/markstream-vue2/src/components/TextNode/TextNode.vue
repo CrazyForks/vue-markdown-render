@@ -1,7 +1,12 @@
 <script setup lang="ts">
-import { resolveStreamingTextState } from 'markstream-core'
 import { computed, getCurrentInstance, inject, ref, watch } from 'vue-demi'
 import { useKatexReady } from '../../composables/useKatexReady'
+
+interface StreamSegment {
+  id: number
+  content: string
+  fading: boolean
+}
 
 const props = defineProps<{
   node: {
@@ -12,6 +17,26 @@ const props = defineProps<{
   }
 }>()
 defineEmits(['copy'])
+
+function settleAndMergeSegments(current: StreamSegment[], segmentId?: number) {
+  return current.reduce<StreamSegment[]>((result, segment) => {
+    const nextSegment = segmentId == null || segment.id === segmentId
+      ? { ...segment, fading: false }
+      : segment
+    const previousSegment = result[result.length - 1]
+    if (previousSegment && !previousSegment.fading && !nextSegment.fading) {
+      result[result.length - 1] = {
+        ...previousSegment,
+        content: previousSegment.content + nextSegment.content,
+      }
+    }
+    else {
+      result.push(nextSegment)
+    }
+    return result
+  }, [])
+}
+
 const katexReady = useKatexReady()
 const instance = getCurrentInstance()
 const attrs = computed<Record<string, unknown>>(() => ((instance?.proxy as any)?.$attrs ?? {}) as Record<string, unknown>)
@@ -39,64 +64,96 @@ const streamStateKey = computed(() => {
     return ''
   return String(raw)
 })
-const settledContent = ref(props.node.content)
-const streamedDelta = ref('')
-const streamFadeVersion = ref(0)
-
-function getRenderedContent() {
-  return settledContent.value + streamedDelta.value
-}
+const segments = ref<StreamSegment[]>(props.node.content
+  ? [{ id: 0, content: props.node.content, fading: false }]
+  : [])
+const renderedContent = ref(props.node.content)
+let nextSegmentId = 1
 
 function setFullContent(next: string) {
-  settledContent.value = next
-  streamedDelta.value = ''
+  if (segments.value.length === 1 && !segments.value[0]?.fading && segments.value[0].content === next)
+    return
+  segments.value = next
+    ? [{ id: nextSegmentId++, content: next, fading: false }]
+    : []
 }
 
-function settleStreamedDelta() {
-  if (!streamedDelta.value)
+function settleSegment(segmentId: number) {
+  if (!segments.value.some(segment => segment.id === segmentId && segment.fading))
     return
-  settledContent.value = getRenderedContent()
-  streamedDelta.value = ''
+  segments.value = settleAndMergeSegments(segments.value, segmentId)
+}
+
+function settleFadingSegments() {
+  if (!segments.value.some(segment => segment.fading))
+    return
+  segments.value = settleAndMergeSegments(segments.value)
+}
+
+function streamedDeltaClass(segment: StreamSegment) {
+  return segment.id % 2 === 0
+    ? 'text-node-stream-delta--a'
+    : 'text-node-stream-delta--b'
 }
 
 watch(
   [() => props.node.content, streamStateKey, fadeEnabled, () => inheritedStreamVersion?.value],
   ([next]) => {
     const normalized = String(next ?? '')
-    const rendered = getRenderedContent()
     const key = streamStateKey.value
     const previousPersisted = key
       ? inheritedTextStreamState?.get(key)
       : undefined
-    const previousContent = previousPersisted ?? rendered
+    const previousContent = previousPersisted ?? renderedContent.value
+    const resumeFromPersistedContent = previousPersisted !== undefined
+      && previousPersisted !== renderedContent.value
 
     if (!fadeEnabled.value) {
       setFullContent(normalized)
+      renderedContent.value = normalized
       if (key)
         inheritedTextStreamState?.set(key, normalized)
       return
     }
 
     if (normalized === previousContent) {
-      if (streamedDelta.value)
-        settleStreamedDelta()
-      else if (rendered !== normalized)
+      if (segments.value.some(segment => segment.fading))
+        settleFadingSegments()
+      else if (renderedContent.value !== normalized)
         setFullContent(normalized)
       if (key)
         inheritedTextStreamState?.set(key, normalized)
+      renderedContent.value = normalized
       return
     }
 
-    const nextState = resolveStreamingTextState({
-      nextContent: normalized,
-      previousContent,
-      typewriterEnabled: fadeEnabled.value,
-    })
+    if (previousContent && normalized.startsWith(previousContent)) {
+      const appendedContent = normalized.slice(previousContent.length)
+      const lastSegment = segments.value[segments.value.length - 1]
+      if (resumeFromPersistedContent) {
+        segments.value = [
+          { id: nextSegmentId++, content: previousContent, fading: false },
+          { id: nextSegmentId++, content: appendedContent, fading: true },
+        ]
+      }
+      else if (lastSegment?.fading) {
+        segments.value = [
+          ...segments.value.slice(0, -1),
+          { ...lastSegment, content: lastSegment.content + appendedContent },
+        ]
+      }
+      else {
+        segments.value = [
+          ...segments.value,
+          { id: nextSegmentId++, content: appendedContent, fading: true },
+        ]
+      }
+    }
+    else {
+      setFullContent(normalized)
+    }
 
-    settledContent.value = nextState.settledContent
-    streamedDelta.value = nextState.streamedDelta
-    if (nextState.appended)
-      streamFadeVersion.value += 1
+    renderedContent.value = normalized
     if (key)
       inheritedTextStreamState?.set(key, normalized)
   },
@@ -108,15 +165,9 @@ watch(
   (enabled) => {
     if (enabled)
       return
-    setFullContent(getRenderedContent())
+    setFullContent(renderedContent.value)
   },
 )
-
-const streamedDeltaClass = computed(() => (
-  streamFadeVersion.value % 2 === 0
-    ? 'text-node-stream-delta--a'
-    : 'text-node-stream-delta--b'
-))
 </script>
 
 <template>
@@ -124,13 +175,13 @@ const streamedDeltaClass = computed(() => (
     :class="[katexReady && node.center ? 'text-node-center' : '']"
     class="whitespace-pre-wrap break-words text-node"
   >
-    <span v-if="settledContent">{{ settledContent }}</span>
     <span
-      v-if="streamedDelta"
-      class="text-node-stream-delta" :class="[streamedDeltaClass]"
-      @animationend="settleStreamedDelta"
+      v-for="segment in segments"
+      :key="segment.id"
+      :class="segment.fading ? ['text-node-stream-delta', streamedDeltaClass(segment)] : undefined"
+      @animationend="segment.fading && settleSegment(segment.id)"
     >
-      {{ streamedDelta }}
+      {{ segment.content }}
     </span>
   </span>
 </template>

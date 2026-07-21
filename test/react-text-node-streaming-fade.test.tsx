@@ -22,7 +22,7 @@ afterEach(() => {
 })
 
 describe('markstream-react text streaming fade', () => {
-  it('keeps only the latest appended suffix animating during rapid streaming updates, like vue3', async () => {
+  it('keeps the active fade segment stable during rapid streaming updates', async () => {
     ;(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true
 
     const host = document.createElement('div')
@@ -59,6 +59,9 @@ describe('markstream-react text streaming fade', () => {
     expect(deltas).toHaveLength(1)
     expect(deltas.map(delta => delta.textContent)).toEqual(['World'])
     expect(host.textContent).toBe('HelloWorld')
+    const settledSegment = host.querySelector('.text-node > span:first-child')
+    const activeSegment = deltas[0]
+    const activeSegmentClass = activeSegment?.className
 
     await act(async () => {
       root.render(renderText('HelloWorld'))
@@ -68,6 +71,8 @@ describe('markstream-react text streaming fade', () => {
     deltas = Array.from(host.querySelectorAll('.text-node-stream-delta'))
     expect(deltas).toHaveLength(1)
     expect(deltas.map(delta => delta.textContent)).toEqual(['World'])
+    expect(deltas[0]).toBe(activeSegment)
+    expect(deltas[0]?.className).toBe(activeSegmentClass)
 
     await act(async () => {
       root.render(renderText('HelloWorldAgain'))
@@ -76,7 +81,11 @@ describe('markstream-react text streaming fade', () => {
 
     deltas = Array.from(host.querySelectorAll('.text-node-stream-delta'))
     expect(deltas).toHaveLength(1)
-    expect(deltas.map(delta => delta.textContent)).toEqual(['Again'])
+    expect(deltas.map(delta => delta.textContent)).toEqual(['WorldAgain'])
+    expect(deltas[0]).toBe(activeSegment)
+    expect(deltas[0]?.className).toBe(activeSegmentClass)
+    expect(host.querySelector('.text-node > span:first-child')).toBe(settledSegment)
+    expect(settledSegment?.textContent).toBe('Hello')
     expect(host.textContent).toBe('HelloWorldAgain')
 
     await act(async () => {
@@ -85,7 +94,31 @@ describe('markstream-react text streaming fade', () => {
     await flushReact()
 
     expect(host.querySelectorAll('.text-node-stream-delta')).toHaveLength(0)
+    expect(host.querySelectorAll('.text-node > span')).toHaveLength(1)
+    expect(host.querySelector('.text-node > span')).toBe(settledSegment)
+    expect(settledSegment?.textContent).toBe('HelloWorldAgain')
+    expect(activeSegment?.isConnected).toBe(false)
     expect(host.textContent).toBe('HelloWorldAgain')
+
+    await act(async () => {
+      root.render(renderText('HelloWorldAgainNext'))
+    })
+    await flushReact()
+
+    deltas = Array.from(host.querySelectorAll('.text-node-stream-delta'))
+    expect(deltas).toHaveLength(1)
+    expect(deltas[0]?.textContent).toBe('Next')
+    expect(host.querySelectorAll('.text-node > span')).toHaveLength(2)
+    expect(host.querySelector('.text-node > span:first-child')).toBe(settledSegment)
+
+    await act(async () => {
+      deltas[0]?.dispatchEvent(new Event('animationend', { bubbles: true }))
+    })
+    await flushReact()
+
+    expect(host.querySelectorAll('.text-node > span')).toHaveLength(1)
+    expect(host.querySelector('.text-node > span')).toBe(settledSegment)
+    expect(settledSegment?.textContent).toBe('HelloWorldAgainNext')
 
     await act(async () => {
       root.unmount()
@@ -120,6 +153,9 @@ describe('markstream-react text streaming fade', () => {
     expect(deltas).toHaveLength(1)
     expect(deltas.map(delta => delta.textContent)).toEqual(['World'])
     expect(host.textContent).toContain('HelloWorld')
+    const settledSegment = host.querySelector('.text-node > span:first-child')
+    const activeSegment = deltas[0]
+    const activeSegmentClass = activeSegment?.className
 
     await act(async () => {
       root.render(renderMarkdown('HelloWorldAgain'))
@@ -128,7 +164,11 @@ describe('markstream-react text streaming fade', () => {
 
     deltas = Array.from(host.querySelectorAll('.text-node-stream-delta'))
     expect(deltas).toHaveLength(1)
-    expect(deltas.map(delta => delta.textContent)).toEqual(['Again'])
+    expect(deltas.map(delta => delta.textContent)).toEqual(['WorldAgain'])
+    expect(deltas[0]).toBe(activeSegment)
+    expect(deltas[0]?.className).toBe(activeSegmentClass)
+    expect(host.querySelector('.text-node > span:first-child')).toBe(settledSegment)
+    expect(settledSegment?.textContent).toBe('Hello')
     expect(host.textContent).toContain('HelloWorldAgain')
 
     await act(async () => {
@@ -249,12 +289,38 @@ describe('markstream-react text streaming fade', () => {
     await flushReact()
 
     const inlineCode = host.querySelector('code.inline-code')
-    const deltas = Array.from(host.querySelectorAll('code.inline-code .text-node-stream-delta'))
+    let deltas = Array.from(host.querySelectorAll('code.inline-code .text-node-stream-delta'))
 
     expect(inlineCode).toBeTruthy()
     expect(deltas).toHaveLength(1)
     expect(deltas[0]?.textContent).toBe('bar')
     expect(inlineCode?.textContent).toBe('foobar')
+    const settledSegment = inlineCode?.querySelector('span:first-child')
+    const activeSegment = deltas[0]
+    const activeSegmentClass = activeSegment?.className
+
+    await act(async () => {
+      root.render(renderMarkdown('Use `foobarbaz` now'))
+    })
+    await flushReact()
+
+    deltas = Array.from(host.querySelectorAll('code.inline-code .text-node-stream-delta'))
+    expect(deltas).toHaveLength(1)
+    expect(deltas[0]?.textContent).toBe('barbaz')
+    expect(deltas[0]).toBe(activeSegment)
+    expect(deltas[0]?.className).toBe(activeSegmentClass)
+    expect(inlineCode?.querySelector('span:first-child')).toBe(settledSegment)
+    expect(settledSegment?.textContent).toBe('foo')
+    expect(inlineCode?.textContent).toBe('foobarbaz')
+
+    await act(async () => {
+      deltas[0]?.dispatchEvent(new Event('animationend', { bubbles: true }))
+    })
+    await flushReact()
+
+    expect(inlineCode?.querySelectorAll('span')).toHaveLength(1)
+    expect(inlineCode?.querySelector('span')).toBe(settledSegment)
+    expect(settledSegment?.textContent).toBe('foobarbaz')
 
     await act(async () => {
       root.unmount()
