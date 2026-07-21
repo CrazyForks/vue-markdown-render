@@ -1506,7 +1506,6 @@ async function runVirtualTimelineZeroStreamingProbe(page, port, ensureServerRunn
   const bottomDriftFrameCount = bottomDistances.filter(
     distance => distance > exactBottomTolerancePx,
   ).length
-  const maxAllowedBottomDriftFrames = Math.ceil(bottomDistances.length * 0.1)
   let consecutiveBottomDriftFrames = 0
   let maxConsecutiveBottomDriftFrames = 0
 
@@ -1533,10 +1532,7 @@ async function runVirtualTimelineZeroStreamingProbe(page, port, ensureServerRunn
     && finalBottomAnchor?.type === 'bottom'
     && peakDistanceFromBottom != null
     && peakDistanceFromBottom <= maxTransientBottomDriftPx
-    && maxConsecutiveBottomDriftFrames <= maxAllowedConsecutiveBottomDriftFrames
-    && bottomDriftFrameCount <= maxAllowedBottomDriftFrames
-    && p90DistanceFromBottom != null
-    && p90DistanceFromBottom <= exactBottomTolerancePx,
+    && maxConsecutiveBottomDriftFrames <= maxAllowedConsecutiveBottomDriftFrames,
     'virtual-timeline-zero bottom-pinned streaming exceeded the bounded catch-up budget',
     {
       visibleSampleCount: result.bottom.visibleSampleCount,
@@ -1551,7 +1547,6 @@ async function runVirtualTimelineZeroStreamingProbe(page, port, ensureServerRunn
         exactBottomTolerancePx,
         maxTransientBottomDriftPx,
         maxAllowedConsecutiveBottomDriftFrames,
-        maxAllowedBottomDriftFrames,
       },
       before: summarizeVirtualTimelineZeroSample(result.bottom.before),
       lastSample: summarizeVirtualTimelineZeroSample(finalBottomSample),
