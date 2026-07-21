@@ -67,6 +67,16 @@ describe('markstream-angular text node streaming consistency', () => {
     expect(updatedTextDelta.content).toBe('WorldAgain')
     expect(textComponent.settledText).toBe('Hello')
 
+    textComponent.settleSegment(updatedTextDelta.id)
+    expect(textComponent.segments).toHaveLength(1)
+    expect(textComponent.segments[0]?.content).toBe('HelloWorldAgain')
+
+    textComponent.context = { ...textComponent.context, streamRenderVersion: 4 }
+    textComponent.node = { type: 'text', content: 'HelloWorldAgainNext', raw: 'HelloWorldAgainNext' } as any
+    textComponent.ngOnChanges()
+    expect(textComponent.segments).toHaveLength(2)
+    expect(textComponent.streamedDelta).toBe('Next')
+
     const codeComponent = new InlineCodeNodeComponent()
     codeComponent.context = { events: {}, fade: true }
     codeComponent.node = { type: 'inline_code', code: 'foo', raw: '`foo`' } as any
@@ -84,6 +94,10 @@ describe('markstream-angular text node streaming consistency', () => {
     expect(codeComponent.streamedDeltaClass(updatedCodeDelta)).toBe(codeDeltaClass)
     expect(updatedCodeDelta.content).toBe('barbaz')
     expect(codeComponent.settledCode).toBe('foo')
+
+    codeComponent.settleSegment(updatedCodeDelta.id)
+    expect(codeComponent.segments).toHaveLength(1)
+    expect(codeComponent.segments[0]?.content).toBe('foobarbaz')
   })
 
   it('ships pre-wrap text styles so softbreaks stay visible in Angular', () => {

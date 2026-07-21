@@ -94,8 +94,31 @@ describe('markstream-react text streaming fade', () => {
     await flushReact()
 
     expect(host.querySelectorAll('.text-node-stream-delta')).toHaveLength(0)
-    expect(host.querySelector('.text-node > span:last-child')).toBe(activeSegment)
+    expect(host.querySelectorAll('.text-node > span')).toHaveLength(1)
+    expect(host.querySelector('.text-node > span')).toBe(settledSegment)
+    expect(settledSegment?.textContent).toBe('HelloWorldAgain')
+    expect(activeSegment?.isConnected).toBe(false)
     expect(host.textContent).toBe('HelloWorldAgain')
+
+    await act(async () => {
+      root.render(renderText('HelloWorldAgainNext'))
+    })
+    await flushReact()
+
+    deltas = Array.from(host.querySelectorAll('.text-node-stream-delta'))
+    expect(deltas).toHaveLength(1)
+    expect(deltas[0]?.textContent).toBe('Next')
+    expect(host.querySelectorAll('.text-node > span')).toHaveLength(2)
+    expect(host.querySelector('.text-node > span:first-child')).toBe(settledSegment)
+
+    await act(async () => {
+      deltas[0]?.dispatchEvent(new Event('animationend', { bubbles: true }))
+    })
+    await flushReact()
+
+    expect(host.querySelectorAll('.text-node > span')).toHaveLength(1)
+    expect(host.querySelector('.text-node > span')).toBe(settledSegment)
+    expect(settledSegment?.textContent).toBe('HelloWorldAgainNext')
 
     await act(async () => {
       root.unmount()
@@ -289,6 +312,15 @@ describe('markstream-react text streaming fade', () => {
     expect(inlineCode?.querySelector('span:first-child')).toBe(settledSegment)
     expect(settledSegment?.textContent).toBe('foo')
     expect(inlineCode?.textContent).toBe('foobarbaz')
+
+    await act(async () => {
+      deltas[0]?.dispatchEvent(new Event('animationend', { bubbles: true }))
+    })
+    await flushReact()
+
+    expect(inlineCode?.querySelectorAll('span')).toHaveLength(1)
+    expect(inlineCode?.querySelector('span')).toBe(settledSegment)
+    expect(settledSegment?.textContent).toBe('foobarbaz')
 
     await act(async () => {
       root.unmount()

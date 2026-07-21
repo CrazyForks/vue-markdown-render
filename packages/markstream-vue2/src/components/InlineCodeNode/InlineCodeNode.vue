@@ -15,6 +15,25 @@ const props = defineProps<{
   }
 }>()
 
+function settleAndMergeSegments(current: StreamSegment[], segmentId: number) {
+  return current.reduce<StreamSegment[]>((result, segment) => {
+    const nextSegment = segment.id === segmentId
+      ? { ...segment, fading: false }
+      : segment
+    const previousSegment = result[result.length - 1]
+    if (previousSegment && !previousSegment.fading && !nextSegment.fading) {
+      result[result.length - 1] = {
+        ...previousSegment,
+        content: previousSegment.content + nextSegment.content,
+      }
+    }
+    else {
+      result.push(nextSegment)
+    }
+    return result
+  }, [])
+}
+
 const instance = getCurrentInstance()
 const attrs = computed<Record<string, unknown>>(() => ((instance?.proxy as any)?.$attrs ?? {}) as Record<string, unknown>)
 const inheritedFade = inject<{ value?: boolean } | undefined>('markstreamFade', undefined)
@@ -55,9 +74,9 @@ function setFullContent(next: string) {
 }
 
 function settleSegment(segmentId: number) {
-  segments.value = segments.value.map(segment => segment.id === segmentId
-    ? { ...segment, fading: false }
-    : segment)
+  if (!segments.value.some(segment => segment.id === segmentId && segment.fading))
+    return
+  segments.value = settleAndMergeSegments(segments.value, segmentId)
 }
 
 function streamedDeltaClass(segment: StreamSegment) {

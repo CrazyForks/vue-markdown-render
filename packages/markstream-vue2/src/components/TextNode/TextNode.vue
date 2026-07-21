@@ -17,6 +17,26 @@ const props = defineProps<{
   }
 }>()
 defineEmits(['copy'])
+
+function settleAndMergeSegments(current: StreamSegment[], segmentId?: number) {
+  return current.reduce<StreamSegment[]>((result, segment) => {
+    const nextSegment = segmentId == null || segment.id === segmentId
+      ? { ...segment, fading: false }
+      : segment
+    const previousSegment = result[result.length - 1]
+    if (previousSegment && !previousSegment.fading && !nextSegment.fading) {
+      result[result.length - 1] = {
+        ...previousSegment,
+        content: previousSegment.content + nextSegment.content,
+      }
+    }
+    else {
+      result.push(nextSegment)
+    }
+    return result
+  }, [])
+}
+
 const katexReady = useKatexReady()
 const instance = getCurrentInstance()
 const attrs = computed<Record<string, unknown>>(() => ((instance?.proxy as any)?.$attrs ?? {}) as Record<string, unknown>)
@@ -59,17 +79,15 @@ function setFullContent(next: string) {
 }
 
 function settleSegment(segmentId: number) {
-  segments.value = segments.value.map(segment => segment.id === segmentId
-    ? { ...segment, fading: false }
-    : segment)
+  if (!segments.value.some(segment => segment.id === segmentId && segment.fading))
+    return
+  segments.value = settleAndMergeSegments(segments.value, segmentId)
 }
 
 function settleFadingSegments() {
   if (!segments.value.some(segment => segment.fading))
     return
-  segments.value = segments.value.map(segment => segment.fading
-    ? { ...segment, fading: false }
-    : segment)
+  segments.value = settleAndMergeSegments(segments.value)
 }
 
 function streamedDeltaClass(segment: StreamSegment) {

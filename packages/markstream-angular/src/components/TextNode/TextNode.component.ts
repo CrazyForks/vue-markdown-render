@@ -10,6 +10,25 @@ interface StreamSegment {
   fading: boolean
 }
 
+function settleAndMergeSegments(segments: StreamSegment[], segmentId?: number) {
+  return segments.reduce<StreamSegment[]>((result, segment) => {
+    const nextSegment = segmentId == null || segment.id === segmentId
+      ? { ...segment, fading: false }
+      : segment
+    const previousSegment = result[result.length - 1]
+    if (previousSegment && !previousSegment.fading && !nextSegment.fading) {
+      result[result.length - 1] = {
+        ...previousSegment,
+        content: previousSegment.content + nextSegment.content,
+      }
+    }
+    else {
+      result.push(nextSegment)
+    }
+    return result
+  }, [])
+}
+
 @Component({
   selector: 'markstream-angular-text-node',
   standalone: true,
@@ -86,7 +105,7 @@ export class TextNodeComponent implements OnChanges {
 
     if (previousText && nextText.startsWith(previousText)) {
       const appendedText = nextText.slice(previousText.length)
-      const lastSegment = this.segments.at(-1)
+      const lastSegment = this.segments[this.segments.length - 1]
       if (resumeFromPersistedText) {
         this.segments = [
           { id: this.nextSegmentId++, content: previousText, fading: false },
@@ -155,9 +174,9 @@ export class TextNodeComponent implements OnChanges {
   }
 
   settleSegment(segmentId: number) {
-    this.segments = this.segments.map(segment => segment.id === segmentId
-      ? { ...segment, fading: false }
-      : segment)
+    if (!this.segments.some(segment => segment.id === segmentId && segment.fading))
+      return
+    this.segments = settleAndMergeSegments(this.segments, segmentId)
   }
 
   private setFullText(content: string) {
@@ -169,8 +188,6 @@ export class TextNodeComponent implements OnChanges {
   }
 
   private settleFadingSegments() {
-    this.segments = this.segments.map(segment => segment.fading
-      ? { ...segment, fading: false }
-      : segment)
+    this.segments = settleAndMergeSegments(this.segments)
   }
 }

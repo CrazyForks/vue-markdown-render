@@ -9,6 +9,25 @@ interface StreamSegment {
   fading: boolean
 }
 
+function settleAndMergeSegments(segments: StreamSegment[], segmentId?: number) {
+  return segments.reduce<StreamSegment[]>((result, segment) => {
+    const nextSegment = segmentId == null || segment.id === segmentId
+      ? { ...segment, fading: false }
+      : segment
+    const previousSegment = result[result.length - 1]
+    if (previousSegment && !previousSegment.fading && !nextSegment.fading) {
+      result[result.length - 1] = {
+        ...previousSegment,
+        content: previousSegment.content + nextSegment.content,
+      }
+    }
+    else {
+      result.push(nextSegment)
+    }
+    return result
+  }, [])
+}
+
 export function InlineCodeNode(props: NodeComponentProps<{ type: 'inline_code', code: string }>) {
   const { node, children, ctx, indexKey, fade } = props
   const content = String(node.code ?? '')
@@ -68,7 +87,7 @@ export function InlineCodeNode(props: NodeComponentProps<{ type: 'inline_code', 
               { id: nextSegmentIdRef.current++, content: appendedContent, fading: true },
             ]
           }
-          const lastSegment = current.at(-1)
+          const lastSegment = current[current.length - 1]
           if (lastSegment?.fading) {
             return [
               ...current.slice(0, -1),
@@ -89,7 +108,7 @@ export function InlineCodeNode(props: NodeComponentProps<{ type: 'inline_code', 
     }
     else if (streamRenderVersionChanged) {
       setSegments(current => current.some(segment => segment.fading)
-        ? current.map(segment => segment.fading ? { ...segment, fading: false } : segment)
+        ? settleAndMergeSegments(current)
         : current)
     }
 
@@ -100,9 +119,9 @@ export function InlineCodeNode(props: NodeComponentProps<{ type: 'inline_code', 
   }, [children, content, streamStateRef, ctx?.textStreamState, ctx?.streamRenderVersion, streamStateKey, fadeEnabled])
 
   const settleSegment = (segmentId: number) => {
-    setSegments(current => current.map(segment => segment.id === segmentId
-      ? { ...segment, fading: false }
-      : segment))
+    setSegments(current => current.some(segment => segment.id === segmentId && segment.fading)
+      ? settleAndMergeSegments(current, segmentId)
+      : current)
   }
 
   return (

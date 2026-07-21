@@ -10,6 +10,25 @@ interface StreamSegment {
   fading: boolean
 }
 
+function settleAndMergeSegments(segments: StreamSegment[], segmentId: number) {
+  return segments.reduce<StreamSegment[]>((result, segment) => {
+    const nextSegment = segment.id === segmentId
+      ? { ...segment, fading: false }
+      : segment
+    const previousSegment = result[result.length - 1]
+    if (previousSegment && !previousSegment.fading && !nextSegment.fading) {
+      result[result.length - 1] = {
+        ...previousSegment,
+        content: previousSegment.content + nextSegment.content,
+      }
+    }
+    else {
+      result.push(nextSegment)
+    }
+    return result
+  }, [])
+}
+
 @Component({
   selector: 'markstream-angular-inline-code-node',
   standalone: true,
@@ -53,7 +72,7 @@ export class InlineCodeNodeComponent implements OnChanges {
     else if (nextCode !== previousCode) {
       if (previousCode && nextCode.startsWith(previousCode)) {
         const appendedCode = nextCode.slice(previousCode.length)
-        const lastSegment = this.segments.at(-1)
+        const lastSegment = this.segments[this.segments.length - 1]
         if (resumeFromPersistedCode) {
           this.segments = [
             { id: this.nextSegmentId++, content: previousCode, fading: false },
@@ -118,9 +137,9 @@ export class InlineCodeNodeComponent implements OnChanges {
   }
 
   settleSegment(segmentId: number) {
-    this.segments = this.segments.map(segment => segment.id === segmentId
-      ? { ...segment, fading: false }
-      : segment)
+    if (!this.segments.some(segment => segment.id === segmentId && segment.fading))
+      return
+    this.segments = settleAndMergeSegments(this.segments, segmentId)
   }
 
   private setFullCode(content: string) {
