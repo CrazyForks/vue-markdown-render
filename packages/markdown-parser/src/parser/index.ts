@@ -28,6 +28,44 @@ type ParsedNodeWithFields = ParsedNode & {
 }
 
 const streamParseEnvCache = new WeakMap<object, Map<string, Record<string, unknown>>>()
+const internalNodeSourceRanges = new WeakMap<object, { start: number, end: number }>()
+const sourceLineOffsetsCache = new WeakMap<object, number[]>()
+const siblingHtmlChildrenCache = new WeakMap<object, {
+  blocks: string[]
+  children: ParsedNode[][]
+  customHtmlTags: string
+  final: boolean
+  requireClosingStrong: boolean | undefined
+  validateLink: ParseOptions['validateLink']
+}>()
+
+function recordInternalNodeSourceRange(node: ParsedNode, token: MarkdownToken | undefined, options?: ParseOptions) {
+  const map = token?.map
+  const internalOptions = options as InternalParseOptions | undefined
+  const source = internalOptions?.__sourceMarkdown
+  if (!Array.isArray(map) || map.length < 2 || typeof source !== 'string' || !options)
+    return
+
+  const startLine = Number(map[0])
+  const endLine = Number(map[1])
+  if (!Number.isFinite(startLine) || !Number.isFinite(endLine))
+    return
+
+  let offsets = sourceLineOffsetsCache.get(options)
+  if (!offsets) {
+    offsets = [0]
+    for (let i = 0; i < source.length; i++) {
+      if (source[i] === '\n')
+        offsets.push(i + 1)
+    }
+    sourceLineOffsetsCache.set(options, offsets)
+  }
+
+  internalNodeSourceRanges.set(node, {
+    start: offsets[Math.max(0, Math.trunc(startLine))] ?? source.length,
+    end: offsets[Math.max(0, Math.trunc(endLine))] ?? source.length,
+  })
+}
 
 interface ExplicitBracketMathContext {
   fenceChar: '`' | '~' | ''
@@ -1772,24 +1810,107 @@ function isCloseOnlyHtmlBlockForTag(node: ParsedNode, tag: string) {
   return new RegExp(String.raw`^\s*<\s*\/\s*${escapeTagForRegExp(tag)}\s*>\s*$`, 'i').test(raw)
 }
 
+const RAW_TEXT_HTML_TAGS = new Set(['iframe', 'script', 'style', 'textarea', 'title'])
+
 function findNextHtmlBlockFromSource(source: string, tag: string, startIndex: number) {
   if (!source || !tag)
     return null
 
   const lowerTag = tag.toLowerCase()
-  const openRe = new RegExp(String.raw`<\s*${escapeTagForRegExp(lowerTag)}(?=\s|>|/)`, 'gi')
-  openRe.lastIndex = Math.max(0, startIndex)
-  const openMatch = openRe.exec(source)
-  if (!openMatch || openMatch.index == null)
+  const readMarkup = (start: number) => {
+    if (source.startsWith('<!--', start)) {
+      const commentEnd = source.indexOf('-->', start + 4)
+      return {
+        closing: false,
+        end: commentEnd === -1 ? source.length : commentEnd + 3,
+        selfClosing: false,
+        tag: '',
+      }
+    }
+
+    if (source.startsWith('<![CDATA[', start)) {
+      const cdataEnd = source.indexOf(']]>', start + 9)
+      return {
+        closing: false,
+        end: cdataEnd === -1 ? source.length : cdataEnd + 3,
+        selfClosing: false,
+        tag: '',
+      }
+    }
+
+    const endRel = findTagCloseIndexOutsideQuotes(source.slice(start))
+    if (endRel === -1)
+      return null
+
+    const end = start + endRel + 1
+    const raw = source.slice(start, end)
+    if (/^<\s*[!?]/.test(raw)) {
+      return {
+        closing: false,
+        end,
+        selfClosing: false,
+        tag: '',
+      }
+    }
+
+    let body = raw.slice(1).trimStart()
+    const closing = body.startsWith('/')
+    if (closing)
+      body = body.slice(1).trimStart()
+    const tagMatch = body.match(/^([A-Z][\w:-]*)/i)
+    if (!tagMatch?.[1]) {
+      return {
+        closing: false,
+        end: start + 1,
+        selfClosing: false,
+        tag: '',
+      }
+    }
+
+    return {
+      closing,
+      end,
+      selfClosing: /\/\s*>$/.test(raw),
+      tag: tagMatch[1].toLowerCase(),
+    }
+  }
+
+  const findRawTextClose = (rawTextTag: string, from: number) => {
+    const closeRe = new RegExp(String.raw`<\s*\/\s*${escapeTagForRegExp(rawTextTag)}(?=\s|>)`, 'gi')
+    closeRe.lastIndex = from
+    const match = closeRe.exec(source)
+    if (!match || match.index == null)
+      return null
+    const markup = readMarkup(match.index)
+    return markup ? { start: match.index, end: markup.end } : null
+  }
+
+  let start = -1
+  let openEnd = -1
+  let searchIndex = Math.max(0, startIndex)
+  while (searchIndex < source.length) {
+    const lt = source.indexOf('<', searchIndex)
+    if (lt === -1)
+      return null
+    const markup = readMarkup(lt)
+    if (!markup)
+      return null
+    if (!markup.closing && markup.tag === lowerTag) {
+      start = lt
+      openEnd = markup.end - 1
+      break
+    }
+    if (!markup.closing && RAW_TEXT_HTML_TAGS.has(markup.tag)) {
+      const close = findRawTextClose(markup.tag, markup.end)
+      searchIndex = close?.end ?? source.length
+      continue
+    }
+    searchIndex = markup.end
+  }
+
+  if (start === -1 || openEnd === -1)
     return null
 
-  const start = openMatch.index
-  const openSlice = source.slice(start)
-  const openEndRel = findTagCloseIndexOutsideQuotes(openSlice)
-  if (openEndRel === -1)
-    return null
-
-  const openEnd = start + openEndRel
   const openTag = source.slice(start, openEnd + 1)
   if (VOID_HTML_TAGS.has(lowerTag) || /\/\s*>$/.test(openTag)) {
     return {
@@ -1800,17 +1921,27 @@ function findNextHtmlBlockFromSource(source: string, tag: string, startIndex: nu
     }
   }
 
+  if (RAW_TEXT_HTML_TAGS.has(lowerTag)) {
+    const close = findRawTextClose(lowerTag, openEnd + 1)
+    if (!close) {
+      return {
+        raw: source.slice(start),
+        start,
+        end: source.length,
+        closed: false,
+      }
+    }
+    return {
+      raw: source.slice(start, close.end),
+      start,
+      end: close.end,
+      closeStart: close.start,
+      closed: true,
+    }
+  }
+
   let depth = 1
   let index = openEnd + 1
-
-  const isOpenAt = (pos: number) => {
-    const slice = source.slice(pos)
-    return new RegExp(String.raw`^<\s*${escapeTagForRegExp(lowerTag)}(?=\s|>|/)`, 'i').test(slice)
-  }
-  const isCloseAt = (pos: number) => {
-    const slice = source.slice(pos)
-    return new RegExp(String.raw`^<\s*\/\s*${escapeTagForRegExp(lowerTag)}(?=\s|>)`, 'i').test(slice)
-  }
 
   while (index < source.length) {
     const lt = source.indexOf('<', index)
@@ -1823,17 +1954,19 @@ function findNextHtmlBlockFromSource(source: string, tag: string, startIndex: nu
       }
     }
 
-    if (isCloseAt(lt)) {
-      const endRel = findTagCloseIndexOutsideQuotes(source.slice(lt))
-      if (endRel === -1)
-        return null
+    const markup = readMarkup(lt)
+    if (!markup)
+      return null
+
+    if (markup.closing && markup.tag === lowerTag) {
       depth--
-      const end = lt + endRel + 1
+      const end = markup.end
       if (depth === 0) {
         return {
           raw: source.slice(start, end),
           start,
           end,
+          closeStart: lt,
           closed: true,
         }
       }
@@ -1841,18 +1974,20 @@ function findNextHtmlBlockFromSource(source: string, tag: string, startIndex: nu
       continue
     }
 
-    if (isOpenAt(lt)) {
-      const endRel = findTagCloseIndexOutsideQuotes(source.slice(lt))
-      if (endRel === -1)
-        return null
-      const raw = source.slice(lt, lt + endRel + 1)
-      if (!/\/\s*>$/.test(raw))
+    if (!markup.closing && markup.tag === lowerTag) {
+      if (!markup.selfClosing && !VOID_HTML_TAGS.has(markup.tag))
         depth++
-      index = lt + endRel + 1
+      index = markup.end
       continue
     }
 
-    index = lt + 1
+    if (!markup.closing && RAW_TEXT_HTML_TAGS.has(markup.tag)) {
+      const close = findRawTextClose(markup.tag, markup.end)
+      index = close?.end ?? source.length
+      continue
+    }
+
+    index = markup.end
   }
 
   return {
@@ -2014,6 +2149,64 @@ function shouldStructureGenericHtmlBlockChildren(
   return Boolean(first && first.type === 'paragraph')
 }
 
+function splitSiblingHtmlBlockFragments(fragment: string) {
+  const blocks: string[] = []
+  let cursor = 0
+
+  while (cursor < fragment.length) {
+    while (/\s/.test(fragment[cursor] ?? ''))
+      cursor++
+    if (cursor >= fragment.length)
+      break
+
+    const tagMatch = fragment.slice(cursor).match(/^<([A-Z][\w:-]*)/i)
+    if (!tagMatch?.[1])
+      return null
+
+    const exact = findNextHtmlBlockFromSource(fragment, tagMatch[1], cursor)
+    if (!exact || exact.start !== cursor)
+      return null
+
+    blocks.push(exact.raw)
+    cursor = exact.end
+  }
+
+  return blocks.length > 1 ? blocks : null
+}
+
+function parseSiblingHtmlBlockChildren(
+  blocks: string[],
+  md: MarkdownIt,
+  options: ParseOptions,
+  final: boolean,
+) {
+  const customHtmlTags = options.customHtmlTags?.join('\0') ?? ''
+  const cacheOwner = md as unknown as object
+  const previous = siblingHtmlChildrenCache.get(cacheOwner)
+  const canReuse = previous
+    && previous.final === final
+    && previous.customHtmlTags === customHtmlTags
+    && previous.requireClosingStrong === options.requireClosingStrong
+    && previous.validateLink === options.validateLink
+
+  const children = blocks.map((block, index) => {
+    if (canReuse && previous.blocks[index] === block)
+      return previous.children[index]
+    return parseDetailsFragmentChildren(block, md, options)
+  })
+
+  siblingHtmlChildrenCache.set(cacheOwner, {
+    blocks,
+    children,
+    customHtmlTags,
+    final,
+    requireClosingStrong: options.requireClosingStrong,
+    validateLink: options.validateLink,
+  })
+
+  return children.flat()
+}
+
 function structureGenericHtmlBlockChildren(
   nodes: ParsedNode[],
   md: MarkdownIt,
@@ -2037,8 +2230,9 @@ function structureGenericHtmlBlockChildren(
     if (openEnd === -1)
       return node
 
-    const closeStart = findLastClosingTagStart(raw, tag)
-    const hasClose = closeStart !== -1 && closeStart >= openEnd + 1
+    const exact = findNextHtmlBlockFromSource(raw, tag, 0)
+    const closeStart = exact?.closeStart ?? -1
+    const hasClose = exact?.closed === true && closeStart >= openEnd + 1
     const innerRaw = hasClose
       ? raw.slice(openEnd + 1, closeStart)
       : raw.slice(openEnd + 1)
@@ -2046,7 +2240,11 @@ function structureGenericHtmlBlockChildren(
     if (!innerRaw.trim())
       return node
 
-    const children = parseDetailsFragmentChildren(innerRaw, md, buildDetailsChildParseOptions(options, final))
+    const childOptions = buildDetailsChildParseOptions(options, final)
+    const siblingHtmlBlocks = hasClose ? null : splitSiblingHtmlBlockFragments(innerRaw)
+    const children = siblingHtmlBlocks
+      ? parseSiblingHtmlBlockChildren(siblingHtmlBlocks, md, childOptions, final)
+      : parseDetailsFragmentChildren(innerRaw, md, childOptions)
     if (!shouldStructureGenericHtmlBlockChildren(innerRaw, children))
       return node
 
@@ -2350,8 +2548,14 @@ function mergeSplitTopLevelHtmlBlocks(nodes: ParsedNode[], final: boolean, sourc
       if (nextPos === -1) {
         if (canFindNodeRawAfterSourceIndex(source, exact.end, nextRaw))
           break
-        merged.splice(j, 1)
-        continue
+        const range = internalNodeSourceRanges.get(merged[j])
+        if (!range)
+          break
+        if (range.start >= exact.start && range.end <= exact.end) {
+          merged.splice(j, 1)
+          continue
+        }
+        break
       }
       tailCursor = nextPos + nextRaw.length
       merged.splice(j, 1)
@@ -3888,6 +4092,7 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
   while (i < tokens.length) {
     const handled = parseCommonBlockToken(tokens, i, linkifyContext.options(), containerTokenHandlers)
     if (handled) {
+      recordInternalNodeSourceRange(handled[0], tokens[i], options)
       result.push(handled[0])
       linkifyContext.remember(handled[0].raw)
       i = handled[1]
@@ -3906,9 +4111,12 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
         if (promoted) {
           if (includeSourceMap)
             inheritSourceMap(promoted, paragraphNode)
+          for (const node of promoted)
+            recordInternalNodeSourceRange(node, token, options)
           result.push(...promoted)
         }
         else {
+          recordInternalNodeSourceRange(paragraphNode, token, options)
           result.push(paragraphNode)
         }
         linkifyContext.remember(paragraphNode.raw)
@@ -3921,6 +4129,7 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
         const [listNode, newIndex] = parseList(tokens, i, linkifyContext.options())
         if (includeSourceMap)
           applyNodeSourceMap(listNode, token, options)
+        recordInternalNodeSourceRange(listNode, token, options)
         result.push(listNode)
         linkifyContext.remember(listNode.raw)
         i = newIndex
@@ -3931,6 +4140,7 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
         const [blockquoteNode, newIndex] = parseBlockquote(tokens, i, linkifyContext.options())
         if (includeSourceMap)
           applyNodeSourceMap(blockquoteNode, token, options)
+        recordInternalNodeSourceRange(blockquoteNode, token, options)
         result.push(blockquoteNode)
         linkifyContext.remember(blockquoteNode.raw)
         i = newIndex
@@ -3947,6 +4157,7 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
         } as ParsedNode
         if (includeSourceMap)
           applyNodeSourceMap(footnoteAnchorNode, token, options)
+        recordInternalNodeSourceRange(footnoteAnchorNode, token, options)
         result.push(footnoteAnchorNode)
         linkifyContext.remember(String(token.content ?? ''))
 
@@ -3974,6 +4185,7 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
         } as ParsedNode
         if (includeSourceMap)
           applyNodeSourceMap(paragraphNode, token, options)
+        recordInternalNodeSourceRange(paragraphNode, token, options)
         result.push(paragraphNode)
         linkifyContext.remember(content)
         i++
@@ -4002,6 +4214,8 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
               for (const node of parsed)
                 applyNodeSourceMap(node, token, options)
             }
+            for (const node of parsed)
+              recordInternalNodeSourceRange(node, token, options)
             result.push(...parsed)
           }
           else {
@@ -4016,9 +4230,12 @@ export function processTokens(tokens: MarkdownToken[], options?: ParseOptions): 
             if (promoted) {
               if (includeSourceMap)
                 inheritSourceMap(promoted, paragraphNode)
+              for (const node of promoted)
+                recordInternalNodeSourceRange(node, token, options)
               result.push(...promoted)
             }
             else {
+              recordInternalNodeSourceRange(paragraphNode, token, options)
               result.push(paragraphNode)
             }
           }
