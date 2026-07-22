@@ -1,6 +1,56 @@
 import { describe, expect, it } from 'vitest'
 import { getMarkdown, parseMarkdownToStructure } from '../src'
 
+const issue588Markdown = `# Metrics
+
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+
+<div>
+
+## Left
+
+**Scope:** left scope
+**Period:** left period
+
+</div>
+
+<div>
+
+## Right
+
+**Scope:** right scope
+**Period:** right period
+
+</div>
+
+</div>`
+
+function textContent(node: any): string {
+  if (Array.isArray(node))
+    return node.map(textContent).join(' ')
+  if (!node || typeof node !== 'object')
+    return ''
+
+  const own = node.type === 'text' ? String(node.content ?? '') : ''
+  const children = Array.isArray(node.children) ? node.children.map(textContent).join(' ') : ''
+  const items = Array.isArray(node.items) ? node.items.map(textContent).join(' ') : ''
+  return `${own} ${children} ${items}`.trim()
+}
+
+function expectIssue588Structure(nodes: any[]) {
+  expect(nodes.map(node => node?.type)).toEqual(['heading', 'html_block'])
+
+  const outer = nodes[1]
+  expect(outer?.tag).toBe('div')
+  expect(outer?.children?.map((child: any) => `${child?.type}:${child?.tag}`)).toEqual([
+    'html_block:div',
+    'html_block:div',
+  ])
+  expect(textContent(outer.children[0])).toContain('Left')
+  expect(textContent(outer.children[1])).toContain('Right')
+  expect(textContent(nodes).match(/Right/g)).toHaveLength(1)
+}
+
 describe('issue 380 html wrapper markdown regression', () => {
   it('keeps markdown nested in a span wrapper as structured children without leaking duplicate top-level nodes', () => {
     const markdown = `<span style="font-size: 12px;">  
@@ -159,5 +209,99 @@ describe('issue 380 html wrapper markdown regression', () => {
     expect(nodes[0]?.loading).toBe(true)
     expect(nodes[0]?.children?.map((child: any) => child?.type)).toEqual(['list'])
     expect(nodes[0]?.children?.[0]?.items).toHaveLength(2)
+  })
+
+  it.each([true, false])('keeps both issue 588 sibling div blocks when final is %s', (final) => {
+    const md = getMarkdown(`issue-588-div-${final}`)
+    const nodes = parseMarkdownToStructure(issue588Markdown, md, { final }) as any[]
+
+    expectIssue588Structure(nodes)
+  })
+
+  it('keeps sibling section blocks inside an html wrapper', () => {
+    const markdown = issue588Markdown.replaceAll('<div>', '<section>').replaceAll('</div>', '</section>')
+    const md = getMarkdown('issue-588-section')
+    const nodes = parseMarkdownToStructure(markdown, md, { final: true }) as any[]
+
+    expect(nodes.map(node => node?.type)).toEqual(['heading', 'html_block'])
+    expect(nodes[1]?.children?.map((child: any) => `${child?.type}:${child?.tag}`)).toEqual([
+      'html_block:section',
+      'html_block:section',
+    ])
+    expect(textContent(nodes[1]?.children?.[0])).toContain('Left')
+    expect(textContent(nodes[1]?.children?.[1])).toContain('Right')
+    expect(textContent(nodes).match(/Right/g)).toHaveLength(1)
+  })
+
+  it('does not lose the second sibling while its html block streams in', () => {
+    const rightOpen = issue588Markdown.indexOf('<div>', issue588Markdown.indexOf('<div>') + 1) + '<div>'.length
+    const rightHeading = issue588Markdown.indexOf('## Right') + '## Right\n\n'.length
+    const rightClose = issue588Markdown.indexOf('</div>', rightHeading) + '</div>'.length
+    const states = [rightOpen, rightHeading, rightClose, issue588Markdown.length]
+    const md = getMarkdown('issue-588-streaming-states')
+
+    for (const [index, end] of states.entries()) {
+      const nodes = parseMarkdownToStructure(issue588Markdown.slice(0, end), md, { final: false }) as any[]
+      expect(nodes.map(node => node?.type)).toEqual(['heading', 'html_block'])
+      expect(nodes[1]?.children?.filter((child: any) => child?.type === 'html_block'), `stream state ${index}`).toHaveLength(2)
+      if (index > 0)
+        expect(textContent(nodes)).toContain('Right')
+    }
+  })
+
+  it.each([
+    ['comment', '<!-- example <div> -->'],
+    ['raw text', '<script>const sample = "<div>"</script>'],
+    ['iframe text', '<iframe>example <div></iframe>'],
+    ['quoted attribute', '<span data-example="<div>">value</span>'],
+  ])('ignores same-tag text inside %s while matching a streaming wrapper close', (name, inner) => {
+    const markdown = `<div>
+${inner}
+
+## After
+
+</div>`
+    const md = getMarkdown(`issue-588-literal-${name}`)
+    const nodes = parseMarkdownToStructure(markdown, md, { final: false }) as any[]
+
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0]?.tag).toBe('div')
+    expect(nodes[0]?.loading).toBe(false)
+    expect(nodes[0]?.raw).toBe(markdown)
+    expect(nodes[0]?.content).toBe(markdown)
+    expect(textContent(nodes)).toContain('After')
+    expect(nodes[0]?.children?.some((child: any) => /^\s*<\/div>\s*$/.test(String(child?.raw ?? '')))).toBe(false)
+  })
+
+  it('keeps three levels of mixed html wrappers structured', () => {
+    const markdown = `<div>
+<section>
+<article>
+
+### Deep
+
+</article>
+</section>
+</div>`
+    const md = getMarkdown('issue-588-deep-mixed')
+    const nodes = parseMarkdownToStructure(markdown, md, { final: false }) as any[]
+
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0]?.tag).toBe('div')
+    expect(nodes[0]?.children?.[0]?.tag).toBe('section')
+    expect(nodes[0]?.children?.[0]?.children?.[0]?.tag).toBe('article')
+    expect(textContent(nodes)).toContain('Deep')
+  })
+
+  it('keeps sibling content when a streaming parse transitions to final', () => {
+    const md = getMarkdown('issue-588-streaming-final-transition')
+    const rightHeading = issue588Markdown.indexOf('## Right') + '## Right\n\n'.length
+
+    const partial = parseMarkdownToStructure(issue588Markdown.slice(0, rightHeading), md, { final: false }) as any[]
+    expect(textContent(partial)).toContain('Right')
+
+    const finalNodes = parseMarkdownToStructure(issue588Markdown, md, { final: true }) as any[]
+    expectIssue588Structure(finalNodes)
+    expect(finalNodes[1]?.loading).toBe(false)
   })
 })
