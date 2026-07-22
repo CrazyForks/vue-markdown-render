@@ -52,6 +52,20 @@ interface CoreStateLike {
   tokens?: Token[]
 }
 
+interface InlineRuleRecord {
+  name: string
+  fn: (...args: any[]) => unknown
+}
+
+interface InlineRulerWithNamedRules {
+  at: (ruleName: string, fn: (...args: any[]) => unknown) => void
+  getNamedRules?: () => InlineRuleRecord[]
+}
+
+interface InlineStateLike {
+  md?: MarkdownItInstance & { validateLink: (url: string) => boolean }
+}
+
 function inlineTokenMayNeedLinkify(token: Token, linkify: LinkifyLike) {
   if (token?.type !== 'inline')
     return false
@@ -115,6 +129,55 @@ function applyLinkifyCandidateFilter(md: MarkdownItInstance) {
   })
 }
 
+function applyInlineUrlValidation(md: MarkdownItInstance) {
+  const ruler = md.inline.ruler as InlineRulerWithNamedRules
+  const rules = ruler.getNamedRules?.()
+  const originalLink = rules?.find(rule => rule.name === 'link')?.fn
+  const originalImage = rules?.find(rule => rule.name === 'image')?.fn
+  if (typeof originalLink !== 'function' || typeof originalImage !== 'function')
+    return
+
+  const markdownIt = md as MarkdownItInstance & { validateLink: (url: string) => boolean }
+  const imageValidateLink = markdownIt.validateLink
+  const markstreamMd = md as MarkdownItInstance & { __markstreamOriginalValidateLink?: (url: string) => boolean }
+  markstreamMd.__markstreamOriginalValidateLink = imageValidateLink
+
+  ruler.at('link', (...args: any[]) => {
+    const state = args[0] as InlineStateLike
+    const activeMd = state.md
+    const validateLink = activeMd?.validateLink === imageValidateLink
+      ? activeMd.options?.validateLink
+      : activeMd?.validateLink
+    if (!activeMd || typeof validateLink !== 'function')
+      return originalLink(...args)
+
+    const originalValidateLink = activeMd.validateLink
+    activeMd.validateLink = validateLink
+    try {
+      return originalLink(...args)
+    }
+    finally {
+      activeMd.validateLink = originalValidateLink
+    }
+  })
+
+  ruler.at('image', (...args: any[]) => {
+    const state = args[0] as InlineStateLike
+    const activeMd = state.md
+    if (!activeMd)
+      return originalImage(...args)
+
+    const originalValidateLink = activeMd.validateLink
+    activeMd.validateLink = imageValidateLink
+    try {
+      return originalImage(...args)
+    }
+    finally {
+      activeMd.validateLink = originalValidateLink
+    }
+  })
+}
+
 export function factory(opts: FactoryOptions = {}): MarkdownItInstance {
   const markdownItOptions = opts.markdownItOptions ?? {}
   const experimental = typeof markdownItOptions.experimental === 'object' && markdownItOptions.experimental !== null
@@ -138,6 +201,8 @@ export function factory(opts: FactoryOptions = {}): MarkdownItInstance {
 
   if (!hasCustomValidateLink)
     md.set({ validateLink: (url: string) => !isUnsafeHtmlUrl(url, { tagName: 'a', attrName: 'href' }) })
+
+  applyInlineUrlValidation(md)
 
   applyLinkifyCandidateFilter(md)
 
