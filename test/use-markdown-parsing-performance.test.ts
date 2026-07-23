@@ -1257,6 +1257,68 @@ describe('useMarkdownParsing performance behavior', () => {
     scope.stop()
   })
 
+  it('scans only the appended delta after priming global reference detection', () => {
+    const content = ref(buildParagraphs(20))
+    const logPerf = vi.fn()
+    const { scope, state } = createParsingState(content, ref(false), {}, ref(true), logPerf)
+
+    content.value += '\n\nFirst appended paragraph.'
+    expect(state.parsedNodes.value).toHaveLength(21)
+
+    content.value += '\n\nSecond appended paragraph.'
+    expect(state.parsedNodes.value).toHaveLength(22)
+
+    logPerf.mockClear()
+    const appended = '\n\nThird appended paragraph.'
+    content.value += appended
+    expect(state.parsedNodes.value).toHaveLength(23)
+
+    expect(logPerf.mock.calls.at(-1)?.[1]).toMatchObject({
+      dirtyStartIndex: 22,
+      stablePrefixNodeCount: 22,
+      referenceDefinitionScanChars: appended.length,
+    })
+
+    scope.stop()
+  })
+
+  it('does not let an old reference definition force every later append to rescan the prefix', () => {
+    const content = ref('[foo][bar] and [new][baz]\n\n[bar]: https://example.com\n\nstable tail')
+    const logPerf = vi.fn()
+    const { scope, state } = createParsingState(content, ref(false), {}, ref(true), logPerf)
+
+    expect(paragraphChildren(state.parsedNodes.value[0]).some(child => child.type === 'link')).toBe(true)
+
+    content.value += '\n\nFirst appended paragraph.'
+    expect(state.parsedNodes.value.at(-1)?.raw).toBe('First appended paragraph.')
+
+    content.value += '\n\nSecond appended paragraph.'
+    expect(state.parsedNodes.value.at(-1)?.raw).toBe('Second appended paragraph.')
+
+    logPerf.mockClear()
+    content.value += '\n\nThird appended paragraph.'
+    expect(state.parsedNodes.value.at(-1)?.raw).toBe('Third appended paragraph.')
+
+    expect(logPerf.mock.calls.at(-1)?.[1]).toMatchObject({
+      dirtyStartIndex: 4,
+      stablePrefixNodeCount: 4,
+    })
+
+    logPerf.mockClear()
+    content.value += '\n\n[baz]: https://example.com\n'
+    expect(state.parsedNodes.value.at(-1)?.raw).toBe('Third appended paragraph.')
+    const resolvedLinks = paragraphChildren(state.parsedNodes.value[0])
+      .filter(child => child.type === 'link') as Array<{ href?: string }>
+    expect(resolvedLinks).toHaveLength(2)
+    expect(resolvedLinks[1]?.href).toBe('https://example.com')
+    expect(logPerf.mock.calls.at(-1)?.[1]).toMatchObject({
+      dirtyStartIndex: 0,
+      stablePrefixNodeCount: 0,
+    })
+
+    scope.stop()
+  })
+
   it('does not skip prefix scans when appended reference definitions can affect earlier nodes', () => {
     const content = ref('[foo][bar]\n\nstable tail')
     const logPerf = vi.fn()
@@ -1280,6 +1342,99 @@ describe('useMarkdownParsing performance behavior', () => {
       stablePrefixNodeCount: 0,
     })
 
+    scope.stop()
+  })
+
+  it('tracks reference labels and separators across append boundaries', () => {
+    for (const chunks of [
+      ['[bar', ']', ': https://example.com\n'],
+      ['[foo\\', ']bar]', ': https://example.com\n'],
+    ]) {
+      const reference = chunks[0].startsWith('[bar') ? 'bar' : 'foo\\]bar'
+      const content = ref(`[x][${reference}]\n\nstable tail\n\n`)
+      const logPerf = vi.fn()
+      const { scope, state } = createParsingState(content, ref(false), {
+        parseOptions: { streamParse: false },
+      }, ref(true), logPerf)
+      const firstParagraph = state.parsedNodes.value[0]
+
+      for (const chunk of chunks) {
+        content.value += chunk
+        void state.parsedNodes.value
+      }
+
+      expect(state.parsedNodes.value[0]).not.toBe(firstParagraph)
+      expect(paragraphChildren(state.parsedNodes.value[0]).some(child => child.type === 'link')).toBe(true)
+      expect(logPerf.mock.calls.at(-1)?.[1]).toMatchObject({
+        dirtyStartIndex: 0,
+        stablePrefixNodeCount: 0,
+      })
+      scope.stop()
+    }
+  })
+
+  it('tracks CRLF reference states across append boundaries', () => {
+    const scenarios = [
+      {
+        initial: '[x][foo bar]\r\nstable tail\r\n\r\n',
+        chunks: ['[foo\r', '\nbar]', ': https://example.com\r', '\n'],
+        href: 'https://example.com',
+      },
+      {
+        initial: '[x][bar]\r\nstable tail\r\n\r\n',
+        chunks: ['[bar]', ':', '\r', '\n https://example.com\r', '\n'],
+        href: 'https://example.com',
+      },
+    ]
+
+    for (const scenario of scenarios) {
+      const content = ref(scenario.initial)
+      const logPerf = vi.fn()
+      const { scope, state } = createParsingState(content, ref(false), {
+        parseOptions: { streamParse: false },
+      }, ref(true), logPerf)
+      const firstParagraph = state.parsedNodes.value[0]
+
+      for (const chunk of scenario.chunks) {
+        content.value += chunk
+        void state.parsedNodes.value
+      }
+
+      const link = paragraphChildren(state.parsedNodes.value[0])
+        .find(child => child.type === 'link') as { href?: string } | undefined
+      const performedFullPrefixScan = logPerf.mock.calls.some(([, data]) => (
+        data.dirtyStartIndex === 0 && data.stablePrefixNodeCount === 0
+      ))
+      expect(state.parsedNodes.value[0]).not.toBe(firstParagraph)
+      expect(link?.href).toBe(scenario.href)
+      expect(performedFullPrefixScan).toBe(true)
+      scope.stop()
+    }
+  })
+
+  it('clears pending reference state after a CRLF blank line', () => {
+    const content = ref(`${buildParagraphs(4)}\r\n\r\n[unused]: https://example.com\r`)
+    const logPerf = vi.fn()
+    const { scope, state } = createParsingState(content, ref(false), {
+      parseOptions: { streamParse: false },
+    }, ref(true), logPerf)
+
+    content.value += '\n\r'
+    void state.parsedNodes.value
+    content.value += '\n'
+    void state.parsedNodes.value
+    content.value += 'ordinary tail'
+    void state.parsedNodes.value
+
+    logPerf.mockClear()
+    const appended = ' continues'
+    content.value += appended
+    void state.parsedNodes.value
+
+    expect(logPerf.mock.calls.at(-1)?.[1]).toMatchObject({
+      referenceDefinitionScanChars: appended.length,
+    })
+    expect(logPerf.mock.calls.at(-1)?.[1]?.dirtyStartIndex).toBeGreaterThan(0)
     scope.stop()
   })
 
@@ -1374,13 +1529,13 @@ describe('useMarkdownParsing performance behavior', () => {
     }
   })
 
-  it('does not skip prefix scans when container reference definitions can affect earlier nodes', () => {
-    for (const definition of [
-      '> [bar]: https://example.com',
-      '- [bar]: https://example.com',
-      '1. [bar]: https://example.com',
+  it('does not skip prefix scans when chunked container reference definitions can affect earlier nodes', () => {
+    for (const chunks of [
+      ['\n\n> [bar', ']', ': https://example.com\n'],
+      ['\n\n- [bar', ']', ': https://example.com\n'],
+      ['\n\n1. [bar', ']', ': https://example.com\n'],
     ]) {
-      const content = ref('[foo][bar]\n\nstable tail')
+      const content = ref('[foo][bar]\n\nstable tail\n\nappend')
       const logPerf = vi.fn()
       const { scope, state } = createParsingState(content, ref(false), {
         parseOptions: {
@@ -1391,11 +1546,10 @@ describe('useMarkdownParsing performance behavior', () => {
       const firstParagraph = state.parsedNodes.value[0]
       expect(paragraphChildren(firstParagraph).some(child => child.type === 'link')).toBe(false)
 
-      content.value = `${content.value}\n\nappend`
-      expect(state.parsedNodes.value.at(-1)?.raw).toBe('append')
-
-      logPerf.mockClear()
-      content.value = `${content.value}\n\n${definition}\n`
+      for (const chunk of chunks) {
+        content.value += chunk
+        void state.parsedNodes.value
+      }
       const secondParagraph = state.parsedNodes.value[0]
       const data = logPerf.mock.calls.at(-1)?.[1]
 
@@ -1408,6 +1562,70 @@ describe('useMarkdownParsing performance behavior', () => {
 
       scope.stop()
     }
+  })
+
+  it('matches fresh parsing while reference definitions stream across scanner boundaries', () => {
+    const fixtures = [
+      {
+        initial: '[x][bar]\n\nstable tail\n\n',
+        chunks: ['[bar', ']', ': https://example.com\n'],
+      },
+      {
+        initial: '[x][bar]\r\n\r\nstable tail\r\n\r\n',
+        chunks: ['[bar]\r', '\n:', ' https://example.com\r', '\n'],
+      },
+      {
+        initial: String.raw`[x][foo\]bar]
+
+stable tail
+
+`,
+        chunks: ['[foo\\', ']bar]', ': https://example.com\n'],
+      },
+      {
+        initial: String.raw`[x][foo\\bar]
+
+stable tail
+
+`,
+        chunks: [String.raw`[foo\\`, 'bar]', ': https://example.com\n'],
+      },
+      {
+        initial: '[x][foo bar]\n\nstable tail\n\n',
+        chunks: ['[foo\n', 'bar]', ': https://example.com\n'],
+      },
+      {
+        initial: '[x][bar]\n\nstable tail\n\n',
+        chunks: ['[bar]:', ' https://example.com\n', '  "title"\n'],
+      },
+      {
+        initial: '[x][bar]\n\nstable tail',
+        chunks: ['\n\n> [bar', ']', ': https://example.com\n'],
+      },
+      {
+        initial: '[x][missing]\n\nstable tail\n\n',
+        chunks: ['[missing]', '\n', '\n', ': https://example.com\n'],
+      },
+    ]
+
+    fixtures.forEach((fixture, fixtureIndex) => {
+      const content = ref(fixture.initial)
+      const { scope, state } = createParsingState(content, ref(false), {
+        parseOptions: { streamParse: false },
+      })
+
+      fixture.chunks.forEach((chunk, chunkIndex) => {
+        content.value += chunk
+        const fresh = parseMarkdownToStructure(
+          content.value,
+          getMarkdown(`reference-differential-${fixtureIndex}-${chunkIndex}`),
+          { streamParse: false },
+        )
+        expect(state.parsedNodes.value).toEqual(fresh)
+      })
+
+      scope.stop()
+    })
   })
 
   it('does not skip prefix scans when final parsing can change earlier nodes', () => {

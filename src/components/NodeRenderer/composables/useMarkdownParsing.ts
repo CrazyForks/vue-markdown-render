@@ -67,6 +67,11 @@ interface ParsedNodeStabilizeOptions {
   scanStartIndex?: number
 }
 
+type GlobalReferenceScanner = (previous: string, next: string) => [
+  mayAffectGlobalReferences: boolean,
+  scannedChars: number,
+]
+
 interface StablePrefixReuseContext {
   content: string
   previousContent: string
@@ -74,6 +79,7 @@ interface StablePrefixReuseContext {
   parseOptions: RendererParseOptions
   customMarkdownIt: NodeRendererProps['customMarkdownIt']
   md: MarkdownIt
+  scanGlobalReferenceAppend: GlobalReferenceScanner
 }
 
 export interface MarkdownParsingOptions {
@@ -525,53 +531,104 @@ function getDirtyTailNodeCount(
     : Math.max(nextNodes.length, previousNodes.length) - dirtyStartIndex
 }
 
-function mayContainGlobalReferenceDefinition(value: string) {
-  let labelStartIndex = -1
+function createGlobalReferenceScanner(): GlobalReferenceScanner {
+  let content = ''
+  // 0: outside a label; 1: inside `[...]`; 2: after the closing `]`.
+  let phase: 0 | 1 | 2 = 0
+  let escaped = false
+  let pendingDefinition = false
+  let lineHasContent = false
+  let previousWasCarriageReturn = false
 
-  for (let index = 0; index < value.length; index++) {
-    const char = value.charCodeAt(index)
-
-    if (labelStartIndex < 0) {
-      if (char === 91)
-        labelStartIndex = index
-      continue
-    }
-
-    if (char === 92) {
-      index += 1
-      continue
-    }
-
-    if (char === 91) {
-      labelStartIndex = index
-      continue
-    }
-
-    if (char !== 93)
-      continue
-
-    let cursor = index + 1
-    while (cursor < value.length) {
-      const nextChar = value.charCodeAt(cursor)
-      if (nextChar !== 9 && nextChar !== 32)
-        break
-      cursor += 1
-    }
-
-    if (value.charCodeAt(cursor) === 58)
-      return true
-
-    labelStartIndex = -1
+  function reset() {
+    content = ''
+    phase = 0
+    escaped = false
+    pendingDefinition = false
+    lineHasContent = false
+    previousWasCarriageReturn = false
   }
 
-  return false
-}
+  function scan(value: string) {
+    let mayAffectGlobalReferences = false
 
-function appendMayDefineGlobalReferences(previous: string, next: string) {
-  if (!previous || !next.startsWith(previous) || next.length <= previous.length)
-    return false
+    for (let index = 0; index < value.length; index++) {
+      const char = value.charCodeAt(index)
 
-  return mayContainGlobalReferenceDefinition(next)
+      if (char === 10 || char === 13) {
+        const isCrLfContinuation = char === 10 && previousWasCarriageReturn
+        previousWasCarriageReturn = char === 13
+        escaped = false
+        if (!isCrLfContinuation) {
+          if (!lineHasContent) {
+            pendingDefinition = false
+            phase = 0
+          }
+          lineHasContent = false
+        }
+        continue
+      }
+
+      previousWasCarriageReturn = false
+      const whitespace = char === 9 || char === 32
+      if (!whitespace) {
+        lineHasContent = true
+        if (pendingDefinition)
+          mayAffectGlobalReferences = true
+      }
+
+      if (!phase) {
+        if (char === 91)
+          phase = 1
+        continue
+      }
+
+      if (phase === 1) {
+        if (escaped) {
+          escaped = false
+          continue
+        }
+        if (char === 92) {
+          escaped = true
+          continue
+        }
+        if (char === 93)
+          phase = 2
+        continue
+      }
+
+      if (whitespace)
+        continue
+      if (char === 58) {
+        mayAffectGlobalReferences = true
+        pendingDefinition = true
+        continue
+      }
+
+      phase = char === 91 ? 1 : 0
+    }
+
+    return mayAffectGlobalReferences
+  }
+
+  return (previous, next) => {
+    if (!previous || !next.startsWith(previous) || next.length <= previous.length) {
+      reset()
+      return [true, 0]
+    }
+
+    let scannedChars = 0
+    if (content !== previous) {
+      reset()
+      scan(previous)
+      scannedChars = previous.length
+    }
+
+    const appended = next.slice(previous.length)
+    const mayAffectGlobalReferences = scan(appended)
+    content = next
+    return [mayAffectGlobalReferences, scannedChars + appended.length]
+  }
 }
 
 function hasRegisteredMarkdownPlugins(md: MarkdownIt) {
@@ -584,30 +641,24 @@ function hasCustomParserExtensions(md: MarkdownIt) {
 }
 
 function getStablePrefixScanStartIndex(context: StablePrefixReuseContext) {
-  if (context.previousDirtyStartIndex <= 0)
-    return 0
-  if (!context.content.startsWith(context.previousContent) || context.content.length <= context.previousContent.length)
-    return 0
-  if (context.parseOptions.final === true)
-    return 0
-  if (context.customMarkdownIt)
-    return 0
-  if (hasCustomParserExtensions(context.md))
-    return 0
-  if (appendMayDefineGlobalReferences(context.previousContent, context.content))
-    return 0
-
+  const [mayAffectGlobalReferences, referenceDefinitionScanChars] = context.scanGlobalReferenceAppend(
+    context.previousContent,
+    context.content,
+  )
   const options = context.parseOptions
-  if (
-    typeof options.preTransformTokens === 'function'
-    || typeof options.postTransformTokens === 'function'
-    || typeof options.postTransformNodes === 'function'
-    || (options.customHtmlTags?.length ?? 0) > 0
-  ) {
-    return 0
-  }
+  const scanStartIndex = context.previousDirtyStartIndex > 0
+    && options.final !== true
+    && !context.customMarkdownIt
+    && !hasCustomParserExtensions(context.md)
+    && !mayAffectGlobalReferences
+    && typeof options.preTransformTokens !== 'function'
+    && typeof options.postTransformTokens !== 'function'
+    && typeof options.postTransformNodes !== 'function'
+    && (options.customHtmlTags?.length ?? 0) === 0
+    ? context.previousDirtyStartIndex
+    : 0
 
-  return context.previousDirtyStartIndex
+  return [scanStartIndex, referenceDefinitionScanChars] as const
 }
 
 function compareCheapStringIfSafe(previous: string, next: string) {
@@ -950,6 +1001,7 @@ export function useMarkdownParsing(
   let previousNodeReuseSemanticKey = ''
   let previousContent = ''
   let previousExternalNodeMutationBoundary = false
+  const scanGlobalReferenceAppend = createGlobalReferenceScanner()
   let parseCoalesceTimer: ReturnType<typeof setTimeout> | undefined
   let parseCommitCount = 0
   let parseCoalescedCount = 0
@@ -1215,19 +1267,22 @@ export function useMarkdownParsing(
     let stabilizeMs = 0
     let parsed: ParsedNode[]
     let primeStartIndex = 0
+    let referenceDefinitionScanChars = 0
 
     if (canReuseParsedNodes) {
       const stabilizeStart = collectPerformanceMetrics
         ? getNow()
         : 0
-      const scanStartIndex = getStablePrefixScanStartIndex({
+      const [scanStartIndex, scannedChars] = getStablePrefixScanStartIndex({
         content,
         previousContent,
         previousDirtyStartIndex: parsedNodesDirtyStartIndexValue,
         parseOptions: mergedParseOptions.value,
         customMarkdownIt: props.customMarkdownIt,
         md,
+        scanGlobalReferenceAppend,
       })
+      referenceDefinitionScanChars = scannedChars
       const reuseDirtyTail = scanStartIndex <= 0
       if (signatureTiming) {
         const result = stabilizeParsedNodesWithMetrics(nextParsed, previousParsedNodes, signatureTiming, {
@@ -1293,6 +1348,7 @@ export function useMarkdownParsing(
         parseCommitCount,
         parseCoalescedCount,
         nodeReuseMs,
+        referenceDefinitionScanChars,
         signatureMs: signatureTiming?.signatureMs ?? 0,
         stabilizeSignatureMs: signatureTiming?.stabilizeSignatureMs ?? 0,
         primeSignatureMs: signatureTiming?.primeSignatureMs ?? 0,

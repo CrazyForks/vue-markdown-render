@@ -4,7 +4,7 @@
 
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
+import { customRef, defineComponent, h, provide, ref } from 'vue'
 import InlineCodeNode from '../src/components/InlineCodeNode'
 import NodeRenderer from '../src/components/NodeRenderer'
 import TextNode from '../src/components/TextNode'
@@ -202,6 +202,47 @@ $$ where $\epsilon$ denotes the target accuracy, $n$ is the number of nodes, and
     }
   })
 
+  it.each([
+    ['text', TextNode, { type: 'text', content: 'stable', raw: 'stable' }],
+    ['inline code', InlineCodeNode, { type: 'inline_code', code: 'stable', raw: '`stable`' }],
+  ] as const)('does not subscribe a fade-enabled stable %s node to streamRenderVersion', async (_, component, node) => {
+    let version = 1
+    let versionReads = 0
+    const streamRenderVersion = customRef<number>((track, trigger) => ({
+      get() {
+        versionReads += 1
+        track()
+        return version
+      },
+      set(next) {
+        version = next
+        trigger()
+      },
+    }))
+    const wrapper = mount(component, {
+      props: { node } as any,
+      attrs: { fade: true },
+      global: {
+        provide: {
+          markstreamStreamVersion: streamRenderVersion,
+        },
+      },
+    })
+
+    try {
+      await flushAll()
+      versionReads = 0
+      streamRenderVersion.value = 2
+      await flushAll()
+
+      expect(versionReads).toBe(0)
+      expect(wrapper.text()).toBe('stable')
+    }
+    finally {
+      wrapper.unmount()
+    }
+  })
+
   it('preserves active TextNode delta until streamRenderVersion changes', async () => {
     const streamRenderVersion = ref(1)
     const textStreamState = new Map<string, string>()
@@ -298,5 +339,165 @@ $$ where $\epsilon$ denotes the target accuracy, $n$ is the number of nodes, and
     finally {
       wrapper.unmount()
     }
+  })
+
+  it('settles an active delta when fade is disabled and resumes on the next append', async () => {
+    const content = ref('Hello')
+    const fade = ref(true)
+    const streamRenderVersion = ref(1)
+    const textStreamState = new Map<string, string>()
+    const Host = defineComponent({
+      setup() {
+        return () => h(TextNode, {
+          node: { type: 'text', content: content.value, raw: content.value },
+          fade: fade.value,
+          indexKey: 'text-0',
+        })
+      },
+    })
+    const wrapper = mount(Host, {
+      global: {
+        provide: {
+          markstreamTextStreamState: textStreamState,
+          markstreamStreamVersion: streamRenderVersion,
+        },
+      },
+    })
+
+    try {
+      content.value = 'HelloWorld'
+      await flushAll()
+      expect(wrapper.get('.text-node-stream-delta').text()).toBe('World')
+
+      fade.value = false
+      await flushAll()
+      expect(wrapper.find('.text-node-stream-delta').exists()).toBe(false)
+      expect(wrapper.text()).toBe('HelloWorld')
+
+      fade.value = true
+      content.value = 'HelloWorldAgain'
+      await flushAll()
+      expect(wrapper.get('.text-node-stream-delta').text()).toBe('Again')
+    }
+    finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('preserves an active delta when the stream state key changes', async () => {
+    const content = ref('Hello')
+    const streamStateKey = ref('text-0')
+    const streamRenderVersion = ref(1)
+    const textStreamState = new Map<string, string>()
+    const Host = defineComponent({
+      setup() {
+        return () => h(TextNode, {
+          node: { type: 'text', content: content.value, raw: content.value },
+          indexKey: streamStateKey.value,
+        })
+      },
+    })
+    const wrapper = mount(Host, {
+      global: {
+        provide: {
+          markstreamTextStreamState: textStreamState,
+          markstreamStreamVersion: streamRenderVersion,
+        },
+      },
+    })
+
+    try {
+      content.value = 'HelloWorld'
+      await flushAll()
+      expect(wrapper.get('.text-node-stream-delta').text()).toBe('World')
+
+      streamStateKey.value = 'text-1'
+      await flushAll()
+      expect(wrapper.get('.text-node-stream-delta').text()).toBe('World')
+      expect(textStreamState.get('text-1')).toBe('HelloWorld')
+
+      streamRenderVersion.value += 1
+      await flushAll()
+      expect(wrapper.find('.text-node-stream-delta').exists()).toBe(false)
+      expect(wrapper.text()).toBe('HelloWorld')
+    }
+    finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('settles the previous delta before a same-tick version bump and content append', async () => {
+    const content = ref('Hello')
+    const streamRenderVersion = ref(1)
+    const textStreamState = new Map<string, string>()
+    const Host = defineComponent({
+      setup() {
+        provide('markstreamTextStreamState', textStreamState)
+        provide('markstreamStreamVersion', streamRenderVersion)
+        return () => h(TextNode, {
+          node: { type: 'text', content: content.value, raw: content.value },
+          indexKey: 'text-0',
+        })
+      },
+    })
+    const wrapper = mount(Host)
+
+    try {
+      content.value = 'HelloWorld'
+      await flushAll()
+      expect(wrapper.get('.text-node-stream-delta').text()).toBe('World')
+
+      content.value = 'HelloWorldAgain'
+      streamRenderVersion.value += 1
+      await flushAll()
+
+      expect(wrapper.get('.text-node-stream-delta').text()).toBe('Again')
+      expect(wrapper.text()).toBe('HelloWorldAgain')
+    }
+    finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('stops the active stream version watcher when unmounted', async () => {
+    let version = 1
+    let versionReads = 0
+    const streamRenderVersion = customRef<number>((track, trigger) => ({
+      get() {
+        versionReads += 1
+        track()
+        return version
+      },
+      set(next) {
+        version = next
+        trigger()
+      },
+    }))
+    const wrapper = mount(TextNode, {
+      props: {
+        node: { type: 'text', content: 'Hello', raw: 'Hello' },
+      },
+      attrs: {
+        'index-key': 'text-0',
+      },
+      global: {
+        provide: {
+          markstreamTextStreamState: new Map<string, string>(),
+          markstreamStreamVersion: streamRenderVersion,
+        },
+      },
+    })
+
+    await wrapper.setProps({
+      node: { type: 'text', content: 'HelloWorld', raw: 'HelloWorld' },
+    })
+    await flushAll()
+    expect(wrapper.get('.text-node-stream-delta').text()).toBe('World')
+
+    wrapper.unmount()
+    versionReads = 0
+    streamRenderVersion.value = 2
+    await flushAll()
+    expect(versionReads).toBe(0)
   })
 })
