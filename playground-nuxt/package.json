@@ -18,9 +18,9 @@
     "markstream-vue": "workspace:*",
     "mermaid": "^11.16.0",
     "monaco-editor": "^0.52.2",
-    "nuxt": "^4.4.8",
+    "nuxt": "^4.5.0",
     "stream-markdown": "latest",
     "stream-monaco": "latest",
-    "vue-i18n": "^11.4.6"
+    "vue-i18n": "^11.4.7"
   }
 }
