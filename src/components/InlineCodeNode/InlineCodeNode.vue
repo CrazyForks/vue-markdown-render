@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { resolveStreamingTextUpdate } from 'markstream-core'
-import { computed, inject, ref, useAttrs, watch } from 'vue'
+import { computed, inject, onScopeDispose, ref, useAttrs, watch } from 'vue'
 
 const props = defineProps<{
   node: {
@@ -39,45 +39,62 @@ const streamStateKey = computed(() => {
 })
 const settledCode = ref(props.node.code)
 const streamedDelta = ref('')
-let lastStreamVersion: number | undefined = inheritedStreamVersion?.value
 const streamFadeVersion = ref(0)
+let stopStreamVersionWatch: (() => void) | undefined
 
 function getRenderedContent() {
   return settledCode.value + streamedDelta.value
 }
 
-function setFullContent(next: string) {
-  settledCode.value = next
-  streamedDelta.value = ''
+function stopWatchingStreamVersion() {
+  stopStreamVersionWatch?.()
+  stopStreamVersionWatch = undefined
 }
 
 function settleStreamedDelta() {
+  stopWatchingStreamVersion()
   if (!streamedDelta.value)
     return
   settledCode.value = getRenderedContent()
   streamedDelta.value = ''
 }
 
+function watchStreamVersionWhileDeltaActive() {
+  if (!streamedDelta.value || stopStreamVersionWatch || !inheritedStreamVersion)
+    return
+
+  const activeVersion = inheritedStreamVersion.value
+  stopStreamVersionWatch = watch(
+    () => inheritedStreamVersion.value,
+    (version) => {
+      if (version !== activeVersion)
+        settleStreamedDelta()
+    },
+    { flush: 'sync' },
+  )
+}
+
 watch(
-  [() => props.node.code, streamStateKey, fadeEnabled, () => inheritedStreamVersion?.value],
-  ([next, _key, _fade, version]) => {
+  [() => props.node.code, streamStateKey, fadeEnabled],
+  ([next]) => {
     const normalized = String(next ?? '')
     const key = streamStateKey.value
-    const versionChanged = version !== lastStreamVersion
-    lastStreamVersion = version
-
     const result = resolveStreamingTextUpdate({
       nextContent: normalized,
       persistedContent: key ? inheritedTextStreamState?.get(key) : undefined,
       currentState: { settledContent: settledCode.value, streamedDelta: streamedDelta.value },
       typewriterEnabled: fadeEnabled.value,
-      streamRenderVersionChanged: versionChanged,
     })
 
     settledCode.value = result.settledContent
     streamedDelta.value = result.streamedDelta
-    if (result.appended)
+    if (result.appended) {
       streamFadeVersion.value += 1
+      watchStreamVersionWhileDeltaActive()
+    }
+    else if (!streamedDelta.value) {
+      stopWatchingStreamVersion()
+    }
 
     if (key)
       inheritedTextStreamState?.set(key, normalized)
@@ -85,14 +102,7 @@ watch(
   { immediate: true },
 )
 
-watch(
-  fadeEnabled,
-  (enabled) => {
-    if (enabled)
-      return
-    setFullContent(getRenderedContent())
-  },
-)
+onScopeDispose(stopWatchingStreamVersion)
 
 const streamedDeltaClass = computed(() => (
   streamFadeVersion.value % 2 === 0
